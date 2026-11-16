@@ -101,8 +101,12 @@ console errors. **Frame rate has not been measured on real hardware** (the CI co
 
 ## Version control
 
+Rollback points are published as **branches** on GitHub (and exist as tags in local clones made from this history):
+
 - `rollback/m0-scaffold`: empty scaffold before any game code
 - `milestone/m2-prototype`: this prototype
+
+To roll back, check out the branch: `git checkout rollback/m0-scaffold`.
 
 ## Screenshots
 

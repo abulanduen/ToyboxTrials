@@ -131,6 +131,8 @@ Do these before Milestone 3/4. Each answer changes the plan.
 
 ## 6. Version control / rollback
 
-- Repository initialised with tag **`rollback/m0-scaffold`** (empty scaffold, before any game code).
-- The Milestone 2 prototype is tagged **`milestone/m2-prototype`**.
-- To roll back: `git checkout rollback/m0-scaffold` (or `git reset --hard <tag>` on a branch).
+- Rollback point **`rollback/m0-scaffold`** (empty scaffold, before any game code).
+- Milestone 2 prototype: **`milestone/m2-prototype`**.
+- Both are published as branches on GitHub (`abulanduen/ToyboxTrials`). The session's git proxy
+  rejected tag pushes, so the tags exist only in the original local repository.
+- To roll back: `git checkout rollback/m0-scaffold`.
