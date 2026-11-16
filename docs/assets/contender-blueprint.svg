@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 560" font-family="Nunito, 'Segoe UI', sans-serif">
+  <!-- Toybox Trials · Contender blueprint (vector reference drawn to match src/character/WindupBot.tsx).
+       Not concept art: a construction sheet for silhouette, proportions and part placement. -->
+  <defs>
+    <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+      <path d="M20 0H0V20" fill="none" stroke="#6BA7C8" stroke-opacity="0.18" stroke-width="1"/>
+    </pattern>
+    <g id="foot"><rect x="-15" y="0" width="30" height="13" rx="5" fill="#6BA7C8" stroke="#2B2433" stroke-width="3"/></g>
+  </defs>
+  <rect width="960" height="560" fill="#F4E8CE"/>
+  <rect width="960" height="560" fill="url(#grid)"/>
+  <text x="24" y="36" font-size="22" font-weight="700" fill="#2B2433">CONTENDER · "Ticker" · construction sheet</text>
+  <text x="24" y="58" font-size="13" fill="#574D69">1 unit = 1 cm · height 3.5 cm to eye-turret top (3.9 cm with antenna) · all motion procedural</text>
+  <!-- ground line -->
+  <line x1="24" y1="472" x2="936" y2="472" stroke="#574D69" stroke-width="2" stroke-dasharray="6 6"/>
+
+  <!-- ========== FRONT ========== -->
+  <g transform="translate(170,472)" stroke="#2B2433" stroke-width="3" stroke-linejoin="round">
+    <use href="#foot" transform="translate(-20,-13)"/>
+    <use href="#foot" transform="translate(20,-13)"/>
+    <rect x="-29" y="-31" width="18" height="20" fill="#548AA8"/>
+    <rect x="11" y="-31" width="18" height="20" fill="#548AA8"/>
+    <rect x="-81" y="-56" width="162" height="34" rx="12" fill="#6BA7C8"/>
+    <line x1="-45" y1="-43" x2="45" y2="-43" stroke="#EFAE45" stroke-width="3"/>
+    <line x1="-45" y1="-35" x2="45" y2="-35" stroke="#EFAE45" stroke-width="3"/>
+    <rect x="-75" y="-152" width="150" height="105" rx="20" fill="#6BA7C8"/>
+    <rect x="-51" y="-128" width="102" height="70" rx="5" fill="#FFF9EE"/>
+    <path d="M-39 -73 A39 39 0 0 1 39 -73 Z" fill="#2B2433"/>
+    <path d="M-34 -73 A34 34 0 0 1 34 -73 Z" fill="#EFAE45" stroke="none"/>
+    <line x1="0" y1="-73" x2="16" y2="-98" stroke="#E76B62" stroke-width="4"/>
+    <!-- arms -->
+    <rect x="-104" y="-145" width="26" height="62" rx="13" fill="#548AA8"/>
+    <rect x="78" y="-145" width="26" height="62" rx="13" fill="#548AA8"/>
+    <circle cx="-91" cy="-78" r="17" fill="#E76B62"/>
+    <circle cx="91" cy="-78" r="17" fill="#E76B62"/>
+    <!-- head -->
+    <rect x="-59" y="-237" width="118" height="82" rx="18" fill="#6BA7C8"/>
+    <rect x="-39" y="-213" width="78" height="36" rx="4" fill="#2B2433"/>
+    <g fill="#FFF9EE" stroke="none">
+      <rect x="-34" y="-210" width="14" height="10"/><rect x="-16" y="-210" width="14" height="10"/><rect x="2" y="-210" width="14" height="10"/><rect x="20" y="-210" width="14" height="10"/>
+      <rect x="-34" y="-190" width="14" height="10"/><rect x="-16" y="-190" width="14" height="10"/><rect x="2" y="-190" width="14" height="10"/><rect x="20" y="-190" width="14" height="10"/>
+    </g>
+    <rect x="-69" y="-210" width="12" height="32" rx="5" fill="#E76B62"/>
+    <rect x="57" y="-210" width="12" height="32" rx="5" fill="#E76B62"/>
+    <!-- turret + eye -->
+    <circle cx="0" cy="-295" r="41" fill="#6BA7C8"/>
+    <circle cx="0" cy="-295" r="36" fill="none" stroke="#EFAE45" stroke-width="6"/>
+    <circle cx="0" cy="-295" r="31" fill="#FFFDF6"/>
+    <circle cx="0" cy="-295" r="15" fill="#2B2433"/>
+    <circle cx="6" cy="-302" r="4.5" fill="#fff" stroke="none"/>
+    <line x1="0" y1="-336" x2="0" y2="-368" stroke-width="3"/>
+    <circle cx="0" cy="-372" r="10" fill="#E76B62"/>
+  </g>
+  <text x="170" y="500" text-anchor="middle" font-size="15" font-weight="700" fill="#2B2433">FRONT</text>
+
+  <!-- ========== SIDE ========== -->
+  <g transform="translate(480,472)" stroke="#2B2433" stroke-width="3" stroke-linejoin="round">
+    <rect x="-33" y="-13" width="86" height="13" rx="5" fill="#6BA7C8"/>
+    <rect x="-9" y="-31" width="18" height="20" fill="#548AA8"/>
+    <rect x="-60" y="-56" width="120" height="34" rx="12" fill="#6BA7C8"/>
+    <rect x="-54" y="-152" width="108" height="105" rx="20" fill="#6BA7C8"/>
+    <rect x="54" y="-128" width="6" height="70" fill="#FFF9EE"/>
+    <!-- arm -->
+    <rect x="-13" y="-145" width="26" height="62" rx="13" fill="#548AA8"/>
+    <circle cx="0" cy="-78" r="17" fill="#E76B62"/>
+    <!-- key (rear = left) -->
+    <rect x="-90" y="-112" width="36" height="12" fill="#C8973A"/>
+    <ellipse cx="-100" cy="-130" rx="10" ry="20" fill="#C8973A"/>
+    <ellipse cx="-100" cy="-82" rx="10" ry="20" fill="#C8973A"/>
+    <circle cx="-100" cy="-106" r="10" fill="#C8973A"/>
+    <!-- head -->
+    <rect x="-49" y="-237" width="98" height="82" rx="18" fill="#6BA7C8"/>
+    <rect x="49" y="-213" width="5" height="36" fill="#2B2433"/>
+    <circle cx="0" cy="-194" r="16" fill="#E76B62"/>
+    <!-- turret (side) -->
+    <rect x="-27" y="-336" width="54" height="82" rx="8" fill="#6BA7C8"/>
+    <rect x="27" y="-331" width="8" height="72" rx="3" fill="#EFAE45"/>
+    <line x1="-4" y1="-336" x2="-4" y2="-368" stroke-width="3"/>
+    <circle cx="-4" cy="-372" r="10" fill="#E76B62"/>
+  </g>
+  <text x="480" y="500" text-anchor="middle" font-size="15" font-weight="700" fill="#2B2433">SIDE (facing right)</text>
+
+  <!-- ========== REAR ========== -->
+  <g transform="translate(790,472)" stroke="#2B2433" stroke-width="3" stroke-linejoin="round">
+    <use href="#foot" transform="translate(-20,-13)"/>
+    <use href="#foot" transform="translate(20,-13)"/>
+    <rect x="-29" y="-31" width="18" height="20" fill="#548AA8"/>
+    <rect x="11" y="-31" width="18" height="20" fill="#548AA8"/>
+    <rect x="-81" y="-56" width="162" height="34" rx="12" fill="#6BA7C8"/>
+    <rect x="-75" y="-152" width="150" height="105" rx="20" fill="#6BA7C8"/>
+    <rect x="-104" y="-145" width="26" height="62" rx="13" fill="#548AA8"/>
+    <rect x="78" y="-145" width="26" height="62" rx="13" fill="#548AA8"/>
+    <circle cx="-91" cy="-78" r="17" fill="#E76B62"/>
+    <circle cx="91" cy="-78" r="17" fill="#E76B62"/>
+    <!-- wind-up key, the hero detail -->
+    <ellipse cx="-30" cy="-106" rx="24" ry="20" fill="#C8973A"/>
+    <ellipse cx="30" cy="-106" rx="24" ry="20" fill="#C8973A"/>
+    <ellipse cx="-30" cy="-106" rx="9" ry="7" fill="#F4E8CE"/>
+    <ellipse cx="30" cy="-106" rx="9" ry="7" fill="#F4E8CE"/>
+    <circle cx="0" cy="-106" r="12" fill="#C8973A"/>
+    <rect x="-59" y="-237" width="118" height="82" rx="18" fill="#6BA7C8"/>
+    <rect x="-69" y="-210" width="12" height="32" rx="5" fill="#E76B62"/>
+    <rect x="57" y="-210" width="12" height="32" rx="5" fill="#E76B62"/>
+    <circle cx="0" cy="-295" r="41" fill="#6BA7C8"/>
+    <circle cx="0" cy="-295" r="10" fill="#548AA8"/>
+    <line x1="0" y1="-336" x2="0" y2="-368" stroke-width="3"/>
+    <circle cx="0" cy="-372" r="10" fill="#E76B62"/>
+  </g>
+  <text x="790" y="500" text-anchor="middle" font-size="15" font-weight="700" fill="#2B2433">REAR</text>
+
+  <!-- legend -->
+  <g font-size="13" fill="#574D69">
+    <text x="24" y="536">● Single eye on a turret (blinks, glances) · ● toothy grille grin · ● chest pressure gauge = wind level / speed ·</text>
+    <text x="24" y="554">● brass key on the back spins faster with speed and pops off on elimination · ● springy antenna bead · ● block feet</text>
+  </g>
+</svg>
