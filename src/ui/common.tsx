@@ -13,6 +13,7 @@ export function ToyButton({
   disabled,
   className = '',
   testId,
+  armDelay = 0,
 }: {
   children: React.ReactNode;
   onClick: () => void;
@@ -21,8 +22,12 @@ export function ToyButton({
   disabled?: boolean;
   className?: string;
   testId?: string;
+  /** Ignore activation for this many ms after mounting (tap-through protection for screens that
+   *  pop up under a player's finger, e.g. results appearing while they're still tapping pads). */
+  armDelay?: number;
 }) {
   const ref = useRef<HTMLButtonElement>(null);
+  const mountedAt = useRef(performance.now());
   // Focus for keyboard players without scrolling the panel (native autoFocus scrolls short
   // phone-landscape panels to the bottom and hides their titles).
   useEffect(() => {
@@ -36,6 +41,7 @@ export function ToyButton({
       disabled={disabled}
       onMouseEnter={() => sfx.tick()}
       onClick={() => {
+        if (performance.now() - mountedAt.current < armDelay) return;
         unlockAudio();
         sfx.click();
         onClick();

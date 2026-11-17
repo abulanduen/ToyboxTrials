@@ -8,6 +8,7 @@ import { sfx } from './audio';
 import { useGame } from './store';
 import { PALETTE } from './palette';
 import { rewardForSecret } from './cosmetics';
+import { openPractice } from '../minigames/session';
 import { GATES, JACK, MUSICBOX, PAVILION, SCOREBOARD, SHOP, TOWER, WORKSHOP, frontOf } from '../scene/layout';
 
 export interface Interactable {
@@ -36,10 +37,10 @@ const gate = (id: string) => {
 };
 
 export const INTERACTABLES: Interactable[] = [
-  { id: 'gate-copycat', ...gate('gate-copycat'), radius: 4.5, verb: 'Enter', label: 'Copycat Conductor' },
+  { id: 'gate-copycat', ...gate('gate-copycat'), radius: 4.5, verb: 'Play', label: 'Copycat Conductor' },
   { id: 'gate-inferno', ...gate('gate-inferno'), radius: 4.5, verb: 'Peek at', label: 'Inferno Escape' },
   { id: 'gate-dash', ...gate('gate-dash'), radius: 4.5, verb: 'Peek at', label: 'Wind-Up Dash' },
-  { id: 'pavilion', ...frontOf(PAVILION.x, PAVILION.z, 0, PAVILION.d / 2 + 3), radius: 4.5, verb: 'Visit', label: 'Tournament Pavilion' },
+  { id: 'pavilion', ...frontOf(PAVILION.x, PAVILION.z, 0, PAVILION.d / 2 + 3), radius: 4.5, verb: 'Enter', label: 'the Tournament Pavilion' },
   { id: 'workshop', ...frontOf(WORKSHOP.x, WORKSHOP.z, WORKSHOP.rot, WORKSHOP.d / 2 + 2.5), radius: 5, verb: 'Tinker at', label: 'the Workshop' },
   { id: 'shop', ...frontOf(SHOP.x, SHOP.z, SHOP.rot, SHOP.d / 2 + 6), radius: 5, verb: 'Browse', label: 'Odds & Ends Shop' },
   { id: 'scoreboard', ...frontOf(SCOREBOARD.x, SCOREBOARD.z, SCOREBOARD.rot, 3.5), radius: 5, verb: 'Read', label: 'the Scoreboard' },
@@ -79,12 +80,7 @@ export function interact(id: string, facing: { x: number; z: number }) {
     case 'gate-copycat':
       sfx.interact();
       events.emit('gate:open', { id });
-      g.openPanel({
-        kind: 'copycat',
-        title: 'Copycat Conductor',
-        subtitle: 'The mechanical music theatre',
-        accent: PALETTE.honey,
-      });
+      openPractice('copycat-conductor');
       break;
     case 'gate-inferno':
       sfx.click();
@@ -108,13 +104,7 @@ export function interact(id: string, facing: { x: number; z: number }) {
       break;
     case 'pavilion':
       sfx.click();
-      g.openPanel({
-        kind: 'preview',
-        title: 'Tournament Pavilion',
-        subtitle: 'Party lobby — coming later',
-        body: 'This is where groups of contenders will gather, pick a trial and line up for the next round. Solo play is open in the meantime.',
-        accent: PALETTE.inkPurple,
-      });
+      g.openPanel({ kind: 'tournament', title: 'Tournament Pavilion', subtitle: 'Pick a format', accent: PALETTE.inkPurple });
       break;
     case 'workshop':
       sfx.windUp(6);

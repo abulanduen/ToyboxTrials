@@ -6,7 +6,22 @@
  * produced it. Bindings are data so a minigame can install its own map (e.g. ASJK for
  * Copycat Conductor) — and must provide a matching touch layout (see src/minigames/types.ts).
  */
-export type Action = 'forward' | 'back' | 'left' | 'right' | 'jump' | 'interact' | 'run' | 'pause';
+export type Action =
+  | 'forward'
+  | 'back'
+  | 'left'
+  | 'right'
+  | 'jump'
+  | 'interact'
+  | 'run'
+  | 'pause'
+  /** Four generic minigame slots (Copycat instruments, rhythm lanes, answer buttons…). */
+  | 'slot1'
+  | 'slot2'
+  | 'slot3'
+  | 'slot4';
+
+export const SLOT_ACTIONS = ['slot1', 'slot2', 'slot3', 'slot4'] as const;
 
 export const HUB_BINDINGS: Record<Action, string[]> = {
   forward: ['KeyW', 'ArrowUp'],
@@ -17,10 +32,36 @@ export const HUB_BINDINGS: Record<Action, string[]> = {
   interact: ['KeyE', 'Enter'],
   run: ['ShiftLeft', 'ShiftRight'],
   pause: ['Escape', 'KeyP'],
+  slot1: [],
+  slot2: [],
+  slot3: [],
+  slot4: [],
+};
+
+/** Minigames with four slots use A S J K (plus D F J K / 1-4 as alternates); movement is off. */
+export const SLOT_BINDINGS: Record<Action, string[]> = {
+  forward: [],
+  back: [],
+  left: [],
+  right: [],
+  jump: [],
+  interact: [],
+  run: [],
+  pause: ['Escape', 'KeyP'],
+  slot1: ['KeyA', 'Digit1', 'ArrowLeft'],
+  slot2: ['KeyS', 'Digit2', 'ArrowDown'],
+  slot3: ['KeyJ', 'Digit3', 'ArrowUp'],
+  slot4: ['KeyK', 'Digit4', 'ArrowRight'],
 };
 
 const down = new Set<string>();
 const pressedThisFrame = new Set<string>();
+/** Every action press since the last frame, in the order it happened (keys, taps, touch buttons). */
+const pressLog: Action[] = [];
+
+function logKeyPress(code: string) {
+  for (const a of Object.keys(bindings) as Action[]) if (bindings[a].includes(code)) pressLog.push(a);
+}
 let mouseDX = 0;
 let mouseDY = 0;
 let bindings = HUB_BINDINGS;
@@ -43,7 +84,10 @@ function isTypingTarget(t: EventTarget | null): boolean {
 
 function onKeyDown(e: KeyboardEvent) {
   if (isTypingTarget(e.target)) return;
-  if (!down.has(e.code)) pressedThisFrame.add(e.code);
+  if (!down.has(e.code)) {
+    pressedThisFrame.add(e.code);
+    if (!e.repeat) logKeyPress(e.code);
+  }
   down.add(e.code);
   // Stop the page scrolling on Space / arrows while playing.
   if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
@@ -109,7 +153,10 @@ export function setStick(x: number, y: number) {
   stick.y = y;
 }
 export function pressVirtual(a: Action) {
-  if (!virtualDown.has(a)) virtualPressed.add(a);
+  if (!virtualDown.has(a)) {
+    virtualPressed.add(a);
+    pressLog.push(a);
+  }
   virtualDown.add(a);
 }
 export function releaseVirtual(a: Action) {
@@ -118,6 +165,12 @@ export function releaseVirtual(a: Action) {
 /** One-shot tap (press + release on the next frame). */
 export function tapVirtual(a: Action) {
   virtualPressed.add(a);
+  pressLog.push(a);
+}
+
+/** Ordered presses since the last frame (for minigames where order matters, e.g. Copycat). */
+export function getPressLog(): readonly Action[] {
+  return pressLog;
 }
 
 export function addMouseDelta(dx: number, dy: number) {
@@ -135,6 +188,7 @@ export function consumeMouseDelta(): [number, number] {
 export function endFrame() {
   pressedThisFrame.clear();
   virtualPressed.clear();
+  pressLog.length = 0;
 }
 
 /** Used by UI layers (pause menu) to drop held keys so the toy doesn't keep walking. */
@@ -143,6 +197,7 @@ export function clearInput() {
   pressedThisFrame.clear();
   virtualDown.clear();
   virtualPressed.clear();
+  pressLog.length = 0;
   stick.x = stick.y = 0;
   mouseDX = 0;
   mouseDY = 0;

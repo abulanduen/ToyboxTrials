@@ -76,7 +76,8 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
   check('Jump button jumps', peak > 0.2, `peak y=${peak.toFixed(2)}`);
   await page.waitForTimeout(1200);
 
-  // Interact button appears at the Copycat gate and opens the panel; instruments are tappable.
+  // Interact button at the Copycat gate opens the game; play a round with the touch pads.
+  await page.evaluate(() => window.__toybox.match.timeScale(4));
   await page.evaluate(() => window.__toybox.teleport(13.9, -20.4, Math.PI - 0.55));
   await page.waitForTimeout(2500);
   check('Interact button appears with a prompt', await page.isVisible('.touch-btn--interact'), await page.textContent('.touch-btn--interact').catch(() => ''));
@@ -85,15 +86,51 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
   await touch('touchStart', [[ib.x + ib.width / 2, ib.y + ib.height / 2, 5]]);
   await page.waitForTimeout(600);
   await touch('touchEnd', []);
-  await page.waitForTimeout(1500);
-  check('Interact button opens the Copycat panel', await page.isVisible('.info-panel'));
-  await page.tap('.instrument >> nth=2');
-  await page.waitForTimeout(150);
-  check('instrument lights up on tap', (await page.$$('.instrument--lit')).length === 1);
-  await page.screenshot({ path: `${OUT}/mobile-03-copycat-panel.png` });
-  await page.tap('.panel__actions .toy-btn');
-  await page.waitForTimeout(1200);
-  check('panel closes via button', !(await page.isVisible('.info-panel')));
+  await page.waitForSelector('.match-intro', { timeout: 60000 }).catch(() => null);
+  await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
+  check('Interact button opens the Copycat intro', await page.isVisible('.match-intro'));
+  await page.tap('[data-testid=match-start]');
+  const MS = () =>
+    page.evaluate(() => {
+      const s = window.__toybox.match.state();
+      return s && { phase: s.phase, round: s.round, seq: s.sequence, len: s.config.startLength + s.round - 1, me: s.players[0] };
+    });
+  const waitInput = async () => {
+    for (let i = 0; i < 600; i++) {
+      const x = await MS();
+      if (x && x.phase === 'input') return x;
+      await page.waitForTimeout(250);
+    }
+    throw new Error('no input phase');
+  };
+  const tapPad = async (i) => {
+    const b = await page.locator('.cc-pad').nth(i).boundingBox();
+    await touch('touchStart', [[b.x + b.width / 2, b.y + b.height / 2, 20 + i]]);
+    await touch('touchEnd', []);
+    await page.waitForTimeout(80);
+  };
+  let cm = await waitInput();
+  check('four instrument pads on screen', (await page.$$('.cc-pad')).length === 4);
+  // Freeze match time while the (slow, software-rendered) screenshot is taken.
+  await page.evaluate(() => window.__toybox.match.timeScale(0));
+  await page.screenshot({ path: `${OUT}/mobile-03-copycat-pads.png` });
+  await page.evaluate(() => window.__toybox.match.timeScale(4));
+  for (let i = cm.me.progress; i < cm.len; i++) await tapPad(cm.seq[i]);
+  for (let i = 0; i < 600; i++) {
+    const x = await MS();
+    if (x.round === 2) break;
+    await page.waitForTimeout(250);
+  }
+  check('tapping the pads repeats the sequence (round 2 reached)', (await MS()).round === 2);
+  cm = await waitInput();
+  await tapPad((cm.seq[cm.me.progress] + 1) % 4);
+  await page.waitForSelector('.results', { timeout: 120000 }).catch(() => null);
+  await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
+  check('a wrong pad ends the run with results', await page.isVisible('.results'));
+  await page.screenshot({ path: `${OUT}/mobile-04-copycat-results.png` });
+  await page.tap('[data-testid=results-leave]');
+  await page.waitForSelector('.touch-stick-zone', { timeout: 60000 }).catch(() => null);
+  check('back to the Playroom with touch controls', await page.isVisible('.touch-stick-zone'));
 
   // Tapping the prompt pill also interacts (workshop building → Workshop screen)
   await page.evaluate(() => window.__toybox.teleport(-24.0, -2.6, 0.3 + Math.PI));

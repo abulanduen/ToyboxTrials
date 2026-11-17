@@ -6,7 +6,9 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e": "node tests/e2e/functional.cjs && node tests/e2e/secrets.cjs && node tests/e2e/mobile.cjs && node tests/e2e/menu.cjs"
   },
   "author": "",
   "license": "UNLICENSED",
@@ -29,7 +31,8 @@
     "@types/three": "^0.181.0",
     "@vitejs/plugin-react": "^6.3.0",
     "typescript": "5.9",
-    "vite": "^8.3.8"
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0"
   },
   "private": true,
   "type": "module"

@@ -2,10 +2,12 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { device } from './input';
 import type { HatId, KeySkinId } from './cosmetics';
+import type { MinigameId } from '../minigames/types';
+import type { TournamentFormat } from '../minigames/tournament';
 
 export type Quality = 'low' | 'balanced' | 'high';
 /** Top-level screens. `menu` = live 3D diorama main menu; `workshop` = customisation. */
-export type Screen = 'menu' | 'playing' | 'workshop';
+export type Screen = 'menu' | 'playing' | 'workshop' | 'minigame';
 export type MenuSheet = 'settings' | 'howto' | null;
 
 export interface Prompt {
@@ -22,7 +24,7 @@ export interface Ticket {
 }
 
 export interface Panel {
-  kind: 'copycat' | 'preview' | 'scoreboard' | 'shop';
+  kind: 'tournament' | 'preview' | 'scoreboard' | 'shop';
   title: string;
   subtitle?: string;
   body?: string;
@@ -42,10 +44,16 @@ interface SettingsSlice {
   keySkin: KeySkinId;
   contenderName: string;
   secretsFound: string[];
+  /** Per-minigame personal records. */
+  records: Partial<Record<MinigameId, { best: number; plays: number; wins: number }>>;
+  tournamentWins: Partial<Record<TournamentFormat, number>>;
+  tournamentHistory: { format: TournamentFormat; place: number; of: number; games: MinigameId[]; at: number }[];
 }
 
 interface SessionSlice {
   screen: Screen;
+  /** Where to put the toy back in the hub after a minigame. */
+  hubReturn: { x: number; z: number; yaw: number } | null;
   /** Where the Workshop returns to when closed. */
   workshopReturn: Screen;
   /** Overlay sheet on the main menu. */
@@ -96,10 +104,14 @@ export const useGame = create<GameState>()(
       keySkin: 'classic',
       contenderName: 'Ticker',
       secretsFound: [],
+      records: {},
+      tournamentWins: {},
+      tournamentHistory: [],
 
       // session
       screen: 'menu',
       workshopReturn: 'menu',
+      hubReturn: null,
       menuSheet: null,
       ready: false,
       paused: false,
@@ -151,6 +163,9 @@ export const useGame = create<GameState>()(
         keySkin: s.keySkin,
         contenderName: s.contenderName,
         secretsFound: s.secretsFound,
+        records: s.records,
+        tournamentWins: s.tournamentWins,
+        tournamentHistory: s.tournamentHistory,
       }),
     },
   ),

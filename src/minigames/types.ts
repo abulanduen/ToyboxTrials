@@ -1,15 +1,20 @@
 /**
- * Minigame module contract (design draft — Milestone 4+).
+ * Minigame module contract (GAME_DESIGN.md §5).
  *
- * Each trial is a self-contained module that owns its scene, rules, controls, timer, scoring,
- * win/loss logic, audio and VFX. It receives shared services (character identity, audio bus,
- * settings, results/progression) from the host and never re-implements them.
+ * Every trial is a self-contained, lazy-loaded module:
+ *   - a deterministic **rules core** (no DOM, no three.js, no timers, seeded RNG), which can run
+ *     unchanged on a future authoritative game server;
+ *   - an optional **bot policy** so solo players always have opponents;
+ *   - a **Scene** (react-three-fiber content placed on the table) and a **Hud** (DOM overlay).
  *
- * The rules core is deliberately framework-free (`step(state, inputs, dt)`), so the same logic can
- * later run on a server or be replayed for networking. The React/three layer only renders state.
+ * The shared host owns everything else: loading, intro card, countdown, pause, results,
+ * tournament scoring, records, input bindings. The tournament controller never needs
+ * game-specific logic to know a round has finished — it asks `rules.isOver()`.
  */
 import type { ComponentType } from 'react';
 import type { PaintJob } from '../game/palette';
+import type { HatId, KeySkinId } from '../game/cosmetics';
+import type { Action } from '../game/input';
 
 export type MinigameId =
   | 'copycat-conductor'
@@ -24,39 +29,78 @@ export type MinigameId =
   | 'spellbox-showdown'
   | 'toybox-trivia';
 
+export type MinigameCategory = 'memory' | 'survival' | 'observation' | 'reflex' | 'pvp' | 'racing' | 'rhythm' | 'strategy' | 'knowledge';
+
+export type BotDifficulty = 'easy' | 'normal' | 'hard';
+
 export interface Contestant {
   id: string;
   name: string;
   paint: PaintJob;
+  hat: HatId;
+  keySkin: KeySkinId;
   isLocal: boolean;
+  /** Undefined for humans. */
+  bot?: BotDifficulty;
 }
 
-/** Shared services the host passes into every minigame. */
-export interface MinigameHost {
-  contestants: Contestant[];
-  /** Plays a named sound through the shared, volume-respecting audio bus. */
-  playSfx: (name: string) => void;
-  /** Ends the round and hands results to the shared results screen. */
-  finish: (result: MinigameResult) => void;
-  /** Leave without results (pause menu → quit). */
-  exit: () => void;
+export interface Placement {
+  contestantId: string;
+  /** 1-based; tied contestants share a place. */
+  place: number;
+  /** Game-specific score (rounds survived, points, time…), for display and records. */
+  score: number;
+  eliminated?: boolean;
+  forfeit?: boolean;
 }
 
 export interface MinigameResult {
   minigame: MinigameId;
-  /** Ordered best → worst. */
-  placements: { contestantId: string; score: number; eliminated?: boolean }[];
+  placements: Placement[];
   durationMs: number;
-  /** Minigame-specific record fields (e.g. longest sequence). */
-  records?: Record<string, number>;
+  /** Game-specific stats for records (e.g. longest sequence). */
+  stats?: Record<string, number>;
 }
 
-/** Pure rules core. No DOM, no three.js, no timers — deterministic given inputs. */
-export interface RulesCore<State, Input> {
-  init(contestants: Contestant[], seed: number): State;
+/** Deterministic rules core. Mutating `state` in place is allowed; it must not touch globals. */
+export interface RulesCore<State, Input, Config = Record<string, never>> {
+  init(contestants: Contestant[], seed: number, config?: Partial<Config>): State;
+  /** Advance by dtMs, applying inputs that arrived since the last step (keyed by contestant id). */
   step(state: State, inputs: Record<string, Input[]>, dtMs: number): State;
   isOver(state: State): boolean;
   result(state: State): Omit<MinigameResult, 'minigame'>;
+  /** Events produced during the last step (sounds/animations for the render layer). Host drains them. */
+  drainEvents(state: State): MatchEvent[];
+}
+
+/** A rules-core event the Scene/Hud react to (e.g. `{ type: 'note', slot: 2 }`). */
+export interface MatchEvent {
+  type: string;
+  [k: string]: unknown;
+}
+
+/** Bot policy: decides a bot's inputs each step from the (shared) state. Own seeded RNG. */
+export interface BotPolicy<State, Input> {
+  decide(state: State, bot: Contestant, dtMs: number, rng: () => number): Input[];
+}
+
+export interface MinigameSceneProps<State> {
+  /** Live state (mutable object; read it in useFrame, don't copy into React state). */
+  getState: () => State | null;
+  contestants: Contestant[];
+  localId: string;
+}
+
+export interface MinigameModule<State = unknown, Input = unknown> {
+  rules: RulesCore<State, Input>;
+  /** Fresh bot policy per match (policies may keep per-match memory). */
+  createBot?: () => BotPolicy<State, Input>;
+  /** Keyboard bindings while this game runs (e.g. SLOT_BINDINGS). */
+  bindings: Record<Action, string[]>;
+  /** Turn this frame's local presses (keyboard / touch / taps, in the order they happened) into inputs. */
+  readLocalInput(presses: readonly Action[]): Input[];
+  Scene: ComponentType<MinigameSceneProps<State>>;
+  Hud: ComponentType<MinigameSceneProps<State>>;
 }
 
 /**
@@ -81,13 +125,22 @@ export interface MinigameDefinition {
   id: MinigameId;
   title: string;
   tagline: string;
+  description: string;
+  category: MinigameCategory;
   accent: string;
   players: { min: number; max: number };
+  /** Typical round length in seconds [min, max]. */
+  durationSec: [number, number];
+  inputs: ('keyboard' | 'mouse' | 'touch')[];
+  bots: 'none' | 'planned' | 'available';
+  eligibility: { tournament: boolean; ranked: boolean; casual: boolean };
+  scoring: 'elimination-order' | 'score' | 'time' | 'progress';
+  tieBreak: string;
   /** Human-readable key map, shown on the intro card. */
   controls: { keys: string; action: string }[];
   /** Mobile/touch controls. Required: a minigame without a touch layout is not shippable. */
   touch: TouchLayout;
-  status: 'playable' | 'integrating' | 'planned';
+  status: 'playable' | 'planned';
   /** Lazy so each minigame is code-split and loaded only when entered. */
-  load?: () => Promise<{ default: ComponentType<{ host: MinigameHost }> }>;
+  load?: () => Promise<MinigameModule<any, any>>;
 }

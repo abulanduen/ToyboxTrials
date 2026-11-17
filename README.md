@@ -56,7 +56,8 @@ The build output in `dist/` is a static folder with relative paths. Host it anyw
 - The gear button pauses.
 
 Things to find in the Playroom:
-- **Copycat Conductor gate** (honey arch): the working entrance. It opens the ASJK instrument bench.
+- **Copycat Conductor gate** (honey arch): play Copycat Conductor solo or against bots.
+- **Tournament Pavilion** (striped tent): run a Blitz (3), Normal (5) or Treasure (8) tournament against bots.
 - **Workshop** (pencil case): opens the Workshop screen. Name your contender and pick a paint job, hat and key skin. Secrets unlock extra items.
 - **Scoreboard** (domino wall): tracks secrets.
 - **Four hidden secrets.** Look behind the pavilion, near the fountain, behind the workshop, and on top of the book tower (jump: domino → book → eraser → block).
@@ -109,6 +110,16 @@ node tests/e2e/mobile.cjs
 
 ```bash
 node tests/e2e/menu.cjs
+```
+
+```bash
+node tests/e2e/minigame.cjs
+```
+
+Unit tests for the game logic (no browser needed):
+
+```bash
+npm test
 ```
 
 Deep links: add `#play` to the URL to skip the menu, or `#workshop` to open the Workshop.

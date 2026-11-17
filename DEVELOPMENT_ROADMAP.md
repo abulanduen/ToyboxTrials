@@ -19,7 +19,11 @@ Legend: ✅ done · 🚧 in progress · ⏳ next · 🔒 blocked on a decision o
 
 ## Single-player foundation (no server)
 
-### M4 · Minigame host + tournament framework + Copycat Conductor 🚧
+### M4 · Minigame host + tournament framework + Copycat Conductor ✅ (first pass)
+Built: the contract, the shared host (lazy load, intro, countdown, pause, results, records), a tournament
+controller (Blitz/Normal/Treasure, seeded selection, standings, final podium, history) with bots,
+Copycat Conductor (rules core, bots, theatre scene, touch pads), unit tests and e2e tests.
+Copycat-only tournaments repeat Copycat until M5–M6 add games. The plan below is kept for reference.
 Brief stages 3 and 4 (first game).
 
 1. **Contract:** extend `MinigameDefinition` with the brief's fields: players min/max, duration,

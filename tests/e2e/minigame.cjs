@@ -1,0 +1,170 @@
+/* Milestone 4: minigame host + Copycat Conductor + tournament flow (desktop).
+   Run: BASE_URL=http://localhost:4173/ node tests/e2e/minigame.cjs */
+const { chromium } = require('playwright');
+const path = require('path');
+const fs = require('fs');
+const OUT = process.env.OUT_DIR || path.join(__dirname, 'output');
+fs.mkdirSync(OUT, { recursive: true });
+const BASE = process.env.BASE_URL || 'http://localhost:4173/';
+const res = [];
+const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? '  — ' + d : ''}`);
+const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
+
+(async () => {
+  const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+  const page = await browser.newPage({ viewport: { width: 1024, height: 600 } });
+  page.setDefaultTimeout(120000);
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  await page.addInitScript(() => {
+    if (!sessionStorage.getItem('seeded')) {
+      sessionStorage.setItem('seeded', '1');
+      localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { quality: 'low' }, version: 0 }));
+    }
+  });
+  const M = () => page.evaluate(() => {
+    const s = window.__toybox.match.state();
+    return { phase: window.__toybox.match.phase(), s: s && { phase: s.phase, round: s.round, seq: s.sequence, len: s.config.startLength + s.round - 1, players: s.players } };
+  });
+  const waitFor = async (pred, label, ms = 240000) => {
+    const t0 = Date.now();
+    while (Date.now() - t0 < ms) {
+      const m = await M();
+      if (pred(m)) return m;
+      await page.waitForTimeout(250);
+    }
+    throw new Error('timeout waiting for ' + label);
+  };
+  /** Play the current round correctly (local player) by reading the sequence. */
+  const playRound = async () => {
+    const m = await waitFor((m) => m.s && m.s.phase === 'input', 'input phase');
+    const me = m.s.players.find((p) => p.id === 'you');
+    for (let i = me.progress; i < m.s.len; i++) {
+      await page.keyboard.press(KEYS[m.s.seq[i]]);
+      await page.waitForTimeout(60);
+    }
+    return m.s.round;
+  };
+  const failRound = async () => {
+    const m = await waitFor((m) => m.s && (m.s.phase === 'input' || m.s.phase === 'over'), 'input phase');
+    if (m.s.phase === 'over') return;
+    const me = m.s.players.find((p) => p.id === 'you');
+    const wrong = (m.s.seq[me.progress] + 1) % 4;
+    await page.keyboard.press(KEYS[wrong]);
+  };
+
+  await page.goto(BASE + '?debug#play');
+  await page.waitForSelector('.loading', { state: 'detached' });
+  await page.waitForTimeout(1500);
+  await page.evaluate(() => window.__toybox.match.timeScale(4));
+
+  // --- Solo practice via the Copycat gate
+  await page.evaluate(() => window.__toybox.teleport(13.9, -20.4, Math.PI - 0.55));
+  await page.waitForTimeout(2500);
+  check('gate prompt says Play Copycat Conductor', (await page.textContent('.prompt'))?.includes('Play'));
+  await page.keyboard.press('KeyE');
+  await page.waitForSelector('.match-intro', { timeout: 60000 });
+  await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
+  check('gate opens the Copycat intro card (lazy-loaded module)', (await page.textContent('.match-intro h2')).includes('Copycat'));
+  check('intro shows keyboard controls', (await page.$$('.intro-controls .keycap')).length === 4);
+  await page.screenshot({ path: `${OUT}/m4-01-intro.png` });
+  await page.click('[data-testid=match-start]');
+  await page.waitForSelector('.countdown', { timeout: 30000 });
+  check('countdown appears', true);
+  // Screenshots are slow under software rendering: freeze match time while capturing.
+  const snap = async (name) => {
+    await page.evaluate(() => window.__toybox.match.timeScale(0));
+    await page.screenshot({ path: `${OUT}/${name}` });
+    await page.evaluate(() => window.__toybox.match.timeScale(4));
+  };
+  await waitFor((m) => m.s && m.s.phase === 'demo', 'demo');
+  await snap('m4-02-demo.png');
+  const r1 = await playRound();
+  await waitFor((m) => m.s.round === 2, 'round 2');
+  check('correct repetition advances to the next round', true, `round ${r1} → 2`);
+  await waitFor((m) => m.s.phase === 'input', 'input r2');
+  const m2 = await M();
+  await page.keyboard.press(KEYS[m2.s.seq[0]]); // one correct note so the pips show progress
+  await waitFor((m) => m.s.players[0].progress >= 1, 'first note registered');
+  await snap('m4-03-input.png');
+  await playRound();
+  await waitFor((m) => m.s.round === 3, 'round 3');
+  check('sequence grows by one note per round', (await M()).s.len === 5);
+  await failRound();
+  await page.waitForSelector('.results', { timeout: 120000 });
+  await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
+  check('a wrong note ends the solo run', true);
+  const score = await page.textContent('[data-testid=solo-score]');
+  check('solo score = rounds completed', score?.trim() === '2', score);
+  check('first run is a new personal best', await page.isVisible('.sticker-badge'));
+  await page.screenshot({ path: `${OUT}/m4-04-results.png` });
+  const rec = await page.evaluate(() => JSON.parse(localStorage.getItem('toybox-trials:prototype:v1')).state.records['copycat-conductor']);
+  check('record is saved', rec?.best === 2 && rec?.plays === 1, JSON.stringify(rec));
+
+  // Play again → quit via pause → back in the hub near the gate
+  await page.click('[data-testid=results-again]');
+  await page.waitForSelector('.countdown', { timeout: 30000 });
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(800);
+  check('Esc pauses the match', await page.isVisible('.pause'));
+  await page.click('.pause__actions .toy-btn >> nth=1');
+  await page.waitForSelector('.hud-sign', { timeout: 60000 });
+  await page.waitForTimeout(1500);
+  const pos = await page.evaluate(() => window.__toybox.state());
+  check('quitting returns to the hub where you left it', Math.hypot(pos.x - 13.9, pos.z + 20.4) < 1.5, `x=${pos.x.toFixed(1)} z=${pos.z.toFixed(1)}`);
+
+  // --- Tournament (Blitz, 1 easy bot): lose each trial on purpose to exercise the flow
+  await page.evaluate(() => window.__toybox.teleport(0, -12.6, Math.PI));
+  await page.waitForTimeout(2500);
+  await page.keyboard.press('KeyE');
+  await page.waitForSelector('.formats', { timeout: 30000 });
+  check('pavilion opens the tournament picker', true);
+  await page.screenshot({ path: `${OUT}/m4-05-picker.png` });
+  await page.click('[data-testid=format-blitz]');
+  await page.click('.intro-options .segmented >> nth=0 >> button >> nth=0'); // 1 bot
+  await page.click('.intro-options .segmented >> nth=1 >> button >> nth=0'); // easy
+  await page.click('[data-testid=tournament-start]');
+  for (let round = 1; round <= 3; round++) {
+    await page.waitForSelector('.reveal-ticket', { timeout: 60000 });
+    await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
+    if (round === 1) await page.screenshot({ path: `${OUT}/m4-06-reveal.png` });
+    check(`trial ${round}: reveal ticket`, (await page.textContent('.reveal-ticket__round')).includes(`Trial ${round} of 3`));
+    await page.click('[data-testid=reveal-go]');
+    await page.waitForSelector('[data-testid=match-start]', { timeout: 60000 });
+    await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
+    await page.click('[data-testid=match-start]');
+    await failRound();
+    await page.waitForSelector('.results', { timeout: 120000 });
+    await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
+    const rows = await page.$$eval('.results-list li', (els) => els.map((e) => e.textContent));
+    check(`trial ${round}: results list both contestants with points`, rows.length === 2 && rows.some((r) => r.includes('+10')) && rows.some((r) => r.includes('+8')), rows.join(' | '));
+    if (round === 1) await page.screenshot({ path: `${OUT}/m4-07-results-tournament.png` });
+    await page.click('[data-testid=results-next]');
+    if (round < 3) {
+      await page.waitForSelector('.standings', { timeout: 30000 });
+      await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
+      if (round === 1) await page.screenshot({ path: `${OUT}/m4-08-standings.png` });
+      await page.click('[data-testid=standings-next]');
+    }
+  }
+  await page.waitForSelector('.final', { timeout: 30000 });
+  await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
+  const title = await page.textContent('.final h2');
+  check('final standings: placed 2nd of 2 after losing every trial', title.includes('2nd of 2'), title);
+  await page.waitForTimeout(2500);
+  await page.screenshot({ path: `${OUT}/m4-09-final.png` });
+  const hist = await page.evaluate(() => JSON.parse(localStorage.getItem('toybox-trials:prototype:v1')).state.tournamentHistory);
+  check('tournament history saved', hist?.[0]?.format === 'blitz' && hist[0].place === 2 && hist[0].games.length === 3);
+  await page.click('[data-testid=final-leave]');
+  await page.waitForSelector('.hud-sign', { timeout: 60000 });
+  check('back to the Playroom after the tournament', true);
+
+  check('no console/page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
+  console.log(res.join('\n'));
+  await browser.close();
+})().catch((e) => {
+  console.log(res.join('\n'));
+  console.log('FAIL  aborted: ' + e.message);
+  process.exit(1);
+});

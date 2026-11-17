@@ -1,0 +1,349 @@
+/**
+ * Minigame host / match session (GAME_DESIGN.md §5 lifecycle).
+ *
+ *   picker → reveal (tournaments) → loading → intro → countdown → playing → results
+ *        → (tournament) standings → reveal next … → final
+ *
+ * React UI reads the `useMatch` store (phase changes only). The live rules state and bot memory
+ * live in the module-level `runtime` object and are stepped by `tickMatch()` from the render loop,
+ * so nothing re-renders per frame.
+ */
+import { create } from 'zustand';
+import { useGame } from '../game/store';
+import { HUB_BINDINGS, clearInput, getPressLog, setBindings } from '../game/input';
+import { exposeDebug } from '../game/debug';
+import { PAINT_JOBS } from '../game/palette';
+import { sfx } from '../game/audio';
+import { Emitter } from '../game/events';
+import { player } from '../game/player';
+import { gameById, tournamentPool } from './registry';
+import { makeBots } from './bots';
+import { newSeed, seededRng, subSeed } from './rng';
+import { addRound, rankStandings, type Standing } from './scoring';
+import { FORMATS, selectGames, type TournamentFormat } from './tournament';
+import type { BotDifficulty, Contestant, MatchEvent, MinigameId, MinigameModule, MinigameResult } from './types';
+
+export type MatchPhase = 'idle' | 'picker' | 'reveal' | 'loading' | 'intro' | 'countdown' | 'playing' | 'results' | 'standings' | 'final';
+
+export const LOCAL_ID = 'you';
+const STEP_MS = 1000 / 60;
+const MAX_STEPS_PER_FRAME = 10;
+export const COUNTDOWN_MS = 3000;
+
+export interface TournamentRun {
+  format: TournamentFormat;
+  seed: number;
+  games: MinigameId[];
+  /** Index of the current game in `games`. */
+  round: number;
+  standings: Standing[];
+}
+
+interface MatchStore {
+  phase: MatchPhase;
+  kind: 'practice' | 'tournament' | null;
+  gameId: MinigameId | null;
+  module: MinigameModule | null;
+  contestants: Contestant[];
+  seed: number;
+  /** Practice: number of bot opponents (0 = solo). Tournament: field size − 1. */
+  opponents: number;
+  difficulty: BotDifficulty;
+  tournament: TournamentRun | null;
+  lastResult: MinigameResult | null;
+  newBest: boolean;
+  paused: boolean;
+  error: string | null;
+  set: (p: Partial<MatchStore>) => void;
+}
+
+export const useMatch = create<MatchStore>()((set) => ({
+  phase: 'idle',
+  kind: null,
+  gameId: null,
+  module: null,
+  contestants: [],
+  seed: 0,
+  opponents: 0,
+  difficulty: 'normal',
+  tournament: null,
+  lastResult: null,
+  newBest: false,
+  paused: false,
+  error: null,
+  set: (p) => set(p),
+}));
+
+/** Rules-core events re-broadcast for the minigame Scene/Hud (sounds, animations). */
+export const matchBus = new Emitter<{ event: MatchEvent; countdown: { n: number } }>();
+
+const runtime = {
+  state: null as unknown,
+  acc: 0,
+  bot: null as ReturnType<NonNullable<MinigameModule['createBot']>> | null,
+  botRngs: new Map<string, () => number>(),
+  countdownLeft: 0,
+  lastCount: 4,
+  timeScale: 1,
+  pendingLocal: [] as unknown[],
+  startedAt: 0,
+};
+
+export const getMatchState = () => runtime.state;
+
+function localContestant(): Contestant {
+  const g = useGame.getState();
+  return {
+    id: LOCAL_ID,
+    name: g.contenderName || 'You',
+    paint: PAINT_JOBS[g.paintIndex % PAINT_JOBS.length],
+    hat: g.hat,
+    keySkin: g.keySkin,
+    isLocal: true,
+  };
+}
+
+function enterMinigameScreen() {
+  const g = useGame.getState();
+  if (g.screen !== 'minigame') {
+    // Remember where to put the toy back in the hub.
+    g.set({ hubReturn: { x: player.pos.x, z: player.pos.z, yaw: player.yaw } });
+    g.goTo('minigame');
+  }
+  player.pos.set(0, 0, 0); // centre the shadow frustum on the stage
+}
+
+async function loadGame(id: MinigameId) {
+  const def = gameById(id);
+  if (!def.load) throw new Error(`${def.title} isn't playable yet.`);
+  useMatch.getState().set({ phase: 'loading', gameId: id, module: null, error: null });
+  try {
+    const mod = await def.load();
+    useMatch.getState().set({ module: mod, phase: 'intro' });
+  } catch (e) {
+    useMatch.getState().set({ error: (e as Error).message, phase: 'intro' });
+  }
+}
+
+// ---------------------------------------------------------------------------------- practice
+
+/** Open a minigame for solo practice (or vs bots). */
+export function openPractice(id: MinigameId) {
+  enterMinigameScreen();
+  const m = useMatch.getState();
+  m.set({ kind: 'practice', tournament: null, lastResult: null, contestants: [localContestant()], opponents: m.kind === 'practice' ? m.opponents : 0 });
+  void loadGame(id);
+}
+
+export function setPracticeOpponents(n: number, difficulty?: BotDifficulty) {
+  useMatch.getState().set({ opponents: n, ...(difficulty ? { difficulty } : {}) });
+}
+
+// -------------------------------------------------------------------------------- tournament
+
+export function openTournamentPicker() {
+  useMatch.getState().set({ phase: 'picker' });
+}
+
+export function startTournament(format: TournamentFormat, opponents: number, difficulty: BotDifficulty) {
+  const pool = tournamentPool();
+  const seed = newSeed();
+  const games = selectGames(seed, FORMATS[format].games, pool);
+  const local = localContestant();
+  const bots = makeBots(subSeed(seed, 'bots'), opponents, difficulty, local.name);
+  const contestants = [local, ...bots];
+  useMatch.getState().set({
+    kind: 'tournament',
+    contestants,
+    opponents,
+    difficulty,
+    lastResult: null,
+    tournament: { format, seed, games, round: 0, standings: contestants.map((c) => ({ contestantId: c.id, points: 0, rounds: [], wins: 0 })) },
+    phase: 'reveal',
+  });
+  enterMinigameScreen();
+}
+
+/** From the reveal card: load the current tournament game. */
+export function playRevealedGame() {
+  const t = useMatch.getState().tournament;
+  if (t) void loadGame(t.games[t.round]);
+}
+
+// --------------------------------------------------------------------------------- lifecycle
+
+/** Intro → countdown. Builds the field (adds practice bots) and initialises the rules. */
+export function beginCountdown() {
+  const m = useMatch.getState();
+  const mod = m.module;
+  if (!mod) return;
+  let contestants = m.contestants;
+  let seed: number;
+  if (m.kind === 'practice') {
+    seed = newSeed();
+    contestants = [localContestant(), ...makeBots(subSeed(seed, 'bots'), m.opponents, m.difficulty, localContestant().name)];
+  } else {
+    const t = m.tournament!;
+    seed = subSeed(t.seed, `game-${t.round}`);
+  }
+  runtime.state = mod.rules.init(contestants, seed);
+  runtime.bot = mod.createBot?.() ?? null;
+  runtime.botRngs = new Map(contestants.filter((c) => c.bot).map((c) => [c.id, seededRng(subSeed(seed, c.id))]));
+  runtime.acc = 0;
+  runtime.pendingLocal = [];
+  runtime.countdownLeft = COUNTDOWN_MS;
+  runtime.lastCount = 4;
+  m.set({ contestants, seed, phase: 'countdown', paused: false, lastResult: null, newBest: false });
+  setBindings(mod.bindings);
+  clearInput();
+}
+
+/** Called every rendered frame while the minigame screen is up (from MatchDriver). */
+export function tickMatch(dtRealMs: number) {
+  const m = useMatch.getState();
+  const mod = m.module;
+  if (!mod || !runtime.state || m.paused) return;
+  const dtMs = Math.min(dtRealMs, 100) * runtime.timeScale;
+
+  if (m.phase === 'countdown') {
+    runtime.countdownLeft -= dtMs;
+    const n = Math.ceil(runtime.countdownLeft / 1000);
+    if (n !== runtime.lastCount && n >= 0) {
+      runtime.lastCount = n;
+      matchBus.emit('countdown', { n });
+      if (n > 0) sfx.click();
+      else sfx.bell();
+    }
+    if (runtime.countdownLeft <= 0) {
+      runtime.startedAt = performance.now();
+      m.set({ phase: 'playing' });
+    }
+    return;
+  }
+  if (m.phase !== 'playing') return;
+
+  // Local presses are queued and delivered on the next fixed step. On high-refresh displays
+  // (e.g. 120 Hz) many frames run no 60 Hz step at all — without the queue those presses vanish.
+  runtime.pendingLocal.push(...mod.readLocalInput(getPressLog()));
+  runtime.acc += dtMs;
+  let steps = 0;
+  const maxSteps = MAX_STEPS_PER_FRAME * Math.max(1, runtime.timeScale);
+  while (runtime.acc >= STEP_MS && steps < maxSteps) {
+    const inputs: Record<string, unknown[]> = {};
+    if (runtime.pendingLocal.length) {
+      inputs[LOCAL_ID] = runtime.pendingLocal;
+      runtime.pendingLocal = [];
+    }
+    if (runtime.bot) {
+      for (const c of m.contestants) {
+        if (!c.bot) continue;
+        const out = runtime.bot.decide(runtime.state, c, STEP_MS, runtime.botRngs.get(c.id)!);
+        if (out.length) inputs[c.id] = out;
+      }
+    }
+    mod.rules.step(runtime.state, inputs, STEP_MS);
+    for (const ev of mod.rules.drainEvents(runtime.state)) matchBus.emit('event', ev);
+    runtime.acc -= STEP_MS;
+    steps++;
+    if (mod.rules.isOver(runtime.state)) {
+      finishGame();
+      return;
+    }
+  }
+  if (steps >= maxSteps) runtime.acc = 0; // don't spiral after a long hitch
+}
+
+function finishGame() {
+  const m = useMatch.getState();
+  const mod = m.module!;
+  const res: MinigameResult = { minigame: m.gameId!, ...mod.rules.result(runtime.state) };
+  const g = useGame.getState();
+  const mine = res.placements.find((p) => p.contestantId === LOCAL_ID);
+  // Records: best score, plays, wins (practice and tournament both count).
+  const prev = g.records[res.minigame] ?? { best: 0, plays: 0, wins: 0 };
+  const newBest = !!mine && mine.score > prev.best;
+  g.set({
+    records: {
+      ...g.records,
+      [res.minigame]: {
+        best: Math.max(prev.best, mine?.score ?? 0),
+        plays: prev.plays + 1,
+        wins: prev.wins + (mine?.place === 1 && res.placements.length > 1 ? 1 : 0),
+      },
+    },
+  });
+  let tournament = m.tournament;
+  if (tournament) tournament = { ...tournament, standings: addRound(tournament.standings, res.placements) };
+  setBindings(HUB_BINDINGS);
+  clearInput();
+  if (mine?.place === 1) sfx.reward();
+  m.set({ phase: 'results', lastResult: res, newBest, tournament });
+}
+
+/** Results → next step. */
+export function continueAfterResults() {
+  const m = useMatch.getState();
+  if (m.kind === 'tournament' && m.tournament) {
+    const t = m.tournament;
+    if (t.round + 1 < t.games.length) {
+      m.set({ phase: 'standings' });
+    } else {
+      finishTournament();
+    }
+  } else {
+    m.set({ phase: 'intro' }); // practice: back to the intro card to go again
+  }
+}
+
+/** Standings → reveal the next game. */
+export function nextTournamentRound() {
+  const m = useMatch.getState();
+  if (!m.tournament) return;
+  m.set({ tournament: { ...m.tournament, round: m.tournament.round + 1 }, phase: 'reveal', module: null });
+}
+
+function finishTournament() {
+  const m = useMatch.getState();
+  const t = m.tournament!;
+  const ranked = rankStandings(t.standings);
+  const me = ranked.find((s) => s.contestantId === LOCAL_ID);
+  const g = useGame.getState();
+  const history = [{ format: t.format, place: me?.place ?? ranked.length, of: ranked.length, games: t.games, at: Date.now() }, ...g.tournamentHistory].slice(0, 10);
+  g.set({
+    tournamentHistory: history,
+    tournamentWins: { ...g.tournamentWins, [t.format]: (g.tournamentWins[t.format] ?? 0) + (me?.place === 1 ? 1 : 0) },
+  });
+  if (me?.place === 1) sfx.reward();
+  m.set({ phase: 'final' });
+}
+
+export function pauseMatch(on: boolean) {
+  const m = useMatch.getState();
+  if (m.phase === 'playing' || m.phase === 'countdown') {
+    m.set({ paused: on });
+    clearInput();
+  }
+}
+
+/** Leave to the Playroom. Mid-match in a tournament this abandons the tournament. */
+export function quitMatch() {
+  runtime.state = null;
+  runtime.bot = null;
+  setBindings(HUB_BINDINGS);
+  clearInput();
+  useMatch.getState().set({ phase: 'idle', kind: null, gameId: null, module: null, tournament: null, paused: false, lastResult: null });
+  useGame.getState().goTo('playing');
+}
+
+/** Test hook (?debug only): speed up match time. */
+export function setMatchTimeScale(k: number) {
+  runtime.timeScale = k;
+}
+
+exposeDebug({
+  match: {
+    state: () => runtime.state,
+    phase: () => useMatch.getState().phase,
+    timeScale: setMatchTimeScale,
+  },
+});

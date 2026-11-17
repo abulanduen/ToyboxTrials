@@ -49,6 +49,15 @@ Build one complete, testable system at a time.
 - Screens: `menu` | `playing` | `workshop` in the store (`goTo`, `openWorkshop`). Camera moves between
   screens must orbit or cut. Never lerp in a straight line through the contender.
 - Cosmetics live in `src/game/cosmetics.ts`. Unlocks are keyed by secret id.
+- **Minigames** (`src/minigames/`):
+  - `types.ts` holds the contract and `registry.ts` the catalogue; mark a game `status: 'playable'` with a lazy `load()`.
+  - `session.ts` is the shared host (lifecycle, fixed 60 Hz stepping, bots, results, tournaments,
+    records). `MatchStage.tsx` is the in-canvas side and `ui/MatchOverlay.tsx` the DOM side.
+  - A game module provides `rules` (deterministic, seeded, with `drainEvents`), `createBot()`, `bindings`,
+    `readLocalInput(presses)` (an ordered press log), `Scene` and `Hud`. Don't touch the hub from a game.
+  - Use `MiniContender` for opponents and crowds. The full `WindupBot` is for the local player only.
+  - Rules cores get vitest unit tests in `tests/unit/`.
+  - The `?debug` hook `__toybox.match.timeScale(k)` speeds up or freezes match time for e2e tests.
 
 ## Commands
 
@@ -60,4 +69,6 @@ node tests/e2e/functional.cjs   # desktop gameplay checks (preview server runnin
 node tests/e2e/secrets.cjs
 node tests/e2e/mobile.cjs       # touch/phone checks
 node tests/e2e/menu.cjs         # main menu, Workshop, unlocks, persistence, deep links
+node tests/e2e/minigame.cjs     # Copycat practice + full Blitz tournament flow
+npm test                        # vitest unit tests for rules cores, scoring, tournament selection
 ```

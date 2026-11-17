@@ -13,6 +13,7 @@ import { player } from '../game/player';
 import { PlayerController } from '../character/PlayerController';
 import { Room, LAMP_HEAD, LAMP_AIM } from './Room';
 import { exposeDebug } from '../game/debug';
+import { MatchStage } from '../minigames/MatchStage';
 import { Village } from './Village';
 
 const QUALITY: Record<Quality, { dpr: [number, number]; shadowMap: number; post: 'none' | 'tilt' | 'dof'; aa: boolean }> = {
@@ -103,6 +104,8 @@ function Effects({ quality }: { quality: Quality }) {
 
 function SceneContents() {
   const quality = useGame((s) => s.quality);
+  // The giant room is shared; the tabletop shows either the village hub or the active trial's set.
+  const inMatch = useGame((s) => s.screen === 'minigame');
   return (
     <>
       <color attach="background" args={['#CDB79C']} />
@@ -116,8 +119,14 @@ function SceneContents() {
       </Environment>
       <Lights quality={quality} />
       <Room />
-      <Village />
-      <PlayerController />
+      {inMatch ? (
+        <MatchStage />
+      ) : (
+        <>
+          <Village />
+          <PlayerController />
+        </>
+      )}
       <Effects quality={quality} />
     </>
   );

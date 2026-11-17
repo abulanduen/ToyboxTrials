@@ -21,7 +21,7 @@ export type GameEvents = {
 
 type Handler<T> = (payload: T) => void;
 
-class Emitter<E extends Record<string, unknown>> {
+export class Emitter<E extends Record<string, unknown>> {
   private map = new Map<keyof E, Set<Handler<never>>>();
 
   on<K extends keyof E>(type: K, fn: Handler<E[K]>): () => void {

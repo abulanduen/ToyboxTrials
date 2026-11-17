@@ -4,11 +4,10 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { useGame } from '../game/store';
-import { sfx } from '../game/audio';
 import { events } from '../game/events';
 import { PAINT_JOBS, PALETTE } from '../game/palette';
 import { SECRET_IDS } from '../game/interactables';
-import { MINIGAMES } from '../minigames/registry';
+import { MatchOverlay, TournamentPicker } from './MatchOverlay';
 import { frameStats } from '../scene/PlayroomScene';
 import { GearIcon, StarSticker, WindKeyIcon } from './icons';
 import { TouchControls, tapInteract } from './TouchControls';
@@ -236,64 +235,11 @@ function LoadingCard() {
 }
 
 // ---------------------------------------------------------------- Panels
-const INSTRUMENTS = [
-  { key: 'A', code: 'KeyA', name: 'Drum', color: PALETTE.coral, play: () => sfx.drum() },
-  { key: 'S', code: 'KeyS', name: 'Bell', color: PALETTE.honey, play: () => sfx.bell() },
-  { key: 'J', code: 'KeyJ', name: 'Xylophone', color: PALETTE.toyBlue, play: () => sfx.xylophone() },
-  { key: 'K', code: 'KeyK', name: 'Music box', color: PALETTE.sage, play: () => sfx.musicBox() },
-];
-
-function CopycatPanel() {
-  const [lit, setLit] = useState<number | null>(null);
-  const timer = useRef(0);
-  const hit = (i: number) => {
-    INSTRUMENTS[i].play();
-    setLit(i);
-    window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => setLit(null), 220);
-  };
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.repeat) return;
-      const i = INSTRUMENTS.findIndex((x) => x.code === e.code);
-      if (i >= 0) hit(i);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  });
-  const def = MINIGAMES[0];
-  const touch = useGame((s) => s.touchUI);
-  return (
-    <>
-      <p className="panel__lead">{def.tagline}</p>
-      <div className="instrument-row">
-        {INSTRUMENTS.map((ins, i) => (
-          <button key={ins.key} className={`instrument${lit === i ? ' instrument--lit' : ''}`} style={{ ['--c' as string]: ins.color }} onPointerDown={() => hit(i)}>
-            <span className="instrument__cap">{ins.key}</span>
-            <span className="instrument__name">{ins.name}</span>
-          </button>
-        ))}
-      </div>
-      <p className="panel__note">
-        {touch ? (
-          'Instrument test bench: tap the instruments to hear the new synthesised voices.'
-        ) : (
-          <>
-            Instrument test bench: press <KeyCap k="A" /> <KeyCap k="S" /> <KeyCap k="J" /> <KeyCap k="K" /> to hear the new synthesised voices.
-          </>
-        )}
-      </p>
-      <div className="panel__status">
-        <strong>Entrance ready · theatre under construction.</strong> Copycat Conductor is being rebuilt as a mechanical music theatre: watch the
-        conductor, then repeat the growing sequence on the four instruments. It opens at Milestone 4.
-      </div>
-    </>
-  );
-}
-
 function Panel() {
   const panel = useGame((s) => s.panel);
   const touchUI = useGame((s) => s.touchUI);
+  const records = useGame((s) => s.records);
+  const tWins = useGame((s) => s.tournamentWins);
   const close = useGame((s) => s.closePanel);
   const secrets = useGame((s) => s.secretsFound);
   if (!panel) return null;
@@ -305,7 +251,7 @@ function Panel() {
         <div className="info-panel__flag" />
         <h2>{panel.title}</h2>
         {panel.subtitle && <div className="info-panel__sub">{panel.subtitle}</div>}
-        {panel.kind === 'copycat' && <CopycatPanel />}
+        {panel.kind === 'tournament' && <TournamentPicker onClose={close} />}
         {(panel.kind === 'preview' || panel.kind === 'shop') && <p className="panel__lead">{panel.body}</p>}
         {panel.kind === 'scoreboard' && (
           <div className="scoreboard">
@@ -321,22 +267,30 @@ function Panel() {
                 {secrets.includes(id) && <StarSticker size={18} />}
               </div>
             ))}
-            <div className="scoreboard__row scoreboard__row--muted">
+            <div className="scoreboard__row">
               <span>Copycat Conductor best</span>
-              <strong>— (records import at Milestone 4)</strong>
+              <strong>{records['copycat-conductor'] ? `${records['copycat-conductor'].best} rounds` : 'not played yet'}</strong>
+            </div>
+            <div className="scoreboard__row scoreboard__row--muted">
+              <span>Tournament wins</span>
+              <strong>
+                Blitz {tWins.blitz ?? 0} · Normal {tWins.normal ?? 0} · Treasure {tWins.treasure ?? 0}
+              </strong>
             </div>
           </div>
         )}
-        <div className="panel__actions">
-          <ToyButton tone="ink" onClick={close} autoFocus>
-            Back to the square
-          </ToyButton>
-          {!touchUI && (
-            <span className="panel__esc">
-              or <KeyCap k="Esc" wide />
-            </span>
-          )}
-        </div>
+        {panel.kind !== 'tournament' && (
+          <div className="panel__actions">
+            <ToyButton tone="ink" onClick={close} autoFocus>
+              Back to the square
+            </ToyButton>
+            {!touchUI && (
+              <span className="panel__esc">
+                or <KeyCap k="Esc" wide />
+              </span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -375,6 +329,7 @@ export function Overlay() {
     <div className="overlay">
       {screen === 'menu' && <MainMenu />}
       {screen === 'workshop' && <WorkshopScreen />}
+      {screen === 'minigame' && <MatchOverlay />}
       {screen === 'playing' && <Hud />}
       {screen === 'playing' && panel && <Panel />}
       {screen === 'playing' && paused && !panel && <PauseMenu />}

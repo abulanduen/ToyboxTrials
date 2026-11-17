@@ -86,7 +86,7 @@ export function Fingerpost() {
       { label: 'Workshop', sub: 'Paint · hats · keys', accent: PALETTE.toyBlue, ...frontOf(WORKSHOP.x, WORKSHOP.z, WORKSHOP.rot, 5) },
       { label: 'Odds & Ends', sub: 'Shop', accent: PALETTE.sage, ...frontOf(SHOP.x, SHOP.z, SHOP.rot, 8) },
       { label: 'Scoreboard', sub: 'Secrets', accent: PALETTE.coral, ...frontOf(SCOREBOARD.x, SCOREBOARD.z, SCOREBOARD.rot, 3) },
-      { label: 'Pavilion', sub: 'Lobby · soon', accent: PALETTE.inkPurple, x: PAVILION.x, z: PAVILION.z + PAVILION.d / 2 },
+      { label: 'Pavilion', sub: 'Tournaments', accent: PALETTE.inkPurple, x: PAVILION.x, z: PAVILION.z + PAVILION.d / 2 },
     ].map((t, i) => {
       const dx = t.x - POST.x;
       const dz = t.z - POST.z;

@@ -49,11 +49,14 @@ export function PlayerController() {
   const shadow = useRef<THREE.Mesh>(null!);
   const anim = useRef<ToyAnim>(createToyAnim());
 
+  // Coming back from a minigame: stand where we left the hub, camera already behind us.
+  const ret = useGame.getState().hubReturn;
+  const startYaw = ret ? ret.yaw : useGame.getState().screen === 'menu' ? 0 : SPAWN.yaw; // face the camera on the menu
   const sim = useRef({
-    pos: new THREE.Vector3(SPAWN.x, 0, SPAWN.z),
+    pos: new THREE.Vector3(ret ? ret.x : SPAWN.x, 0, ret ? ret.z : SPAWN.z),
     vel: new THREE.Vector2(),
-    yaw: useGame.getState().screen === 'menu' ? 0 : SPAWN.yaw, // face the camera on the menu
-    camYaw: 0,
+    yaw: startYaw,
+    camYaw: startYaw + Math.PI,
     camPitch: DEFAULT_PITCH,
     camDist: CAM_DIST,
     camTarget: new THREE.Vector3(SPAWN.x, TARGET_H, SPAWN.z),
@@ -69,8 +72,8 @@ export function PlayerController() {
     wsYaw: 0,
     wsYawTarget: 0,
     wsDist: 10,
-    /** Cut (rather than sweep) the camera on the next menu frame. */
-    snapCam: false,
+    /** Cut (rather than sweep) the camera on the next frame. */
+    snapCam: !!ret,
     /** Next idle wave on the main menu. */
     nextWave: 3,
   });
@@ -183,6 +186,10 @@ export function PlayerController() {
       }),
     [],
   );
+
+  useEffect(() => {
+    if (useGame.getState().hubReturn) useGame.getState().set({ hubReturn: null });
+  }, []);
 
   // ---------- test hooks (?debug only) ----------
   useEffect(() => {

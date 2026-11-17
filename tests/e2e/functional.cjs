@@ -61,14 +61,14 @@ const check = (name, ok, detail = '') => { results.push(`${ok ? 'PASS' : 'FAIL'}
   check('prompt shows at Copycat gate', !!promptTxt && promptTxt.includes('Copycat'), JSON.stringify(promptTxt));
   await page.screenshot({ path: `${OUT}/10-gate-prompt.png` });
   await page.keyboard.press('KeyE');
-  await page.waitForTimeout(2000);
-  check('E opens Copycat Conductor panel', await page.isVisible('.info-panel'), await page.textContent('.info-panel h2').catch(() => ''));
-  await page.keyboard.press('KeyS');
-  await page.waitForTimeout(400);
-  await page.screenshot({ path: `${OUT}/11-copycat-panel.png` });
-  await page.keyboard.press('Escape');
+  await page.waitForSelector('.match-intro', { timeout: 60000 }).catch(() => null);
+  await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
+  check('E at the gate opens the Copycat Conductor intro', await page.isVisible('.match-intro'), await page.textContent('.match-intro h2').catch(() => ''));
+  await page.screenshot({ path: `${OUT}/11-copycat-intro.png` });
+  await page.click('[data-testid=match-leave]');
+  await page.waitForSelector('.hud-sign', { timeout: 60000 }).catch(() => null);
   await page.waitForTimeout(1200);
-  check('Esc closes panel without opening pause', !(await page.isVisible('.info-panel')) && !(await page.isVisible('.pause')));
+  check('leaving the intro returns to the Playroom unpaused', (await page.isVisible('.hud-sign')) && !(await page.isVisible('.pause')));
 
   // Pause via Escape (no pointer lock in headless)
   await page.keyboard.press('Escape');

@@ -7,7 +7,7 @@ import { unlockAudio } from './game/audio';
 import { useGame, type Screen } from './game/store';
 
 /** Shareable deep links: #play and #workshop open straight onto a screen. */
-const HASH: Record<Screen, string> = { menu: '', playing: '#play', workshop: '#workshop' };
+const HASH: Record<Screen, string> = { menu: '', playing: '#play', workshop: '#workshop', minigame: '#play' };
 function screenFromHash(): Screen | null {
   const h = window.location.hash;
   return h === '#play' ? 'playing' : h === '#workshop' ? 'workshop' : h === '' || h === '#' ? 'menu' : null;
