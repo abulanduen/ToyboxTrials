@@ -61,7 +61,13 @@ Built: an original bank of 26 categories with tiered answers, forgiving answer m
 typos), a rules core with a hidden fuse, bots that know more of the unusual answers at higher difficulty, the
 biscuit-tin arena, and a typing HUD that keeps the answer box clear of phone keyboards. The coral hub gate opens it,
 and it joins the tournament rotation. Untuned: fuse range (12–28 s) and bot speeds need real-player testing.
-Next: **Find the Original**.
+**Find the Original** ✅ (first pass) is a five-round spot-the-real-one race. Built: Baldwyn and his look-alikes
+as a trait table (11 possible mistakes in three tiers of subtlety), a seeded rules core (crowds of 6 → 24,
+order points plus a speed bonus, wrong-pick penalty and lockout, a "hurry" clock after the first find), bots
+with per-difficulty scan speed and slip rates, an instanced crowd with a reference card that stays on screen,
+and tap / click / keyboard picking with finger-sized targets in portrait and landscape. It is in the tournament
+rotation. Still to do: a hub entrance (for now `__toybox.match.practice('find-the-original')` with `?debug`,
+or a tournament), and tuning of timings, points and bot speeds with real players on real phones.
 Both are easy to make bots for and work well alone or with bots.
 _Depends on:_ M4.
 

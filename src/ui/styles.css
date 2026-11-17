@@ -2005,3 +2005,158 @@ canvas {
     display: none;
   }
 }
+
+/* ---------- Find the Original HUD ----------
+   The reference card and the crowd are drawn in 3D; their screen positions come from
+   screenLayout() in src/minigames/findoriginal/Scene.tsx. Keep the two in step. */
+.fo-hud {
+  --fo-card-h: clamp(130px, 36vh, 230px);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.fo-hud--locked::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 0 5px rgba(231, 107, 98, 0.85), inset 0 0 70px rgba(231, 107, 98, 0.35);
+  animation: fade-in 0.15s both;
+}
+.fo-top {
+  position: absolute;
+  top: calc(10px + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  width: min(560px, calc(100vw - 150px));
+}
+.fo-stickers {
+  display: flex;
+  gap: 6px;
+}
+.fo-score strong {
+  font: 700 1.05rem var(--font-display);
+}
+.fo-banner {
+  max-width: 100%;
+}
+.fo-timer.hurry > div {
+  background: repeating-linear-gradient(-45deg, var(--honey) 0 6px, var(--coral) 6px 12px);
+}
+.fo-lock {
+  position: absolute;
+  left: 50%;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 6px 14px 8px;
+  border-radius: 14px;
+  border: 3px solid var(--ink-deep);
+  background: #f3b1ab;
+  box-shadow: 0 4px 0 rgba(43, 36, 51, 0.4);
+  font: 700 0.85rem var(--font-body);
+  white-space: nowrap;
+}
+.fo-lock__bar {
+  width: 150px;
+  height: 9px;
+  border-radius: 5px;
+  border: 2px solid var(--ink-deep);
+  background: rgba(255, 249, 238, 0.7);
+  overflow: hidden;
+}
+.fo-lock__bar > div {
+  height: 100%;
+  background: var(--ink-deep);
+  transition: width 0.09s linear;
+}
+.fo-field {
+  position: absolute;
+  top: calc(78px + env(safe-area-inset-top));
+  right: calc(12px + env(safe-area-inset-right));
+  width: 130px;
+  display: grid;
+  gap: 5px;
+}
+.fo-chip {
+  min-width: 0;
+  font-size: 0.76rem;
+  padding-right: 8px;
+}
+.fo-chip .cc-chip__dot {
+  flex: none;
+}
+.fo-chip__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fo-chip b {
+  font: 700 0.7rem var(--font-display);
+  color: #2f6b3a;
+}
+.fo-chip em {
+  font-style: normal;
+  opacity: 0.7;
+}
+.fo-chip.locked {
+  background: #f3b1ab;
+}
+@media (orientation: portrait) {
+  .fo-hud {
+    --fo-card-h: clamp(124px, 17vh, 170px);
+  }
+  .fo-top {
+    width: calc(100vw - 150px);
+  }
+  .fo-banner {
+    font-size: clamp(0.95rem, 4.4vw, 1.5rem);
+    padding: 7px 12px;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.1;
+  }
+  .fo-field {
+    top: calc(128px + env(safe-area-inset-top));
+    left: calc(24px + env(safe-area-inset-left) + var(--fo-card-h) * 0.8);
+    right: calc(10px + env(safe-area-inset-right));
+    width: auto;
+    grid-template-columns: 1fr 1fr;
+    align-content: start;
+  }
+}
+@media (max-height: 519px) and (orientation: landscape) {
+  .fo-top {
+    top: calc(8px + env(safe-area-inset-top));
+    grid-template-columns: auto auto;
+    justify-content: center;
+    align-items: center;
+    gap: 4px 10px;
+    width: calc(100vw - 320px);
+  }
+  .fo-stickers {
+    flex-direction: column;
+    gap: 2px;
+  }
+  .fo-stickers .sticker {
+    padding: 0 10px;
+    font-size: 0.78rem;
+  }
+  .fo-banner {
+    padding: 4px 14px;
+    font-size: 1.15rem;
+  }
+  .fo-timer {
+    grid-column: 1 / -1;
+    height: 8px;
+  }
+  .fo-field {
+    top: calc(74px + env(safe-area-inset-top));
+  }
+}
