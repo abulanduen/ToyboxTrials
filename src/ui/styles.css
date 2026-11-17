@@ -2041,6 +2041,7 @@ canvas {
 }
 .fo-banner {
   max-width: 100%;
+  box-sizing: border-box;
 }
 .fo-timer.hurry > div {
   background: repeating-linear-gradient(-45deg, var(--honey) 0 6px, var(--coral) 6px 12px);
@@ -2113,7 +2114,7 @@ canvas {
     --fo-card-h: clamp(124px, 17vh, 170px);
   }
   .fo-top {
-    width: calc(100vw - 150px);
+    width: calc(100vw - 160px);
   }
   .fo-banner {
     font-size: clamp(0.95rem, 4.4vw, 1.5rem);

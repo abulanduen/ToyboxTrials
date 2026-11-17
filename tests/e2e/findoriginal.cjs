@@ -214,6 +214,7 @@ async function desktop(browser, errors) {
   await page.waitForTimeout(900);
   const rows = await page.$$eval('.results-list li', (els) => els.map((e) => e.textContent));
   check('bots: results rank all four toys', rows.length === 4, rows.join(' | '));
+  check('bots: results show points, not "last standing"', rows.every((r) => /\d+ points?/.test(r)) && !rows.some((r) => r.includes('last standing')), rows[0]);
   const last = await d.F();
   check('bots: never picking leaves you on 0 points', last.me.score === 0 && last.players.some((p) => p.score > 0));
   await page.screenshot({ path: `${OUT}/fo-10-bots-results.png` });

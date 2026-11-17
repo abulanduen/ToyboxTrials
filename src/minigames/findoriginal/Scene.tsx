@@ -311,10 +311,14 @@ export function FindScene({ getState, localId }: MinigameSceneProps<FindState>) 
     const aw = Math.max(40, lay.area.x1 - lay.area.x0);
     const ah = Math.max(40, lay.area.y1 - lay.area.y0);
     const projW = nx * CU;
-    const projH = nz * CV * sinE + TOY_HEIGHT * cosE;
-    let wpp = Math.max(projW / (aw * 0.96), projH / (ah * 0.94), (MIN_DIST * 2 * tanHalf) / H);
+    // When the width is what limits the zoom (tall phones), spread the rows out to use the spare
+    // height: more room between toys front-to-back, so they hide each other less.
+    const wppWide = Math.max(projW / (aw * 0.96), (MIN_DIST * 2 * tanHalf) / H);
+    const cv = clamp((ah * 0.94 * wppWide - TOY_HEIGHT * cosE) / (nz * sinE), CV, CV * 1.45);
+    const projH = nz * cv * sinE + TOY_HEIGHT * cosE;
+    let wpp = Math.max(wppWide, projH / (ah * 0.94));
     let d = (wpp * H) / (2 * tanHalf);
-    wpp *= 1 + (nz * CV * 0.5 * cosE) / d; // the nearest row is a little bigger than the middle one
+    wpp *= 1 + (nz * cv * 0.5 * cosE) / d; // the nearest row is a little bigger than the middle one
     d = (wpp * H) / (2 * tanHalf);
     const ox = (lay.area.x0 + lay.area.x1) / 2 - W / 2;
     const oy = (lay.area.y0 + lay.area.y1) / 2 - H / 2;
@@ -331,7 +335,7 @@ export function FindScene({ getState, localId }: MinigameSceneProps<FindState>) 
 
     // ---- tray ----
     vw.tray.x += (nx * CU + 2.5 - vw.tray.x) * k;
-    vw.tray.y += (nz * CV + 2.5 - vw.tray.y) * k;
+    vw.tray.y += (nz * cv + 2.5 - vw.tray.y) * k;
     const tw = vw.tray.x;
     const td = vw.tray.y;
     const [board, rimL, rimR, rimF, rimB] = tray.current.children;
@@ -361,7 +365,7 @@ export function FindScene({ getState, localId }: MinigameSceneProps<FindState>) 
       const toy = s.toys[i];
       toyPose(s, i, pose);
       const x = ((lay.portrait ? pose.v : pose.u) - nx / 2) * CU;
-      const z = ((lay.portrait ? pose.u : pose.v) - nz / 2) * CV;
+      const z = ((lay.portrait ? pose.u : pose.v) - nz / 2) * cv;
       let scale = phase === 'search' ? easeOutBack(clamp((s.searchT - i * 16) / 280, 0, 1)) : 1;
       let squash = 1;
       let y = BASE_Y;

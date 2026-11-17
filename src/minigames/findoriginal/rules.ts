@@ -68,8 +68,8 @@ export const DEFAULT_CONFIG: FindConfig = {
     { cols: 3, rows: 2, diffs: [2, 3], tierWeights: [3, 2, 1], needTier: 0, drift: 0, turn: 0, hardness: 0 },
     { cols: 4, rows: 3, diffs: [1, 2], tierWeights: [2, 3, 1], needTier: 1, drift: 0, turn: 0, hardness: 0.25 },
     { cols: 5, rows: 3, diffs: [1, 2], tierWeights: [0, 3, 2], needTier: 2, drift: 0.08, turn: 0.12, hardness: 0.5 },
-    { cols: 5, rows: 4, diffs: [1, 1], tierWeights: [0, 3, 3], needTier: 2, drift: 0.12, turn: 0.22, hardness: 0.8 },
-    { cols: 6, rows: 4, diffs: [1, 1], tierWeights: [0, 1, 3], needTier: 2, drift: 0.16, turn: 0.32, hardness: 1 },
+    { cols: 5, rows: 4, diffs: [1, 1], tierWeights: [0, 3, 3], needTier: 2, drift: 0.11, turn: 0.22, hardness: 0.8 },
+    { cols: 6, rows: 4, diffs: [1, 1], tierWeights: [0, 1, 3], needTier: 2, drift: 0.14, turn: 0.32, hardness: 1 },
   ],
   introMs: 900,
   firstStudyMs: 3400,
@@ -151,7 +151,7 @@ export function toyPose(s: FindState, i: number, out = { u: 0, v: 0, yaw: 0 }) {
   const t = s.searchT / 1000;
   const k = s.spec.drift;
   out.u = toy.col + 0.5 + toy.jx + k * Math.sin(TAU * toy.f * t + toy.ph);
-  out.v = toy.row + 0.5 + toy.jz + k * 0.8 * Math.sin(TAU * toy.f * 0.83 * t + toy.ph2);
+  out.v = toy.row + 0.5 + toy.jz + k * 0.5 * Math.sin(TAU * toy.f * 0.83 * t + toy.ph2);
   out.yaw = s.spec.turn * Math.sin(TAU * toy.f * 0.6 * t + toy.ph + toy.ph2);
   return out;
 }
@@ -196,7 +196,7 @@ function buildCrowd(seed: number, round: number, spec: RoundSpec): Toy[] {
     col: i % spec.cols,
     row: Math.floor(i / spec.cols),
     jx: (rng() - 0.5) * 0.12,
-    jz: (rng() - 0.5) * 0.12,
+    jz: (rng() - 0.5) * 0.06,
     ph: rng() * TAU,
     ph2: rng() * TAU,
     f: 0.16 + rng() * 0.12,
