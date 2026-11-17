@@ -82,14 +82,26 @@ Base44 version's menu, customisation or settings (17 Nov 2026), so nothing here 
   and the contender's name on the HUD.
 - The results screen arrives with the first minigame (M4).
 
-**M4 · Copycat Conductor integration.**
-1. Characterisation tests on the *existing* rules (sequence, timing, scoring, restart, records).
-2. Wrap the existing logic as a `MinigameDefinition` (see `src/minigames/types.ts`). Keep its state machine unchanged.
-3. New presentation: fixed, gently elevated camera on a cigar-box stage; four instruments
-   (A coral drum, S golden bell, J blue xylophone, K green music box) as 3D props with hit
-   animations; a wind-up conductor (the mascot model with a baton) demonstrates sequences.
-4. Swap the sound triggers to the synthesised voices (`sfx.drum/bell/xylophone/musicBox`), which already exist.
-5. Re-run the characterisation tests and fix only *confirmed* defects.
+**M4 · Minigame host + Copycat Conductor (redesigned).** The Base44 version isn't being ported, so
+Copycat is designed fresh. It's the first of many games, so M4 builds the shared runtime first:
+1. **Minigame host:**
+   - lazy-load the minigame module and dispose of its scene
+   - intro card showing controls (keyboard + touch)
+   - a 3-2-1 countdown
+   - pause/quit
+   - a shared **Results** screen (placements, score, personal best, cosmetic rewards)
+   - records saved per game
+2. **Copycat rules core** (pure and unit-tested): a growing sequence over 4 instruments, with playback
+   speeding up by round, an input window per note, lives or a fail rule, scoring, and a seeded RNG so
+   later multiplayer rounds get identical sequences.
+3. **Presentation:**
+   - a cigar-box stage with felt curtains and a fixed, gently elevated camera
+   - the four instruments (A coral drum, S golden bell, J blue xylophone, K green music box) as 3D
+     props with hit animations and the existing synthesised voices
+   - the contender model as a wind-up conductor with a baton, demonstrating each sequence
+4. **Touch:** the instruments are the buttons (2×2 in portrait, a row in landscape), and tapping the 3D
+   instrument also counts.
+5. Desktop, mobile and rules-core tests.
 
 **M5 · Performance & polish.** Real-device testing (integrated GPU laptop, mid-range Android phone, iPhone Safari, tablet),
 static-geometry merging, shadow budget, loading screen, resize/orientation, audio mix pass,

@@ -1,7 +1,7 @@
 {
   "$comment": "Toybox Trials asset manifest. Concept art is reference only and is stripped from production builds (see vite.config.ts). Production 3D models, textures and audio are generated in code, so there are no binary assets to license.",
   "version": 1,
-  "updated": "2026-11-16",
+  "updated": "2026-11-17",
   "conventions": {
     "folders": {
       "concepts": "Art-direction reference images. Never loaded by the game.",
@@ -49,40 +49,324 @@
       "prompt": "docs/04-concept-art-prompts.md (02)",
       "notes": "Same mascot caveat as concept-01."
     },
-    { "id": "concept-03", "file": "concepts/concept-03-copycat-conductor-music-theatre.png", "status": "prompt-only", "type": "concept-art", "subject": "Copycat Conductor mechanical music theatre", "width": 1344, "height": 752, "aspect": "16:9", "transparency": false, "camera": "Gently elevated, facing stage", "intendedUse": "Milestone 4 scene reference", "prompt": "docs/04-concept-art-prompts.md (03)", "notes": "Generation attempted twice via ElevenLabs; provider busy, nothing charged." },
-    { "id": "concept-04", "file": "concepts/concept-04-inferno-escape-cardboard-labyrinth.png", "status": "prompt-only", "type": "concept-art", "subject": "Inferno Escape cardboard labyrinth", "aspect": "16:9", "transparency": false, "camera": "Top-down three-quarter", "prompt": "docs/04-concept-art-prompts.md (04)" },
-    { "id": "concept-05", "file": "concepts/concept-05-midnight-hunger-survival-arena.png", "status": "prompt-only", "type": "concept-art", "subject": "Midnight Hunger wind-up survival arena (night)", "aspect": "16:9", "transparency": false, "camera": "Toy height, behind and above", "prompt": "docs/04-concept-art-prompts.md (05)" },
-    { "id": "concept-06", "file": "concepts/concept-06-find-the-original-collection-shelf.png", "status": "prompt-only", "type": "concept-art", "subject": "Find the Original toy-collection shelf", "aspect": "16:9", "transparency": false, "camera": "Toy height along shelf ledge", "prompt": "docs/04-concept-art-prompts.md (06)" },
-    { "id": "concept-07", "file": "concepts/concept-07-red-light-green-light-runway.png", "status": "prompt-only", "type": "concept-art", "subject": "Red Light, Green Light toy runway", "aspect": "16:9", "transparency": false, "camera": "Toy height down the runway", "prompt": "docs/04-concept-art-prompts.md (07)" },
-    { "id": "concept-08", "file": "concepts/concept-08-blink-duel-battle-arena.png", "status": "prompt-only", "type": "concept-art", "subject": "Blink Duel miniature battle arena", "aspect": "16:9", "transparency": false, "camera": "Elevated three-quarter", "prompt": "docs/04-concept-art-prompts.md (08)" },
-    { "id": "concept-09", "file": "concepts/concept-09-wind-up-dash-obstacle-course.png", "status": "prompt-only", "type": "concept-art", "subject": "Wind-Up Dash obstacle course", "aspect": "16:9", "transparency": false, "camera": "Toy height, chasing racers", "prompt": "docs/04-concept-art-prompts.md (09)" },
-    { "id": "concept-10", "file": "concepts/concept-10-music-box-rhythm-stage.png", "status": "prompt-only", "type": "concept-art", "subject": "Music Box Rhythm performance stage", "aspect": "16:9", "transparency": false, "camera": "Lanes running toward camera", "prompt": "docs/04-concept-art-prompts.md (10)" },
-    { "id": "concept-11", "file": "concepts/concept-11-toy-squad-strategy-board.png", "status": "prompt-only", "type": "concept-art", "subject": "Toy Squad miniature strategy board", "aspect": "16:9", "transparency": false, "camera": "Higher three-quarter for readability", "prompt": "docs/04-concept-art-prompts.md (11)" },
-    { "id": "concept-12", "file": "concepts/concept-12-spellbox-showdown-arena.png", "status": "prompt-only", "type": "concept-art", "subject": "Spellbox Showdown magical toy arena", "aspect": "16:9", "transparency": false, "camera": "Elevated three-quarter", "prompt": "docs/04-concept-art-prompts.md (12)" },
-    { "id": "concept-13", "file": "concepts/concept-13-toybox-trivia-game-show.png", "status": "prompt-only", "type": "concept-art", "subject": "Toybox Trivia game-show stage", "aspect": "16:9", "transparency": false, "camera": "Front-on stage view", "prompt": "docs/04-concept-art-prompts.md (13)" },
-
-    { "id": "ref-mascot-front", "file": "characters/ref-01-contender-front.png", "status": "prompt-only", "type": "character-reference", "aspect": "1:1", "transparency": true, "camera": "Orthographic front", "prompt": "docs/04-concept-art-prompts.md (A1)" },
-    { "id": "ref-mascot-side", "file": "characters/ref-02-contender-side.png", "status": "prompt-only", "type": "character-reference", "aspect": "1:1", "transparency": true, "camera": "Orthographic side", "prompt": "docs/04-concept-art-prompts.md (A1)" },
-    { "id": "ref-mascot-rear", "file": "characters/ref-03-contender-rear.png", "status": "prompt-only", "type": "character-reference", "aspect": "1:1", "transparency": true, "camera": "Orthographic rear", "prompt": "docs/04-concept-art-prompts.md (A1)" },
-    { "id": "ref-mascot-blueprint", "file": "../../docs/assets/contender-blueprint.svg", "status": "created", "type": "character-reference", "width": 960, "height": 560, "transparency": false, "camera": "Orthographic front / side / rear", "intendedUse": "Construction sheet matching the in-game 3D model", "source": "Hand-authored SVG in this repository", "license": "Original work for this project" },
-    { "id": "ref-colour-variations", "file": "characters/ref-04-contender-paint-jobs.png", "status": "prompt-only", "type": "character-reference", "aspect": "16:9", "transparency": true, "prompt": "docs/04-concept-art-prompts.md (A2)" },
-    { "id": "ref-accessories", "file": "characters/ref-05-hats-and-accessories.png", "status": "prompt-only", "type": "character-reference", "aspect": "16:9", "transparency": true, "prompt": "docs/04-concept-art-prompts.md (A3)" },
-    { "id": "ref-blocks", "file": "props/ref-06-wooden-blocks-kit.png", "status": "prompt-only", "type": "prop-reference", "aspect": "16:9", "transparency": true, "prompt": "docs/04-concept-art-prompts.md (A4)" },
-    { "id": "ref-felt", "file": "props/ref-07-felt-platforms.png", "status": "prompt-only", "type": "prop-reference", "aspect": "16:9", "transparency": true, "prompt": "docs/04-concept-art-prompts.md (A5)" },
-    { "id": "ref-cardboard", "file": "props/ref-08-cardboard-walls.png", "status": "prompt-only", "type": "prop-reference", "aspect": "16:9", "transparency": true, "prompt": "docs/04-concept-art-prompts.md (A6)" },
-    { "id": "ref-mechanisms", "file": "props/ref-09-buttons-and-mechanisms.png", "status": "prompt-only", "type": "prop-reference", "aspect": "16:9", "transparency": true, "prompt": "docs/04-concept-art-prompts.md (A7)" },
-    { "id": "ref-cards", "file": "ui/ref-10-game-cards-and-scoreboards.png", "status": "prompt-only", "type": "ui-reference", "aspect": "16:9", "transparency": true, "prompt": "docs/04-concept-art-prompts.md (A8)" },
-    { "id": "ref-title", "file": "ui/ref-11-title-treatment.png", "status": "prompt-only", "type": "ui-reference", "aspect": "16:9", "transparency": true, "prompt": "docs/04-concept-art-prompts.md (A9)", "notes": "A code-rendered title sign is implemented in src/ui (Overlay.tsx + styles.css)." },
-    { "id": "ref-instruments", "file": "props/ref-12-copycat-instruments.png", "status": "prompt-only", "type": "prop-reference", "aspect": "16:9", "transparency": true, "prompt": "docs/04-concept-art-prompts.md (A10)" },
-    { "id": "env-room-plate", "file": "environments/env-01-bedroom-backdrop-plate.jpg", "status": "prompt-only", "type": "environment-backdrop", "aspect": "21:9", "transparency": false, "intendedUse": "Optional pre-rendered backdrop for a future ultra-low tier", "prompt": "docs/04-concept-art-prompts.md (A11)" }
+    {
+      "id": "concept-03",
+      "file": "concepts/concept-03-copycat-conductor-music-theatre.png",
+      "status": "prompt-only",
+      "type": "concept-art",
+      "subject": "Copycat Conductor mechanical music theatre",
+      "width": 1344,
+      "height": 752,
+      "aspect": "16:9",
+      "transparency": false,
+      "camera": "Gently elevated, facing stage",
+      "intendedUse": "Milestone 4 scene reference",
+      "prompt": "docs/04-concept-art-prompts.md (03)",
+      "notes": "Generation attempted twice via ElevenLabs; provider busy, nothing charged."
+    },
+    {
+      "id": "concept-04",
+      "file": "concepts/concept-04-inferno-escape-cardboard-labyrinth.png",
+      "status": "prompt-only",
+      "type": "concept-art",
+      "subject": "Inferno Escape cardboard labyrinth",
+      "aspect": "16:9",
+      "transparency": false,
+      "camera": "Top-down three-quarter",
+      "prompt": "docs/04-concept-art-prompts.md (04)"
+    },
+    {
+      "id": "concept-05",
+      "file": "concepts/concept-05-midnight-hunger-survival-arena.png",
+      "status": "prompt-only",
+      "type": "concept-art",
+      "subject": "Midnight Hunger wind-up survival arena (night)",
+      "aspect": "16:9",
+      "transparency": false,
+      "camera": "Toy height, behind and above",
+      "prompt": "docs/04-concept-art-prompts.md (05)"
+    },
+    {
+      "id": "concept-06",
+      "file": "concepts/concept-06-find-the-original-collection-shelf.png",
+      "status": "prompt-only",
+      "type": "concept-art",
+      "subject": "Find the Original toy-collection shelf",
+      "aspect": "16:9",
+      "transparency": false,
+      "camera": "Toy height along shelf ledge",
+      "prompt": "docs/04-concept-art-prompts.md (06)"
+    },
+    {
+      "id": "concept-07",
+      "file": "concepts/concept-07-red-light-green-light-runway.png",
+      "status": "prompt-only",
+      "type": "concept-art",
+      "subject": "Red Light, Green Light toy runway",
+      "aspect": "16:9",
+      "transparency": false,
+      "camera": "Toy height down the runway",
+      "prompt": "docs/04-concept-art-prompts.md (07)"
+    },
+    {
+      "id": "concept-08",
+      "file": "concepts/concept-08-blink-duel-battle-arena.png",
+      "status": "prompt-only",
+      "type": "concept-art",
+      "subject": "Blink Duel miniature battle arena",
+      "aspect": "16:9",
+      "transparency": false,
+      "camera": "Elevated three-quarter",
+      "prompt": "docs/04-concept-art-prompts.md (08)"
+    },
+    {
+      "id": "concept-09",
+      "file": "concepts/concept-09-wind-up-dash-obstacle-course.png",
+      "status": "prompt-only",
+      "type": "concept-art",
+      "subject": "Wind-Up Dash obstacle course",
+      "aspect": "16:9",
+      "transparency": false,
+      "camera": "Toy height, chasing racers",
+      "prompt": "docs/04-concept-art-prompts.md (09)"
+    },
+    {
+      "id": "concept-10",
+      "file": "concepts/concept-10-music-box-rhythm-stage.png",
+      "status": "prompt-only",
+      "type": "concept-art",
+      "subject": "Music Box Rhythm performance stage",
+      "aspect": "16:9",
+      "transparency": false,
+      "camera": "Lanes running toward camera",
+      "prompt": "docs/04-concept-art-prompts.md (10)"
+    },
+    {
+      "id": "concept-11",
+      "file": "concepts/concept-11-toy-squad-strategy-board.png",
+      "status": "prompt-only",
+      "type": "concept-art",
+      "subject": "Toy Squad miniature strategy board",
+      "aspect": "16:9",
+      "transparency": false,
+      "camera": "Higher three-quarter for readability",
+      "prompt": "docs/04-concept-art-prompts.md (11)"
+    },
+    {
+      "id": "concept-12",
+      "file": "concepts/concept-12-spellbox-showdown-arena.png",
+      "status": "prompt-only",
+      "type": "concept-art",
+      "subject": "Spellbox Showdown magical toy arena",
+      "aspect": "16:9",
+      "transparency": false,
+      "camera": "Elevated three-quarter",
+      "prompt": "docs/04-concept-art-prompts.md (12)"
+    },
+    {
+      "id": "concept-13",
+      "file": "concepts/concept-13-toybox-trivia-game-show.png",
+      "status": "prompt-only",
+      "type": "concept-art",
+      "subject": "Toybox Trivia game-show stage",
+      "aspect": "16:9",
+      "transparency": false,
+      "camera": "Front-on stage view",
+      "prompt": "docs/04-concept-art-prompts.md (13)"
+    },
+    {
+      "id": "ref-mascot-front",
+      "file": "characters/ref-01-contender-front.png",
+      "status": "prompt-only",
+      "type": "character-reference",
+      "aspect": "1:1",
+      "transparency": true,
+      "camera": "Orthographic front",
+      "prompt": "docs/04-concept-art-prompts.md (A1)"
+    },
+    {
+      "id": "ref-mascot-side",
+      "file": "characters/ref-02-contender-side.png",
+      "status": "prompt-only",
+      "type": "character-reference",
+      "aspect": "1:1",
+      "transparency": true,
+      "camera": "Orthographic side",
+      "prompt": "docs/04-concept-art-prompts.md (A1)"
+    },
+    {
+      "id": "ref-mascot-rear",
+      "file": "characters/ref-03-contender-rear.png",
+      "status": "prompt-only",
+      "type": "character-reference",
+      "aspect": "1:1",
+      "transparency": true,
+      "camera": "Orthographic rear",
+      "prompt": "docs/04-concept-art-prompts.md (A1)"
+    },
+    {
+      "id": "ref-mascot-blueprint",
+      "file": "../../docs/assets/contender-blueprint.svg",
+      "status": "created",
+      "type": "character-reference",
+      "width": 960,
+      "height": 560,
+      "transparency": false,
+      "camera": "Orthographic front / side / rear",
+      "intendedUse": "Construction sheet matching the in-game 3D model",
+      "source": "Hand-authored SVG in this repository",
+      "license": "Original work for this project"
+    },
+    {
+      "id": "ref-colour-variations",
+      "file": "characters/ref-04-contender-paint-jobs.png",
+      "status": "prompt-only",
+      "type": "character-reference",
+      "aspect": "16:9",
+      "transparency": true,
+      "prompt": "docs/04-concept-art-prompts.md (A2)"
+    },
+    {
+      "id": "ref-accessories",
+      "file": "characters/ref-05-hats-and-accessories.png",
+      "status": "prompt-only",
+      "type": "character-reference",
+      "aspect": "16:9",
+      "transparency": true,
+      "prompt": "docs/04-concept-art-prompts.md (A3)"
+    },
+    {
+      "id": "ref-blocks",
+      "file": "props/ref-06-wooden-blocks-kit.png",
+      "status": "prompt-only",
+      "type": "prop-reference",
+      "aspect": "16:9",
+      "transparency": true,
+      "prompt": "docs/04-concept-art-prompts.md (A4)"
+    },
+    {
+      "id": "ref-felt",
+      "file": "props/ref-07-felt-platforms.png",
+      "status": "prompt-only",
+      "type": "prop-reference",
+      "aspect": "16:9",
+      "transparency": true,
+      "prompt": "docs/04-concept-art-prompts.md (A5)"
+    },
+    {
+      "id": "ref-cardboard",
+      "file": "props/ref-08-cardboard-walls.png",
+      "status": "prompt-only",
+      "type": "prop-reference",
+      "aspect": "16:9",
+      "transparency": true,
+      "prompt": "docs/04-concept-art-prompts.md (A6)"
+    },
+    {
+      "id": "ref-mechanisms",
+      "file": "props/ref-09-buttons-and-mechanisms.png",
+      "status": "prompt-only",
+      "type": "prop-reference",
+      "aspect": "16:9",
+      "transparency": true,
+      "prompt": "docs/04-concept-art-prompts.md (A7)"
+    },
+    {
+      "id": "ref-cards",
+      "file": "ui/ref-10-game-cards-and-scoreboards.png",
+      "status": "prompt-only",
+      "type": "ui-reference",
+      "aspect": "16:9",
+      "transparency": true,
+      "prompt": "docs/04-concept-art-prompts.md (A8)"
+    },
+    {
+      "id": "ref-title",
+      "file": "ui/ref-11-title-treatment.png",
+      "status": "prompt-only",
+      "type": "ui-reference",
+      "aspect": "16:9",
+      "transparency": true,
+      "prompt": "docs/04-concept-art-prompts.md (A9)",
+      "notes": "A code-rendered title sign is implemented in src/ui (Overlay.tsx + styles.css)."
+    },
+    {
+      "id": "ref-instruments",
+      "file": "props/ref-12-copycat-instruments.png",
+      "status": "prompt-only",
+      "type": "prop-reference",
+      "aspect": "16:9",
+      "transparency": true,
+      "prompt": "docs/04-concept-art-prompts.md (A10)"
+    },
+    {
+      "id": "env-room-plate",
+      "file": "environments/env-01-bedroom-backdrop-plate.jpg",
+      "status": "prompt-only",
+      "type": "environment-backdrop",
+      "aspect": "21:9",
+      "transparency": false,
+      "intendedUse": "Optional pre-rendered backdrop for a future ultra-low tier",
+      "prompt": "docs/04-concept-art-prompts.md (A11)"
+    },
+    {
+      "id": "room-dog-pitbull",
+      "file": "environments/room-dog-pitbull.glb",
+      "status": "requested",
+      "type": "room-creature-model",
+      "subject": "Brown American pit bull terrier (the family dog), lifelike room-layer creature",
+      "format": "GLB, quadruped rig with neck/head bones; animations idle/walk/sniff/lie_idle",
+      "triangles": "15k-40k",
+      "textures": "PBR 2048 (1024 copies for the Low tier)",
+      "intendedUse": "Background life in the room; occasionally sniffs at the table edge. Lazy-loaded.",
+      "source": "To be generated by the project owner with Meshy or Tripo",
+      "license": "Pending: confirm commercial-use rights for the generating plan",
+      "brief": "docs/06-room-dog-asset-brief.md"
+    },
+    {
+      "id": "room-dog-pitbull-lying",
+      "file": "environments/room-dog-pitbull-lying.glb",
+      "status": "requested-optional",
+      "type": "room-creature-model",
+      "subject": "Same dog in a lying pose (fallback if no quadruped rig is available)",
+      "brief": "docs/06-room-dog-asset-brief.md"
+    }
   ],
   "codeGenerated": [
-    { "id": "mesh-contender", "where": "src/character/WindupBot.tsx", "what": "Wind-up robot model + procedural animation" },
-    { "id": "mesh-hub", "where": "src/scene/Buildings.tsx, Interactive.tsx, props.tsx, Village.tsx", "what": "All hub architecture and props" },
-    { "id": "mesh-room", "where": "src/scene/Room.tsx", "what": "Table, desk lamp, books, mug, pencil, window, bed, shelf, walls" },
-    { "id": "tex-procedural", "where": "src/scene/textures.ts", "what": "Wood, felt, cardboard, stripes, sky, blob shadow, card faces" },
-    { "id": "sfx-synth", "where": "src/game/audio.ts", "what": "Every sound effect incl. Copycat A/S/J/K voices" },
-    { "id": "ui-svg", "where": "src/ui/icons.tsx", "what": "Wind-up key, gear, star sticker, contender badge" },
-    { "id": "fonts", "where": "@fontsource/fredoka, @fontsource/nunito", "what": "Self-hosted fonts, SIL Open Font License 1.1" }
+    {
+      "id": "mesh-contender",
+      "where": "src/character/WindupBot.tsx",
+      "what": "Wind-up robot model + procedural animation"
+    },
+    {
+      "id": "mesh-hub",
+      "where": "src/scene/Buildings.tsx, Interactive.tsx, props.tsx, Village.tsx",
+      "what": "All hub architecture and props"
+    },
+    {
+      "id": "mesh-room",
+      "where": "src/scene/Room.tsx",
+      "what": "Table, desk lamp, books, mug, pencil, window, bed, shelf, walls"
+    },
+    {
+      "id": "tex-procedural",
+      "where": "src/scene/textures.ts",
+      "what": "Wood, felt, cardboard, stripes, sky, blob shadow, card faces"
+    },
+    {
+      "id": "sfx-synth",
+      "where": "src/game/audio.ts",
+      "what": "Every sound effect incl. Copycat A/S/J/K voices"
+    },
+    {
+      "id": "ui-svg",
+      "where": "src/ui/icons.tsx",
+      "what": "Wind-up key, gear, star sticker, contender badge"
+    },
+    {
+      "id": "fonts",
+      "where": "@fontsource/fredoka, @fontsource/nunito",
+      "what": "Self-hosted fonts, SIL Open Font License 1.1"
+    }
   ]
 }

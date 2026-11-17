@@ -72,6 +72,7 @@ Things to find in the Playroom:
 | 5. Explorable 3D prototype | `src/` (run with `npm run dev`) |
 | 6. Run instructions | this file |
 | 7. Known limitations & performance risks | [`docs/05-known-limitations.md`](docs/05-known-limitations.md) |
+| Room dog model brief (Meshy/Tripo) | [`docs/06-room-dog-asset-brief.md`](docs/06-room-dog-asset-brief.md) |
 | Asset manifest | [`public/assets/asset-manifest.json`](public/assets/asset-manifest.json) |
 | Character construction sheet | [`docs/assets/contender-blueprint.svg`](docs/assets/contender-blueprint.svg) |
 

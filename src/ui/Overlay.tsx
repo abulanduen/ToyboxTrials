@@ -284,8 +284,8 @@ function CopycatPanel() {
         )}
       </p>
       <div className="panel__status">
-        <strong>Entrance ready · game not yet connected.</strong> The existing Copycat Conductor rules (sequence memory, timing, scoring, records) live in the
-        Base44 app, which isn’t in this repository yet. At Milestone 4 they mount here unchanged inside the mechanical music theatre.
+        <strong>Entrance ready · theatre under construction.</strong> Copycat Conductor is being rebuilt as a mechanical music theatre: watch the
+        conductor, then repeat the growing sequence on the four instruments. It opens at Milestone 4.
       </div>
     </>
   );

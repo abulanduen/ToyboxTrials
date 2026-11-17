@@ -5,9 +5,8 @@ import type { MinigameDefinition, TouchLayout } from './types';
 const TOUCH_TBD: TouchLayout = { movement: 'none', look: 'none', buttons: [], orientation: 'any', notes: 'To be designed with the minigame.' };
 
 /**
- * Catalogue of trials. Only Copycat Conductor has an entrance in the hub today, and its
- * existing implementation (from the Base44 app) is not in this repository yet — see
- * docs/01-architecture-audit.md for the integration checklist.
+ * Catalogue of trials. Only Copycat Conductor has an entrance in the hub today; it is being
+ * redesigned here (Milestone 4). Every trial plugs into the shared minigame host.
  */
 export const MINIGAMES: MinigameDefinition[] = [
   {

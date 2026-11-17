@@ -17,8 +17,17 @@ Read `docs/` (audit, plan, visual guide, prompts, limitations) before major work
   - Test every feature with `tests/e2e/mobile.cjs` (emulated phone, real touch events) as well as
     the desktop tests.
   - Budget for phones: touch devices default to the Low quality tier.
-- **Preserve Copycat Conductor's rules.** Its sequence, timing, ASJK mapping, scoring, restart and
-  records come from the existing Base44 app and must not change unless fixing a confirmed defect.
+- **This repo is the canonical game.** The earlier Base44 version is not being ported (owner decision,
+  17 Nov 2026). Copycat Conductor is being **redesigned**. Keep its core: repeat a growing sequence on
+  four instruments (A coral drum / S golden bell / J blue xylophone / K green music box, or tap them).
+- **Many minigames are planned (11+).** Each is a self-contained, lazy-loaded module behind the
+  `MinigameDefinition` contract, with a pure rules core plus a render layer. It reuses the shared
+  systems (input actions, audio bus, contender/cosmetics, results, settings). Never fork or
+  re-implement a shared system inside a minigame; extend the shared one instead.
+- **Two art layers.** Toys and the village are stylised, chunky and code-built. The real-world room can be
+  lifelike. Generated 3D models (Meshy/Tripo) are allowed for the room layer only (e.g. the family
+  dog). They must be GLB, compressed, lazy-loaded after the hub is interactive, skipped or simplified
+  on the Low tier, and recorded in `public/assets/asset-manifest.json` with source and licence.
 - **Original work only.** No recreated characters, levels, art or sounds from reference games.
   All sound is synthesised (`src/game/audio.ts`). No emoji or icon packs for important visuals.
 - **Honesty.** Don't claim performance or behaviour that hasn't been measured. This container has

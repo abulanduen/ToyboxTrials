@@ -14,9 +14,8 @@ _What is not done, not verified, or risky. Updated at Milestone 2._
 
 ## Functional limitations
 
-- **The existing app isn't here.** Copycat Conductor's real rules, records and the existing mascot
-  and customisation screens could not be inspected (see audit). The gate opens an entrance panel and
-  instrument bench only.
+- **Copycat Conductor isn't playable yet.** It's being redesigned at Milestone 4. The gate opens an entrance
+  panel with the instrument sound bench only.
 - **No gamepad input yet.** Keyboard, mouse and touch are supported.
 - **Panels scroll on short landscape phones.** On short landscape screens (about 400 px tall) the Copycat panel needs a short scroll to reach its button. Tapping outside a panel also closes it.
 - **No results screen yet.** It arrives with the first playable minigame (M4). Screen routing is store-driven with `#play` and `#workshop` deep links, not a router library.
