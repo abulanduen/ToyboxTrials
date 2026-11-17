@@ -6,3 +6,4 @@ dist
 test-results
 release
 tests/e2e/output
+.claude/worktrees
