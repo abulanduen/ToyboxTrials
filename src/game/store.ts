@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { device } from './input';
 
 export type Quality = 'low' | 'balanced' | 'high';
 export type Screen = 'title' | 'playing';
@@ -45,6 +46,8 @@ interface SessionSlice {
   panel: Panel | null;
   boostUntil: number;
   pointerLocked: boolean;
+  /** Show on-screen touch controls (touch-primary device, or a touch was seen). */
+  touchUI: boolean;
 }
 
 interface Actions {
@@ -69,7 +72,8 @@ export const useGame = create<GameState>()(
       // settings
       masterVolume: 0.8,
       sfxVolume: 0.9,
-      quality: 'balanced',
+      // Phones/tablets start on Low; players can raise it in the pause menu.
+      quality: device.touch ? 'low' : 'balanced',
       mouseSensitivity: 1,
       invertY: false,
       showFps: false,
@@ -84,6 +88,7 @@ export const useGame = create<GameState>()(
       panel: null,
       boostUntil: 0,
       pointerLocked: false,
+      touchUI: device.touch,
 
       set: (patch) => set(patch),
       setPrompt: (p) => {

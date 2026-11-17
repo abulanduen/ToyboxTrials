@@ -7,7 +7,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { WindupBot } from './WindupBot';
 import { createToyAnim, ELIM_DURATION, INTERACT_DURATION, RESPAWN_DURATION, type ToyAnim } from './anim';
-import { addMouseDelta, consumeMouseDelta, endFrame, isDown, wasPressed, clearInput } from '../game/input';
+import { addMouseDelta, consumeMouseDelta, endFrame, getMoveAxis, isDown, stickRunning, wasPressed, clearInput } from '../game/input';
 import { groundHeightAt, resolve } from '../game/collision';
 import { inputBlocked, useGame } from '../game/store';
 import { sfx } from '../game/audio';
@@ -66,17 +66,27 @@ export function PlayerController() {
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const tmp = useMemo(() => ({ dir: new THREE.Vector3(), desired: new THREE.Vector3(), look: new THREE.Vector3() }), []);
 
-  // ---------- mouse look: pointer lock when playing, drag as a fallback ----------
+  // ---------- look: pointer lock (mouse), drag (mouse fallback), drag (touch) ----------
   useEffect(() => {
     const el = gl.domElement;
-    let dragging = false;
-    const canLock = () => {
+    let mouseDragging = false;
+    // Touch: each finger that started on the canvas drags the camera. We compute deltas ourselves
+    // because `movementX` is unreliable for touch pointers (always 0 on iOS Safari).
+    const touches = new Map<number, { x: number; y: number }>();
+    const TOUCH_LOOK_GAIN = 2.2;
+    const canLook = () => {
       const s = useGame.getState();
       return s.screen === 'playing' && !s.paused && !s.panel;
     };
     const onDown = (e: PointerEvent) => {
-      if (!canLock()) return;
-      dragging = true;
+      if (e.pointerType === 'touch') {
+        if (!useGame.getState().touchUI) useGame.getState().set({ touchUI: true });
+        if (!canLook()) return;
+        touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        return;
+      }
+      if (!canLook()) return;
+      mouseDragging = true;
       if (e.pointerType === 'mouse' && !document.pointerLockElement) {
         const p = el.requestPointerLock?.() as unknown as Promise<void> | undefined;
         p?.catch?.(() => {
@@ -84,9 +94,20 @@ export function PlayerController() {
         });
       }
     };
-    const onUp = () => (dragging = false);
+    const onUp = (e: PointerEvent) => {
+      if (e.pointerType === 'touch') touches.delete(e.pointerId);
+      else mouseDragging = false;
+    };
     const onMove = (e: PointerEvent) => {
-      if (document.pointerLockElement === el || (dragging && canLock())) addMouseDelta(e.movementX, e.movementY);
+      if (e.pointerType === 'touch') {
+        const t = touches.get(e.pointerId);
+        if (!t) return;
+        if (canLook()) addMouseDelta((e.clientX - t.x) * TOUCH_LOOK_GAIN, (e.clientY - t.y) * TOUCH_LOOK_GAIN);
+        t.x = e.clientX;
+        t.y = e.clientY;
+        return;
+      }
+      if (document.pointerLockElement === el || (mouseDragging && canLook())) addMouseDelta(e.movementX, e.movementY);
     };
     const onLockChange = () => {
       const locked = document.pointerLockElement === el;
@@ -100,11 +121,13 @@ export function PlayerController() {
     };
     el.addEventListener('pointerdown', onDown);
     window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
     window.addEventListener('pointermove', onMove);
     document.addEventListener('pointerlockchange', onLockChange);
     return () => {
       el.removeEventListener('pointerdown', onDown);
       window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
       window.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerlockchange', onLockChange);
     };
@@ -134,7 +157,7 @@ export function PlayerController() {
         sim.current.camYaw = camYaw;
         sim.current.camPitch = camPitch;
       },
-      state: () => ({ x: sim.current.pos.x, y: sim.current.pos.y, z: sim.current.pos.z, yaw: sim.current.yaw, anim: { ...anim.current } }),
+      state: () => ({ x: sim.current.pos.x, y: sim.current.pos.y, z: sim.current.pos.z, yaw: sim.current.yaw, camYaw: sim.current.camYaw, camPitch: sim.current.camPitch, fov: (camera as THREE.PerspectiveCamera).fov, anim: { ...anim.current } }),
     });
   }, []);
 
@@ -205,22 +228,17 @@ export function PlayerController() {
     let ix = 0;
     let iz = 0;
     if (playing && !blocked && !eliminated) {
-      const f = (isDown('forward') ? 1 : 0) - (isDown('back') ? 1 : 0);
-      const r = (isDown('right') ? 1 : 0) - (isDown('left') ? 1 : 0);
+      // Keyboard and touch stick both arrive here as one analog vector (x = right, y = forward).
+      const m = getMoveAxis();
       // camera-relative: forward = away from camera
       const fx = -Math.sin(s.camYaw);
       const fz = -Math.cos(s.camYaw);
       const rx = Math.cos(s.camYaw);
       const rz = -Math.sin(s.camYaw);
-      ix = fx * f + rx * r;
-      iz = fz * f + rz * r;
-      const len = Math.hypot(ix, iz);
-      if (len > 1) {
-        ix /= len;
-        iz /= len;
-      }
+      ix = fx * m.y + rx * m.x;
+      iz = fz * m.y + rz * m.x;
     }
-    let maxSpeed = isDown('run') ? RUN : WALK;
+    let maxSpeed = isDown('run') || stickRunning() ? RUN : WALK;
     if (a.boosted) maxSpeed *= BOOST;
     const targetVX = ix * maxSpeed;
     const targetVZ = iz * maxSpeed;
@@ -337,6 +355,13 @@ export function PlayerController() {
     (shadow.current.material as THREE.MeshBasicMaterial).opacity = sc;
 
     // ---------- camera ----------
+    // Portrait phones: widen the vertical FOV so the horizontal view isn't a keyhole.
+    const persp = camera as THREE.PerspectiveCamera;
+    const wantFov = persp.aspect < 1 ? 50 + (1 - persp.aspect) * 40 : 50;
+    if (Math.abs(persp.fov - wantFov) > 0.1) {
+      persp.fov = wantFov;
+      persp.updateProjectionMatrix();
+    }
     if (!playing) {
       // Title "attract" orbit around the village.
       const t = state.clock.elapsedTime * 0.06;

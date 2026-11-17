@@ -30,6 +30,8 @@ body,
   color: var(--ink-deep);
   -webkit-font-smoothing: antialiased;
   user-select: none;
+  -webkit-user-select: none;
+  overscroll-behavior: none; /* no pull-to-refresh / bounce on phones */
 }
 canvas {
   display: block;
@@ -711,5 +713,235 @@ canvas {
   }
   .instrument-row {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ======================================================================
+   Touch controls (phones / tablets) — toy parts, ≥ 56 px targets
+   ====================================================================== */
+.overlay button,
+.touch-stick-zone {
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+.touch-controls {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+/* Left-thumb zone: the joystick floats to wherever the thumb lands. */
+.touch-stick-zone {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 46%;
+  height: 58%;
+  pointer-events: auto;
+}
+.touch-stick {
+  position: absolute;
+  left: calc(36px + env(safe-area-inset-left) + 66px);
+  top: calc(100% - 36px - env(safe-area-inset-bottom) - 66px);
+  width: 132px;
+  height: 132px;
+  transform: translate(-50%, -50%);
+  opacity: 0.72;
+  transition: opacity 0.15s;
+}
+.touch-stick--on {
+  opacity: 1;
+}
+.touch-stick__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid var(--ink-deep);
+  background: radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px) 0 0 / 4px 4px, rgba(79, 111, 82, 0.82);
+  box-shadow: 0 5px 0 rgba(43, 36, 51, 0.35), inset 0 0 0 10px rgba(255, 249, 238, 0.08);
+}
+.touch-stick__knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: 3px solid var(--ink-deep);
+  background: radial-gradient(circle at 35% 30%, #f0c890, #c8925a 60%, #9b6a3c);
+  box-shadow: 0 5px 0 rgba(43, 36, 51, 0.45);
+  transform: translate(-50%, -50%);
+}
+.touch-buttons {
+  position: absolute;
+  right: calc(22px + env(safe-area-inset-right));
+  bottom: calc(26px + env(safe-area-inset-bottom));
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  pointer-events: none;
+}
+.touch-btn {
+  pointer-events: auto;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 3px solid var(--ink-deep);
+  font: 700 1rem var(--font-display);
+  color: var(--ink-deep);
+  box-shadow: 0 7px 0 var(--ink-deep);
+  transform: translateY(-2px);
+  transition: transform 0.05s, box-shadow 0.05s;
+}
+.touch-btn.is-down {
+  transform: translateY(5px);
+  box-shadow: 0 1px 0 var(--ink-deep);
+}
+.touch-btn--jump {
+  width: 88px;
+  height: 88px;
+  background: radial-gradient(circle at 35% 30%, #f7cd7f, var(--honey) 65%);
+}
+.touch-btn--interact {
+  width: 72px;
+  height: 72px;
+  margin-bottom: 64px;
+  background: radial-gradient(circle at 35% 30%, #f3a29b, var(--coral) 65%);
+  animation: prompt-pop 0.25s cubic-bezier(0.2, 1.8, 0.4, 1) both;
+}
+.touch-btn__verb {
+  max-width: 62px;
+  font-size: 0.82rem;
+  line-height: 1;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.touch-pause {
+  position: absolute;
+  top: calc(14px + env(safe-area-inset-top));
+  right: calc(14px + env(safe-area-inset-right));
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  border: 3px solid var(--ink-deep);
+  background: var(--cream);
+  box-shadow: 0 4px 0 rgba(43, 36, 51, 0.4);
+  pointer-events: auto;
+}
+/* Tappable prompt pill on touch */
+.prompt--touch {
+  pointer-events: auto;
+  cursor: pointer;
+  bottom: calc(150px + env(safe-area-inset-bottom));
+}
+.prompt__tap {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 3px solid var(--ink-deep);
+  background: var(--coral);
+  box-shadow: inset 0 0 0 4px var(--paper);
+}
+.look-hint--touch {
+  left: 50%;
+  right: auto;
+  bottom: auto;
+  top: calc(16px + env(safe-area-inset-top));
+  transform: translateX(-50%);
+}
+
+/* ---------- safe areas & small screens ---------- */
+.hud-sign {
+  top: calc(16px + env(safe-area-inset-top));
+  left: calc(18px + env(safe-area-inset-left));
+}
+.hud-secrets {
+  top: calc(82px + env(safe-area-inset-top));
+  left: calc(22px + env(safe-area-inset-left));
+}
+.tickets {
+  top: calc(18px + env(safe-area-inset-top));
+  right: calc(18px + env(safe-area-inset-right));
+}
+.touch-controls ~ .tickets,
+.overlay:has(.touch-controls) .tickets {
+  top: calc(80px + env(safe-area-inset-top));
+}
+@media (max-width: 700px), (max-height: 500px) {
+  .hud-sign {
+    padding: 5px 12px 7px;
+  }
+  .hud-sign__title {
+    font-size: 1rem;
+  }
+  .hud-secrets {
+    top: calc(64px + env(safe-area-inset-top));
+  }
+  .ticket {
+    max-width: min(300px, 70vw);
+    font-size: 0.82rem;
+  }
+  .prompt {
+    font-size: 0.95rem;
+    padding: 8px 14px 8px 10px;
+  }
+  .title-sign {
+    transform: rotate(-1.2deg) scale(0.86);
+  }
+  .title-ticket {
+    display: none;
+  }
+  .cardboard-panel {
+    padding: 1.4rem 1.2rem 1.2rem;
+  }
+  .cardboard-panel h2 {
+    font-size: 1.5rem;
+  }
+  .setting {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}
+@media (max-height: 500px) {
+  .title-sign__badge {
+    display: none;
+  }
+  .title-sign {
+    padding: 1.6rem 2rem 1.2rem;
+  }
+  .title-tagline {
+    margin: 0.5rem 0 0.8rem;
+  }
+  .modal-layer {
+    align-items: start;
+    overflow: auto;
+    padding: 12px 0;
+  }
+}
+
+/* Portrait phones: lift the prompt clear of the thumb controls. */
+@media (orientation: portrait) {
+  .prompt--touch {
+    bottom: calc(250px + env(safe-area-inset-bottom));
+    max-width: calc(100vw - 24px);
+  }
+}
+/* Short landscape phones: compact the Copycat bench so panels need little scrolling. */
+@media (max-height: 500px) {
+  .instrument {
+    padding: 8px 4px 6px;
+  }
+  .instrument__cap {
+    width: 36px;
+    height: 36px;
+    font-size: 1.15rem;
+  }
+  .panel__lead,
+  .panel__note,
+  .panel__status {
+    font-size: 0.85rem;
+    margin-bottom: 0.6rem;
   }
 }

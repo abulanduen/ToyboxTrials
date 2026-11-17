@@ -11,12 +11,19 @@ import { SECRET_IDS } from '../game/interactables';
 import { MINIGAMES } from '../minigames/registry';
 import { frameStats } from '../scene/PlayroomScene';
 import { GearIcon, StarSticker, TickerBadge, WindKeyIcon } from './icons';
+import { TouchControls, tapInteract } from './TouchControls';
 
 function ToyButton({ children, onClick, tone = 'honey', autoFocus, disabled }: { children: React.ReactNode; onClick: () => void; tone?: 'honey' | 'coral' | 'blue' | 'sage' | 'ink'; autoFocus?: boolean; disabled?: boolean }) {
+  const ref = useRef<HTMLButtonElement>(null);
+  // Focus for keyboard players without scrolling the panel (native autoFocus scrolls short
+  // phone-landscape panels to the bottom and hides their titles).
+  useEffect(() => {
+    if (autoFocus) ref.current?.focus({ preventScroll: true });
+  }, [autoFocus]);
   return (
     <button
+      ref={ref}
       className={`toy-btn toy-btn--${tone}`}
-      autoFocus={autoFocus}
       disabled={disabled}
       onMouseEnter={() => sfx.tick()}
       onClick={() => {
@@ -37,6 +44,7 @@ function KeyCap({ k, wide }: { k: string; wide?: boolean }) {
 // ---------------------------------------------------------------- Title
 function TitleScreen() {
   const set = useGame((s) => s.set);
+  const touch = useGame((s) => s.touchUI);
   const paint = PAINT_JOBS[useGame((s) => s.paintIndex) % PAINT_JOBS.length];
   const start = () => {
     unlockAudio();
@@ -71,9 +79,7 @@ function TitleScreen() {
             Enter the Playroom
           </ToyButton>
         </div>
-        <p className="title-hint">
-          Press <KeyCap k="Enter" wide /> to start
-        </p>
+        <p className="title-hint">{touch ? 'Tap the button to start' : <>Press <KeyCap k="Enter" wide /> to start</>}</p>
       </div>
       <div className="ticket title-ticket">
         <strong>Prototype · Milestone 2</strong>
@@ -86,7 +92,16 @@ function TitleScreen() {
 // ---------------------------------------------------------------- HUD
 function Prompt() {
   const prompt = useGame((s) => s.prompt);
+  const touch = useGame((s) => s.touchUI);
   if (!prompt) return null;
+  if (touch)
+    return (
+      <button className="prompt prompt--touch" key={prompt.id} onClick={tapInteract}>
+        <span className="prompt__tap" aria-hidden />
+        <span className="prompt__verb">{prompt.verb}</span>
+        <span className="prompt__label">{prompt.label}</span>
+      </button>
+    );
   return (
     <div className="prompt" key={prompt.id}>
       <KeyCap k="E" />
@@ -207,9 +222,20 @@ function Fps() {
   return show ? <div ref={ref} className="fps" /> : null;
 }
 
+/** Touch: brief hint, then gets out of the way. */
+function LookHint() {
+  const [show, setShow] = useState(true);
+  useEffect(() => {
+    const id = window.setTimeout(() => setShow(false), 9000);
+    return () => window.clearTimeout(id);
+  }, []);
+  return show ? <div className="look-hint look-hint--touch">Drag the scene to look around</div> : null;
+}
+
 function Hud() {
   const secrets = useGame((s) => s.secretsFound.length);
   const locked = useGame((s) => s.pointerLocked);
+  const touch = useGame((s) => s.touchUI);
   const paint = PAINT_JOBS[useGame((s) => s.paintIndex) % PAINT_JOBS.length];
   return (
     <>
@@ -225,9 +251,9 @@ function Hud() {
       </div>
       <Prompt />
       <Tickets />
-      <Controls />
+      {touch ? <TouchControls /> : <Controls />}
       <BoostMeter />
-      {!locked && <div className="look-hint">Click the scene to look around</div>}
+      {touch ? <LookHint /> : !locked && <div className="look-hint">Click the scene to look around</div>}
       <Fps />
     </>
   );
@@ -256,7 +282,7 @@ function PauseMenu() {
         <div className="pause__grid">
           <Slider label="Master volume" value={s.masterVolume} onChange={(v) => s.set({ masterVolume: v })} />
           <Slider label="Effects volume" value={s.sfxVolume} onChange={(v) => s.set({ sfxVolume: v })} />
-          <Slider label="Mouse sensitivity" value={s.mouseSensitivity} min={0.4} max={2} step={0.1} onChange={(v) => s.set({ mouseSensitivity: v })} />
+          <Slider label={s.touchUI ? 'Look sensitivity' : 'Mouse sensitivity'} value={s.mouseSensitivity} min={0.4} max={2} step={0.1} onChange={(v) => s.set({ mouseSensitivity: v })} />
           <div className="setting">
             <span>Visual quality</span>
             <div className="segmented">
@@ -323,6 +349,7 @@ function CopycatPanel() {
     return () => window.removeEventListener('keydown', onKey);
   });
   const def = MINIGAMES[0];
+  const touch = useGame((s) => s.touchUI);
   return (
     <>
       <p className="panel__lead">{def.tagline}</p>
@@ -335,7 +362,13 @@ function CopycatPanel() {
         ))}
       </div>
       <p className="panel__note">
-        Instrument test bench — press <KeyCap k="A" /> <KeyCap k="S" /> <KeyCap k="J" /> <KeyCap k="K" /> to hear the new synthesised voices.
+        {touch ? (
+          'Instrument test bench: tap the instruments to hear the new synthesised voices.'
+        ) : (
+          <>
+            Instrument test bench: press <KeyCap k="A" /> <KeyCap k="S" /> <KeyCap k="J" /> <KeyCap k="K" /> to hear the new synthesised voices.
+          </>
+        )}
       </p>
       <div className="panel__status">
         <strong>Entrance ready · game not yet connected.</strong> The existing Copycat Conductor rules (sequence memory, timing, scoring, records) live in the
@@ -347,6 +380,7 @@ function CopycatPanel() {
 
 function Panel() {
   const panel = useGame((s) => s.panel);
+  const touchUI = useGame((s) => s.touchUI);
   const close = useGame((s) => s.closePanel);
   const secrets = useGame((s) => s.secretsFound);
   if (!panel) return null;
@@ -384,9 +418,11 @@ function Panel() {
           <ToyButton tone="ink" onClick={close} autoFocus>
             Back to the square
           </ToyButton>
-          <span className="panel__esc">
-            or <KeyCap k="Esc" wide />
-          </span>
+          {!touchUI && (
+            <span className="panel__esc">
+              or <KeyCap k="Esc" wide />
+            </span>
+          )}
         </div>
       </div>
     </div>

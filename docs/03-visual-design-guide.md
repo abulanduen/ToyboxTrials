@@ -118,6 +118,19 @@ Typography: **Fredoka** (display, rounded) and **Nunito** (body). Both are open-
 Contrast: all gameplay-critical text is ink `#2B2433` on cream or paper, which meets WCAG AA or better.
 Reduced motion: every CSS animation is disabled under `prefers-reduced-motion`.
 
+**Touch UI (phones and tablets).** On-screen controls are toy parts too:
+- the joystick is a felt pad with a turned-wood knob
+- action buttons are chunky painted pushers that physically depress
+- the pause button is a cream tile with a gear
+
+Rules for touch:
+- targets of at least 56 px
+- primary actions within reach of the right thumb
+- movement on the left thumb
+- everything inside the safe-area insets
+- nothing that works only on hover
+- every key prompt has a touch equivalent (sticker keycaps become tappable pills or buttons)
+
 ## 9. Audio identity
 
 Tactile and mechanical. Everything is synthesised (`src/game/audio.ts`):

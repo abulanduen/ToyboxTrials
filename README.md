@@ -47,6 +47,12 @@ The build output in `dist/` is a static folder with relative paths. Host it anyw
 | **Esc** / **P** | Pause and settings (volume, quality, mouse sensitivity, invert Y, FPS meter) |
 | **H** | Show/hide the controls card |
 
+**On phones and tablets** (works in both portrait and landscape):
+- Put your left thumb anywhere on the lower-left to bring up the joystick. Push it to the rim to run.
+- Drag anywhere else to look around.
+- Tap **Jump**, or the red action button that appears next to things. You can also tap the prompt itself.
+- The gear button pauses.
+
 Things to find in the Playroom:
 - **Copycat Conductor gate** (honey arch): the working entrance. It opens the ASJK instrument bench.
 - **Workshop** (pencil case): repaint your contender.
@@ -92,11 +98,16 @@ node tests/e2e/functional.cjs
 node tests/e2e/secrets.cjs
 ```
 
+```bash
+node tests/e2e/mobile.cjs
+```
+
 `?debug` in the URL exposes test hooks (`window.__toybox.teleport/aim/state/renderInfo`). Gameplay never uses them.
 
-Verified in headless Chromium at Milestone 2: movement, pavilion collision, play-area bounds, jumping,
+Verified in headless Chromium: movement, pavilion collision, play-area bounds, jumping,
 standable surfaces, interaction prompts, the Copycat panel and ASJK bench, pause and resume, repainting,
-elimination and respawn, all four secrets, the speed boost, and persistence across reloads. There were no
+elimination and respawn, all four secrets, the speed boost, and persistence across reloads. On an emulated phone it also checked the touch
+joystick, two-thumb move and look, the Jump and Interact buttons, the tappable prompt, the pause button, and portrait FOV. There were no
 console errors. **Frame rate has not been measured on real hardware** (the CI container has no GPU).
 
 ## Version control

@@ -59,6 +59,24 @@ export interface RulesCore<State, Input> {
   result(state: State): Omit<MinigameResult, 'minigame'>;
 }
 
+/**
+ * Touch layout — REQUIRED for every minigame (Toybox Trials is a web game that must be fully
+ * playable on phones and tablets). Controls feed the shared action layer in src/game/input.ts,
+ * so the rules core never knows which device is in use.
+ */
+export interface TouchLayout {
+  /** How the player moves, if at all. */
+  movement: 'joystick' | 'none' | 'tap-to-target' | 'swipe';
+  /** Look/aim: drag on the scene, or fixed camera. */
+  look: 'drag' | 'none';
+  /** On-screen buttons (≥ 56 px, thumb-reachable, right side unless stated). */
+  buttons: { id: string; label: string; colour?: string; hold?: boolean }[];
+  /** Orientations the game is designed for. Both, unless there's a strong reason. */
+  orientation: 'any' | 'landscape' | 'portrait';
+  /** Anything special: e.g. "instruments are the buttons — tap them directly". */
+  notes?: string;
+}
+
 export interface MinigameDefinition {
   id: MinigameId;
   title: string;
@@ -67,6 +85,8 @@ export interface MinigameDefinition {
   players: { min: number; max: number };
   /** Human-readable key map, shown on the intro card. */
   controls: { keys: string; action: string }[];
+  /** Mobile/touch controls. Required: a minigame without a touch layout is not shippable. */
+  touch: TouchLayout;
   status: 'playable' | 'integrating' | 'planned';
   /** Lazy so each minigame is code-split and loaded only when entered. */
   load?: () => Promise<{ default: ComponentType<{ host: MinigameHost }> }>;

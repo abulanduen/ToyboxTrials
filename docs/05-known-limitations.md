@@ -9,7 +9,7 @@ _What is not done, not verified, or risky. Updated at Milestone 2._
 | **Real frame rate** | The build container has no GPU. Headless Chromium used SwiftShader (CPU), which ran at about 1 fps for every tier, so no performance claim is made. | Run `npm run preview`, open the pause menu (Esc), enable **Show frame rate**, and try Low / Balanced / High on your target machines. |
 | **How the audio sounds** | Sounds were triggered without errors in automated tests, but nobody has listened to them yet. | Play with headphones: footsteps, jump, wind-up at the Workshop, the A/S/J/K bench at the Copycat gate. |
 | **Pointer lock** | Headless browsers refuse pointer lock, so only the drag-to-look fallback was exercised. | Click the scene on desktop Chrome, Firefox and Safari, then press Esc (it should pause). |
-| **Safari / iOS / touch** | Not tested. There are no touch controls yet. | M5 device pass. |
+| **Touch on real devices** | Touch controls are implemented and pass an emulated-phone test in Chromium (joystick, two-thumb move and look, buttons, portrait). They have not been tried on a real phone, and not at all in iOS Safari or WebKit. | Open the hosted build on an iPhone and an Android phone. Check thumb comfort, look sensitivity, the audio unlock and the frame rate on Low. |
 | **Concept art licensing** | The two generated images came from Higgsfield under your account. Usage rights follow that service's terms. | Confirm before public or competition use. |
 
 ## Functional limitations
@@ -17,7 +17,8 @@ _What is not done, not verified, or risky. Updated at Milestone 2._
 - **The existing app isn't here.** Copycat Conductor's real rules, records and the existing mascot
   and customisation screens could not be inspected (see audit). The gate opens an entrance panel and
   instrument bench only.
-- **No touch or gamepad input.** Keyboard and mouse only.
+- **No gamepad input yet.** Keyboard, mouse and touch are supported.
+- **Panels scroll on short landscape phones.** On short landscape screens (about 400 px tall) the Copycat panel needs a short scroll to reach its button. Tapping outside a panel also closes it.
 - **No main menu, router or results screen.** The title card is a minimal start screen. The full menu is M3.
 - **Customisation is minimal.** The Workshop cycles 5 paint jobs. There are no hats or accessories yet.
 - **Climbing is jump-based only.** No ledge grabbing. A missed jump from the eraser just drops you

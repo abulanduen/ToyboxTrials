@@ -16,7 +16,7 @@ import { exposeDebug } from '../game/debug';
 import { Village } from './Village';
 
 const QUALITY: Record<Quality, { dpr: [number, number]; shadowMap: number; post: 'none' | 'tilt' | 'dof'; aa: boolean }> = {
-  low: { dpr: [0.75, 1], shadowMap: 0, post: 'none', aa: false },
+  low: { dpr: [1, 1.25], shadowMap: 0, post: 'none', aa: false },
   balanced: { dpr: [1, 1.5], shadowMap: 1024, post: 'tilt', aa: true },
   high: { dpr: [1, 2], shadowMap: 2048, post: 'dof', aa: true },
 };

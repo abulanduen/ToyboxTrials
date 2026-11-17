@@ -15,6 +15,39 @@ _Concise plan, Milestones 1–6. Each milestone ends in a testable, shippable st
 | Physics | None (planar collision) | Add Rapier only if a minigame truly needs rigid bodies (e.g. Inferno Escape debris) |
 | Backend | None | Solo play is fully local. Multiplayer needs a real-time relay later (see below) |
 
+## Mobile & touch: required for every screen and minigame
+
+Toybox Trials is a web game that must be fully playable on phones and tablets.
+
+- **One action layer** (`src/game/input.ts`). Keyboard, the on-screen joystick and touch buttons
+  all produce the same actions (`getMoveAxis()`, `isDown('jump')`, …). Gameplay and rules code never
+  read raw keys or touches.
+- **Hub touch scheme (implemented):**
+  - a floating joystick on the left half (push to the rim to run)
+  - drag anywhere else to look
+  - Jump and a contextual Interact button on the right
+  - the prompt pill is tappable too
+  - pause button top-right
+- **Every minigame declares a `touch: TouchLayout`** in its definition (movement, look, buttons,
+  orientation). Placeholder layouts (`TOUCH_TBD`) block shipping.
+- **Rules:** touch targets ≥ 56 px, safe-area aware, both orientations unless there's a strong
+  reason, no hover-only UI, and portrait widens the camera FOV.
+- **Performance:** touch devices default to the Low tier (no shadows or post-processing, DPR ≤ 1.25).
+- **Testing:** `tests/e2e/mobile.cjs` drives an emulated phone with real touch events. A real-device
+  pass on iOS Safari and Android Chrome is part of every milestone.
+- **Planned per-game touch schemes:**
+
+  | Game | Touch scheme |
+  | --- | --- |
+  | Copycat | Instruments are the buttons (2×2 in portrait) |
+  | Music Box Rhythm | Four lane pads |
+  | Red Light | Hold-to-run pad |
+  | Find the Original | Tap the toy |
+  | Wind-Up Dash | Joystick + jump |
+  | Blink Duel / Spellbox | Joystick + 2–3 ability buttons, tap-to-aim |
+  | Toy Squad | Drag to place |
+  | Trivia | Big answer cards |
+
 ## Frame-loop architecture
 
 ```
@@ -50,7 +83,7 @@ background, quality tiers, synthesised audio, toy UI. This is a separate project
 4. Swap the sound triggers to the synthesised voices (`sfx.drum/bell/xylophone/musicBox`), which already exist.
 5. Re-run the characterisation tests and fix only *confirmed* defects.
 
-**M5 · Performance & polish.** Real-device testing (integrated GPU laptop, mid-range phone, Safari),
+**M5 · Performance & polish.** Real-device testing (integrated GPU laptop, mid-range Android phone, iPhone Safari, tablet),
 static-geometry merging, shadow budget, loading screen, resize/orientation, audio mix pass,
 accessibility (reduced motion, remappable keys, colour-blind instrument shapes).
 
