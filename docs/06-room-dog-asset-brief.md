@@ -1,6 +1,7 @@
 # 06 · Room creature brief: the family dog (brown pit bull)
 
 _Status: requested, waiting for the generated model (Meshy or Tripo). Not implemented yet._
+_The room now exists in code. The refined request (clip names, where the dog walks and sleeps, the table-height options) is in `07-asset-requests.md`; where the two differ, 07 wins._
 
 ## Why
 

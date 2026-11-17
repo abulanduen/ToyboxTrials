@@ -216,7 +216,7 @@ export function WindowLight({ quality }: { quality: Quality }) {
       <mesh position={[30, 110, W.zOut - 70]} material={o.skyMat}>
         <planeGeometry args={[440, 300]} />
       </mesh>
-      <mesh position={[cx, cy + 4, W.zIn + 2.5]} material={o.glowMat} renderOrder={2}>
+      <mesh position={[cx, cy + 4, W.zIn + 4]} material={o.glowMat} renderOrder={2}>
         <planeGeometry args={[W.x1 - W.x0 + 150, W.y1 - W.y0 + 130]} />
       </mesh>
       <mesh geometry={o.shafts} material={o.shaftMat} frustumCulled={false} renderOrder={3} />
