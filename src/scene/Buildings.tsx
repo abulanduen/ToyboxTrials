@@ -154,7 +154,7 @@ export function Pavilion() {
         </mesh>
       </group>
       {/* felt carpet + steps */}
-      <mesh position={[0, 0.06, d / 2 + 2.6]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow material={feltMat(PALETTE.coral)}>
+      <mesh position={[0, 0.13, d / 2 + 2.6]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow material={feltMat(PALETTE.coral)}>
         <planeGeometry args={[4, 5.2]} />
       </mesh>
       {/* hanging felt banners */}
@@ -406,7 +406,7 @@ function Gate({ gate }: { gate: (typeof GATES)[number] }) {
               <sphereGeometry args={[0.28, 10, 8]} />
             </mesh>
           </group>
-          <mesh ref={glow} position={[0, 0.07, 1.5]} rotation={[-Math.PI / 2, 0, 0]}>
+          <mesh ref={glow} position={[0, 0.14, 1.5]} rotation={[-Math.PI / 2, 0, 0]}>
             <circleGeometry args={[3, 32]} />
             <meshBasicMaterial color={PALETTE.honey} transparent opacity={0.4} depthWrite={false} />
           </mesh>

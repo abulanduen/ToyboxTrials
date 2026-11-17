@@ -141,7 +141,9 @@ export function PlayroomScene() {
       shadows={q.shadowMap > 0 ? 'soft' : false}
       dpr={q.dpr}
       gl={{ antialias: q.post === 'none' && quality !== 'low', powerPreference: 'high-performance', stencil: false }}
-      camera={{ fov: 50, near: 0.3, far: 1200, position: [0, 30, 70] }}
+      // near/far tuned for depth precision: nothing gets closer than ~0.6 cm to the camera, and
+      // the room fits inside 900 cm. A tighter range means less z-fighting on phone GPUs.
+      camera={{ fov: 50, near: 0.6, far: 900, position: [0, 30, 70] }}
       onCreated={({ gl }) => {
         gl.toneMapping = THREE.ACESFilmicToneMapping;
         gl.toneMappingExposure = 1.05;

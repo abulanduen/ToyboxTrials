@@ -49,10 +49,10 @@ function Playmat() {
   }, []);
   return (
     <group>
-      <mesh geometry={edgeGeo} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]} receiveShadow>
+      <mesh geometry={edgeGeo} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.035, 0]} receiveShadow>
         <meshStandardMaterial color={PALETTE.honey} roughness={1} />
       </mesh>
-      <mesh geometry={geo} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.06, 0]} receiveShadow material={mat} />
+      <mesh geometry={geo} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.075, 0]} receiveShadow material={mat} />
     </group>
   );
 }
@@ -104,19 +104,28 @@ function Paths() {
         }
       }
     }
-    // ring of tiles around the fountain
-    const ringN = 26;
+    // Ring of tiles around the fountain. 22 tiles on a 7 cm radius ≈ 2.0 cm apart, so the
+    // 1.9 cm tiles sit edge to edge instead of overlapping (overlaps z-fight and flicker).
+    const ringN = 22;
+    const ringTiles: typeof out = [];
     for (let i = 0; i < ringN; i++) {
       const a = (i / ringN) * Math.PI * 2;
-      out.push({ x: FOUNTAIN.x + Math.cos(a) * 7, z: FOUNTAIN.z + Math.sin(a) * 7, rot: -a, c: colors[i % 3] });
+      ringTiles.push({ x: FOUNTAIN.x + Math.cos(a) * 7, z: FOUNTAIN.z + Math.sin(a) * 7, rot: -a, c: colors[i % 3] });
     }
-    return out;
+    // Drop any path tile that would land on top of one already placed (e.g. where a spoke
+    // meets the ring) — coplanar overlapping tops are what caused the flickering.
+    const kept: typeof out = [];
+    for (const t of [...ringTiles, ...out]) {
+      if (kept.every((k2) => Math.hypot(k2.x - t.x, k2.z - t.z) >= 1.55)) kept.push(t);
+    }
+    return kept;
   }, []);
   return (
     <Instances limit={tiles.length} receiveShadow castShadow material={woodMat('#ffffff')}>
       <boxGeometry args={[1.9, 0.22, 1.9]} />
       {tiles.map((t, i) => (
-        <Instance key={i} position={[t.x, 0.12, t.z]} rotation={[0, t.rot, 0]} color={t.c} />
+        // Tiny per-tile height steps so any remaining edge overlap never has coplanar tops.
+        <Instance key={i} position={[t.x, 0.12 + (i % 3) * 0.02, t.z]} rotation={[0, t.rot, 0]} color={t.c} />
       ))}
     </Instances>
   );
