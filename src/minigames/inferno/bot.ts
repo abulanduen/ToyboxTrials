@@ -10,12 +10,11 @@ export function createInfernoBot(): BotPolicy<InfernoState, InfernoInput> {
     const a = ahead(p);
     if (s.phase === 'prepare' && !p.wallUsed && s.t > s.config.prepMs * 0.6 && tileAt(s, a.x, a.z) === 'floor') return [{ action: 'build' }];
     const danger = distances(s);
-    if (s.phase === 'hunt' && danger[index(p.x, p.z)] === Infinity) return [];
     const choices = DIRECTIONS.map(([dx, dz], direction) => ({ direction: direction as Direction, x: p.x + dx, z: p.z + dz, noise: rng() }))
-      .filter(c => tileAt(s, c.x, c.z) !== 'edge' && !s.players.some(other => other.alive && other.x === c.x && other.z === c.z));
+      .filter(c => tileAt(s, c.x, c.z) !== 'edge' && (tileAt(s, c.x, c.z) !== 'wall' || s.wallOwners[index(c.x, c.z)] === p.id) && !s.players.some(other => other.alive && other.x === c.x && other.z === c.z));
     choices.sort((a, b) => {
       const value = (c: typeof a) => (tileAt(s, c.x, c.z) === 'floor' ? 10 : 0)
-        + (s.phase === 'hunt' ? Math.min(30, danger[index(c.x, c.z)]) : 0) + c.noise * 5;
+        + (s.phase === 'prepare' ? (Math.abs(c.x - 5) + Math.abs(c.z - 5)) * 8 : Math.min(30, danger[index(c.x, c.z)] / s.config.furnaceMs)) + c.noise * 5;
       return value(b) - value(a);
     });
     const c = choices[0];

@@ -180,11 +180,11 @@ exist. This supersedes the earlier two-game status snapshot for this branch only
 planned count in that snapshot is now eight. See `src/minigames/inferno/README.md` for explicit
 provisional balance and the surviving-player tie/time-limit policy; these are not final design decisions.
 
-- A small arena of destructible rocks and obstacles, with about 15 s of preparation before the Inferno appears.
+- All players start in a shared centre clearing; the rest of the arena interior is rocks. There are about 15 s of preparation before the Inferno appears.
 - During preparation, players break rocks to make paths and shelter, and each builds **exactly one** wall.
-- Players can break obstacles around opponents to open paths into their shelters.
-- The Inferno then moves through accessible passages and eliminates exposed players. Shelters are
-  only safe while the Inferno can't reach them. The last survivor wins.
+- Players can break rocks and their own wall, but cannot destroy another player's wall.
+- The Inferno follows passages and destroys blocking rocks; built walls take longer to destroy.
+  Shelters delay the Inferno rather than stopping it permanently. The last survivor wins.
 
 **Toybox:** a wooden-block and cardboard fortress, with a roaming wind-up furnace or spreading
 mechanical hazard. **Tech:** top-down destructible tile grid, no 3D destruction physics, and pathfinding that

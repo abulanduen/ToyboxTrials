@@ -4,12 +4,14 @@ Entry: Tournament Pavilion → **Or practise one trial → Inferno Escape**. Als
 
 - WASD/arrows or held directional pads move on the board and turn the facing marker.
 - Space/Break removes the rock or wall ahead. E/Build wall places one blue wall on an empty, unoccupied tile ahead during the 15-second preparation.
-- After preparation, the furnace follows the shortest open route to a reachable survivor. Destroying blocks changes those routes immediately. An enclosed shelter is safe until opened.
+- Everyone starts in a shared 3×3 centre clearing. All other interior tiles are rocks; the outside border is impassable.
+- After preparation, the furnace appears in the centre and pursues survivors along routes weighted by travel and destruction time. It breaks rocks in 0.9 seconds and walls in 1.8 seconds; the block under attack glows coral. Shelters buy time rather than stopping it permanently.
+- Players can break rocks and their own wall, but never another player's wall. Removing your own wall does not restore your build allowance.
 - Contact eliminates a toy; the last survivor wins. Results use elimination time; personal records count seconds survived after preparation.
 
-Provisional balance/interpretations: 11×11 seeded board, 220 ms movement, 500 ms breaking, 300 ms furnace movement, breaking allowed during the hunt, one wall allowance with no replacement after destruction. Unused walls expire rather than being placed automatically. After 90 seconds of hunting, survivors share first place to prevent permanently sealed shelters stalling a tournament. These choices need owner/playtest approval before treating them as final design.
+Provisional balance: 11×11 board, 220 ms movement, 500 ms player breaking cooldown, 300 ms furnace movement, 900 ms rock destruction and 1800 ms wall destruction. Breaking is allowed during the hunt; one wall allowance with no replacement after destruction. Unused walls expire rather than being placed automatically. After 90 seconds of hunting, remaining survivors share first place. Timings remain subject to playtesting.
 
-Bot behaviour is a first pass: explore, build during preparation, flee reachable danger and remain in sealed shelters. Difficulty changes reaction interval. Visuals use a fixed elevated board camera; smooth movement and richer furnace/character animation remain polish work.
+Bot behaviour is a first pass: dig outward, build during preparation and flee danger without breaking opponents' walls. Difficulty changes reaction interval. Visuals use a fixed elevated board camera; smooth movement and richer furnace/character animation remain polish work.
 
 Integration touches only `registry.ts` in the runtime outside this folder. The existing tournament browser test now recognises Inferno; keep that small change when merging Claude's updates. Do not overwrite Claude's movement core, other minigames or room pass.
 
@@ -19,3 +21,6 @@ Verified on 18 November 2026: 41 unit tests and production build pass; Inferno d
 entry, movement, pause, results, records and return pass; Copycat/Jack regression and a full mixed
 Blitz pass without console/page errors. Browser checks use Chromium software rendering and are
 not frame-rate benchmarks.
+
+Centre-spawn revision: 43 unit tests and production build pass, including rock/wall destruction
+timing and wall ownership. Inferno desktop and touch-portrait flows were rerun successfully.

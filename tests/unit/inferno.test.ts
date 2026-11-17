@@ -6,13 +6,15 @@ import { createInfernoBot } from '../../src/minigames/inferno/bot';
 import { seededRng } from '../../src/minigames/rng';
 
 const people: Contestant[] = ['you', 'bot'].map(id => ({ id, name: id, paint: PAINT_JOBS[0], hat: 'none', keySkin: 'classic', isLocal: id === 'you', bot: 'normal' }));
-const fresh = () => infernoRules.init(people, 123);
+const fresh = () => { const s = infernoRules.init(people, 123); s.players[0].x = 1; s.players[0].z = 1; s.players[1].x = 9; s.players[1].z = 9; for (const p of s.players) s.tiles[index(p.x, p.z)] = 'floor'; return s; };
 function empty(s: InfernoState) { s.tiles = s.tiles.map(t => t === 'edge' ? t : 'floor'); }
 
 describe('Inferno Escape', () => {
-  it('generates a repeatable board with clear, distinct spawns', () => {
-    const s = fresh(); expect(fresh()).toEqual(s);
-    expect(infernoRules.init(people, 456).tiles).not.toEqual(s.tiles);
+  it('starts all eight toys in the centre with rocks everywhere else inside the boundary', () => {
+    const s = infernoRules.init(Array.from({ length: 8 }, (_, i) => ({ ...people[0], id: String(i) })), 123);
+    expect(new Set(s.players.map(p => index(p.x, p.z))).size).toBe(8);
+    expect(s.players.every(p => p.x >= 4 && p.x <= 6 && p.z >= 4 && p.z <= 6)).toBe(true);
+    for (let z = 1; z < 10; z++) for (let x = 1; x < 10; x++) expect(s.tiles[index(x, z)]).toBe(x >= 4 && x <= 6 && z >= 4 && z <= 6 ? 'floor' : 'rock');
     for (const p of s.players) expect(s.tiles[index(p.x, p.z)]).toBe('floor');
   });
   it('blocks movement through rocks and boundaries, while turning toward them', () => {
@@ -41,13 +43,41 @@ describe('Inferno Escape', () => {
     p.x = 8; p.z = 9;
     infernoRules.step(s, { you: [{ action: 'build' }] }, 16); expect(p.wallUsed).toBe(false);
   });
-  it('recomputes reachability when sabotage opens a shelter', () => {
+  it('recomputes route costs when a rock is removed', () => {
     const s = fresh(); empty(s);
-    s.tiles[index(2, 1)] = 'wall'; s.tiles[index(1, 2)] = 'rock';
-    expect(distances(s)[index(1, 1)]).toBe(Infinity);
+    s.tiles[index(2, 1)] = 'rock'; s.tiles[index(1, 2)] = 'rock';
+    const before = distances(s)[index(1, 1)];
     s.players[0].facing = 1;
     infernoRules.step(s, { you: [{ action: 'break' }] }, 16);
-    expect(distances(s)[index(1, 1)]).toBeLessThan(Infinity);
+    expect(distances(s)[index(1, 1)]).toBeLessThan(before);
+  });
+  it('protects another player’s wall but lets its owner remove it', () => {
+    const s = fresh(); empty(s); s.players[0].facing = 1;
+    infernoRules.step(s, { you: [{ action: 'build' }] }, 16);
+    expect(s.wallOwners[index(2, 1)]).toBe('you');
+    Object.assign(s.players[1], { x: 3, z: 1, facing: 3 });
+    infernoRules.step(s, { bot: [{ action: 'break' }] }, 16);
+    expect(s.tiles[index(2, 1)]).toBe('wall');
+    infernoRules.step(s, { you: [{ action: 'break' }] }, 16);
+    expect(s.tiles[index(2, 1)]).toBe('floor');
+  });
+  it('the furnace waits to break obstacles, with walls taking longer than rocks', () => {
+    const breakTime = (tile: 'rock' | 'wall') => {
+      const s = fresh(); s.tiles.fill('edge');
+      s.tiles[index(5, 5)] = 'floor'; s.tiles[index(6, 5)] = tile; s.tiles[index(7, 5)] = 'floor';
+      Object.assign(s.players[0], { x: 7, z: 5 });
+      s.wallOwners[index(6, 5)] = 'you';
+      infernoRules.step(s, {}, s.config.prepMs + s.config.furnaceMs);
+      expect(s.attack).toMatchObject({ x: 6, z: 5 });
+      expect(s.tiles[index(6, 5)]).toBe(tile);
+      const start = s.t;
+      while (s.tiles[index(6, 5)] !== 'floor' && s.t - start < 5000) infernoRules.step(s, {}, 100);
+      expect(s.furnace).toEqual({ x: 6, z: 5 });
+      expect(s.wallOwners[index(6, 5)]).toBeUndefined();
+      return s.t - start;
+    };
+    expect(breakTime('rock')).toBe(900);
+    expect(breakTime('wall')).toBe(1800);
   });
   it('eliminates on contact and ranks the last survivor first', () => {
     const s = fresh(); s.players[0].x = 5; s.players[0].z = 5;

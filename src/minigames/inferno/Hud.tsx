@@ -28,7 +28,7 @@ export function InfernoHud({ getState, localId }: MinigameSceneProps<InfernoStat
   return <div className="inferno-hud">
     <div className="inferno-banner">
       <strong>{prep ? `Build your shelter · ${seconds}s` : `The furnace is loose · ${seconds}s`}</strong>
-      <span>{!me.alive ? 'You are out — watching the survivors' : prep ? 'Break blocks. Place your one wall.' : 'Stay out of reach. Break open rival shelters.'}</span>
+      <span>{!me.alive ? 'You are out — watching the survivors' : prep ? 'Dig out from the centre. Place your one wall.' : 'The furnace breaks rocks. Walls hold it longer.'}</span>
       <small>{s.players.filter(p => p.alive).length} toys left · Wall: {me.wallUsed ? 'placed' : prep ? '1 available' : 'expired'}</small>
     </div>
     {!paused && me.alive && <div className="inferno-controls">

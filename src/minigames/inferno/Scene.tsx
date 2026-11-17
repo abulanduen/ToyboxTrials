@@ -20,6 +20,9 @@ function Block({ i, getState }: { i: number; getState: () => InfernoState | null
     mesh.current.visible = !!tile && tile !== 'floor';
     const mat = mesh.current.material as THREE.MeshStandardMaterial;
     mat.color.set(tile === 'wall' ? PALETTE.toyBlue : tile === 'edge' ? PALETTE.woodDark : PALETTE.cardboard);
+    const attack = getState()?.attack;
+    mat.emissive.set(attack && attack.x === i % SIZE && attack.z === Math.floor(i / SIZE) ? PALETTE.coral : '#000000');
+    mat.emissiveIntensity = 0.45;
     mesh.current.scale.y = tile === 'edge' ? 0.45 : 1;
   });
   return <mesh ref={mesh} position={[coord(i % SIZE), 1, coord(Math.floor(i / SIZE))]} castShadow receiveShadow>
@@ -66,6 +69,7 @@ export function InfernoScene({ getState, contestants }: MinigameSceneProps<Infer
     camera.position.set(0, distance, distance * 0.52);
     camera.lookAt(0, 0, 1);
     const s = getState();
+    furnace.current.visible = !!s?.furnace && s.phase !== 'prepare';
     if (!s?.furnace) { target.current.visible = false; return; }
     furnace.current.position.set(coord(s.furnace.x), 0.3, coord(s.furnace.z));
     const local = s.players.find(p => p.id === contestants.find(c => c.isLocal)?.id);
