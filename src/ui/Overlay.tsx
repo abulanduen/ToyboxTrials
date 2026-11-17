@@ -7,7 +7,8 @@ import { useGame } from '../game/store';
 import { events } from '../game/events';
 import { PAINT_JOBS, PALETTE } from '../game/palette';
 import { SECRET_IDS } from '../game/interactables';
-import { MatchOverlay, TournamentPicker } from './MatchOverlay';
+import { MatchOverlay, TournamentPicker, unit } from './MatchOverlay';
+import { MINIGAMES } from '../minigames/registry';
 import { frameStats } from '../scene/PlayroomScene';
 import { GearIcon, StarSticker, WindKeyIcon } from './icons';
 import { TouchControls, tapInteract } from './TouchControls';
@@ -267,10 +268,15 @@ function Panel() {
                 {secrets.includes(id) && <StarSticker size={18} />}
               </div>
             ))}
-            <div className="scoreboard__row">
-              <span>Copycat Conductor best</span>
-              <strong>{records['copycat-conductor'] ? `${records['copycat-conductor'].best} rounds` : 'not played yet'}</strong>
-            </div>
+            {MINIGAMES.filter((g) => g.status === 'playable').map((g) => {
+              const r = records[g.id];
+              return (
+                <div key={g.id} className="scoreboard__row">
+                  <span>{g.title} best</span>
+                  <strong>{r ? `${r.best} ${unit(g.recordUnit, r.best)}` : 'not played yet'}</strong>
+                </div>
+              );
+            })}
             <div className="scoreboard__row scoreboard__row--muted">
               <span>Tournament wins</span>
               <strong>

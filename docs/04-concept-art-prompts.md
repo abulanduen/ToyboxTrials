@@ -113,9 +113,10 @@ floor, edges falling away to the table; contenders casting spells shaped like gl
 paper stars; knockback rings; fairy-light strands overhead; the lamp tinted slightly ink purple.
 STYLE.
 
-**13 · Toybox Trivia: game-show stage.** A game-show set built from a shoebox: podiums made of
-cotton reels with button buzzers, a cardboard question board with blank light-up squares, a
-host-desk made from a tissue box, spotlight from a torch. STYLE.
+**13 · Jack-in-the-Box: the biscuit-tin ring.** Wind-up toys sitting in a circle on an old blue
+biscuit-tin lid lined with purple felt; a painted wind-up box with a brass crank in the middle, lid
+bursting open as a cheerful jack on a spring leans out at one startled toy; speech-bubble cards
+floating over the others; warm lamp light. STYLE.
 
 ---
 

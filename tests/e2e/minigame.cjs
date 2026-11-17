@@ -1,4 +1,4 @@
-/* Milestone 4: minigame host + Copycat Conductor + tournament flow (desktop).
+/* Milestones 4–5: minigame host, Copycat Conductor, Jack-in-the-Box and the tournament flow (desktop).
    Run: BASE_URL=http://localhost:4173/ node tests/e2e/minigame.cjs */
 const { chromium } = require('playwright');
 const path = require('path');
@@ -114,6 +114,71 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   const pos = await page.evaluate(() => window.__toybox.state());
   check('quitting returns to the hub where you left it', Math.hypot(pos.x - 13.9, pos.z + 20.4) < 1.5, `x=${pos.x.toFixed(1)} z=${pos.z.toFixed(1)}`);
 
+  // --- Jack-in-the-Box practice via the coral gate: type real answers into the answer box
+  const J = () => page.evaluate(() => {
+    const s = window.__toybox.match.state();
+    return s && s.category ? { phase: s.phase, round: s.round, holder: s.holder, said: s.said.map((x) => x.display.toLowerCase()), tiers: s.category.tiers, prompt: s.category.prompt, players: s.players } : null;
+  });
+  const waitJ = async (pred, label, ms = 240000) => {
+    const t0 = Date.now();
+    while (Date.now() - t0 < ms) {
+      const j = await J();
+      if (j && pred(j)) return j;
+      await page.waitForTimeout(200);
+    }
+    throw new Error('timeout waiting for ' + label);
+  };
+  /** A valid answer from the category's common tier that hasn't been said yet. */
+  const freshAnswer = (j) => j.tiers[0].split(',').map((e) => e.split('|')[0].trim()).find((a) => !j.said.includes(a));
+  await page.evaluate(() => window.__toybox.teleport(23.2, -16.2, Math.PI - 0.961));
+  await page.waitForTimeout(2500);
+  check('coral gate prompt says Play Jack-in-the-Box', (await page.textContent('.prompt'))?.includes('Jack-in-the-Box'), await page.textContent('.prompt'));
+  await page.keyboard.press('KeyE');
+  await page.waitForSelector('.match-intro', { timeout: 60000 });
+  await page.waitForTimeout(900);
+  check('gate opens the Jack-in-the-Box intro card', (await page.textContent('.match-intro h2')).includes('Jack'));
+  const opts = await page.$$eval('.intro-options .segmented >> nth=0 >> button', (els) => els.map((e) => e.textContent));
+  check('Jack practice needs company: no Solo option, bots by default', !opts.includes('Solo') && (await page.textContent('.intro-options .segmented .on'))?.includes('3 bots'), opts.join(','));
+  await page.click('.intro-options .segmented >> nth=0 >> button >> nth=0'); // 1 bot
+  await page.click('.intro-options .segmented >> nth=1 >> button >> nth=0'); // easy
+  await page.screenshot({ path: `${OUT}/m5-01-jack-intro.png` });
+  await page.evaluate(() => window.__toybox.match.timeScale(2));
+  await page.click('[data-testid=match-start]');
+  let j = await waitJ((j) => j.phase === 'live' && j.holder === 'you', 'my turn');
+  check('category card shows the prompt', (await page.textContent('[data-testid=jb-category]')).includes(j.prompt), j.prompt);
+  await page.evaluate(() => window.__toybox.match.timeScale(0)); // freeze the fuse while we type
+  check('answer box is focused when the box reaches you', await page.evaluate(() => document.activeElement?.getAttribute('data-testid') === 'jb-input'));
+  await page.keyboard.type('zzqx nonsense');
+  await page.keyboard.press('Enter');
+  await page.evaluate(() => window.__toybox.match.timeScale(0.05)); // let one step run
+  await page.waitForSelector('[data-testid=jb-note]', { timeout: 30000 });
+  await page.evaluate(() => window.__toybox.match.timeScale(0));
+  check('a wrong answer is rejected and keeps the box', (await page.textContent('[data-testid=jb-note]')).includes("doesn't count") && (await J()).holder === 'you');
+  await page.screenshot({ path: `${OUT}/m5-02-jack-reject.png` });
+  j = await J();
+  const ans = freshAnswer(j);
+  await page.fill('[data-testid=jb-input]', '');
+  await page.keyboard.type(ans.toUpperCase()); // case doesn't matter
+  await page.keyboard.press('Enter');
+  await page.evaluate(() => window.__toybox.match.timeScale(0.05));
+  const after = await waitJ((x) => x.holder !== 'you', 'box passed on', 60000);
+  check('a valid answer cranks the box and passes it on', after.said.includes(ans), `${ans} → ${after.said.join(',')}`);
+  check('typing P in the answer box does not pause', !(await page.isVisible('.pause')));
+  await page.evaluate(() => window.__toybox.match.timeScale(0));
+  await page.screenshot({ path: `${OUT}/m5-03-jack-passed.png` });
+  await page.evaluate(() => window.__toybox.match.timeScale(4));
+  // Now stop answering: the jack pops on us (or the bot) and the match ends.
+  await page.waitForSelector('.results', { timeout: 180000 });
+  await page.waitForTimeout(900);
+  const jrows = await page.$$eval('.results-list li', (els) => els.map((e) => e.textContent));
+  check('Jack results list both toys', jrows.length === 2, jrows.join(' | '));
+  await page.screenshot({ path: `${OUT}/m5-04-jack-results.png` });
+  const jrec = await page.evaluate(() => JSON.parse(localStorage.getItem('toybox-trials:prototype:v1')).state.records['jack-in-the-box']);
+  check('Jack record saved (answers given)', jrec?.best >= 1 && jrec?.plays === 1, JSON.stringify(jrec));
+  await page.click('[data-testid=results-leave]');
+  await page.waitForSelector('.hud-sign', { timeout: 60000 });
+  await page.waitForTimeout(1200);
+
   // --- Tournament (Blitz, 1 easy bot): lose each trial on purpose to exercise the flow
   await page.evaluate(() => window.__toybox.teleport(0, -12.6, Math.PI));
   await page.waitForTimeout(2500);
@@ -125,6 +190,7 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   await page.click('.intro-options .segmented >> nth=0 >> button >> nth=0'); // 1 bot
   await page.click('.intro-options .segmented >> nth=1 >> button >> nth=0'); // easy
   await page.click('[data-testid=tournament-start]');
+  const games = [];
   for (let round = 1; round <= 3; round++) {
     await page.waitForSelector('.reveal-ticket', { timeout: 60000 });
     await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
@@ -134,8 +200,10 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
     await page.waitForSelector('[data-testid=match-start]', { timeout: 60000 });
     await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
     await page.click('[data-testid=match-start]');
-    await failRound();
-    await page.waitForSelector('.results', { timeout: 120000 });
+    const game = await page.evaluate(() => window.__toybox.match.state()?.category ? 'jack' : 'copycat');
+    games.push(game);
+    if (game === 'copycat') await failRound(); // Jack: just never answer, and the jack pops on us
+    await page.waitForSelector('.results', { timeout: 180000 });
     await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
     const rows = await page.$$eval('.results-list li', (els) => els.map((e) => e.textContent));
     check(`trial ${round}: results list both contestants with points`, rows.length === 2 && rows.some((r) => r.includes('+10')) && rows.some((r) => r.includes('+8')), rows.join(' | '));
@@ -152,6 +220,7 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
   const title = await page.textContent('.final h2');
   check('final standings: placed 2nd of 2 after losing every trial', title.includes('2nd of 2'), title);
+  check('tournament mixes the playable games', games.includes('jack') && games.includes('copycat'), games.join(','));
   await page.waitForTimeout(2500);
   await page.screenshot({ path: `${OUT}/m4-09-final.png` });
   const hist = await page.evaluate(() => JSON.parse(localStorage.getItem('toybox-trials:prototype:v1')).state.tournamentHistory);

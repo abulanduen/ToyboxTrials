@@ -163,6 +163,65 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
   check('portrait widens the camera FOV', p.fov > 60, `fov=${p.fov.toFixed(1)}`);
   await page.screenshot({ path: `${OUT}/mobile-05-portrait.png` });
 
+  // Jack-in-the-Box in portrait: the answer box sits high (clear of the phone keyboard), tap Crank! to pass.
+  await page.evaluate(() => window.__toybox.match.timeScale(2));
+  await page.evaluate(() => window.__toybox.teleport(23.2, -16.2, Math.PI - 0.961));
+  await page.waitForTimeout(2500);
+  const jib = await (await page.$('.touch-btn--interact')).boundingBox();
+  await touch('touchStart', [[jib.x + jib.width / 2, jib.y + jib.height / 2, 6]]);
+  await page.waitForTimeout(600);
+  await touch('touchEnd', []);
+  await page.waitForSelector('.match-intro', { timeout: 60000 }).catch(() => null);
+  await page.waitForTimeout(1500); // a long press must not tap-through to the intro's buttons
+  check('Interact button at the coral gate opens Jack-in-the-Box and it stays open (portrait)', (await page.textContent('.match-intro h2').catch(() => ''))?.includes('Jack'));
+  await page.tap('[data-testid=match-start]');
+  const JS = () => page.evaluate(() => {
+    const s = window.__toybox.match.state();
+    return s && s.category ? { phase: s.phase, holder: s.holder, said: s.said.map((x) => x.display.toLowerCase()), tiers: s.category.tiers } : null;
+  });
+  let js = null;
+  for (let i = 0; i < 900; i++) {
+    js = await JS();
+    if (js && js.phase === 'live' && js.holder === 'you') break;
+    if (await page.isVisible('.results')) break;
+    await page.waitForTimeout(200);
+  }
+  await page.evaluate(() => window.__toybox.match.timeScale(0));
+  const myTurn = js && js.phase === 'live' && js.holder === 'you';
+  check('the box reaches you (portrait)', myTurn);
+  if (myTurn) {
+    const ib2 = await page.locator('[data-testid=jb-input]').boundingBox();
+    const sb = await page.locator('[data-testid=jb-send]').boundingBox();
+    check('answer box sits in the top third (clear of the keyboard)', ib2.y + ib2.height < 915 / 3, `bottom=${(ib2.y + ib2.height).toFixed(0)}`);
+    check('answer box and Crank! button are ≥ 56 px tall', ib2.height >= 56 && sb.height >= 56, `${ib2.height}/${sb.height}`);
+    await page.screenshot({ path: `${OUT}/mobile-09-jack-portrait.png` });
+    const ans = js.tiers[0].split(',').map((e) => e.split('|')[0].trim()).find((a) => !js.said.includes(a));
+    await page.tap('[data-testid=jb-input]');
+    await page.keyboard.type(ans);
+    const sb2 = await page.locator('[data-testid=jb-send]').boundingBox();
+    await touch('touchStart', [[sb2.x + sb2.width / 2, sb2.y + sb2.height / 2, 30]]);
+    await touch('touchEnd', []);
+    await page.evaluate(() => window.__toybox.match.timeScale(0.05));
+    let passed = false;
+    for (let i = 0; i < 100 && !passed; i++) {
+      const x = await JS();
+      passed = !!x && x.said.includes(ans);
+      await page.waitForTimeout(150);
+    }
+    check('tapping Crank! submits the answer and passes the box', passed, ans);
+  }
+  await page.evaluate(() => window.__toybox.match.timeScale(4));
+  if (!(await page.isVisible('.results'))) {
+    await page.tap('.match-pause');
+    await page.waitForTimeout(1000);
+    await page.tap('.pause__actions .toy-btn >> nth=1'); // leave
+  } else {
+    await page.waitForTimeout(900);
+    await page.tap('[data-testid=results-leave]');
+  }
+  await page.waitForSelector('.touch-stick-zone', { timeout: 60000 }).catch(() => null);
+  check('back in the Playroom after Jack (portrait)', await page.isVisible('.touch-stick-zone'));
+
   // Portrait menu and Workshop
   await page.tap('.touch-pause');
   await page.waitForTimeout(800);

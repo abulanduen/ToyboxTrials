@@ -8,8 +8,9 @@ import type { MinigameDefinition, MinigameId, TouchLayout } from './types';
 /** Placeholder for planned games: must be replaced with a real layout before a game ships. */
 const TOUCH_TBD: TouchLayout = { movement: 'none', look: 'none', buttons: [], orientation: 'any', notes: 'To be designed with the minigame.' };
 
-const planned = (d: Omit<MinigameDefinition, 'status' | 'touch' | 'inputs' | 'bots'> & { touch?: TouchLayout }): MinigameDefinition => ({
+const planned = (d: Omit<MinigameDefinition, 'status' | 'touch' | 'inputs' | 'bots' | 'recordUnit'> & { touch?: TouchLayout }): MinigameDefinition => ({
   touch: TOUCH_TBD,
+  recordUnit: 'points',
   inputs: ['keyboard', 'mouse', 'touch'],
   bots: 'planned',
   status: 'planned',
@@ -32,6 +33,7 @@ export const MINIGAMES: MinigameDefinition[] = [
     eligibility: { tournament: true, ranked: true, casual: true },
     scoring: 'elimination-order',
     tieBreak: 'Same round: more notes repeated, then out later',
+    recordUnit: 'rounds',
     controls: [
       { keys: 'A', action: 'Coral drum' },
       { keys: 'S', action: 'Golden bell' },
@@ -179,20 +181,36 @@ export const MINIGAMES: MinigameDefinition[] = [
     tieBreak: 'Out later ranks higher',
     controls: [],
   }),
-  planned({
-    id: 'toybox-trivia',
-    title: 'Toybox Trivia',
-    tagline: 'The quiz show for tiny contenders.',
-    description: 'Timed multiple choice. Correct answers score, with a bonus for being fast.',
+  {
+    id: 'jack-in-the-box',
+    title: 'Jack-in-the-Box',
+    tagline: 'Name one, pass the box, and pray it doesn’t pop.',
+    description:
+      'Each round has a category, like “Name a fruit”. Whoever holds the wind-up box must type something that fits and hasn’t been said yet. A good answer cranks the handle and passes the box on. A hidden fuse is ticking: when the jack pops, whoever is holding it is out. Last toy in wins.',
     category: 'knowledge',
-    accent: PALETTE.honey,
-    players: { min: 1, max: 8 },
-    durationSec: [60, 150],
+    accent: PALETTE.coral,
+    players: { min: 2, max: 8 },
+    durationSec: [60, 240],
+    inputs: ['keyboard', 'mouse', 'touch'],
+    bots: 'available',
     eligibility: { tournament: true, ranked: true, casual: true },
-    scoring: 'score',
-    tieBreak: 'Total answer time',
-    controls: [],
-  }),
+    scoring: 'elimination-order',
+    tieBreak: 'None needed: toys pop one at a time',
+    recordUnit: 'answers',
+    controls: [
+      { keys: 'Type', action: 'Your answer' },
+      { keys: 'Enter', action: 'Crank and pass' },
+    ],
+    touch: {
+      movement: 'none',
+      look: 'none',
+      buttons: [{ id: 'crank', label: 'Crank!', colour: PALETTE.coral }],
+      orientation: 'any',
+      notes: 'Type your answer and tap Crank! (or your keyboard’s send key). The answer box sits at the top so the phone keyboard never hides it.',
+    },
+    status: 'playable',
+    load: () => import('./jackbox').then((m) => m.default),
+  },
 ];
 
 export const gameById = (id: MinigameId) => MINIGAMES.find((g) => g.id === id)!;

@@ -69,6 +69,6 @@ node tests/e2e/functional.cjs   # desktop gameplay checks (preview server runnin
 node tests/e2e/secrets.cjs
 node tests/e2e/mobile.cjs       # touch/phone checks
 node tests/e2e/menu.cjs         # main menu, Workshop, unlocks, persistence, deep links
-node tests/e2e/minigame.cjs     # Copycat practice + full Blitz tournament flow
+node tests/e2e/minigame.cjs     # Copycat + Jack-in-the-Box practice, full Blitz tournament flow
 npm test                        # vitest unit tests for rules cores, scoring, tournament selection
 ```

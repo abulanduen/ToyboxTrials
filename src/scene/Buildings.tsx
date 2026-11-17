@@ -410,8 +410,8 @@ function Gate({ gate }: { gate: (typeof GATES)[number] }) {
             <circleGeometry args={[3, 32]} />
             <meshBasicMaterial color={PALETTE.honey} transparent opacity={0.4} depthWrite={false} />
           </mesh>
-          {/* the four instrument colours as a sticker strip on the lintel */}
-          {[PALETTE.coral, PALETTE.honey, PALETTE.toyBlue, PALETTE.sage].map((c, i) => (
+          {/* the four instrument colours as a sticker strip on the lintel (Copycat's gate) */}
+          {(gate.id === 'gate-copycat' ? [PALETTE.coral, PALETTE.honey, PALETTE.toyBlue, PALETTE.sage] : []).map((c, i) => (
             <mesh key={c} position={[-1.8 + i * 1.2, GATE.height - 1.1, GATE.depth / 2 + 0.17]} material={paintMat(c, 0.5)}>
               <circleGeometry args={[0.45, 16]} />
             </mesh>

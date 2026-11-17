@@ -130,7 +130,7 @@ export function GateBoards() {
   return (
     <>
       {GATES.map((g) => {
-        const title = g.id === 'gate-copycat' ? 'Copycat Conductor' : g.id === 'gate-inferno' ? 'Inferno Escape' : 'Wind-Up Dash';
+        const title = g.id === 'gate-copycat' ? 'Copycat Conductor' : g.id === 'gate-jack' ? 'Jack-in-the-Box' : 'Wind-Up Dash';
         const sub = g.active ? 'Step inside' : 'Coming soon';
         return (
           <group key={g.id} position={[g.x, 0, g.z]} rotation={[0, g.rot, 0]}>

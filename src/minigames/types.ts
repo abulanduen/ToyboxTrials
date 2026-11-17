@@ -27,7 +27,7 @@ export type MinigameId =
   | 'music-box-rhythm'
   | 'toy-squad'
   | 'spellbox-showdown'
-  | 'toybox-trivia';
+  | 'jack-in-the-box';
 
 export type MinigameCategory = 'memory' | 'survival' | 'observation' | 'reflex' | 'pvp' | 'racing' | 'rhythm' | 'strategy' | 'knowledge';
 
@@ -136,6 +136,8 @@ export interface MinigameDefinition {
   eligibility: { tournament: boolean; ranked: boolean; casual: boolean };
   scoring: 'elimination-order' | 'score' | 'time' | 'progress';
   tieBreak: string;
+  /** What the record score counts, e.g. "rounds" or "answers" (plural). */
+  recordUnit: string;
   /** Human-readable key map, shown on the intro card. */
   controls: { keys: string; action: string }[];
   /** Mobile/touch controls. Required: a minigame without a touch layout is not shippable. */

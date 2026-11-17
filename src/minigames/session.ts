@@ -131,7 +131,12 @@ async function loadGame(id: MinigameId) {
 export function openPractice(id: MinigameId) {
   enterMinigameScreen();
   const m = useMatch.getState();
-  m.set({ kind: 'practice', tournament: null, lastResult: null, contestants: [localContestant()], opponents: m.kind === 'practice' ? m.opponents : 0 });
+  const def = gameById(id);
+  let opponents = m.kind === 'practice' ? m.opponents : 0;
+  // Games that need company (e.g. Jack-in-the-Box) default to a few bots.
+  if (opponents + 1 < def.players.min) opponents = Math.min(3, def.players.max - 1);
+  if (opponents + 1 > def.players.max) opponents = def.players.max - 1;
+  m.set({ kind: 'practice', tournament: null, lastResult: null, contestants: [localContestant()], opponents });
   void loadGame(id);
 }
 
@@ -146,7 +151,8 @@ export function openTournamentPicker() {
 }
 
 export function startTournament(format: TournamentFormat, opponents: number, difficulty: BotDifficulty) {
-  const pool = tournamentPool();
+  const field = opponents + 1;
+  const pool = tournamentPool().filter((g) => field >= g.players.min && field <= g.players.max);
   const seed = newSeed();
   const games = selectGames(seed, FORMATS[format].games, pool);
   const local = localContestant();

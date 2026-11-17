@@ -55,9 +55,14 @@ Brief stages 3 and 4 (first game).
 
 _Depends on:_ M3. _Unblocks:_ every later minigame.
 
-### M5 · Find the Original + Toybox Trivia ⏳
-Both are easy to make bots for and work well alone or with bots. Trivia needs a question bank: an original
-starter set, then categories.
+### M5 · Jack-in-the-Box + Find the Original 🚧
+**Jack-in-the-Box** ✅ (first pass; replaces Toybox Trivia, amendment A8) is a hot-potato category game.
+Built: an original bank of 26 categories with tiered answers, forgiving answer matching (aliases, plurals, small
+typos), a rules core with a hidden fuse, bots that know more of the unusual answers at higher difficulty, the
+biscuit-tin arena, and a typing HUD that keeps the answer box clear of phone keyboards. The coral hub gate opens it,
+and it joins the tournament rotation. Untuned: fuse range (12–28 s) and bot speeds need real-player testing.
+Next: **Find the Original**.
+Both are easy to make bots for and work well alone or with bots.
 _Depends on:_ M4.
 
 ### M6 · Red Light, Green Light + Wind-Up Dash ⏳
@@ -131,5 +136,6 @@ _Depends on:_ M8.
 | 17 Nov 2026 | Base44 version not ported. This repo is canonical, and Copycat is redesigned |
 | 17 Nov 2026 | Adopted the master brief (GAME_DESIGN.md) with amendments A1–A7 |
 | 17 Nov 2026 | Start with casual and bots. One ranked ladder first, the other two later |
+| 17 Nov 2026 | Toybox Trivia replaced by Jack-in-the-Box (hot-potato categories, Puffer Party-style) |
 | _pending_ | Game-server host for multiplayer (M8) |
 | _pending_ | Rating algorithm, ranked guest access, Base44 competition eligibility |

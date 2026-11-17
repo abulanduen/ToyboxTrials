@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react';
 import { useGame } from '../game/store';
 import { sfx } from '../game/audio';
-import { gameById } from '../minigames/registry';
+import { gameById, tournamentPool } from '../minigames/registry';
 import {
   LOCAL_ID,
   beginCountdown,
@@ -50,6 +50,8 @@ export function MatchOverlay() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.code !== 'Escape' && e.code !== 'KeyP') return;
+      const el = e.target as HTMLElement | null;
+      if (e.code === 'KeyP' && el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
       const s = useMatch.getState();
       if (s.phase === 'playing' || s.phase === 'countdown') {
         pauseMatch(!s.paused);
@@ -146,7 +148,7 @@ function Intro({ touch }: { touch: boolean }) {
               <div className="setting">
                 <span>Opponents</span>
                 <div className="segmented">
-                  {[0, 1, 3, 5, 7].map((n) => (
+                  {[0, 1, 3, 5, 7].filter((n) => n + 1 >= def.players.min && n + 1 <= def.players.max).map((n) => (
                     <button key={n} className={m.opponents === n ? 'on' : ''} onClick={() => (sfx.click(), setPracticeOpponents(n))}>
                       {n === 0 ? 'Solo' : `${n} bot${n > 1 ? 's' : ''}`}
                     </button>
@@ -165,7 +167,7 @@ function Intro({ touch }: { touch: boolean }) {
           )}
           {rec && (
             <p className="intro-record">
-              <StarSticker size={18} /> Best: <strong>{rec.best}</strong> rounds · played {rec.plays}
+              <StarSticker size={18} /> Best: <strong>{rec.best}</strong> {unit(def.recordUnit, rec.best)} · played {rec.plays}
               {rec.wins ? ` · ${rec.wins} win${rec.wins > 1 ? 's' : ''}` : ''}
             </p>
           )}
@@ -238,7 +240,7 @@ function Results() {
       </div>
       {solo ? (
         <div className="results-solo">
-          <span>Rounds survived</span>
+          <span>{def.recordUnit === 'rounds' ? 'Rounds survived' : def.recordUnit[0].toUpperCase() + def.recordUnit.slice(1)}</span>
           <strong data-testid="solo-score">{mine?.score ?? 0}</strong>
           {m.newBest && <span className="sticker-badge">New personal best!</span>}
         </div>
@@ -249,14 +251,14 @@ function Results() {
               <Medal place={p.place} />
               <Who c={byId(p.contestantId)} />
               <span className="results-list__score">
-                {p.forfeit ? 'quit' : !p.eliminated ? 'last standing' : `${p.score} rd${p.score === 1 ? '' : 's'}`}
+                {p.forfeit ? 'quit' : !p.eliminated ? 'last standing' : `${p.score} ${unit(def.recordUnit, p.score)}`}
               </span>
               {isTournament && <span className="results-list__pts">+{pointsForPlace(p.place)}</span>}
             </li>
           ))}
         </ol>
       )}
-      {!solo && m.newBest && <p className="intro-record"><StarSticker size={18} /> New personal best: {mine?.score} rounds</p>}
+      {!solo && m.newBest && <p className="intro-record"><StarSticker size={18} /> New personal best: {mine?.score} {unit(def.recordUnit, mine?.score ?? 0)}</p>}
       <div className="pause__actions">
         {isTournament ? (
           <ToyButton armDelay={700} onClick={continueAfterResults} autoFocus testId="results-next">
@@ -395,8 +397,11 @@ export function TournamentPicker({ onClose }: { onClose: () => void }) {
         <DifficultyPicker value={difficulty} onChange={setDifficulty} />
       </div>
       <p className="panel__note">
-        Unranked for now. Online play and ranked tournaments come later. Only <strong>Copycat Conductor</strong> is playable so far, so every trial is Copycat
-        until new games join the rotation.
+        Unranked for now. Online play and ranked tournaments come later. In the rotation so far:{' '}
+        {tournamentPool()
+          .map((g) => g.title)
+          .join(' and ')}
+        . More trials join as they're built.
       </p>
       {history[0] && (
         <p className="intro-record">
@@ -420,4 +425,9 @@ export function TournamentPicker({ onClose }: { onClose: () => void }) {
       </div>
     </>
   );
+}
+
+/** "1 answer" / "3 answers"; units are stored plural. */
+export function unit(plural: string, n: number) {
+  return n === 1 && plural.endsWith('s') ? plural.slice(0, -1) : plural;
 }

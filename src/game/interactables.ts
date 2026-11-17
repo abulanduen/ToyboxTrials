@@ -38,7 +38,7 @@ const gate = (id: string) => {
 
 export const INTERACTABLES: Interactable[] = [
   { id: 'gate-copycat', ...gate('gate-copycat'), radius: 4.5, verb: 'Play', label: 'Copycat Conductor' },
-  { id: 'gate-inferno', ...gate('gate-inferno'), radius: 4.5, verb: 'Peek at', label: 'Inferno Escape' },
+  { id: 'gate-jack', ...gate('gate-jack'), radius: 4.5, verb: 'Play', label: 'Jack-in-the-Box' },
   { id: 'gate-dash', ...gate('gate-dash'), radius: 4.5, verb: 'Peek at', label: 'Wind-Up Dash' },
   { id: 'pavilion', ...frontOf(PAVILION.x, PAVILION.z, 0, PAVILION.d / 2 + 3), radius: 4.5, verb: 'Enter', label: 'the Tournament Pavilion' },
   { id: 'workshop', ...frontOf(WORKSHOP.x, WORKSHOP.z, WORKSHOP.rot, WORKSHOP.d / 2 + 2.5), radius: 5, verb: 'Tinker at', label: 'the Workshop' },
@@ -82,15 +82,10 @@ export function interact(id: string, facing: { x: number; z: number }) {
       events.emit('gate:open', { id });
       openPractice('copycat-conductor');
       break;
-    case 'gate-inferno':
-      sfx.click();
-      g.openPanel({
-        kind: 'preview',
-        title: 'Inferno Escape',
-        subtitle: 'Arena under construction',
-        body: 'Dig through cardboard, build one wall, and outlast the creeping heat. The toys are still taping this one together.',
-        accent: PALETTE.coral,
-      });
+    case 'gate-jack':
+      sfx.interact();
+      events.emit('gate:open', { id });
+      openPractice('jack-in-the-box');
       break;
     case 'gate-dash':
       sfx.click();

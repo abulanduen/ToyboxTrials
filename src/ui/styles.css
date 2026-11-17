@@ -1830,3 +1830,178 @@ canvas {
     min-height: 60px;
   }
 }
+
+/* ---------- Jack-in-the-Box HUD ---------- */
+.jb-hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.jb-top {
+  position: absolute;
+  top: calc(10px + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  width: min(560px, calc(100vw - 140px));
+}
+.jb-card {
+  display: grid;
+  justify-items: center;
+  padding: 6px 22px 8px;
+  border-radius: 16px;
+  border: 3px solid var(--ink-deep);
+  background: var(--paper);
+  box-shadow: 0 5px 0 rgba(43, 36, 51, 0.4);
+  animation: prompt-pop 0.35s cubic-bezier(0.2, 1.8, 0.4, 1) both;
+}
+.jb-card strong {
+  font: 700 clamp(1.3rem, 4.6vw, 2rem) var(--font-display);
+  line-height: 1.1;
+  text-align: center;
+}
+.jb-card__round {
+  font: 700 0.75rem var(--font-body);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.65;
+}
+.jb-banner {
+  font-size: clamp(0.95rem, 3vw, 1.25rem);
+  padding: 5px 16px;
+  white-space: normal;
+  text-align: center;
+}
+.jb-answer {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  pointer-events: auto;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+.jb-answer.on {
+  opacity: 1;
+}
+.jb-answer input {
+  flex: 1;
+  min-width: 0;
+  min-height: 56px;
+  padding: 0 16px;
+  border-radius: 16px;
+  border: 3px solid var(--ink-deep);
+  background: #fffdf6;
+  font: 700 1.15rem var(--font-body);
+  color: var(--ink-deep);
+}
+.jb-answer.on input {
+  outline: 4px solid var(--honey);
+}
+.jb-answer button {
+  min-width: 96px;
+  min-height: 56px;
+  border-radius: 16px;
+  border: 3px solid var(--ink-deep);
+  background: var(--coral);
+  box-shadow: 0 5px 0 var(--ink-deep);
+  font: 700 1.05rem var(--font-display);
+  color: var(--ink-deep);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.jb-answer button:disabled {
+  background: #d9cfc0;
+  box-shadow: 0 3px 0 rgba(43, 36, 51, 0.5);
+  cursor: default;
+}
+.jb-answer button:not(:disabled):active {
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 var(--ink-deep);
+}
+.jb-note {
+  padding: 5px 14px;
+  border-radius: 12px;
+  border: 2.5px solid var(--ink-deep);
+  font: 700 0.95rem var(--font-body);
+  animation: prompt-pop 0.25s cubic-bezier(0.2, 1.8, 0.4, 1) both;
+}
+.jb-note--no {
+  background: #f3b1ab;
+}
+.jb-note--ok {
+  background: #d7ecd7;
+}
+.jb-said {
+  position: absolute;
+  left: 50%;
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 5px;
+  width: min(640px, calc(100vw - 32px));
+}
+.jb-said span {
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 2px solid var(--ink-deep);
+  background: rgba(255, 249, 238, 0.88);
+  font: 700 0.8rem var(--font-body);
+}
+.jb-said span.me {
+  background: #fff3d6;
+}
+.jb-field .cc-chip em {
+  margin-left: 4px;
+  font-style: normal;
+  opacity: 0.6;
+}
+.cc-chip.holding {
+  background: var(--honey);
+  outline: 3px solid var(--coral);
+}
+@media (orientation: portrait) {
+  .jb-top {
+    width: calc(100vw - 84px);
+  }
+  .jb-field {
+    top: auto;
+    left: calc(10px + env(safe-area-inset-left));
+    right: calc(10px + env(safe-area-inset-right));
+    bottom: calc(64px + env(safe-area-inset-bottom));
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  .jb-top {
+    gap: 4px;
+  }
+  .jb-card {
+    padding: 2px 16px 4px;
+  }
+  .jb-card strong {
+    font-size: 1.1rem;
+  }
+  .jb-card__round {
+    display: none;
+  }
+  /* The chips and the answer box's placeholder already say whose turn it is. */
+  .jb-banner {
+    display: none;
+  }
+  .jb-answer input,
+  .jb-answer button {
+    min-height: 56px;
+  }
+  .jb-field {
+    top: calc(12px + env(safe-area-inset-top));
+  }
+  .jb-said {
+    display: none;
+  }
+}

@@ -20,6 +20,7 @@ inline and summarised first. Everything marked _proposal_ is not final.
 | A5 | Find the Original anti-cheat | Prevent players getting the target from frontend data | The client must render the target, so this can only be made **impractical**, not impossible: no target flag in the client data, and identity comes from render parameters. Fine for a party game |
 | A6 | Music | All sound is synthesised | Sound effects stay synthesised. **Music Box Rhythm needs real songs**, which may be composed in code, commissioned or licensed and recorded in the asset manifest. Music only |
 | A7 | Bots | Bots everywhere | Bots are planned per game, in order of difficulty. Combat bots (Blink Duel, Spellbox) are a substantial job, which is one reason those games come late |
+| A8 | Toybox Trivia | Timed multiple-choice quiz | **Replaced by Jack-in-the-Box**, a hot-potato category game in the style of Krillion's Puffer Party, adapted with original content (owner decision, 17 Nov 2026). The shared category and answer bank can later also power a solo "rare answers score more" daily challenge |
 
 ---
 
@@ -233,12 +234,23 @@ A short, simple auto-battler. Each round, players:
 **Toybox:** toy mages in a plastic-and-wood ring, with spells as toy explosions, springs, bubbles and fireworks.
 **Tech:** planar arena physics, authoritative damage and knockback, and a small spell roster to start.
 
-### 11 · Toybox Trivia (Knowledge / Speed · 1–8)
-- Timed multiple choice, with the same question for everyone. Correct answers score, plus an optional speed bonus.
-- Wrong or blank answers score nothing, and the highest total wins.
+### 11 · Jack-in-the-Box (Knowledge / Nerve · 2–8) — 🔧 Amended (A8), replaces Toybox Trivia
+A hot-potato category game. The contenders sit in a ring around a cranking jack-in-the-box.
+- Each round reveals a category ("Name a fruit"). Whoever holds the box must **type a valid answer
+  that hasn't been used yet this round**, and a correct answer passes the box to the next player.
+- Wrong or repeated answers are rejected, and the crank keeps turning while you try again.
+- The box has a **hidden fuse** (about 12–28 s, rolled from the match seed). It ticks and rattles harder the longer
+  a round runs. That is based on time elapsed, not time left, so it builds tension without giving the fuse away.
+  Whoever holds it when it springs is knocked out.
+- A new category starts each round, beginning with the next player. The last toy standing wins.
+- Placement is by elimination order. The score is valid answers given.
 
-**Toybox:** a shoebox game-show stage with mechanical question boards, buzzers and a wind-up host.
-**Tech:** question banks by category and difficulty, server timers, and answers and scoring that resist client tampering.
+**Matching:** case, accents, "a/the", simple plurals and small typos are forgiven. Aliases cover spelling
+variants (grey/gray). Answer lists are curated per category with common, uncommon and rare tiers.
+**Bots** know only the tiers that suit their difficulty, so they "blank" as the easy answers run out.
+**Tech:** turn-based and latency-tolerant, so it's a strong candidate for the first online game (M8). Server-side
+validation is needed in competitive play. Mechanic inspiration: Krillion's Puffer Party and classic
+hot-potato word games. Content and theme are original.
 
 ---
 

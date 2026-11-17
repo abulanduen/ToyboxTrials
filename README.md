@@ -57,6 +57,7 @@ The build output in `dist/` is a static folder with relative paths. Host it anyw
 
 Things to find in the Playroom:
 - **Copycat Conductor gate** (honey arch): play Copycat Conductor solo or against bots.
+- **Jack-in-the-Box gate** (coral arch): a hot-potato word game against 1–7 bots. Each round has a category ("Name a fruit"). Type an answer nobody has said yet to crank the box and pass it on. When the jack pops, whoever is holding it is out.
 - **Tournament Pavilion** (striped tent): run a Blitz (3), Normal (5) or Treasure (8) tournament against bots.
 - **Workshop** (pencil case): opens the Workshop screen. Name your contender and pick a paint job, hat and key skin. Secrets unlock extra items.
 - **Scoreboard** (domino wall): tracks secrets.
@@ -127,7 +128,7 @@ Deep links: add `#play` to the URL to skip the menu, or `#workshop` to open the 
 `?debug` in the URL exposes test hooks (`window.__toybox.teleport/aim/state/renderInfo`). Gameplay never uses them.
 
 Verified in headless Chromium: movement, pavilion collision, play-area bounds, jumping,
-standable surfaces, interaction prompts, the Copycat panel and ASJK bench, pause and resume, repainting,
+standable surfaces, interaction prompts, Copycat Conductor and Jack-in-the-Box (typed answers, rejects, passing, results), mixed-game tournaments, pause and resume, repainting,
 elimination and respawn, all four secrets, the speed boost, and persistence across reloads. On an emulated phone it also checked the touch
 joystick, two-thumb move and look, the Jump and Interact buttons, the tappable prompt, the pause button, and portrait FOV. There were no
 console errors. **Frame rate has not been measured on real hardware** (the CI container has no GPU).

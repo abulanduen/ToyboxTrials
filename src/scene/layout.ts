@@ -23,7 +23,7 @@ export const FINGERPOST = { x: -5.5, z: 14 };
 /** Minigame gates: arches of building blocks facing the fountain. */
 export const GATES = [
   { id: 'gate-copycat', x: 15, z: -24, color: PALETTE.honey, active: true },
-  { id: 'gate-inferno', x: 26.5, z: -18.5, color: PALETTE.coral, active: false },
+  { id: 'gate-jack', x: 26.5, z: -18.5, color: PALETTE.coral, active: true },
   { id: 'gate-dash', x: 34.5, z: -8, color: PALETTE.toyBlue, active: false },
 ].map((g) => ({ ...g, rot: Math.atan2(-g.x, -g.z) }));
 export const GATE = { width: 9, pillar: 2.6, height: 8.5, depth: 3 };

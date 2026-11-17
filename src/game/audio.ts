@@ -241,6 +241,52 @@ export const sfx = {
       at += durs[i];
     });
   },
+
+  // ---- Jack-in-the-Box ----
+
+  /**
+   * One crank of the jack-in-the-box handle: a ratchet click plus the next two notes of the box's
+   * own tune (an original pentatonic phrase that loops), so a fast round "plays" the box.
+   */
+  crank(step: number) {
+    const t = now();
+    const tune = [784, 880, 1046.5, 880, 1174.7, 1046.5, 880, 784, 659.3, 784, 880, 1046.5, 1318.5, 1174.7, 1046.5, 880];
+    for (let i = 0; i < 3; i++) noise(t + i * 0.045, 0.16, 0.014, 3400 + i * 200, 5);
+    tine(tune[(step * 2) % tune.length], t + 0.02, 0.12, 0.6, 5.2);
+    tine(tune[(step * 2 + 1) % tune.length], t + 0.16, 0.1, 0.7, 5.2);
+  },
+  /** Answer not accepted: a dull double bonk. */
+  reject() {
+    const t = now();
+    tone(196, t, 0.14, 0.08, 'triangle', 0.002, 150);
+    tone(165, t + 0.1, 0.12, 0.12, 'triangle', 0.002, 120);
+  },
+  /** The jack pops: lid clack, big spring boing, a burst of confetti noise. */
+  jackPop() {
+    const t = now();
+    const c = live();
+    if (!c) return;
+    noise(t, 0.3, 0.05, 1800, 1.5);
+    const o = c.createOscillator();
+    const lfo = c.createOscillator();
+    const lfoGain = c.createGain();
+    const g = c.createGain();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(160, t);
+    o.frequency.exponentialRampToValueAtTime(520, t + 0.12);
+    o.frequency.exponentialRampToValueAtTime(300, t + 0.9);
+    lfo.frequency.setValueAtTime(22, t);
+    lfo.frequency.linearRampToValueAtTime(5, t + 0.9);
+    lfoGain.gain.value = 90;
+    lfo.connect(lfoGain).connect(o.frequency);
+    env(g, t, 0.28, 0.004, 0.95);
+    o.connect(g).connect(master!);
+    o.start(t);
+    lfo.start(t);
+    o.stop(t + 1.05);
+    lfo.stop(t + 1.05);
+    for (let i = 0; i < 6; i++) noise(t + 0.05 + i * 0.03, 0.08, 0.05, 5000 + i * 400, 3);
+  },
 };
 
 export type SfxName = keyof typeof sfx;

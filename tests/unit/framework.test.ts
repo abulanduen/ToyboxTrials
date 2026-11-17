@@ -25,7 +25,7 @@ describe('seeded rng', () => {
 const pool: { id: MinigameId; category: MinigameCategory }[] = [
   { id: 'copycat-conductor', category: 'memory' },
   { id: 'find-the-original', category: 'observation' },
-  { id: 'toybox-trivia', category: 'knowledge' },
+  { id: 'jack-in-the-box', category: 'knowledge' },
   { id: 'red-light-green-light', category: 'reflex' },
   { id: 'wind-up-dash', category: 'racing' },
   { id: 'blink-duel', category: 'pvp' },

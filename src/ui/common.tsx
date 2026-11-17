@@ -28,6 +28,7 @@ export function ToyButton({
 }) {
   const ref = useRef<HTMLButtonElement>(null);
   const mountedAt = useRef(performance.now());
+  const pressedHere = useRef(false);
   // Focus for keyboard players without scrolling the panel (native autoFocus scrolls short
   // phone-landscape panels to the bottom and hides their titles).
   useEffect(() => {
@@ -40,7 +41,17 @@ export function ToyButton({
       className={`toy-btn toy-btn--${tone} ${className}`}
       disabled={disabled}
       onMouseEnter={() => sfx.tick()}
-      onClick={() => {
+      onPointerDown={() => {
+        pressedHere.current = true;
+      }}
+      onClick={(e) => {
+        // Tap-through guard: a pointer click only counts if the press also began on this button.
+        // Otherwise a finger still held down from the previous screen (e.g. a long press on Play)
+        // would "click" whatever pops up under it when lifted. Keyboard clicks have detail 0.
+        const fromPointer = e.detail > 0;
+        const began = pressedHere.current;
+        pressedHere.current = false;
+        if (armDelay && fromPointer && !began) return;
         if (performance.now() - mountedAt.current < armDelay) return;
         unlockAudio();
         sfx.click();
