@@ -32,6 +32,9 @@ Read `docs/` (audit, plan, visual guide, prompts, limitations) before major work
 - No React state changes per frame. The frame loop reads the Zustand store and plain objects.
 - Colours come from `src/game/palette.ts`.
 - `?debug` exposes `window.__toybox` test hooks. Gameplay must never depend on them.
+- Screens: `menu` | `playing` | `workshop` in the store (`goTo`, `openWorkshop`). Camera moves between
+  screens must orbit or cut. Never lerp in a straight line through the contender.
+- Cosmetics live in `src/game/cosmetics.ts`. Unlocks are keyed by secret id.
 
 ## Commands
 
@@ -42,4 +45,5 @@ npm run preview -- --port 4173
 node tests/e2e/functional.cjs   # desktop gameplay checks (preview server running)
 node tests/e2e/secrets.cjs
 node tests/e2e/mobile.cjs       # touch/phone checks
+node tests/e2e/menu.cjs         # main menu, Workshop, unlocks, persistence, deep links
 ```

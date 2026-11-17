@@ -19,16 +19,15 @@ _What is not done, not verified, or risky. Updated at Milestone 2._
   instrument bench only.
 - **No gamepad input yet.** Keyboard, mouse and touch are supported.
 - **Panels scroll on short landscape phones.** On short landscape screens (about 400 px tall) the Copycat panel needs a short scroll to reach its button. Tapping outside a panel also closes it.
-- **No main menu, router or results screen.** The title card is a minimal start screen. The full menu is M3.
-- **Customisation is minimal.** The Workshop cycles 5 paint jobs. There are no hats or accessories yet.
+- **No results screen yet.** It arrives with the first playable minigame (M4). Screen routing is store-driven with `#play` and `#workshop` deep links, not a router library.
+- **Customisation doesn't map to the existing app yet.** The Workshop has paint, hats and keys, but its ids aren't mapped to the Base44 app's options because that code hasn't been seen. There are no badges or accessories beyond hats and keys.
 - **Climbing is jump-based only.** No ledge grabbing. A missed jump from the eraser just drops you
   back onto the book.
 - **The camera can still clip small props** (trees, blocks, train). Only large props block the camera.
   This is a deliberate trade-off against jitter.
 - **The marble is the only pushable object.** Its physics is simple (friction and reflection), and it
   can't roll onto raised surfaces.
-- **No loading screen.** Start-up generates textures and compiles shaders on the main thread. Expect a
-  short hitch on first frame (larger on low-end devices).
+- **The loading card hides start-up, it doesn't shorten it.** Textures and shaders are still generated on the main thread. The card stays up until the first frames render, so low-end phones will wait longer behind it.
 
 ## Performance risks (ranked)
 

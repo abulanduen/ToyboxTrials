@@ -14,6 +14,8 @@ import { RoundedBox } from '@react-three/drei';
 import * as THREE from 'three';
 import { PALETTE, type PaintJob } from '../game/palette';
 import { ELIM_DURATION, INTERACT_DURATION, RESPAWN_DURATION, type ToyAnim } from './anim';
+import type { HatId, KeySkinId } from '../game/cosmetics';
+import { HAT_HIDES_ANTENNA, Hat, KeyBow } from './Cosmetics';
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const damp = (cur: number, target: number, lambda: number, dt: number) =>
@@ -27,9 +29,11 @@ const easeOutBack = (x: number) => {
 interface Props {
   anim: React.RefObject<ToyAnim>;
   paint: PaintJob;
+  hat?: HatId;
+  keySkin?: KeySkinId;
 }
 
-export function WindupBot({ anim, paint }: Props) {
+export function WindupBot({ anim, paint, hat = 'none', keySkin = 'classic' }: Props) {
   const mats = useMemo(() => {
     const plastic = (c: string, rough = 0.42) => new THREE.MeshStandardMaterial({ color: c, roughness: rough, metalness: 0.02 });
     return {
@@ -309,14 +313,7 @@ export function WindupBot({ anim, paint }: Props) {
             <mesh position={[0, 0, -0.15]} rotation={[Math.PI / 2, 0, 0]} material={mats.brass} castShadow>
               <cylinderGeometry args={[0.07, 0.07, 0.34, 8]} />
             </mesh>
-            {[-1, 1].map((side) => (
-              <mesh key={side} position={[side * 0.27, 0, -0.34]} material={mats.brass} castShadow>
-                <torusGeometry args={[0.22, 0.075, 8, 16]} />
-              </mesh>
-            ))}
-            <mesh position={[0, 0, -0.34]} material={mats.brass}>
-              <sphereGeometry args={[0.11, 10, 8]} />
-            </mesh>
+            <KeyBow skin={keySkin} />
           </group>
         </group>
 
@@ -373,8 +370,10 @@ export function WindupBot({ anim, paint }: Props) {
                 </mesh>
               </group>
             </group>
+            {/* hat (sits on the turret) */}
+            <Hat id={hat} />
             {/* springy antenna */}
-            <group ref={antenna} position={[0, 0.38, -0.05]}>
+            <group ref={antenna} position={[0, 0.38, -0.05]} visible={!HAT_HIDES_ANTENNA[hat]}>
               <mesh position={[0, 0.18, 0]} material={mats.ink}>
                 <cylinderGeometry args={[0.025, 0.025, 0.36, 6]} />
               </mesh>

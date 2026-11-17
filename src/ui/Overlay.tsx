@@ -3,91 +3,18 @@
  * Styled as physical toy-world objects (wooden signs, cardboard, stickers, tickets, felt).
  */
 import { useEffect, useRef, useState } from 'react';
-import { useGame, type Quality } from '../game/store';
-import { sfx, unlockAudio } from '../game/audio';
+import { useGame } from '../game/store';
+import { sfx } from '../game/audio';
 import { events } from '../game/events';
 import { PAINT_JOBS, PALETTE } from '../game/palette';
 import { SECRET_IDS } from '../game/interactables';
 import { MINIGAMES } from '../minigames/registry';
 import { frameStats } from '../scene/PlayroomScene';
-import { GearIcon, StarSticker, TickerBadge, WindKeyIcon } from './icons';
+import { GearIcon, StarSticker, WindKeyIcon } from './icons';
 import { TouchControls, tapInteract } from './TouchControls';
-
-function ToyButton({ children, onClick, tone = 'honey', autoFocus, disabled }: { children: React.ReactNode; onClick: () => void; tone?: 'honey' | 'coral' | 'blue' | 'sage' | 'ink'; autoFocus?: boolean; disabled?: boolean }) {
-  const ref = useRef<HTMLButtonElement>(null);
-  // Focus for keyboard players without scrolling the panel (native autoFocus scrolls short
-  // phone-landscape panels to the bottom and hides their titles).
-  useEffect(() => {
-    if (autoFocus) ref.current?.focus({ preventScroll: true });
-  }, [autoFocus]);
-  return (
-    <button
-      ref={ref}
-      className={`toy-btn toy-btn--${tone}`}
-      disabled={disabled}
-      onMouseEnter={() => sfx.tick()}
-      onClick={() => {
-        unlockAudio();
-        sfx.click();
-        onClick();
-      }}
-    >
-      <span>{children}</span>
-    </button>
-  );
-}
-
-function KeyCap({ k, wide }: { k: string; wide?: boolean }) {
-  return <kbd className={`keycap${wide ? ' keycap--wide' : ''}`}>{k}</kbd>;
-}
-
-// ---------------------------------------------------------------- Title
-function TitleScreen() {
-  const set = useGame((s) => s.set);
-  const touch = useGame((s) => s.touchUI);
-  const paint = PAINT_JOBS[useGame((s) => s.paintIndex) % PAINT_JOBS.length];
-  const start = () => {
-    unlockAudio();
-    sfx.windUp(10);
-    set({ screen: 'playing', paused: false });
-  };
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.code === 'Enter' || e.code === 'Space') {
-        e.preventDefault();
-        start();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  });
-  return (
-    <div className="title-layer">
-      <div className="title-sign">
-        <div className="title-sign__nail title-sign__nail--l" />
-        <div className="title-sign__nail title-sign__nail--r" />
-        <div className="title-sign__badge">
-          <TickerBadge size={92} body={paint.body} trim={paint.trim} accent={paint.accent} />
-        </div>
-        <h1 className="title-logo" aria-label="Toybox Trials">
-          <span className="title-logo__top">Toybox</span>
-          <span className="title-logo__bottom">Trials</span>
-        </h1>
-        <p className="title-tagline">Tiny contenders. Big chaos.</p>
-        <div className="title-actions">
-          <ToyButton onClick={start} autoFocus>
-            Enter the Playroom
-          </ToyButton>
-        </div>
-        <p className="title-hint">{touch ? 'Tap the button to start' : <>Press <KeyCap k="Enter" wide /> to start</>}</p>
-      </div>
-      <div className="ticket title-ticket">
-        <strong>Prototype · Milestone 2</strong>
-        <span>Explorable tabletop hub. Copycat Conductor plugs in at Milestone 4.</span>
-      </div>
-    </div>
-  );
-}
+import { KeyCap, SettingsForm, ToyButton } from './common';
+import { MainMenu } from './MainMenu';
+import { WorkshopScreen } from './WorkshopScreen';
 
 // ---------------------------------------------------------------- HUD
 function Prompt() {
@@ -234,6 +161,7 @@ function LookHint() {
 
 function Hud() {
   const secrets = useGame((s) => s.secretsFound.length);
+  const name = useGame((s) => s.contenderName);
   const locked = useGame((s) => s.pointerLocked);
   const touch = useGame((s) => s.touchUI);
   const paint = PAINT_JOBS[useGame((s) => s.paintIndex) % PAINT_JOBS.length];
@@ -241,7 +169,7 @@ function Hud() {
     <>
       <div className="hud-sign">
         <span className="hud-sign__title">The Playroom</span>
-        <span className="hud-sign__sub">{paint.name}</span>
+        <span className="hud-sign__sub">{name || paint.name}</span>
       </div>
       <div className="hud-secrets" title="Playroom secrets found">
         <StarSticker size={24} />
@@ -260,64 +188,49 @@ function Hud() {
 }
 
 // ---------------------------------------------------------------- Pause / settings
-function Slider({ label, value, onChange, min = 0, max = 1, step = 0.05 }: { label: string; value: number; onChange: (v: number) => void; min?: number; max?: number; step?: number }) {
-  return (
-    <label className="setting">
-      <span>{label}</span>
-      <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(parseFloat(e.target.value))} onPointerUp={() => sfx.tick()} />
-    </label>
-  );
-}
-
 function PauseMenu() {
   const s = useGame();
   return (
     <div className="modal-layer">
-      <div className="cardboard-panel pause">
+      <div className="cardboard-panel pause" role="dialog" aria-label="Paused">
         <div className="tape tape--l" />
         <div className="tape tape--r" />
         <h2>
           <GearIcon /> Paused
         </h2>
-        <div className="pause__grid">
-          <Slider label="Master volume" value={s.masterVolume} onChange={(v) => s.set({ masterVolume: v })} />
-          <Slider label="Effects volume" value={s.sfxVolume} onChange={(v) => s.set({ sfxVolume: v })} />
-          <Slider label={s.touchUI ? 'Look sensitivity' : 'Mouse sensitivity'} value={s.mouseSensitivity} min={0.4} max={2} step={0.1} onChange={(v) => s.set({ mouseSensitivity: v })} />
-          <div className="setting">
-            <span>Visual quality</span>
-            <div className="segmented">
-              {(['low', 'balanced', 'high'] as Quality[]).map((q) => (
-                <button
-                  key={q}
-                  className={s.quality === q ? 'on' : ''}
-                  onClick={() => {
-                    sfx.click();
-                    s.set({ quality: q });
-                  }}
-                >
-                  {q}
-                </button>
-              ))}
-            </div>
-          </div>
-          <label className="setting setting--check">
-            <input type="checkbox" checked={s.invertY} onChange={(e) => s.set({ invertY: e.target.checked })} />
-            <span>Invert camera Y</span>
-          </label>
-          <label className="setting setting--check">
-            <input type="checkbox" checked={s.showFps} onChange={(e) => s.set({ showFps: e.target.checked })} />
-            <span>Show frame rate</span>
-          </label>
-        </div>
+        <SettingsForm />
         <div className="pause__actions">
           <ToyButton onClick={() => s.togglePause(false)} autoFocus>
             Resume
           </ToyButton>
-          <ToyButton tone="ink" onClick={() => s.set({ screen: 'title', paused: false, panel: null })}>
-            Back to title
+          <ToyButton tone="blue" onClick={() => s.openWorkshop()}>
+            Workshop
+          </ToyButton>
+          <ToyButton tone="ink" onClick={() => s.goTo('menu')}>
+            Main menu
           </ToyButton>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Shown until the first frames have rendered (texture generation + shader compile). */
+function LoadingCard() {
+  const ready = useGame((s) => s.ready);
+  const [gone, setGone] = useState(false);
+  useEffect(() => {
+    if (!ready) return;
+    const id = window.setTimeout(() => setGone(true), 450);
+    return () => window.clearTimeout(id);
+  }, [ready]);
+  if (gone) return null;
+  return (
+    <div className={`loading${ready ? ' loading--out' : ''}`} aria-live="polite">
+      <div className="loading__key">
+        <WindKeyIcon size={64} />
+      </div>
+      <span>Winding up the Playroom…</span>
     </div>
   );
 }
@@ -442,18 +355,17 @@ export function Overlay() {
   const paused = useGame((s) => s.paused);
   const panel = useGame((s) => s.panel);
 
-  // Esc while a DOM panel or pause menu has focus (the canvas loop handles in-game Esc).
+  // Esc closes the top-most DOM layer (the canvas loop handles in-game Esc → pause).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.code !== 'Escape') return;
       const g = useGame.getState();
-      if (g.panel) {
-        g.closePanel();
-        e.stopPropagation();
-      } else if (g.paused) {
-        g.togglePause(false);
-        e.stopPropagation();
-      }
+      if (g.panel) g.closePanel();
+      else if (g.paused) g.togglePause(false);
+      else if (g.menuSheet) g.set({ menuSheet: null });
+      else if (g.screen === 'workshop') g.goTo(g.workshopReturn === 'workshop' ? 'menu' : g.workshopReturn);
+      else return;
+      e.stopPropagation();
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
@@ -461,10 +373,12 @@ export function Overlay() {
 
   return (
     <div className="overlay">
-      {screen === 'title' && <TitleScreen />}
+      {screen === 'menu' && <MainMenu />}
+      {screen === 'workshop' && <WorkshopScreen />}
       {screen === 'playing' && <Hud />}
       {screen === 'playing' && panel && <Panel />}
       {screen === 'playing' && paused && !panel && <PauseMenu />}
+      <LoadingCard />
     </div>
   );
 }

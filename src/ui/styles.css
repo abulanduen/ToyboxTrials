@@ -945,3 +945,398 @@ canvas {
     margin-bottom: 0.6rem;
   }
 }
+
+/* ======================================================================
+   Milestone 3 — main menu, Workshop, How to play, loading
+   ====================================================================== */
+/* ---------- main menu ---------- */
+.menu-layer {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(43, 36, 51, 0.38) 0%, rgba(43, 36, 51, 0.12) 38%, rgba(43, 36, 51, 0) 55%);
+  animation: fade-in 0.5s ease-out;
+}
+.menu-column {
+  position: absolute;
+  left: calc(36px + env(safe-area-inset-left));
+  top: 50%;
+  transform: translateY(-50%);
+  width: min(380px, 42vw);
+  display: grid;
+  gap: 18px;
+  pointer-events: auto;
+}
+.menu-sign {
+  position: relative;
+  padding: 1.6rem 1.6rem 0.9rem;
+  border-radius: 24px;
+  border: 4px solid var(--ink-deep);
+  background:
+    repeating-linear-gradient(0deg, rgba(126, 83, 50, 0.12) 0 2px, transparent 2px 9px),
+    linear-gradient(180deg, #e2b47a, #c8925a);
+  box-shadow: var(--shadow), inset 0 4px 0 rgba(255, 255, 255, 0.35), inset 0 -8px 0 rgba(126, 83, 50, 0.35);
+  text-align: center;
+  transform: rotate(-1.4deg);
+  animation: sign-drop 0.7s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+.menu-logo .title-logo__top {
+  font-size: clamp(2.4rem, 5.6vw, 4.4rem);
+}
+.menu-logo .title-logo__bottom {
+  font-size: clamp(2.1rem, 4.8vw, 3.8rem);
+}
+.menu-sign .title-tagline {
+  margin: 0.7rem 0 0.2rem;
+  font-size: 1.05rem;
+}
+.menu-buttons {
+  display: grid;
+  gap: 12px;
+}
+.menu-btn {
+  width: 100%;
+}
+.menu-btn > span {
+  padding: 0.8em 1.2em;
+}
+.menu-btn--primary {
+  font-size: 1.5rem;
+}
+.menu-btn--small {
+  font-size: 1rem;
+}
+.menu-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.menu-contender {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px 8px 8px;
+}
+.menu-contender strong {
+  display: block;
+  font: 700 1.1rem var(--font-display);
+}
+.menu-contender span {
+  display: block;
+  font-size: 0.85rem;
+  opacity: 0.9;
+}
+.menu-contender__secrets {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font: 700 0.95rem var(--font-display);
+}
+.menu-hint {
+  position: absolute;
+  left: 50%;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(43, 36, 51, 0.6);
+  color: var(--paper);
+  font: 600 0.85rem var(--font-body);
+}
+.menu-ticket {
+  position: absolute;
+  right: calc(18px + env(safe-area-inset-right));
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  flex-direction: column;
+  align-items: flex-start;
+  max-width: 300px;
+  transform: rotate(1deg);
+}
+
+/* ---------- How to play ---------- */
+.howto {
+  width: min(680px, calc(100vw - 32px));
+}
+.howto__cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 1.2rem;
+}
+.howto__col {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 2px dashed rgba(110, 82, 54, 0.5);
+  background: rgba(255, 249, 238, 0.45);
+}
+.howto__col--active {
+  border-style: solid;
+  border-color: var(--ink-deep);
+  background: rgba(255, 249, 238, 0.85);
+}
+.howto__col h3 {
+  margin: 0 0 8px;
+  font: 700 1.1rem var(--font-display);
+}
+.howto__col ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 8px;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+/* ---------- Workshop ---------- */
+.workshop-layer {
+  position: absolute;
+  inset: 0;
+  animation: fade-in 0.3s ease-out;
+}
+.workshop-panel {
+  position: absolute;
+  right: calc(24px + env(safe-area-inset-right));
+  top: 50%;
+  transform: translateY(-50%);
+  width: min(430px, 44vw);
+  max-height: calc(100vh - 32px);
+  pointer-events: auto;
+  animation: panel-in 0.35s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+.workshop-hint {
+  position: absolute;
+  left: 24%;
+  bottom: calc(22px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(43, 36, 51, 0.6);
+  color: var(--paper);
+  font: 600 0.85rem var(--font-body);
+}
+.workshop-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0.4rem 0 0.9rem;
+  font: 700 0.95rem var(--font-body);
+}
+.workshop-name input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  border: 2.5px solid var(--ink-deep);
+  background: var(--paper);
+  font: 700 1.05rem var(--font-display);
+  color: var(--ink-deep);
+  user-select: text;
+  -webkit-user-select: text;
+}
+.workshop-tabs {
+  display: flex;
+  border: 2.5px solid var(--ink-deep);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.workshop-tabs button {
+  flex: 1;
+  min-height: 46px;
+  border: 0;
+  background: var(--paper);
+  font: 700 1rem var(--font-display);
+  color: var(--ink-deep);
+  cursor: pointer;
+}
+.workshop-tabs button + button {
+  border-left: 2px solid var(--ink-deep);
+}
+.workshop-tabs button.on {
+  background: var(--honey);
+}
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+}
+.swatch {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  min-height: 96px;
+  padding: 10px 6px 8px;
+  border-radius: 14px;
+  border: 2.5px solid var(--ink-deep);
+  background: var(--paper);
+  box-shadow: 0 4px 0 rgba(43, 36, 51, 0.35);
+  cursor: pointer;
+  transition: transform 0.06s;
+}
+.swatch:active {
+  transform: translateY(3px);
+}
+.swatch--on {
+  background: #fff3d6;
+  outline: 4px solid var(--honey);
+  outline-offset: 0;
+}
+.swatch--locked > svg,
+.swatch--locked .swatch__paint {
+  filter: grayscale(1) brightness(0.75);
+  opacity: 0.55;
+}
+.swatch__paint {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2.5px solid var(--ink-deep);
+}
+.swatch__label {
+  font: 700 0.78rem/1.1 var(--font-body);
+  text-align: center;
+}
+.swatch__lock {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+}
+.workshop-info {
+  min-height: 3.6em;
+  margin: 12px 0 14px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 249, 238, 0.6);
+  border: 2px dashed rgba(110, 82, 54, 0.5);
+  font-size: 0.9rem;
+}
+.workshop-info strong {
+  display: block;
+  font: 700 1rem var(--font-display);
+}
+
+/* ---------- loading ---------- */
+.loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 14px;
+  background: #2b2433;
+  color: var(--cream);
+  font: 600 1.15rem var(--font-display);
+  pointer-events: auto;
+  transition: opacity 0.45s ease;
+  z-index: 10;
+}
+.loading--out {
+  opacity: 0;
+  pointer-events: none;
+}
+.loading__key {
+  animation: wind 1.1s linear infinite;
+}
+@keyframes wind {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- portrait phones: menu & workshop become bottom sheets ---------- */
+@media (orientation: portrait) {
+  .menu-layer {
+    background: linear-gradient(0deg, rgba(43, 36, 51, 0.5) 0%, rgba(43, 36, 51, 0.1) 50%, rgba(43, 36, 51, 0) 65%);
+  }
+  .menu-column {
+    left: 50%;
+    top: auto;
+    bottom: calc(18px + env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    width: min(420px, calc(100vw - 32px));
+    gap: 12px;
+  }
+  .menu-sign {
+    position: fixed;
+    top: calc(14px + env(safe-area-inset-top));
+    left: 50%;
+    width: min(330px, calc(100vw - 48px));
+    padding: 1rem 1rem 0.6rem;
+    transform: translateX(-50%) rotate(-1.4deg);
+    animation: none;
+  }
+  .menu-ticket,
+  .menu-hint {
+    display: none;
+  }
+  .workshop-panel {
+    left: 50%;
+    right: auto;
+    top: auto;
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    width: calc(100vw - 20px);
+    max-height: 54vh;
+    padding: 1.1rem 1rem 1rem;
+  }
+  .workshop-panel h2 {
+    font-size: 1.4rem;
+  }
+  .workshop-hint {
+    left: 50%;
+    top: calc(14px + env(safe-area-inset-top));
+    bottom: auto;
+  }
+  .swatches {
+    grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  }
+}
+/* short landscape phones */
+@media (max-height: 500px) and (orientation: landscape) {
+  .menu-column {
+    gap: 8px;
+    width: min(330px, 44vw);
+  }
+  .menu-sign {
+    padding: 0.8rem 1rem 0.5rem;
+  }
+  .menu-sign .title-tagline {
+    display: none;
+  }
+  .menu-logo .title-logo__top {
+    font-size: 2.1rem;
+  }
+  .menu-logo .title-logo__bottom {
+    font-size: 1.8rem;
+  }
+  .menu-btn > span {
+    padding: 0.55em 1em;
+  }
+  .menu-btn--primary {
+    font-size: 1.2rem;
+  }
+  .menu-contender {
+    display: none;
+  }
+  .menu-ticket {
+    display: none;
+  }
+  .workshop-panel {
+    max-height: calc(100vh - 16px);
+    padding: 1rem;
+  }
+  .swatch {
+    min-height: 84px;
+  }
+  .howto__cols {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 600px) {
+  .howto__cols {
+    grid-template-columns: 1fr;
+  }
+}

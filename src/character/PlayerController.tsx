@@ -42,6 +42,8 @@ export function PlayerController() {
   const { camera, gl } = useThree();
   const paintIndex = useGame((s) => s.paintIndex);
   const paint = PAINT_JOBS[paintIndex % PAINT_JOBS.length];
+  const hat = useGame((s) => s.hat);
+  const keySkin = useGame((s) => s.keySkin);
 
   const root = useRef<THREE.Group>(null!);
   const shadow = useRef<THREE.Mesh>(null!);
@@ -50,7 +52,7 @@ export function PlayerController() {
   const sim = useRef({
     pos: new THREE.Vector3(SPAWN.x, 0, SPAWN.z),
     vel: new THREE.Vector2(),
-    yaw: SPAWN.yaw,
+    yaw: useGame.getState().screen === 'menu' ? 0 : SPAWN.yaw, // face the camera on the menu
     camYaw: 0,
     camPitch: DEFAULT_PITCH,
     camDist: CAM_DIST,
@@ -61,6 +63,16 @@ export function PlayerController() {
     boostUntil: 0,
     respawnAt: -1,
     lastPrompt: '' as string,
+    /** Turn the toy to face this yaw (menu → play turnaround), or null. */
+    yawTarget: null as number | null,
+    /** Workshop turntable camera: current angle/distance orbit toward their targets. */
+    wsYaw: 0,
+    wsYawTarget: 0,
+    wsDist: 10,
+    /** Cut (rather than sweep) the camera on the next menu frame. */
+    snapCam: false,
+    /** Next idle wave on the main menu. */
+    nextWave: 3,
   });
 
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
@@ -76,7 +88,8 @@ export function PlayerController() {
     const TOUCH_LOOK_GAIN = 2.2;
     const canLook = () => {
       const s = useGame.getState();
-      return s.screen === 'playing' && !s.paused && !s.panel;
+      // Workshop: drag to spin the camera around the contender (no pointer lock).
+      return (s.screen === 'playing' || s.screen === 'workshop') && !s.paused && !s.panel;
     };
     const onDown = (e: PointerEvent) => {
       if (e.pointerType === 'touch') {
@@ -87,7 +100,7 @@ export function PlayerController() {
       }
       if (!canLook()) return;
       mouseDragging = true;
-      if (e.pointerType === 'mouse' && !document.pointerLockElement) {
+      if (e.pointerType === 'mouse' && !document.pointerLockElement && useGame.getState().screen === 'playing') {
         const p = el.requestPointerLock?.() as unknown as Promise<void> | undefined;
         p?.catch?.(() => {
           /* pointer lock refused (iframe/sandbox) — drag-to-look still works */
@@ -133,13 +146,39 @@ export function PlayerController() {
     };
   }, [gl]);
 
-  // Release pointer lock whenever a menu/panel opens.
+  // Release pointer lock whenever a menu/panel opens; choreograph screen changes.
   useEffect(
     () =>
       useGame.subscribe((s, p) => {
         if ((s.paused && !p.paused) || (s.panel && !p.panel) || (s.screen !== 'playing' && p.screen === 'playing')) {
           clearInput();
           if (document.pointerLockElement) document.exitPointerLock();
+        }
+        if (s.screen === p.screen) return;
+        const sim0 = sim.current;
+        if (s.screen === 'menu') {
+          // Back on the menu: stand on the spawn tile, facing the camera; cut to the menu shot.
+          sim0.pos.set(SPAWN.x, 0, SPAWN.z);
+          sim0.vel.set(0, 0);
+          sim0.yaw = 0;
+          sim0.yawTarget = null;
+          sim0.snapCam = true;
+        } else if (s.screen === 'playing') {
+          if (p.screen === 'menu') {
+            // Turn round to face the village while the camera settles behind.
+            sim0.yawTarget = SPAWN.yaw;
+            sim0.camYaw = SPAWN.yaw + Math.PI;
+          } else {
+            sim0.camYaw = sim0.yaw + Math.PI;
+            sim0.snapCam = true; // from the Workshop: cut behind the toy rather than sweep through it
+          }
+          sim0.camPitch = DEFAULT_PITCH;
+        } else if (s.screen === 'workshop') {
+          // Orbit (never cut through the toy) from wherever the camera is to a 3/4 front view.
+          sim0.vel.set(0, 0);
+          sim0.wsYaw = Math.atan2(sim0.camPos.x - sim0.pos.x, sim0.camPos.z - sim0.pos.z);
+          sim0.wsDist = Math.max(4, Math.hypot(sim0.camPos.x - sim0.pos.x, sim0.camPos.z - sim0.pos.z));
+          sim0.wsYawTarget = sim0.yaw + 0.55;
         }
       }),
     [],
@@ -176,6 +215,9 @@ export function PlayerController() {
       }),
       events.on('player:boost', ({ seconds }) => {
         sim.current.boostUntil = performance.now() + seconds * 1000;
+      }),
+      events.on('workshop:view', ({ back }) => {
+        sim.current.wsYawTarget = sim.current.yaw + (back ? Math.PI + 0.6 : 0.55);
       }),
     ];
     return () => offs.forEach((o) => o());
@@ -218,7 +260,9 @@ export function PlayerController() {
 
     // ---------- camera orbit from mouse ----------
     const [mdx, mdy] = consumeMouseDelta();
-    if (playing && !blocked) {
+    if (g.screen === 'workshop' && !g.paused) {
+      s.wsYawTarget -= mdx * 0.006;
+    } else if (playing && !blocked) {
       const sens = 0.0024 * g.mouseSensitivity;
       s.camYaw -= mdx * sens;
       s.camPitch = THREE.MathUtils.clamp(s.camPitch + mdy * sens * (g.invertY ? -1 : 1), PITCH_MIN, PITCH_MAX);
@@ -271,6 +315,13 @@ export function PlayerController() {
     // ---------- facing & turn rate ----------
     const hSpeed = Math.hypot(s.vel.x, s.vel.y);
     const prevYaw = s.yaw;
+    if (s.yawTarget !== null && hSpeed < 0.6) {
+      const d = wrapAngle(s.yawTarget - s.yaw);
+      if (Math.abs(d) < 0.01) s.yawTarget = null;
+      else s.yaw += THREE.MathUtils.clamp(d, -7 * dt, 7 * dt);
+    } else if (hSpeed > 0.6) {
+      s.yawTarget = null;
+    }
     if (hSpeed > 0.6 && !eliminated) {
       const targetYaw = Math.atan2(s.vel.x, s.vel.y);
       const d = wrapAngle(targetYaw - s.yaw);
@@ -362,16 +413,46 @@ export function PlayerController() {
       persp.fov = wantFov;
       persp.updateProjectionMatrix();
     }
-    if (!playing) {
-      // Title "attract" orbit around the village.
-      const t = state.clock.elapsedTime * 0.06;
-      tmp.desired.set(Math.sin(t) * 52, 22 + Math.sin(t * 0.7) * 3, Math.cos(t) * 52);
-      s.camPos.lerp(tmp.desired, 1 - Math.exp(-2 * dt));
+    const portrait = persp.aspect < 1;
+    if (g.screen === 'menu') {
+      // Main menu diorama: low, slowly drifting shot in front of the contender with the
+      // village behind it (concept 01 composition). The toy sits right of the menu panel
+      // in landscape, above it in portrait.
+      const t = state.clock.elapsedTime;
+      if (t > s.nextWave && a.interactT < 0) {
+        a.interactT = 0; // occasional happy hop for the camera
+        s.nextWave = t + 6 + Math.random() * 4;
+      }
+      const ang = 0.32 + Math.sin(t * 0.09) * 0.22;
+      const dist = portrait ? 12.5 : 9.5;
+      tmp.desired.set(s.pos.x + Math.sin(ang) * dist, s.pos.y + 3.0 + Math.sin(t * 0.13) * 0.4, s.pos.z + Math.cos(ang) * dist);
+      if (s.snapCam) {
+        s.camPos.copy(tmp.desired);
+        s.snapCam = false;
+      } else s.camPos.lerp(tmp.desired, 1 - Math.exp(-2.2 * dt));
       camera.position.copy(s.camPos);
-      camera.lookAt(0, 4, -4);
-      // When play starts, swing round behind the toy.
-      s.camYaw = s.yaw + Math.PI;
-      s.camPitch = DEFAULT_PITCH;
+      const rx = Math.cos(ang);
+      const rz = -Math.sin(ang);
+      const side = portrait ? 0 : -2.3; // shift look point left → toy appears on the right
+      tmp.look.set(s.pos.x + rx * side, s.pos.y + 2.4 - (portrait ? 1.6 : 0), s.pos.z + rz * side);
+      camera.lookAt(tmp.look);
+      s.camTarget.set(s.pos.x, s.pos.y + TARGET_H, s.pos.z);
+    } else if (g.screen === 'workshop') {
+      // Workshop turntable: close orbit around the contender, drag to spin, gentle auto-spin.
+      s.wsYawTarget += dt * 0.12;
+      s.wsYaw += wrapAngle(s.wsYawTarget - s.wsYaw) * (1 - Math.exp(-6 * dt));
+      s.wsDist = damp(s.wsDist, portrait ? 10 : 7.2, 4, dt);
+      const ang = s.wsYaw;
+      const dist = s.wsDist;
+      tmp.desired.set(s.pos.x + Math.sin(ang) * dist, s.pos.y + 2.6, s.pos.z + Math.cos(ang) * dist);
+      s.camPos.copy(tmp.desired); // the orbit itself is smoothed above
+      camera.position.copy(s.camPos);
+      const rx = Math.cos(ang);
+      const rz = -Math.sin(ang);
+      const side = portrait ? 0 : 1.9; // shift look point right → toy appears left of the panel
+      tmp.look.set(s.pos.x + rx * side, s.pos.y + 1.9 - (portrait ? 2.3 : 0), s.pos.z + rz * side);
+      camera.lookAt(tmp.look);
+      s.camTarget.set(s.pos.x, s.pos.y + TARGET_H, s.pos.z);
     } else {
       s.camTarget.x = damp(s.camTarget.x, s.pos.x, 12, dt);
       s.camTarget.z = damp(s.camTarget.z, s.pos.z, 12, dt);
@@ -392,7 +473,11 @@ export function PlayerController() {
 
       tmp.desired.copy(s.camTarget).addScaledVector(tmp.dir, s.camDist);
       tmp.desired.y = Math.max(tmp.desired.y, 0.8);
-      s.camPos.lerp(tmp.desired, 1 - Math.exp(-(g.paused ? 3 : 14) * dt));
+      if (s.snapCam) {
+        s.camPos.copy(tmp.desired);
+        s.camDist = want;
+        s.snapCam = false;
+      } else s.camPos.lerp(tmp.desired, 1 - Math.exp(-(g.paused ? 3 : 14) * dt));
       camera.position.copy(s.camPos);
       // look slightly ahead of the toy so the world opens up in front of it
       // Pitching down low turns into looking up at the giant room (worm's-eye view).
@@ -407,7 +492,7 @@ export function PlayerController() {
   return (
     <>
       <group ref={root}>
-        <WindupBot anim={anim} paint={paint} />
+        <WindupBot anim={anim} paint={paint} hat={hat} keySkin={keySkin} />
       </group>
       <mesh ref={shadow} rotation={[-Math.PI / 2, 0, 0]} renderOrder={1}>
         <planeGeometry args={[1, 1]} />

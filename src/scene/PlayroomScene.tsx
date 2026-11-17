@@ -28,19 +28,23 @@ function Lights({ quality }: { quality: Quality }) {
   const { scene } = useThree();
 
   useEffect(() => {
-    // Lights' targets must be in the scene graph to update.
-    scene.add(sun.current.target);
-    scene.add(spot.current.target);
-    spot.current.target.position.copy(LAMP_AIM);
+    // Lights' targets must be in the scene graph to update. Capture them now: the refs are
+    // cleared before this cleanup runs when the canvas remounts (quality change) or unmounts.
+    const sunTarget = sun.current.target;
+    const spotTarget = spot.current.target;
+    scene.add(sunTarget);
+    scene.add(spotTarget);
+    spotTarget.position.copy(LAMP_AIM);
     return () => {
-      scene.remove(sun.current.target);
-      scene.remove(spot.current.target);
+      scene.remove(sunTarget);
+      scene.remove(spotTarget);
     };
   }, [scene]);
 
   // Keep the shadow frustum centred on the player so the map resolution goes where it matters.
   useFrame(() => {
     const s = sun.current;
+    if (!s) return;
     const cx = THREE.MathUtils.clamp(player.pos.x, -20, 20);
     const cz = THREE.MathUtils.clamp(player.pos.z, -15, 15);
     s.position.set(cx + 70, 110, cz - 60);
@@ -159,7 +163,10 @@ function FrameStats() {
       },
     });
   }, [gl, scene]);
+  const frames = useRef(0);
   useFrame((_, dt) => {
+    // A few frames in, textures exist and shaders have compiled: hide the loading card.
+    if (++frames.current === 4) useGame.getState().set({ ready: true });
     acc.current.t += dt;
     acc.current.n++;
     if (acc.current.t > 0.5) {

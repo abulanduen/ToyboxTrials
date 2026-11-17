@@ -17,6 +17,8 @@ export const SCOREBOARD = { x: 31, z: 7, rot: Math.atan2(-31, -7) };
 export const TRACK = { x: 19, z: 21.5, rx: 11, rz: 6.5 };
 export const MUSICBOX = { x: 11, z: -27.5 };
 export const JACK = { x: -35, z: -22 };
+/** Wooden fingerpost near spawn pointing at every destination. */
+export const FINGERPOST = { x: -5.5, z: 14 };
 
 /** Minigame gates: arches of building blocks facing the fountain. */
 export const GATES = [
@@ -99,6 +101,7 @@ export function registerHubColliders() {
   }
   list.push({ kind: 'box', id: 'musicbox', x: MUSICBOX.x, z: MUSICBOX.z, hx: 2.6, hz: 1.9, rot: 0, top: 2.6 });
   list.push({ kind: 'circle', id: 'jack', x: JACK.x, z: JACK.z, r: 2.1, top: 4.2 });
+  list.push({ kind: 'circle', id: 'fingerpost', x: FINGERPOST.x, z: FINGERPOST.z, r: 1.15, top: 11 });
   addStatic(...list);
 }
 

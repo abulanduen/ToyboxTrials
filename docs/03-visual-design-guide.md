@@ -77,7 +77,10 @@ frame. The room stays below 60 % saturation.
   always visible. Pitching down past the default flips into a worm's-eye view looking up at the room.
 - **Minigames:** fixed or gently elevated three-quarter views (e.g. Copycat: stage centred, all
   four instruments visible, no orbiting during sequence playback).
-- **Menus:** a slow orbit of the diorama at about 50 cm radius (the title screen already does this).
+- **Main menu:** a low, slowly drifting shot of the contender facing camera, with the village and room behind
+  (concept 01). In landscape the menu sits on the left and the toy on the right. In portrait the toy is on top and the menu below.
+- **Workshop:** a close turntable orbit at 7–10 cm. The toy sits left of the panel (landscape) or above it (portrait).
+- **Screen transitions** orbit or cut. They never sweep through the toy or scenery.
 
 ## 7. Character system: "Contenders"
 
@@ -89,8 +92,9 @@ frame. The room stays below 60 % saturation.
 - **Silhouette test:** must read at 40 px tall in solid black (turret plus key plus block feet).
 - **Paint jobs:** body, trim and accent colours from the palette (5 shipped: Toy Blue, Coral Clank,
   Sage Sprocket, Honey Hustle, Midnight Tin).
-- **Accessories (next):** attach points on the turret top (hats: thimble helmet, bottle-cap crown,
-  paper-boat hat), chest (button badges) and back (key skins).
+- **Accessories:** hats on the turret top (thimble helmet, bottle-cap crown, paper-boat hat, acorn
+  cap) and key skins on the back (classic, heart, star, golden) are implemented. Button badges on the chest come next.
+  Each hat is a recognisable household object, so it follows the "built, not bought" pillar.
 - **Motion (procedural):**
   - Idle: breathing bob and glances.
   - Walk/run: hop-step bob, waddle roll and arm swing.

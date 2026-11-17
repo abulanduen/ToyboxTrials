@@ -29,18 +29,22 @@ function Joystick() {
     base.current!.style.top = `${oy - z.top}px`;
   };
   const moveKnob = (dx: number, dy: number) => {
-    knob.current!.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+    if (!knob.current) return;
+    knob.current.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
   };
   const reset = () => {
     active.current = null;
     setStick(0, 0);
     moveKnob(0, 0);
-    base.current!.style.left = '';
-    base.current!.style.top = '';
+    if (base.current) {
+      base.current.style.left = '';
+      base.current.style.top = '';
+    }
     setEngaged(false);
   };
 
-  useEffect(() => reset, []);
+  // On unmount only release the stick: refs are already detached, so never touch the DOM here.
+  useEffect(() => () => setStick(0, 0), []);
 
   return (
     <div

@@ -65,3 +65,59 @@ export function TickerBadge({ size = 96, body = '#6BA7C8', trim = '#EFAE45', acc
     </svg>
   );
 }
+
+/** Small swatch icons for the Workshop (match the 3D cosmetics). */
+export function HatIcon({ id, size = 40 }: { id: string; size?: number }) {
+  const o = { stroke: '#2B2433', strokeWidth: 2.5, strokeLinejoin: 'round' as const };
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden>
+      {/* turret silhouette for context */}
+      <circle cx="24" cy="36" r="10" fill="#6BA7C8" {...o} />
+      <circle cx="24" cy="36" r="5" fill="#FFFDF6" stroke="#2B2433" strokeWidth="1.5" />
+      {id === 'none' && (
+        <>
+          <line x1="24" y1="26" x2="24" y2="14" {...o} />
+          <circle cx="24" cy="12" r="4" fill="#E76B62" {...o} />
+        </>
+      )}
+      {id === 'thimble' && <path d="M14 27 L16 12 Q24 4 32 12 L34 27 Z" fill="#C9C7C2" {...o} />}
+      {id === 'bottlecap' && <path d="M12 27 L12 19 L16 12 L20 19 L24 10 L28 19 L32 12 L36 19 L36 27 Z" fill="#EFAE45" {...o} />}
+      {id === 'paperboat' && <path d="M6 27 L42 27 L36 21 L28 21 L24 6 L20 21 L12 21 Z" fill="#F6EEDC" {...o} />}
+      {id === 'acorn' && (
+        <>
+          <path d="M11 27 Q11 13 24 13 Q37 13 37 27 Z" fill="#8A5A34" {...o} />
+          <line x1="24" y1="13" x2="27" y2="6" {...o} />
+        </>
+      )}
+    </svg>
+  );
+}
+
+export function KeySkinIcon({ id, size = 40 }: { id: string; size?: number }) {
+  const o = { stroke: '#2B2433', strokeWidth: 2.5, strokeLinejoin: 'round' as const };
+  const fill = id === 'golden' ? '#F2C14E' : id === 'heart' ? '#E76B62' : id === 'star' ? '#6BA7C8' : '#C8973A';
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden>
+      <rect x="21" y="26" width="6" height="18" rx="2" fill="#C8973A" {...o} />
+      {(id === 'classic' || id === 'golden') && (
+        <>
+          <ellipse cx="14" cy="17" rx="9" ry="8" fill={fill} {...o} />
+          <ellipse cx="34" cy="17" rx="9" ry="8" fill={fill} {...o} />
+          <circle cx="24" cy="21" r="5" fill={fill} {...o} />
+          {id === 'golden' && <path d="M38 6 l1.5 3 3 1.5 -3 1.5 -1.5 3 -1.5 -3 -3 -1.5 3 -1.5z" fill="#FFF9EE" />}
+        </>
+      )}
+      {id === 'heart' && <path d="M24 30 C14 22 8 16 12 10 C16 4 22 7 24 11 C26 7 32 4 36 10 C40 16 34 22 24 30 Z" fill={fill} {...o} />}
+      {id === 'star' && <path d="M24 4l5 10 11 1.5-8 7.5 2 11-10-5.5-10 5.5 2-11-8-7.5 11-1.5z" fill={fill} {...o} />}
+    </svg>
+  );
+}
+
+export function PadlockIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden>
+      <path d="M7 11 V8 a5 5 0 0 1 10 0 V11" fill="none" stroke="#2B2433" strokeWidth="2.5" />
+      <rect x="4.5" y="11" width="15" height="10" rx="2.5" fill="#EFAE45" stroke="#2B2433" strokeWidth="2.2" />
+    </svg>
+  );
+}

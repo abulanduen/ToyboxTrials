@@ -9,6 +9,7 @@ import { PLAY_BOUNDS } from '../game/collision';
 import { feltTexture } from './textures';
 import { Block, Bunting, Dominoes, FeltTree, woodMat, type DominoSpec } from './props';
 import { Fountain, Gates, Pavilion, Scoreboard, Shop, Workshop } from './Buildings';
+import { DustMotes, Fingerpost, GateBoards } from './Ambience';
 import { JackInTheBox, KeyTower, Marble, MusicBox, PencilLog, Train, TrainTrack } from './Interactive';
 import { BLOCKS, BLOCK_SIZE, FOUNTAIN, GATES, PAVILION, SCOREBOARD, SHOP, TREES, WORKSHOP, frontOf, registerHubColliders } from './layout';
 
@@ -162,6 +163,9 @@ export function Village() {
       <Shop />
       <Scoreboard />
       <Gates />
+      <GateBoards />
+      <Fingerpost />
+      <DustMotes />
       <TrainTrack />
       <Train />
       <Marble />

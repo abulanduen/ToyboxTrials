@@ -15,6 +15,8 @@ export type GameEvents = {
   'prop:musicbox-play': void;
   'prop:key-collected': void;
   'gate:open': { id: string };
+  /** Workshop asks the turntable to show the front (paint/hats) or back (wind-up key). */
+  'workshop:view': { back: boolean };
 };
 
 type Handler<T> = (payload: T) => void;

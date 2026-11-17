@@ -6,7 +6,8 @@
 import { events } from './events';
 import { sfx } from './audio';
 import { useGame } from './store';
-import { PAINT_JOBS, PALETTE } from './palette';
+import { PALETTE } from './palette';
+import { rewardForSecret } from './cosmetics';
 import { GATES, JACK, MUSICBOX, PAVILION, SCOREBOARD, SHOP, TOWER, WORKSHOP, frontOf } from '../scene/layout';
 
 export interface Interactable {
@@ -39,7 +40,7 @@ export const INTERACTABLES: Interactable[] = [
   { id: 'gate-inferno', ...gate('gate-inferno'), radius: 4.5, verb: 'Peek at', label: 'Inferno Escape' },
   { id: 'gate-dash', ...gate('gate-dash'), radius: 4.5, verb: 'Peek at', label: 'Wind-Up Dash' },
   { id: 'pavilion', ...frontOf(PAVILION.x, PAVILION.z, 0, PAVILION.d / 2 + 3), radius: 4.5, verb: 'Visit', label: 'Tournament Pavilion' },
-  { id: 'workshop', ...frontOf(WORKSHOP.x, WORKSHOP.z, WORKSHOP.rot, WORKSHOP.d / 2 + 2.5), radius: 5, verb: 'Repaint at', label: 'the Workshop' },
+  { id: 'workshop', ...frontOf(WORKSHOP.x, WORKSHOP.z, WORKSHOP.rot, WORKSHOP.d / 2 + 2.5), radius: 5, verb: 'Tinker at', label: 'the Workshop' },
   { id: 'shop', ...frontOf(SHOP.x, SHOP.z, SHOP.rot, SHOP.d / 2 + 6), radius: 5, verb: 'Browse', label: 'Odds & Ends Shop' },
   { id: 'scoreboard', ...frontOf(SCOREBOARD.x, SCOREBOARD.z, SCOREBOARD.rot, 3.5), radius: 5, verb: 'Read', label: 'the Scoreboard' },
   // hidden
@@ -61,7 +62,12 @@ function discover(id: string, name: string) {
   if (g.markSecret(id)) {
     sfx.reward();
     const n = useGame.getState().secretsFound.length;
-    g.pushTicket({ title: 'Secret found!', body: `${name} — ${n}/${SECRET_IDS.length} playroom secrets`, tone: 'reward' });
+    const reward = rewardForSecret(id);
+    g.pushTicket({
+      title: 'Secret found!',
+      body: `${name}: ${n}/${SECRET_IDS.length} playroom secrets${reward ? `. Unlocked: ${reward} (Workshop)` : ''}`,
+      tone: 'reward',
+    });
   }
 }
 
@@ -110,13 +116,10 @@ export function interact(id: string, facing: { x: number; z: number }) {
         accent: PALETTE.inkPurple,
       });
       break;
-    case 'workshop': {
+    case 'workshop':
       sfx.windUp(6);
-      g.cyclePaint();
-      const job = PAINT_JOBS[useGame.getState().paintIndex % PAINT_JOBS.length];
-      g.pushTicket({ title: 'Fresh coat of paint', body: job.name, tone: 'info' });
+      g.openWorkshop();
       break;
-    }
     case 'shop':
       sfx.click();
       g.openPanel({

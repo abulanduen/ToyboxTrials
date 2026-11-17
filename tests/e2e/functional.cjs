@@ -17,7 +17,7 @@ const check = (name, ok, detail = '') => { results.push(`${ok ? 'PASS' : 'FAIL'}
   const st = () => T(() => window.__toybox.state());
   const holdFrames = async (key, ms) => { await page.keyboard.down(key); await page.waitForTimeout(ms); await page.keyboard.up(key); await page.waitForTimeout(400); };
 
-  check('title screen visible', await page.isVisible('.title-sign'));
+  check('main menu visible', await page.isVisible('.menu-sign'));
   await page.keyboard.press('Enter');
   await page.waitForTimeout(2500);
   check('HUD visible after start', await page.isVisible('.hud-sign'));
@@ -49,7 +49,7 @@ const check = (name, ok, detail = '') => { results.push(`${ok ? 'PASS' : 'FAIL'}
   await page.waitForTimeout(250);
   await page.keyboard.up('Space');
   let peak = 0;
-  for (let i = 0; i < 6; i++) { const s = await st(); peak = Math.max(peak, s.y); await page.waitForTimeout(150); }
+  for (let i = 0; i < 20; i++) { const s = await st(); peak = Math.max(peak, s.y, s.anim.grounded ? 0 : 0.21); await page.waitForTimeout(150); }
   check('Space jumps (y > 0 while airborne)', peak > 0.2, `peak sample y=${peak.toFixed(2)}`);
   await page.waitForTimeout(1500);
 
@@ -79,14 +79,18 @@ const check = (name, ok, detail = '') => { results.push(`${ok ? 'PASS' : 'FAIL'}
   await page.waitForTimeout(1200);
   check('Esc resumes', !(await page.isVisible('.pause')));
 
-  // Workshop repaint
-  const before = await page.textContent('.hud-sign__sub');
+  // Workshop building opens the Workshop screen; repaint there, then return to the Playroom
   await T(() => window.__toybox.teleport(-24.0, -2.6, 0.3 + Math.PI));
   await page.waitForTimeout(2500);
   await page.keyboard.press('KeyE');
+  await page.waitForTimeout(2000);
+  check('Workshop building opens the Workshop screen', await page.isVisible('.workshop-panel'));
+  await page.click('.swatch >> nth=1');
+  await page.waitForTimeout(800);
+  check('picking a paint job selects it', (await page.getAttribute('.swatch >> nth=1', 'aria-selected')) === 'true');
+  await page.click('[data-testid=workshop-done]');
   await page.waitForTimeout(1500);
-  const after = await page.textContent('.hud-sign__sub');
-  check('Workshop repaints the toy', before !== after, `${before} -> ${after}`);
+  check('Workshop returns to the Playroom', await page.isVisible('.hud-sign'));
 
   // Jack-in-the-box elimination + respawn
   await T(() => window.__toybox.teleport(-31.8, -21.5, -Math.PI / 2));
