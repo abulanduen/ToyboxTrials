@@ -2,6 +2,8 @@
 
 **Tiny contenders. Big chaos.**
 
+▶ **Play the prototype:** https://toybox-trials.vercel.app (desktop or phone; auto-deploys from `main`)
+
 When the humans leave the room, the toys come alive and hold a tournament on the tabletop.
 This repository contains **Milestones 1–2**: the art-direction package and a small, genuinely
 explorable 3D toy-world prototype.
