@@ -174,40 +174,6 @@ export function blobShadowTexture() {
   });
 }
 
-/** Window sky: soft afternoon gradient with blurred clouds and a tree line. */
-export function skyTexture() {
-  return memo('sky', () => {
-    const c = document.createElement('canvas');
-    c.width = 256;
-    c.height = 256;
-    const g = c.getContext('2d')!;
-    const grd = g.createLinearGradient(0, 0, 0, 256);
-    grd.addColorStop(0, '#9CC6E4');
-    grd.addColorStop(0.65, '#E9E4D2');
-    grd.addColorStop(1, '#F6D9A6');
-    g.fillStyle = grd;
-    g.fillRect(0, 0, 256, 256);
-    const r = rng(21);
-    g.filter = 'blur(6px)';
-    for (let i = 0; i < 7; i++) {
-      g.fillStyle = 'rgba(255,255,255,0.7)';
-      g.beginPath();
-      g.ellipse(r() * 256, 40 + r() * 80, 30 + r() * 30, 10 + r() * 8, 0, 0, Math.PI * 2);
-      g.fill();
-    }
-    g.fillStyle = 'rgba(110,140,100,0.85)';
-    for (let x = -10; x < 270; x += 18) {
-      g.beginPath();
-      g.ellipse(x, 230, 16, 30 + r() * 20, 0, 0, Math.PI * 2);
-      g.fill();
-    }
-    g.filter = 'none';
-    const t = new THREE.CanvasTexture(c);
-    t.colorSpace = THREE.SRGBColorSpace;
-    return t;
-  });
-}
-
 /** Big flat graphic for the scoreboard card / gate signs (pips, laurels). */
 export function cardFaceTexture(title: string, sub: string, accent: string) {
   return memo(`cardface:${title}:${sub}:${accent}`, () => {
@@ -230,6 +196,363 @@ export function cardFaceTexture(title: string, sub: string, accent: string) {
     g.font = '600 30px Nunito, "Trebuchet MS", sans-serif';
     g.fillStyle = accent;
     g.fillText(sub, 256, 215);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = 4;
+    return t;
+  });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Room layer
+// ---------------------------------------------------------------------------------------------
+
+/** Soft elliptical blob drawn with a radial gradient (no ctx.filter: Safari's canvas lacks it). */
+function blob(g: CanvasRenderingContext2D, x: number, y: number, rx: number, ry: number, rgb: string, alpha: number, hard = 0) {
+  g.save();
+  g.translate(x, y);
+  g.scale(1, ry / rx);
+  const grd = g.createRadialGradient(0, 0, rx * hard, 0, 0, rx);
+  grd.addColorStop(0, `rgba(${rgb},${alpha})`);
+  grd.addColorStop(1, `rgba(${rgb},0)`);
+  g.fillStyle = grd;
+  g.beginPath();
+  g.arc(0, 0, rx, 0, Math.PI * 2);
+  g.fill();
+  g.restore();
+}
+
+/**
+ * What you see through the window: afternoon sky with a hazy sun, soft clouds, a big garden tree,
+ * a hedge line and a neighbour's roof. Painted soft on purpose: it always sits far out of focus.
+ * `sun` is the sun's position in texture space (u, v from the top-left).
+ */
+export function gardenTexture(sun: [number, number] = [0.58, 0.23]) {
+  return memo(`garden:${sun}`, () => {
+    const W = 512;
+    const H = 384;
+    const c = document.createElement('canvas');
+    c.width = W;
+    c.height = H;
+    const g = c.getContext('2d')!;
+    const r = rng(77);
+    const sky = g.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, '#86B9E2');
+    sky.addColorStop(0.45, '#BFDDEE');
+    sky.addColorStop(0.72, '#F3E6C6');
+    sky.addColorStop(1, '#EBD3A4');
+    g.fillStyle = sky;
+    g.fillRect(0, 0, W, H);
+    // hazy sun
+    blob(g, sun[0] * W, sun[1] * H, 300, 300, '255,236,196', 0.75);
+    blob(g, sun[0] * W, sun[1] * H, 110, 110, '255,250,232', 0.8);
+    blob(g, sun[0] * W, sun[1] * H, 46, 46, '255,255,250', 1, 0.5);
+    // clouds
+    for (let i = 0; i < 9; i++) {
+      const x = r() * W;
+      const y = 30 + r() * 170;
+      for (let k = 0; k < 4; k++) blob(g, x + (r() - 0.5) * 90, y + (r() - 0.5) * 16, 46 + r() * 40, 15 + r() * 10, '255,252,244', 0.42);
+    }
+    // far hills, then the hedge line
+    for (let x = -20; x < W + 40; x += 26) blob(g, x, H * 0.8, 44, 30 + r() * 16, '150,178,160', 0.9, 0.5);
+    // neighbour's roof
+    g.fillStyle = '#C79A7E';
+    g.beginPath();
+    g.moveTo(330, H * 0.82);
+    g.lineTo(392, H * 0.66);
+    g.lineTo(458, H * 0.82);
+    g.closePath();
+    g.fill();
+    g.fillStyle = '#E9DCC6';
+    g.fillRect(340, H * 0.82 - 1, 108, 40);
+    for (let x = -20; x < W + 40; x += 18) blob(g, x, H * 0.93, 30, 26 + r() * 22, '104,140,98', 0.95, 0.55);
+    // the big tree on the left, lit from the right
+    for (let i = 0; i < 46; i++) {
+      const a = r() * Math.PI * 2;
+      const d = Math.sqrt(r());
+      const x = 78 + Math.cos(a) * d * 112;
+      const y = H * 0.52 + Math.sin(a) * d * 120;
+      const lit = (x - 78) / 112 > 0.1 && y < H * 0.52;
+      blob(g, x, y, 22 + r() * 22, 20 + r() * 18, lit ? '150,182,112' : '84,122,84', 0.9, 0.45);
+    }
+    g.fillStyle = 'rgba(96,74,56,0.9)';
+    g.fillRect(70, H * 0.7, 16, H * 0.3);
+    // warm haze over everything near the horizon
+    const haze = g.createLinearGradient(0, H * 0.5, 0, H);
+    haze.addColorStop(0, 'rgba(255,236,200,0)');
+    haze.addColorStop(1, 'rgba(255,236,200,0.28)');
+    g.fillStyle = haze;
+    g.fillRect(0, 0, W, H);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  });
+}
+
+/** Soft halo for the window: stands in for bloom on tiers without post-processing. */
+export function windowGlowTexture() {
+  return memo('winglow', () => {
+    const c = document.createElement('canvas');
+    c.width = c.height = 128;
+    const g = c.getContext('2d')!;
+    g.fillStyle = '#000';
+    g.fillRect(0, 0, 128, 128);
+    blob(g, 64, 64, 64, 64, '255,255,255', 0.55);
+    blob(g, 74, 46, 40, 40, '255,255,255', 0.55);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  });
+}
+
+/** A woven rug: field colour, border bands and rows of diamonds. */
+export function rugTexture(field: string, accent: string) {
+  return memo(`rug:${field}:${accent}`, () => {
+    const c = document.createElement('canvas');
+    c.width = 512;
+    c.height = 384;
+    const g = c.getContext('2d')!;
+    const r = rng(41);
+    g.fillStyle = field;
+    g.fillRect(0, 0, 512, 384);
+    g.strokeStyle = accent;
+    g.lineWidth = 10;
+    g.strokeRect(22, 22, 468, 340);
+    g.lineWidth = 3;
+    g.strokeRect(40, 40, 432, 304);
+    g.fillStyle = accent;
+    for (let i = 0; i < 7; i++) {
+      const x = 76 + i * 60;
+      for (const y of [112, 192, 272]) {
+        const s = y === 192 ? 22 : 12;
+        g.beginPath();
+        g.moveTo(x, y - s);
+        g.lineTo(x + s, y);
+        g.lineTo(x, y + s);
+        g.lineTo(x - s, y);
+        g.closePath();
+        g.fill();
+      }
+    }
+    for (let i = 0; i < 9000; i++) {
+      g.fillStyle = r() > 0.5 ? `rgba(255,250,235,${r() * 0.08})` : `rgba(20,20,35,${r() * 0.1})`;
+      g.fillRect(r() * 512, r() * 384, 1 + r() * 2, 1);
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = 4;
+    return t;
+  });
+}
+
+/** Number of cells per row / column in the room picture atlas. */
+export const ATLAS = { cols: 4, rows: 2 };
+/**
+ * One small atlas for everything flat that hangs on the walls: four framed pictures, a clock
+ * face, a child's drawing, a rocket poster and a height chart. All original doodles.
+ */
+export function roomAtlasTexture() {
+  return memo('roomatlas', () => {
+    const S = 256;
+    const c = document.createElement('canvas');
+    c.width = S * ATLAS.cols;
+    c.height = S * ATLAS.rows;
+    const g = c.getContext('2d')!;
+    const r = rng(5);
+    const cell = (i: number, paint: () => void) => {
+      g.save();
+      g.translate((i % ATLAS.cols) * S, Math.floor(i / ATLAS.cols) * S);
+      g.beginPath();
+      g.rect(0, 0, S, S);
+      g.clip();
+      paint();
+      g.restore();
+    };
+    // 0: hills at dusk
+    cell(0, () => {
+      const sky = g.createLinearGradient(0, 0, 0, S);
+      sky.addColorStop(0, '#9CC0D8');
+      sky.addColorStop(1, '#F2D7A6');
+      g.fillStyle = sky;
+      g.fillRect(0, 0, S, S);
+      g.fillStyle = '#F6E7B8';
+      g.beginPath();
+      g.arc(176, 84, 30, 0, Math.PI * 2);
+      g.fill();
+      for (const [y, col] of [
+        [150, '#8FAE96'],
+        [182, '#6E947C'],
+        [214, '#587B66'],
+      ] as const) {
+        g.fillStyle = col;
+        g.beginPath();
+        g.moveTo(0, S);
+        for (let x = 0; x <= S; x += 16) g.lineTo(x, y + Math.sin(x * 0.03 + y) * 16);
+        g.lineTo(S, S);
+        g.fill();
+      }
+    });
+    // 1: abstract shapes
+    cell(1, () => {
+      g.fillStyle = '#EFE6D2';
+      g.fillRect(0, 0, S, S);
+      g.fillStyle = '#D9805F';
+      g.beginPath();
+      g.arc(96, 104, 58, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = '#5E86A3';
+      g.fillRect(118, 112, 96, 96);
+      g.fillStyle = '#E3B55A';
+      g.beginPath();
+      g.moveTo(40, 220);
+      g.lineTo(110, 130);
+      g.lineTo(170, 220);
+      g.fill();
+    });
+    // 2: little sailing boat
+    cell(2, () => {
+      g.fillStyle = '#CFE2EA';
+      g.fillRect(0, 0, S, S);
+      g.fillStyle = '#7FA9C0';
+      g.fillRect(0, 170, S, 86);
+      g.fillStyle = '#F6F0E2';
+      g.beginPath();
+      g.moveTo(128, 50);
+      g.lineTo(128, 160);
+      g.lineTo(60, 160);
+      g.fill();
+      g.fillStyle = '#D9805F';
+      g.beginPath();
+      g.moveTo(136, 70);
+      g.lineTo(136, 160);
+      g.lineTo(190, 160);
+      g.fill();
+      g.fillStyle = '#6E4C33';
+      g.beginPath();
+      g.moveTo(54, 168);
+      g.lineTo(202, 168);
+      g.lineTo(180, 196);
+      g.lineTo(76, 196);
+      g.fill();
+    });
+    // 3: botanical print
+    cell(3, () => {
+      g.fillStyle = '#F1EADB';
+      g.fillRect(0, 0, S, S);
+      g.strokeStyle = '#5F8A5C';
+      g.lineWidth = 5;
+      g.beginPath();
+      g.moveTo(128, 236);
+      g.quadraticCurveTo(120, 140, 132, 36);
+      g.stroke();
+      g.fillStyle = '#7FA878';
+      for (let i = 0; i < 6; i++) {
+        const y = 200 - i * 28;
+        for (const s of [-1, 1]) {
+          g.save();
+          g.translate(128, y);
+          g.rotate(s * 0.9);
+          g.beginPath();
+          g.ellipse(0, -30, 13, 34, 0, 0, Math.PI * 2);
+          g.fill();
+          g.restore();
+        }
+      }
+    });
+    // 4: clock face (ten past ten)
+    cell(4, () => {
+      g.fillStyle = '#6E4C33';
+      g.fillRect(0, 0, S, S);
+      g.fillStyle = '#F6F0E2';
+      g.beginPath();
+      g.arc(128, 128, 112, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = '#574D69';
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2;
+        g.beginPath();
+        g.arc(128 + Math.sin(a) * 92, 128 - Math.cos(a) * 92, i % 3 === 0 ? 8 : 4, 0, Math.PI * 2);
+        g.fill();
+      }
+      g.strokeStyle = '#2B2433';
+      g.lineCap = 'round';
+      g.lineWidth = 10;
+      g.beginPath();
+      g.moveTo(128, 128);
+      g.lineTo(128 - 48, 128 - 30);
+      g.stroke();
+      g.lineWidth = 7;
+      g.beginPath();
+      g.moveTo(128, 128);
+      g.lineTo(128 + 66, 128 - 44);
+      g.stroke();
+      g.fillStyle = '#E76B62';
+      g.beginPath();
+      g.arc(128, 128, 9, 0, Math.PI * 2);
+      g.fill();
+    });
+    // 5: a child's crayon drawing
+    cell(5, () => {
+      g.fillStyle = '#FBF6EA';
+      g.fillRect(0, 0, S, S);
+      g.lineCap = 'round';
+      const scribble = (col: string, pts: number[][], w = 7) => {
+        g.strokeStyle = col;
+        g.lineWidth = w;
+        g.beginPath();
+        pts.forEach(([x, y], i) => (i ? g.lineTo(x + (r() - 0.5) * 5, y + (r() - 0.5) * 5) : g.moveTo(x, y)));
+        g.stroke();
+      };
+      scribble('#E76B62', [[70, 200], [70, 120], [128, 70], [186, 120], [186, 200], [70, 200]]);
+      scribble('#6BA7C8', [[112, 200], [112, 152], [144, 152], [144, 200]]);
+      scribble('#EFAE45', [[206, 52], [222, 60], [218, 42], [206, 52], [200, 36]], 9);
+      scribble('#89B78A', [[20, 214], [70, 206], [128, 216], [190, 206], [240, 214]], 10);
+    });
+    // 6: rocket poster
+    cell(6, () => {
+      g.fillStyle = '#3F4A66';
+      g.fillRect(0, 0, S, S);
+      g.fillStyle = '#F4E8CE';
+      for (let i = 0; i < 26; i++) g.fillRect(r() * S, r() * S, 3, 3);
+      g.save();
+      g.translate(128, 132);
+      g.rotate(0.5);
+      g.fillStyle = '#F4E8CE';
+      g.beginPath();
+      g.ellipse(0, 0, 30, 74, 0, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = '#E76B62';
+      g.beginPath();
+      g.moveTo(-30, 30);
+      g.lineTo(-56, 76);
+      g.lineTo(-18, 58);
+      g.moveTo(30, 30);
+      g.lineTo(56, 76);
+      g.lineTo(18, 58);
+      g.fill();
+      g.fillStyle = '#6BA7C8';
+      g.beginPath();
+      g.arc(0, -22, 13, 0, Math.PI * 2);
+      g.fill();
+      g.fillStyle = '#EFAE45';
+      g.beginPath();
+      g.moveTo(-14, 70);
+      g.lineTo(0, 112);
+      g.lineTo(14, 70);
+      g.fill();
+      g.restore();
+    });
+    // 7: height chart
+    cell(7, () => {
+      g.fillStyle = '#EFE2C4';
+      g.fillRect(0, 0, S, S);
+      g.fillStyle = '#89B78A';
+      g.fillRect(96, 0, 64, S);
+      g.fillStyle = '#574D69';
+      for (let i = 0; i < 16; i++) g.fillRect(96, 8 + i * 16, i % 4 === 0 ? 40 : 22, 3);
+      g.fillStyle = '#E76B62';
+      g.fillRect(96, 116, 64, 5);
+    });
     const t = new THREE.CanvasTexture(c);
     t.colorSpace = THREE.SRGBColorSpace;
     t.anisotropy = 4;

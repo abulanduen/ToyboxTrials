@@ -44,7 +44,7 @@ Never pull the camera up to human eye level in gameplay.
 | Sage green | `#89B78A` | Felt ground, trees, calm |
 | Ink purple | `#574D69` | Shadows, outlines in UI, night |
 | *Supporting* | wood `#C8925A`, cardboard `#C9A57A`, felt `#7FA878`, brass `#C8973A`, ink `#2B2433` | Materials |
-| *Room* | wall `#B7A99A`, floor `#8A6A4E`, fabric `#9DAAB8` | Deliberately desaturated |
+| *Room* | `ROOM` in `src/game/palette.ts`: wall `#DCCBB4`, panelling `#86A39C`, floor `#8A6A4E`, sofa `#7C8FA6` … | Deliberately desaturated |
 
 Rules: at most **two** palette accents per object. Characters use the most saturated values in
 frame. The room stays below 60 % saturation.
@@ -62,14 +62,43 @@ frame. The room stays below 60 % saturation.
 
 ## 5. Lighting & atmosphere
 
-- **Key:** warm afternoon sun through the window (`#FFE3B8`), casting soft shadows.
-- **Practical:** desk-lamp spotlight (honey) pooling over the square. It is the visual "heart" of the hub.
-- **Fill:** warm hemisphere (cream sky / wood ground) plus a cool window bounce for silhouette separation.
+One light story on every tier: **late-afternoon sun comes in through the big window in the back
+wall and lands on the table**. The village sits in that sun patch; the rest of the room is lit by
+what bounces around. `SUN_DIR` and `WINDOW` in `src/scene/room/bake.ts` are the single source of
+truth for where the light comes from.
+
+- **Key (toy layer, real time):** a warm directional sun (`#FFDDAE`) along `SUN_DIR`, about 31°
+  above the horizon, raking toward the usual camera so toys get long shadows and a rim of light.
+  On Balanced and High it casts shadow maps from a **fixed** frustum fitted to the whole table (no
+  shadow swimming as the player moves). The thick window wall, the glazing bars and the drapes are
+  shadow casters, so the sun patch on the table has real edges and a glazing-bar cross.
+- **Practical:** the desk-lamp spotlight (honey) pooling over the square, the "heart" of the hub.
+- **Fill:** warm hemisphere plus a soft cool fill from the room side, so sun-backlit faces stay readable.
+- **Room layer (baked):** the room is static, so its light is computed once on the CPU into vertex
+  colours (`bake.ts`): sky light from the window, direct sun where a point lies in the beam, warm
+  bounce off the sunlit table, hemisphere ambient, and darkening toward corners, the floor and
+  under the table. It renders with unlit materials: the cheapest possible, and the same on every tier.
+- **Window:** an over-bright garden backdrop behind the glass, a soft additive halo (stands in for
+  bloom on Low), additive **light shafts** (sheets lying along the sun direction that fade near the
+  camera, edge-on and above the table) and dust drifting in the beam (Balanced/High).
 - **Reflections:** a local, generated environment map (no downloaded HDRs).
-- **Depth:** fog from 140 to 560 cm softens the room. Balanced quality uses a tilt-shift band
-  focused on the toy's screen height. High quality uses true depth of field focused on the toy.
-- **Contact:** shadow maps plus a soft blob shadow under the character. Blob shadows alone are
-  acceptable on Low.
+- **Depth:** fog from 140 to 560 cm softens the room. Balanced uses a tilt-shift band focused on
+  the toy's screen height. High uses true depth of field focused on the toy.
+- **Grade:** ACES filmic tone mapping on every tier (renderer tone mapping on Low; a tone-mapping
+  pass at the end of the post chain on Balanced/High), mild bloom and vignette on Balanced/High.
+- **Contact:** shadow maps plus a soft blob shadow under the character. Blob shadows alone on Low.
+
+| | Low (default on touch) | Balanced | High |
+| --- | --- | --- | --- |
+| Sun shadow map | none | 2048 × 1024 | 4096 × 2048 |
+| Post | none | tilt-shift, bloom, vignette, ACES | depth of field, bloom, vignette, ACES |
+| Light shafts | 3 sheets | 9 sheets | 9 sheets |
+| Beam dust / drape sway | off | on | on |
+| Room clutter (books, radiator, pennants…) | simplified | full | full |
+
+Rules for adding to the room: build it with the `Builder` in `bake.ts` so it merges into the
+existing draw calls and picks up the baked light; no colliders; nothing coplanar with a wall (trim
+straddles the wall plane); keep the floor strip in front of the table clear for the dog (doc 07).
 
 ## 6. Camera language
 
