@@ -351,5 +351,6 @@ exposeDebug({
     state: () => runtime.state,
     phase: () => useMatch.getState().phase,
     timeScale: setMatchTimeScale,
+    practice: (id: MinigameId) => openPractice(id),
   },
 });

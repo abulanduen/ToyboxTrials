@@ -251,7 +251,7 @@ function Results() {
               <Medal place={p.place} />
               <Who c={byId(p.contestantId)} />
               <span className="results-list__score">
-                {p.forfeit ? 'quit' : !p.eliminated ? 'last standing' : `${p.score} ${unit(def.recordUnit, p.score)}`}
+                {p.forfeit ? 'quit' : !p.eliminated && def.scoring === 'elimination-order' ? 'last standing' : `${p.score} ${unit(def.recordUnit, p.score)}`}
               </span>
               {isTournament && <span className="results-list__pts">+{pointsForPlace(p.place)}</span>}
             </li>

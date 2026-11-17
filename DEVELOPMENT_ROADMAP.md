@@ -65,9 +65,17 @@ Next: **Find the Original**.
 Both are easy to make bots for and work well alone or with bots.
 _Depends on:_ M4.
 
-### M6 · Red Light, Green Light + Wind-Up Dash ⏳
-These are movement games that reuse the hub's controller and collision. Bots follow scripted lanes with
-reaction-time noise.
+### M6 · Red Light, Green Light + Wind-Up Dash 🚧
+Built: a shared deterministic **movement core** for minigames (`src/minigames/shared/`: the hub toy's tuning,
+circle/box collision, jump, input as data) with a chase camera, a touch joystick + Jump HUD and a race progress
+strip. The hub's `PlayerController` is untouched.
+**Red Light, Green Light** ✅ (first pass): the Signalman referee, seeded go / tell / stop cycles, a knock-back to
+the start for moving on red, bots with reaction noise and over-runs.
+**Wind-Up Dash** ⏳ is next, on the same core.
+Red Light is in the tournament rotation. Unit tests cover the core and its rules; `tests/e2e/movement.cjs`
+plays it on desktop and an emulated phone (landscape and portrait) through the `?debug` hook
+`__toybox.match.practice(id)`.
+Not done: a **hub entrance** (gate), and real-device tuning of every timing. No frame rates have been measured.
 _Depends on:_ M4.
 
 ### M7 · Performance, real devices & polish ⏳

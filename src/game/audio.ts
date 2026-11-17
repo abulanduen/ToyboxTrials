@@ -287,6 +287,78 @@ export const sfx = {
     lfo.stop(t + 1.05);
     for (let i = 0; i < 6; i++) noise(t + 0.05 + i * 0.03, 0.08, 0.05, 5000 + i * 400, 3);
   },
+
+  // ---- Movement minigames (Red Light Green Light, Wind-Up Dash) ----
+
+  /** Green light: two bright bell dings, rising. */
+  signalGo() {
+    const t = now();
+    tine(1046.5, t, 0.17, 0.45, 4.1);
+    tine(1568, t + 0.11, 0.17, 0.7, 4.1);
+  },
+  /** The referee winding up to turn round: ratchet clicks spread across the tell, climbing in pitch. */
+  signalWarn(ms = 700) {
+    const t = now();
+    const n = 7;
+    for (let i = 0; i < n; i++) {
+      const at = t + (i / n) * (ms / 1000) * 0.9;
+      noise(at, 0.24, 0.02, 2600 + i * 260, 5);
+      tone(520 + i * 75, at, 0.06, 0.03, 'square');
+    }
+  },
+  /** Red light: a short pea-whistle blast. */
+  signalStop() {
+    const t = now();
+    const c = live();
+    if (!c) return;
+    for (const f of [2150, 2420]) {
+      const o = c.createOscillator();
+      const lfo = c.createOscillator();
+      const lfoGain = c.createGain();
+      const g = c.createGain();
+      o.type = 'triangle';
+      o.frequency.setValueAtTime(f, t);
+      lfo.frequency.value = 38; // the rattling pea
+      lfoGain.gain.value = 70;
+      lfo.connect(lfoGain).connect(o.frequency);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.11, t + 0.015);
+      g.gain.setValueAtTime(0.11, t + 0.26);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.36);
+      o.connect(g).connect(master!);
+      o.start(t);
+      lfo.start(t);
+      o.stop(t + 0.4);
+      lfo.stop(t + 0.4);
+    }
+    noise(t, 0.08, 0.3, 3200, 2);
+  },
+  /** Caught or sprung: a spring flick that sends a toy flying. */
+  flick() {
+    const t = now();
+    noise(t, 0.26, 0.04, 1500, 1.5);
+    tone(230, t, 0.24, 0.42, 'triangle', 0.004, 760);
+    tone(460, t + 0.02, 0.08, 0.3, 'sine', 0.004, 1300);
+  },
+  /** Across the finish line: a quick rising run on the tines. */
+  finishLine() {
+    const t = now();
+    [784, 987.8, 1174.7, 1568].forEach((f, i) => tine(f, t + i * 0.07, 0.15, 0.6, 4.1));
+  },
+  /** A domino tipping over: a dry tile clack, then the slap as it lands. */
+  dominoClack() {
+    const t = now();
+    noise(t, 0.22, 0.02, jitter(3000, 0.1), 4);
+    tone(jitter(1350, 0.06), t, 0.07, 0.03, 'triangle');
+    noise(t + 0.2, 0.16, 0.035, 1500, 2);
+  },
+  /** Snap jaws slamming shut: a hard metallic clack with a short spring ring. */
+  trapSnap(gain = 1) {
+    const t = now();
+    noise(t, 0.4 * gain, 0.035, 2200, 1.2);
+    tone(310, t, 0.2 * gain, 0.07, 'square', 0.001, 120);
+    tone(1750, t + 0.01, 0.06 * gain, 0.22, 'sine', 0.001, 1500);
+  },
 };
 
 export type SfxName = keyof typeof sfx;
