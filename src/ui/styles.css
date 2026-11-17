@@ -1620,6 +1620,51 @@ canvas {
 }
 
 /* tournament picker */
+.practice-list {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0 4px;
+}
+.practice-list__title {
+  font: 700 0.8rem var(--font-body);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+.practice-list__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+.practice-card {
+  display: grid;
+  gap: 2px;
+  min-height: 56px;
+  padding: 8px 12px;
+  text-align: left;
+  border-radius: 14px;
+  border: 2.5px solid var(--ink-deep);
+  border-left: 10px solid var(--accent);
+  background: var(--paper);
+  box-shadow: 0 4px 0 rgba(43, 36, 51, 0.35);
+  cursor: pointer;
+  color: var(--ink-deep);
+  touch-action: manipulation;
+}
+.practice-card strong {
+  font: 700 0.95rem var(--font-display);
+}
+.practice-card span {
+  font: 600 0.75rem var(--font-body);
+  opacity: 0.75;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.practice-card:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 rgba(43, 36, 51, 0.35);
+}
 .formats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

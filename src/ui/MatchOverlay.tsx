@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react';
 import { useGame } from '../game/store';
 import { sfx } from '../game/audio';
-import { gameById, tournamentPool } from '../minigames/registry';
+import { MINIGAMES, gameById, tournamentPool } from '../minigames/registry';
 import {
   LOCAL_ID,
   beginCountdown,
@@ -13,6 +13,7 @@ import {
   getMatchState,
   matchBus,
   nextTournamentRound,
+  openPractice,
   pauseMatch,
   playRevealedGame,
   quitMatch,
@@ -398,11 +399,10 @@ export function TournamentPicker({ onClose }: { onClose: () => void }) {
       </div>
       <p className="panel__note">
         Unranked for now. Online play and ranked tournaments come later. In the rotation so far:{' '}
-        {tournamentPool()
-          .map((g) => g.title)
-          .join(' and ')}
+        {new Intl.ListFormat('en', { style: 'long', type: 'conjunction' }).format(tournamentPool().map((g) => g.title))}
         . More trials join as they're built.
       </p>
+      <PracticeList onClose={onClose} />
       {history[0] && (
         <p className="intro-record">
           Last: {FORMATS[history[0].format].name}, placed {ordinal(history[0].place)} of {history[0].of}
@@ -430,4 +430,36 @@ export function TournamentPicker({ onClose }: { onClose: () => void }) {
 /** "1 answer" / "3 answers"; units are stored plural. */
 export function unit(plural: string, n: number) {
   return n === 1 && plural.endsWith('s') ? plural.slice(0, -1) : plural;
+}
+
+/** Every playable trial, for solo/bot practice — so new games are reachable before they get a hub gate. */
+function PracticeList({ onClose }: { onClose: () => void }) {
+  const records = useGame((s) => s.records);
+  const games = MINIGAMES.filter((g) => g.status === 'playable');
+  return (
+    <div className="practice-list" aria-label="Practice a trial">
+      <span className="practice-list__title">Or practise one trial</span>
+      <div className="practice-list__grid">
+        {games.map((g) => {
+          const r = records[g.id];
+          return (
+            <button
+              key={g.id}
+              className="practice-card"
+              style={{ ['--accent' as string]: g.accent }}
+              data-testid={`practice-${g.id}`}
+              onClick={() => {
+                sfx.click();
+                onClose();
+                openPractice(g.id);
+              }}
+            >
+              <strong>{g.title}</strong>
+              <span>{r ? `Best ${r.best} ${unit(g.recordUnit, r.best)}` : g.tagline}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
