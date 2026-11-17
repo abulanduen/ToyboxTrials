@@ -1,0 +1,340 @@
+# Toybox Trials: master game design & multiplayer brief
+
+**Tiny contenders. Big chaos.**
+Multiplayer party game · competitive minigame collection · social world · browser.
+
+This is the master product and gameplay specification. It's the creative director's brief
+(17 Nov 2026) with the amendments agreed on the same day. Amendments are marked **🔧 Amended**
+inline and summarised first. Everything marked _proposal_ is not final.
+
+---
+
+## 0. Amendments agreed on 17 Nov 2026
+
+| # | Topic | Original brief | Agreed amendment |
+| --- | --- | --- | --- |
+| A1 | Existing Base44 app | Preserve existing Copycat logic, audit the old repo | **Not ported.** This repo is the canonical game, and **Copycat Conductor is redesigned** (core rules below kept) |
+| A2 | Backend | "No backend" (prototype rule) | The client stays a **static web build**. Multiplayer, matchmaking and ranked play need a separate **authoritative real-time game server**. The candidate is Colyseus (TypeScript) on an always-on host. It is chosen at the multiplayer proof-of-concept stage, not before |
+| A3 | Ranked ladders | Three ladders (Blitz, Normal, Treasure) from the start | **Start with Casual / Friends / Custom Party with bots.** Launch **one** ranked ladder once real players exist. Add the other two when the population can fill three queues. All three formats exist as tournament *formats* from day one |
+| A4 | Base44 hosting | "Potentially Base44" | Base44 (and Vercel) can host the **client only**, not real-time game servers. Whether a competition entry may use externally developed code is still unconfirmed |
+| A5 | Find the Original anti-cheat | Prevent players getting the target from frontend data | The client must render the target, so this can only be made **impractical**, not impossible: no target flag in the client data, and identity comes from render parameters. Fine for a party game |
+| A6 | Music | All sound is synthesised | Sound effects stay synthesised. **Music Box Rhythm needs real songs**, which may be composed in code, commissioned or licensed and recorded in the asset manifest. Music only |
+| A7 | Bots | Bots everywhere | Bots are planned per game, in order of difficulty. Combat bots (Blink Duel, Spellbox) are a substantial job, which is one reason those games come late |
+
+---
+
+## 1. Game overview
+
+Players control customisable little wind-up toys living inside an enormous real-world playroom.
+A miniature playable world sits on a tabletop, surrounded by oversized household objects and
+lifelike scenery. Players move around the tabletop, meet other toys, explore and enter competitions.
+
+It combines:
+- a shared explorable social lobby
+- short competitive minigames with different mechanics
+- randomised tournaments
+- casual minigame selection and practice
+- multiplayer with friends or other players
+- bots when there aren't enough players
+- character customisation and progression
+- a cohesive miniature toy-world aesthetic
+
+Inspirations (design qualities only, all content original): Club Penguin (social exploration,
+customisation), Warcraft III custom maps such as Uther Party (unpredictable minigame tournaments),
+Boomerang Fu (readability), It Takes Two (miniature scale).
+
+**Design philosophy:** easy to understand, difficult to master, visually charming, highly replayable.
+**It must stay fun with very few players online.**
+
+---
+
+## 2. Game modes
+
+### 2.1 Tournaments (ranked, later)
+
+| Format | Minigames | Ranking |
+| --- | --- | --- |
+| Blitz | 3 | Independent Blitz rating |
+| Normal | 5 | Independent Normal rating |
+| Treasure | 8 | Independent Treasure rating |
+
+🔧 **Amended (A3):** these formats are playable unranked from the start (Custom Party and
+bot tournaments). Ranked play launches with **one** ladder first. Each ladder, once live, has its own
+rating, progression, match history and leaderboard. A Blitz rank must not determine a Normal or
+Treasure rank.
+
+**Tournament flow**
+1. Enter the shared tabletop lobby.
+2. Choose Blitz, Normal or Treasure.
+3. Enter the matchmaking queue (or start a bot or Custom Party tournament).
+4. A tournament lobby forms when enough players are available.
+5. The server randomly selects the required number of minigames.
+6. Play each minigame.
+7. Award points by placement.
+8. Update the cumulative scoreboard between rounds.
+9. Show tournament results after the final minigame.
+10. Give rewards. In ranked play, update that format's rating.
+11. Return to the lobby.
+
+**Randomisation**
+- Pick from tournament-eligible games, with no repeats within a tournament while enough distinct games exist.
+- The server is authoritative in competitive play. Locally, use a seeded RNG so the same seed gives the same order.
+- All players get the same games in the same order. Reveal the next game between rounds.
+- Store the sequence and results in match history.
+- Avoid over-favouring one category (_proposal:_ at most two games from one category per tournament).
+- Each minigame has configurable **ranked** and **casual** eligibility flags.
+
+**Scoring** (_preliminary, configurable_), for 8 players:
+
+| Place | 1st | 2nd | 3rd | 4th | 5th | 6th | 7th | 8th |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Points | 10 | 8 | 6 | 5 | 4 | 3 | 2 | 1 |
+
+- Elimination games place players by elimination order (last out = 1st). Score or time games rank by result.
+- Ties, disconnections, forfeits and incomplete rounds need consistent rules (see §10, open).
+- Rating is a **separate skill system**. Cumulative tournament points are not a permanent rank.
+- Ratings should eventually support placement matches, opponent-strength adjustment and seasons.
+  Tiers are configurable, not hard-coded.
+
+### 2.2 Casual and practice (never affects ranked ratings)
+
+- **Solo Practice:** play any game alone, with bots where opponents are needed, and restart instantly.
+- **Play with Friends:** a private room with a room code, any game, match settings, and bots to fill slots.
+- **Public Casual Match:** pick a game and join an open room, with bots if it doesn't fill.
+- **Custom Party:** host a private tournament, choosing specific games or random ones, the number of rounds, rules and bot difficulty.
+
+These may award limited ordinary progression rewards (to be balanced later).
+
+---
+
+## 3. The shared tabletop lobby
+
+A miniature toy village on a large tabletop inside a realistic room. It's built from wooden blocks,
+felt playmats, cardboard buildings, plastic toys, marbles, dominoes, toy train tracks, miniature signs,
+clockwork mechanisms and household objects repurposed as scenery. The huge room supplies the sense of scale.
+
+**Activities:**
+- walk with WASD (or touch) and rotate the camera within limits
+- see other players, use emotes and inspect their cosmetics
+- approach minigame entrances
+- queue for tournaments or join casual games
+- customise and shop
+- view leaderboards
+- invite friends into private parties
+
+**Capacity:** _long-term target_ is up to 500 concurrent players per lobby server. The client must
+not render or animate all of them:
+- proximity-based interest management and distance-based visibility
+- lower update rates for distant players
+- instanced or simplified avatars
+- regional or logical lobby instances
+- separate game-session servers for matches
+
+**Match size:** 2–8 players per minigame, configurable per game. Lobby population and match size are separate systems.
+
+**Social (initially):** preset emotes, basic gestures, friend invites and room codes, visible nicknames,
+party grouping. No unrestricted public text chat early on.
+
+---
+
+## 4. Minigame catalogue
+
+Every game is an independent module in the shared framework (§5). The original gameplay concepts are
+kept while the visuals are adapted to the Toybox Trials universe. Inspirations are named for
+mechanics only. Names, art and audio are original.
+
+### 01 · Copycat Conductor (Memory / Reflexes · 1–8)
+A mechanical wind-up bandleader demonstrates a sequence on four instruments, each with its own
+colour, sound and animation: **A coral drum · S golden bell · J blue xylophone · K green music box**.
+- The sequence starts short. Players watch, then reproduce it in order.
+- Correct players progress and incorrect players are eliminated.
+- Each round adds one action, and demonstrations get faster.
+- The last player standing wins.
+
+**Practice:** solo, scored by rounds survived. **Multiplayer:** every player gets the same sequence and
+timing, and input correctness is validated fairly.
+🔧 **Amended (A1):** redesigned rather than preserved.
+
+### 02 · Inferno Escape (Survival / Strategy / Sabotage · 2–8)
+- A small arena of destructible rocks and obstacles, with about 15 s of preparation before the Inferno appears.
+- During preparation, players break rocks to make paths and shelter, and each builds **exactly one** wall.
+- Players can break obstacles around opponents to open paths into their shelters.
+- The Inferno then moves through accessible passages and eliminates exposed players. Shelters are
+  only safe while the Inferno can't reach them. The last survivor wins.
+
+**Toybox:** a wooden-block and cardboard fortress, with a roaming wind-up furnace or spreading
+mechanical hazard. **Tech:** top-down destructible tile grid, no 3D destruction physics, and pathfinding that
+updates as tiles change.
+
+### 03 · Midnight Hunger (Survival / Scarcity · 2–8)
+Each contender's energy drains continuously, and play alternates between two phases until one player remains.
+- **Night:** about 10 s to catch a target. Only **N−1** targets spawn for N survivors, so at least one player goes without.
+  Catching one restores energy.
+- **Day:** "sunlight" drains energy much faster. Players retreat to shelters, which slow the drain but don't stop it.
+
+**Toybox:** nocturnal clockwork toys whose targets are battery-carrying bots, and sunlight overheats them.
+**Tech:** deterministic drain maths and server-controlled phase timing, with rates balanced in playtests.
+
+### 04 · Find the Original (Observation / Speed · 1–8)
+- A crowd of similar characters fills a shared arena. One is the target, **Baldwyn**, an original wind-up toy
+  with distinctive details. The rest are Not-Baldwyn decoys.
+- Players click or tap the one they think is Baldwyn. The first correct pick scores most, and later correct picks
+  score by order. The last player scores nothing.
+
+**Tech:** identical positions and target on every client, with details readable at the target resolution.
+🔧 **Amended (A5):** client-side anti-cheat is "impractical, not impossible".
+
+### 05 · Red Light, Green Light (Reflexes / Movement · 2–8)
+- A giant mechanical referee alternates green (move) and red (stop) on a toy-soldier runway.
+- Moving on red is eliminated or penalised (configurable until finalised).
+- First to the finish wins. Others are placed by finish order or progress.
+
+**Tech:** clear transition cues and fair latency handling.
+
+### 06 · Blink Duel (PvP / Precision / Mind games · 2–8)
+- Teleport (blink) with **no cooldown**. One successful hit eliminates.
+- Attacks have a **long, clearly telegraphed** wind-up, so players bait and blink out.
+- The last survivor wins.
+
+**Toybox:** wind-up ninja toys with oversized toy swords, and blinks shown as a spring-pop burst.
+**Tech:** server-authoritative hits, with blink destinations validated inside the arena.
+
+### 07 · Wind-Up Dash (Racing / Obstacles · 2–8)
+- A narrow course of tight passages, moving hazards, timing obstacles, and traps that slow, stun or reset.
+- First to finish wins. Others are placed by time or progress.
+
+**Toybox:** a course built from train track, dominoes, ramps, springs and mechanical traps.
+**Tech:** simple collision, deterministic obstacle patterns, a clear camera and readable boundaries.
+
+### 08 · Music Box Rhythm (Rhythm / Timing · 1–8)
+- A four-lane rhythm game on **A S J K**, with Perfect, Good and Miss judgements.
+- Includes combo multiplier, accuracy percentage, increasing complexity and multiple tracks. Ranked by score.
+
+**Toybox:** a stage inside a giant mechanical music box, with notes as toy pieces.
+**Tech:** judge input against the **audio clock**, provide latency calibration, and use original or licensed music.
+🔧 **Amended (A6):** music is exempt from the "synthesised only" rule.
+
+### 09 · Toy Squad (Strategy / Auto-battler · 1–8)
+A short, simple auto-battler. Each round, players:
+1. get some currency
+2. buy units from a small shop
+3. position them
+4. optionally upgrade or combine them
+5. watch the auto-battle and get results
+
+**Toybox:** soldiers, wind-up animals, robots and plastic creatures on a tabletop strategy board.
+**Tech:** small roster, deterministic combat, balanced to avoid dominant combos. Round count and victory condition are open.
+
+### 10 · Spellbox Showdown (Arena / Builds / Knockback · 2–8)
+- Players pick spells to form a build, each with its own effects and cooldowns.
+- **Damage increases knockback**, and the goal is to push opponents out of the ring. Positioning is everything.
+- The last player in the ring wins.
+
+**Toybox:** toy mages in a plastic-and-wood ring, with spells as toy explosions, springs, bubbles and fireworks.
+**Tech:** planar arena physics, authoritative damage and knockback, and a small spell roster to start.
+
+### 11 · Toybox Trivia (Knowledge / Speed · 1–8)
+- Timed multiple choice, with the same question for everyone. Correct answers score, plus an optional speed bonus.
+- Wrong or blank answers score nothing, and the highest total wins.
+
+**Toybox:** a shoebox game-show stage with mechanical question boards, buzzers and a wind-up host.
+**Tech:** question banks by category and difficulty, server timers, and answers and scoring that resist client tampering.
+
+---
+
+## 5. Shared minigame framework
+
+**Lifecycle:**
+1. Initialise
+2. Load players
+3. Prepare round
+4. Countdown
+5. Start
+6. Update and handle input
+7. Determine placements
+8. Display results
+9. Clean up
+10. Return to tournament or lobby
+
+**Each game defines:**
+- id, name and description
+- minimum and maximum players, and estimated duration
+- supported inputs (keyboard, mouse, **touch**) and bot support
+- ranked and casual eligibility
+- scoring method and tie-break method
+- scene configuration and rules configuration
+
+The tournament controller needs **no game-specific logic** to know a round has finished. Minigames
+are independently testable. Implementation: `src/minigames/types.ts` (`MinigameDefinition`, a pure
+`RulesCore` and the host interface).
+
+---
+
+## 6. Multiplayer architecture (long-term)
+
+| Service | Responsible for |
+| --- | --- |
+| Shared Lobby | Presence, movement, nearby visibility, emotes, social |
+| Matchmaking | Tournament and casual queues |
+| Game Session | Match sync, timers, input validation, eliminations, results |
+| Progression | Cosmetics, currency, unlocks, rank history, rewards |
+| Client rendering | World, animation, particles, UI, camera |
+
+- Don't substitute frontend state or database polling for authoritative real-time networking.
+- **First implementation:** a small proof of concept with two real browser sessions.
+- Never assume 500 players share a single minigame.
+- 🔧 **Amended (A2):** the game server is a separate deployable. The rules cores (pure TypeScript) are
+  shared between client and server.
+
+---
+
+## 7. Player profiles & customisation
+
+**Categories:** body colour, face and expressions, hats, accessories, wind-up key variants, decorative effects,
+outfits and collectible badges. Paint, hats and keys exist today.
+
+**Eventually:** display name, profile, per-format ranks, match history, cosmetic inventory, currency,
+achievements and statistics.
+
+**Guest access is always available. No account is needed to play.** Permanent progression and secure
+ranked identity may need an *optional* account, subject to platform and competition rules.
+
+---
+
+## 8. Development order
+
+See **[DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md)** for milestones and dependencies.
+In summary:
+1. Foundation
+2. Tabletop hub
+3. Tournament framework with simulated players
+4. First five games: Copycat, Find the Original, Trivia, Red Light Green Light, Wind-Up Dash
+5. Two-client multiplayer proof of concept
+6. Ranking and matchmaking (one ladder first)
+7. Social expansion
+
+---
+
+## 9. Open design decisions (proposals only until decided)
+
+| Question | Current proposal |
+| --- | --- |
+| Do tournaments always use 8 players? | No: 2–8, and the points table scales to player count |
+| Bots in ranked? | No bots in ranked. Ranked launches only once queues fill with humans (A3) |
+| How are ratings calculated? | Undecided. Candidates are Glicko-2 or TrueSkill-style multiplayer rating |
+| Ties | Tied players share the higher placement's points. The next placement is skipped |
+| Disconnections and forfeits | Forfeit = last place for that round. A bot takes over in casual play |
+| Do eliminated players spectate? | Yes, with a spectate camera until the round ends |
+| Round durations | Per game, roughly 60–150 s, tuned in playtests |
+| Can guests play ranked? | Undecided. Depends on account system and competition rules |
+| Lobby scaling to 500 | Logical lobby instances of about 50 visible players with interest management |
+| Lobby → match transfer | Matchmaking hands players a match-server room ID, and the client switches connections |
+
+---
+
+## 10. Constraints
+
+The full vision is long-term. Build **one complete, testable system at a time**, keep functioning
+features, keep a clean git history, and stay playable on phones and desktops (see `CLAUDE.md`).
+For any competition version, keep public no-login play and confirm the eligibility of
+externally developed code before deploying.

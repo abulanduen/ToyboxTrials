@@ -1,12 +1,16 @@
 # Toybox Trials: project rules
 
 Original browser party game. Miniature wind-up toys compete on a tabletop inside a huge real room.
-Read `docs/` (audit, plan, visual guide, prompts, limitations) before major work.
+**Specs:** `GAME_DESIGN.md` (master gameplay and multiplayer spec, with amendments A1–A7) and
+`DEVELOPMENT_ROADMAP.md` (milestones, dependencies, decisions log). Read them and `docs/` before major work.
+Build one complete, testable system at a time.
 
 ## Non-negotiables
 
-- **It is a web game.** Static build (`npm run build` → `dist/`), no backend, `base: './'`.
-  It must stay deployable to any static host and embeddable in Base44 later.
+- **It is a web game.** The client is a static build (`npm run build` → `dist/`, `base: './'`), deployable
+  to any static host (live on Vercel). Single-player and bot play need no server. Multiplayer
+  (M8+) will use a **separate authoritative game server**, sharing the pure TypeScript rules cores.
+  Never fake multiplayer with frontend state or database polling.
 - **Mobile is required for everything.** Every screen and every minigame must be fully playable on
   phones and tablets (touch, portrait and landscape) as well as keyboard and mouse.
   - Input goes through the shared action layer (`src/game/input.ts`): keys, joystick and touch
@@ -29,7 +33,8 @@ Read `docs/` (audit, plan, visual guide, prompts, limitations) before major work
   dog). They must be GLB, compressed, lazy-loaded after the hub is interactive, skipped or simplified
   on the Low tier, and recorded in `public/assets/asset-manifest.json` with source and licence.
 - **Original work only.** No recreated characters, levels, art or sounds from reference games.
-  All sound is synthesised (`src/game/audio.ts`). No emoji or icon packs for important visuals.
+  All sound effects are synthesised (`src/game/audio.ts`). Music for Music Box Rhythm is the only exception
+  (composed, commissioned or licensed, and recorded in the manifest). No emoji or icon packs for important visuals.
 - **Honesty.** Don't claim performance or behaviour that hasn't been measured. This container has
   no GPU, so headless frame rates mean nothing.
 

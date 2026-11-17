@@ -62,54 +62,9 @@ Rules: no React state changes per frame. The UI reads the store, and the scene r
 
 ## Milestones
 
-**M1 · Audit & art direction ✅** Audit (with integration checklist), this plan, visual design
-guide, concept prompts + 2 generated concepts, asset manifest.
-
-**M2 · Explorable prototype ✅** Tabletop hub, toy character, movement and camera, collision, room
-background, quality tiers, synthesised audio, toy UI. This is a separate project, so the existing app is untouched.
-
-**M3 · Main menu & hub polish ✅** This repository is now the canonical game. The owner decided not to port the
-Base44 version's menu, customisation or settings (17 Nov 2026), so nothing here waits on it:
-- ✅ Screens: Main menu → Playroom ⇄ Workshop, with `#play` / `#workshop` deep links (store-driven,
-  no router dependency).
-- ✅ Main menu as a live 3D diorama: the contender faces the camera in front of the village
-  (concept 01 framing), hops now and then, and turns round to face the village when you press Play.
-  It has Settings and How to play sheets and a contender card.
-- ✅ Workshop screen: a turntable camera (drag to spin), name, 5 paint jobs, 5 hats, 4 key skins.
-  Secrets unlock 4 of them (the first progression loop). It opens from the menu, the pause menu,
-  or the Workshop building.
-- ✅ Hub polish: a loading card, a fingerpost and gate name boards, dust motes in the lamp light,
-  and the contender's name on the HUD.
-- The results screen arrives with the first minigame (M4).
-
-**M4 · Minigame host + Copycat Conductor (redesigned).** The Base44 version isn't being ported, so
-Copycat is designed fresh. It's the first of many games, so M4 builds the shared runtime first:
-1. **Minigame host:**
-   - lazy-load the minigame module and dispose of its scene
-   - intro card showing controls (keyboard + touch)
-   - a 3-2-1 countdown
-   - pause/quit
-   - a shared **Results** screen (placements, score, personal best, cosmetic rewards)
-   - records saved per game
-2. **Copycat rules core** (pure and unit-tested): a growing sequence over 4 instruments, with playback
-   speeding up by round, an input window per note, lives or a fail rule, scoring, and a seeded RNG so
-   later multiplayer rounds get identical sequences.
-3. **Presentation:**
-   - a cigar-box stage with felt curtains and a fixed, gently elevated camera
-   - the four instruments (A coral drum, S golden bell, J blue xylophone, K green music box) as 3D
-     props with hit animations and the existing synthesised voices
-   - the contender model as a wind-up conductor with a baton, demonstrating each sequence
-4. **Touch:** the instruments are the buttons (2×2 in portrait, a row in landscape), and tapping the 3D
-   instrument also counts.
-5. Desktop, mobile and rules-core tests.
-
-**M5 · Performance & polish.** Real-device testing (integrated GPU laptop, mid-range Android phone, iPhone Safari, tablet),
-static-geometry merging, shadow budget, loading screen, resize/orientation, audio mix pass,
-accessibility (reduced motion, remappable keys, colour-blind instrument shapes).
-
-**M6 · Further minigames, one at a time.** Suggested order by reuse: Music Box Rhythm (reuses ASJK
-and the instrument voices), Red Light Green Light (reuses hub movement), Find the Original (reuses
-character paint system), Wind-Up Dash, then the combat and strategy titles.
+Milestones moved to **[DEVELOPMENT_ROADMAP.md](../DEVELOPMENT_ROADMAP.md)**, which merges this plan with
+the master brief ([GAME_DESIGN.md](../GAME_DESIGN.md)). M1–M3 are done, and M4 (minigame host, tournament
+framework, Copycat Conductor) is in progress.
 
 ## Minigame framework (contract drafted in `src/minigames/types.ts`)
 

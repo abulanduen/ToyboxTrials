@@ -65,6 +65,8 @@ Things to find in the Playroom:
 
 | Deliverable | Where |
 | --- | --- |
+| **Master game design (spec)** | [`GAME_DESIGN.md`](GAME_DESIGN.md) |
+| **Development roadmap** | [`DEVELOPMENT_ROADMAP.md`](DEVELOPMENT_ROADMAP.md) |
 | 1. Repository architecture audit | [`docs/01-architecture-audit.md`](docs/01-architecture-audit.md) |
 | 2. Technical implementation plan | [`docs/02-technical-plan.md`](docs/02-technical-plan.md) |
 | 3. Visual design guide | [`docs/03-visual-design-guide.md`](docs/03-visual-design-guide.md) |
