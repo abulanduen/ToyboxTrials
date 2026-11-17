@@ -1251,22 +1251,31 @@ canvas {
   .menu-layer {
     background: linear-gradient(0deg, rgba(43, 36, 51, 0.5) 0%, rgba(43, 36, 51, 0.1) 50%, rgba(43, 36, 51, 0) 65%);
   }
+  /* Sign at the top, buttons at the bottom, the contender visible in between. */
   .menu-column {
-    left: 50%;
-    top: auto;
+    left: 16px;
+    right: 16px;
+    top: calc(14px + env(safe-area-inset-top));
     bottom: calc(18px + env(safe-area-inset-bottom));
-    transform: translateX(-50%);
-    width: min(420px, calc(100vw - 32px));
+    transform: none;
+    width: auto;
+    max-width: 420px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
     gap: 12px;
+    pointer-events: none;
+  }
+  .menu-column > * {
+    pointer-events: auto;
   }
   .menu-sign {
-    position: fixed;
-    top: calc(14px + env(safe-area-inset-top));
-    left: 50%;
-    width: min(330px, calc(100vw - 48px));
+    align-self: center;
+    width: min(330px, 100%);
     padding: 1rem 1rem 0.6rem;
-    transform: translateX(-50%) rotate(-1.4deg);
-    animation: none;
+  }
+  .menu-buttons {
+    margin-top: auto;
   }
   .menu-ticket,
   .menu-hint {
@@ -1284,6 +1293,22 @@ canvas {
   }
   .workshop-panel h2 {
     font-size: 1.4rem;
+  }
+  /* Keep Done reachable without scrolling. */
+  .workshop-panel .pause__actions {
+    position: sticky;
+    bottom: -1rem;
+    margin: 0 -1rem -1rem;
+    padding: 10px 1rem 12px;
+    background: linear-gradient(rgba(201, 165, 122, 0), #c9a57a 14px);
+  }
+  .swatch {
+    min-height: 80px;
+    padding: 8px 4px 6px;
+  }
+  .workshop-info {
+    min-height: 0;
+    margin: 10px 0 4px;
   }
   .workshop-hint {
     left: 50%;

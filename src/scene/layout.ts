@@ -46,7 +46,7 @@ export const TREES: [number, number, number][] = [
   [9, -12, 0.8],
   [37, 18, 1.2],
   [-37, 3.5, 0.9],
-  [6, 31, 0.8],
+  [27, 31.5, 0.8], // kept clear of the menu / Workshop camera paths near spawn
   [38, -20, 1],
 ];
 
