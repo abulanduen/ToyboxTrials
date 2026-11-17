@@ -3,7 +3,6 @@
  *
  * Unlocks: some items are free; others are earned by finding Playroom secrets (the first
  * progression loop). Later the Odds & Ends shop and minigame results can grant items too.
- * When the existing Base44 app is connected, its customisation options map onto these ids.
  */
 import { PALETTE } from './palette';
 

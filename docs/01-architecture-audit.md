@@ -88,7 +88,12 @@ src/
 5. **Static deployment.** `base: './'` builds a folder that can be dropped into any static host or
    embedded in another app, which fits Base44 or GitHub sync. There is no server and no secrets.
 
-## 4. Integration checklist: run this once the existing app is connected
+## 4. Integration checklist (superseded)
+
+> **Update, 17 Nov 2026:** the owner decided not to port the Base44 version's menu, customisation or
+> settings. This repository is the canonical game, so the checklist below no longer applies to those
+> systems. It's kept for reference in case any Base44 code is ever reused.
+
 
 Do these before Milestone 3/4. Each answer changes the plan.
 

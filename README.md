@@ -10,8 +10,8 @@ explorable 3D toy-world prototype.
 
 ![Hub](docs/screenshots/prototype-02-hub-spawn.jpg)
 
-> **Status:** standalone prototype. The existing Toybox Trials app, including Copycat Conductor,
-> has **not** been modified. It wasn't available to this work (see [the audit](docs/01-architecture-audit.md)).
+> **Status:** prototype hub + main menu + Workshop (Milestones 1–3). This repository is the canonical
+> game. The earlier Base44 version is not being ported.
 
 ## Run it locally
 

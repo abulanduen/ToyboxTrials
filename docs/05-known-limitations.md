@@ -20,7 +20,7 @@ _What is not done, not verified, or risky. Updated at Milestone 2._
 - **No gamepad input yet.** Keyboard, mouse and touch are supported.
 - **Panels scroll on short landscape phones.** On short landscape screens (about 400 px tall) the Copycat panel needs a short scroll to reach its button. Tapping outside a panel also closes it.
 - **No results screen yet.** It arrives with the first playable minigame (M4). Screen routing is store-driven with `#play` and `#workshop` deep links, not a router library.
-- **Customisation doesn't map to the existing app yet.** The Workshop has paint, hats and keys, but its ids aren't mapped to the Base44 app's options because that code hasn't been seen. There are no badges or accessories beyond hats and keys.
+- **Customisation is a first pass.** Paint, hats and key skins only. There are no chest badges yet, and the shop doesn't sell anything.
 - **Climbing is jump-based only.** No ledge grabbing. A missed jump from the eraser just drops you
   back onto the book.
 - **The camera can still clip small props** (trees, blocks, train). Only large props block the camera.

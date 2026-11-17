@@ -68,9 +68,10 @@ guide, concept prompts + 2 generated concepts, asset manifest.
 **M2 · Explorable prototype ✅** Tabletop hub, toy character, movement and camera, collision, room
 background, quality tiers, synthesised audio, toy UI. This is a separate project, so the existing app is untouched.
 
-**M3 · Main menu & hub polish (in progress).** Built without the existing app (still not connected):
+**M3 · Main menu & hub polish ✅** This repository is now the canonical game. The owner decided not to port the
+Base44 version's menu, customisation or settings (17 Nov 2026), so nothing here waits on it:
 - ✅ Screens: Main menu → Playroom ⇄ Workshop, with `#play` / `#workshop` deep links (store-driven,
-  no router dependency; it can be swapped for the existing app's router when that's connected).
+  no router dependency).
 - ✅ Main menu as a live 3D diorama: the contender faces the camera in front of the village
   (concept 01 framing), hops now and then, and turns round to face the village when you press Play.
   It has Settings and How to play sheets and a contender card.
@@ -79,8 +80,7 @@ background, quality tiers, synthesised audio, toy UI. This is a separate project
   or the Workshop building.
 - ✅ Hub polish: a loading card, a fingerpost and gate name boards, dust motes in the lamp light,
   and the contender's name on the HUD.
-- ⏳ Still to do once the existing app is connected: port its customisation options to these ids,
-  merge settings keys, and reuse its menu and route names. Results screen arrives with the first minigame (M4).
+- The results screen arrives with the first minigame (M4).
 
 **M4 · Copycat Conductor integration.**
 1. Characterisation tests on the *existing* rules (sequence, timing, scoring, restart, records).
