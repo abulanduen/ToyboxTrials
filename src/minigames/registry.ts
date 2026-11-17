@@ -55,7 +55,7 @@ export const MINIGAMES: MinigameDefinition[] = [
     status: 'playable',
     load: () => import('./copycat').then((m) => m.default),
   },
-  planned({
+  {
     id: 'inferno-escape',
     title: 'Inferno Escape',
     tagline: 'Dig, build one wall, and outlast the creeping heat.',
@@ -67,8 +67,16 @@ export const MINIGAMES: MinigameDefinition[] = [
     eligibility: { tournament: true, ranked: true, casual: true },
     scoring: 'elimination-order',
     tieBreak: 'Out later ranks higher',
-    controls: [],
-  }),
+    controls: [{ keys: 'WASD / arrows', action: 'Move and face' }, { keys: 'Space', action: 'Break the block ahead' }, { keys: 'E', action: 'Place your one wall during preparation' }],
+    inputs: ['keyboard', 'mouse', 'touch'],
+    bots: 'available',
+    recordUnit: 'seconds',
+    touch: { movement: 'none', look: 'none', orientation: 'any',
+      buttons: [{ id: 'forward', label: 'Up' }, { id: 'left', label: 'Left' }, { id: 'back', label: 'Down' }, { id: 'right', label: 'Right' }, { id: 'slot1', label: 'Break' }, { id: 'slot2', label: 'Build wall' }],
+      notes: 'Hold directional pads to move; Break clears the tile ahead. Build wall places one wall during the 15-second preparation. Unused walls expire. Survivors tie at the time limit.' },
+    status: 'playable',
+    load: () => import('./inferno').then(m => m.default),
+  },
   planned({
     id: 'midnight-hunger',
     title: 'Midnight Hunger',

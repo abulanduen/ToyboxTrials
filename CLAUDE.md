@@ -1,5 +1,11 @@
 # Toybox Trials: project rules
 
+Read **[AGENTS.md](AGENTS.md)** first: it is the shared current instruction source for Codex and Claude Code.
+The guidance below is retained from earlier milestones. Where it differs, follow AGENTS.md and the
+owner's current instructions, especially preserving the working Copycat implementation. Current status
+is in [ROADMAP.md](ROADMAP.md) and [TECHNICAL_PLAN.md](TECHNICAL_PLAN.md); the separate authoritative
+design conversation is still pending.
+
 Original browser party game. Miniature wind-up toys compete on a tabletop inside a huge real room.
 **Specs:** `GAME_DESIGN.md` (master gameplay and multiplayer spec, with amendments A1–A7) and
 `DEVELOPMENT_ROADMAP.md` (milestones, dependencies, decisions log). Read them and `docs/` before major work.

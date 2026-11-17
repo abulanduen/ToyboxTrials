@@ -200,9 +200,13 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
     await page.waitForSelector('[data-testid=match-start]', { timeout: 60000 });
     await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
     await page.click('[data-testid=match-start]');
-    const game = await page.evaluate(() => window.__toybox.match.state()?.category ? 'jack' : 'copycat');
+    const game = await page.evaluate(() => { const s = window.__toybox.match.state(); return s?.category ? 'jack' : s?.furnace ? 'inferno' : 'copycat'; });
     games.push(game);
     if (game === 'copycat') await failRound(); // Jack: just never answer, and the jack pops on us
+    if (game === 'inferno') {
+      // Set up an exposed player, then let the real rules/host resolve the loss.
+      await page.evaluate(() => { const s = window.__toybox.match.state(); s.players[0].x = s.furnace.x; s.players[0].z = s.furnace.z; });
+    }
     await page.waitForSelector('.results', { timeout: 180000 });
     await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
     const rows = await page.$$eval('.results-list li', (els) => els.map((e) => e.textContent));
@@ -232,6 +236,7 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   check('no console/page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
   console.log(res.join('\n'));
   await browser.close();
+  if (res.some(line => line.startsWith('FAIL'))) process.exitCode = 1;
 })().catch((e) => {
   console.log(res.join('\n'));
   console.log('FAIL  aborted: ' + e.message);

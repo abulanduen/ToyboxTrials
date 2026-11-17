@@ -9,6 +9,24 @@ inline and summarised first. Everything marked _proposal_ is not final.
 
 ---
 
+## Current status and source authority (18 November 2026)
+
+This existing specification is preserved pending the owner's separately supplied authoritative
+game-design conversation, which has not yet been provided in this chat. Do not invent missing mechanics.
+Current owner instructions take precedence over historical amendments: preserve the working Copycat
+Conductor implementation. Amendment A1 records the earlier Base44 decision, not permission to rewrite it now.
+
+**Implemented in source:** explorable 3D hub, menu, Workshop, local persistence, Copycat Conductor,
+Jack-in-the-Box, practice/bots and local unranked Blitz/Normal/Treasure tournaments. **Not implemented:**
+the other nine games, online multiplayer, matchmaking, ranked ratings or online leaderboards.
+Registry eligibility flags describe intended use, not available online/ranked modes.
+
+The planned ranked modes have three independent ratings: **Blitz (3 rounds), Normal (5 rounds),
+Treasure (8 rounds)**. The older A3 amendment proposes a staged launch; launch timing awaits reconciliation
+with the separate specification. The catalogue below retains existing rules; proposals and unresolved
+choices are not final mechanics. See `AGENTS.md`, `ART_DIRECTION.md`, `TECHNICAL_PLAN.md` and `ROADMAP.md`
+for current development instructions and source-audited status. Older milestone reports may be stale.
+
 ## 0. Amendments agreed on 17 Nov 2026
 
 | # | Topic | Original brief | Agreed amendment |
@@ -157,6 +175,11 @@ timing, and input correctness is validated fairly.
 🔧 **Amended (A1):** redesigned rather than preserved.
 
 ### 02 · Inferno Escape (Survival / Strategy / Sabotage · 2–8)
+**Local first pass on `astra/inferno-escape`:** rules, bots, scene and touch/keyboard controls now
+exist. This supersedes the earlier two-game status snapshot for this branch only. The nine-game
+planned count in that snapshot is now eight. See `src/minigames/inferno/README.md` for explicit
+provisional balance and the surviving-player tie/time-limit policy; these are not final design decisions.
+
 - A small arena of destructible rocks and obstacles, with about 15 s of preparation before the Inferno appears.
 - During preparation, players break rocks to make paths and shelter, and each builds **exactly one** wall.
 - Players can break obstacles around opponents to open paths into their shelters.
@@ -320,7 +343,7 @@ In summary:
 1. Foundation
 2. Tabletop hub
 3. Tournament framework with simulated players
-4. First five games: Copycat, Find the Original, Trivia, Red Light Green Light, Wind-Up Dash
+4. First five games: Copycat, Jack-in-the-Box (replaces Trivia), Find the Original, Red Light Green Light, Wind-Up Dash
 5. Two-client multiplayer proof of concept
 6. Ranking and matchmaking (one ladder first)
 7. Social expansion
