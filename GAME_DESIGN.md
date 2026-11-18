@@ -248,7 +248,8 @@ Each contender's energy drains continuously, and play alternates between two pha
 🔧 **Amended (A6):** music is exempt from the "synthesised only" rule.
 
 ### 09 · Toy Squad (Strategy / Auto-battler · 1–8)
-**Local first pass on `astra/toy-squad`:** shop, six-square formations, upgrades/selling, seeded
+**Local first pass on `astra/toy-squad`:** shop, 8×8 battlefield with four deployment rows per side,
+drag-and-drop formations, turning units with attack particles, upgrades/selling, seeded
 snapshot opponents, deterministic auto-combat, bots and keyboard/touch UI. It remains casual-only.
 The provisional three-round format, points/health victory rules and unit balance are documented
 in `src/minigames/toysquad/README.md`; the final round count/victory condition remain open.

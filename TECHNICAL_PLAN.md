@@ -11,6 +11,13 @@ existing frame-to-fixed-step queue; no host, multiplayer or storage schema chang
 Validation: 71 unit tests and production build pass; Toy Squad desktop/portrait/landscape flows
 and the existing mobile regression suite pass. Format, balance and real-device performance remain
 provisional. Browser-only timing fixes are documented in the module README.
+Board revision: 8×8 arena, validated 32-square home placement and swaps. Captured pointer drags
+preview positions locally and submit one shared-host move command on release; invalid/cancelled
+drops never alter rules state. Combat rules emit facing/attack metadata; the render layer smoothly
+turns models and displays a bounded instanced particle pool, with reduced-motion support.
+Revision validation: 72 unit tests and production build pass; desktop, portrait and landscape
+browser checks pass 3D drags, back-corner retrieval, invalid drops, swaps, facing/attack metadata
+and full rounds/results/restart without console/page errors.
 
 Toy Squad branch update: fifth local playable module, excluded from tournament/ranked pools by
 its existing metadata. Rules validate shop commands, own formation/currency, simulate independent

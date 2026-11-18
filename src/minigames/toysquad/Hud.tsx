@@ -3,7 +3,7 @@ import { useMatch } from '../session';
 import { unlockAudio } from '../../game/audio';
 import type { MinigameSceneProps } from '../types';
 import { clearSquadInput, submitSquadInput } from './local';
-import { ROSTER, type SquadInput, type SquadState, type UnitKind } from './rules';
+import { DEPLOY_CELLS, MAX_UNITS, ROSTER, type SquadInput, type SquadState, type UnitKind } from './rules';
 import './toysquad.css';
 
 export function SquadHud({ getState, localId, contestants }: MinigameSceneProps<SquadState>) {
@@ -28,16 +28,16 @@ export function SquadHud({ getState, localId, contestants }: MinigameSceneProps<
       <div className="squad-shop" aria-label="Unit shop">
         {(Object.keys(ROSTER) as UnitKind[]).map(kind => {
           const def = ROSTER[kind];
-          return <button key={kind} data-testid={`squad-buy-${kind}`} disabled={!editable || me.coins < def.cost || me.units.length >= 6} onClick={() => send({ type: 'buy', kind })}>
+          return <button key={kind} data-testid={`squad-buy-${kind}`} disabled={!editable || me.coins < def.cost || me.units.length >= MAX_UNITS} onClick={() => send({ type: 'buy', kind })}>
             <strong>{def.name} · {def.cost}c</strong><small>{def.role} · HP {def.hp} / Hit {def.damage} / Reach {def.range}</small>
           </button>;
         })}
       </div>
-      <div className="squad-formation">
-        <strong>Formation · enemy to the right →</strong>
-        <small>Select a toy, then a square to move or swap it.</small>
+      <details className="squad-formation">
+        <summary data-testid="squad-formation-toggle">Formation & upgrades · {me.units.length}/{MAX_UNITS} toys</summary>
+        <small>Drag toys on the 8×8 board. Or select a toy here, then a square. Enemy is across the red line.</small>
         <div className="squad-grid" aria-label="Formation board">
-          {Array.from({ length: 6 }, (_, cell) => {
+          {Array.from({ length: DEPLOY_CELLS }, (_, cell) => {
             const here = me.units.find(u => u.cell === cell);
             return <button key={cell} data-testid={`squad-cell-${cell}`} aria-label={`Square ${cell + 1}${here ? `: ${ROSTER[here.kind].name}, level ${here.tier}` : ': empty'}`} aria-pressed={!!here && here.id === selected} disabled={!editable}
               onClick={() => { if (unit && unit.cell !== cell) send({ type: 'move', unit: unit.id, cell }); else select(here?.id ?? null); }}>
@@ -50,7 +50,7 @@ export function SquadHud({ getState, localId, contestants }: MinigameSceneProps<
           <button disabled={!editable || !unit} data-testid="squad-sell" onClick={() => { if (unit) { send({ type: 'sell', unit: unit.id }); select(null); } }}>Sell selected</button>
           <button disabled={!editable} onClick={() => select(null)}>Clear selection</button>
         </div>
-      </div>
+      </details>
       <button className="squad-ready" disabled={!editable} data-testid="squad-ready" onClick={() => send({ type: 'ready' })}>{me.ready ? 'Ready — waiting for others' : 'Ready for battle'}</button>
       <small>Unused coins carry over. Earn {s.config.income} each round. Ready locks your squad.</small>
     </section> : <section className="squad-scoreboard" aria-label="Squad standings">

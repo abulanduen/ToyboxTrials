@@ -12,10 +12,9 @@ export function createSquadBot(): BotPolicy<SquadState, SquadInput> {
     if (p.units.length < 6 && affordable.length) return [{ type: 'buy', kind: affordable[Math.floor(rng() * affordable.length)] }];
     const upgrade = p.units.find(u => u.tier < 3);
     if (upgrade && p.coins >= 3) return [{ type: 'upgrade', unit: upgrade.id }];
-    // Put durable units nearest the opponent; ranged units prefer the back.
-    const ordered = [...p.units].sort((a, b) => ROSTER[b.kind].range - ROSTER[a.kind].range);
-    const misplaced = ordered.find((u, i) => u.cell !== i);
-    if (misplaced) return [{ type: 'move', unit: misplaced.id, cell: ordered.indexOf(misplaced) }];
+    const placements = p.units.map((u, i) => ({ unit: u, cell: (u.kind === 'hare' ? 24 : 0) + i }));
+    const misplaced = placements.find(p => p.unit.cell !== p.cell);
+    if (misplaced) return [{ type: 'move', unit: misplaced.unit.id, cell: misplaced.cell }];
     return [{ type: 'ready' }];
   } };
 }

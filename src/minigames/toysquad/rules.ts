@@ -10,16 +10,22 @@ export const ROSTER = {
   hare: { name: 'Spring Hare', cost: 4, hp: 5, damage: 1, range: 3, colour: PALETTE.honey, role: 'Fragile ranged attacker' },
 } as const;
 export type UnitKind = keyof typeof ROSTER;
+export const BOARD_SIZE = 8;
+export const DEPLOY_CELLS = BOARD_SIZE * 4;
+export const MAX_UNITS = 6;
+export const deploymentPosition = (cell: number, side: 0 | 1) => ({ x: cell % BOARD_SIZE, z: side === 0 ? 4 + Math.floor(cell / BOARD_SIZE) : 3 - Math.floor(cell / BOARD_SIZE) });
 export interface SquadUnit { id: number; kind: UnitKind; tier: number; cell: number }
 export interface SquadPlayer {
   id: string; coins: number; units: SquadUnit[]; ready: boolean; points: number; health: number; wins: number;
 }
 export type SquadInput = { type: 'buy'; kind: UnitKind } | { type: 'move'; unit: number; cell: number }
   | { type: 'upgrade' | 'sell'; unit: number } | { type: 'ready' };
-export interface Fighter { id: number; kind: UnitKind; tier: number; side: 0 | 1; x: number; z: number; hp: number; maxHp: number }
+export interface Fighter { id: number; kind: UnitKind; tier: number; side: 0 | 1; x: number; z: number; hp: number; maxHp: number; facing?: number }
+export interface AttackEffect { serial: number; from: number; to: number; kind: UnitKind; x: number; z: number; tx: number; tz: number }
 export interface Battle {
   owner: string; opponent: string; fighters: Fighter[]; done: boolean;
   outcome: 'win' | 'loss' | 'draw' | null; health: number;
+  attacks?: AttackEffect[]; tick?: number;
 }
 export interface SquadConfig { rounds: number; buildMs: number; battleMs: number; recapMs: number; tickMs: number; income: number }
 export const DEFAULT_CONFIG: SquadConfig = { rounds: 3, buildMs: 30000, battleMs: 20000, recapMs: 3000, tickMs: 500, income: 10 };
@@ -27,7 +33,7 @@ export interface SquadState {
   kind: 'toy-squad'; seed: number; config: SquadConfig; t: number; phase: 'build' | 'battle' | 'recap' | 'over';
   phaseEnds: number; nextTick: number; round: number; nextId: number; players: SquadPlayer[]; battles: Battle[]; events: MatchEvent[];
 }
-const validCell = (cell: number) => Number.isInteger(cell) && cell >= 0 && cell < 6;
+const validCell = (cell: number) => Number.isInteger(cell) && cell >= 0 && cell < DEPLOY_CELLS;
 export const unitHp = (u: Pick<SquadUnit, 'kind' | 'tier'>) => ROSTER[u.kind].hp + (u.tier - 1) * 5;
 const damage = (u: Fighter) => ROSTER[u.kind].damage + u.tier - 1;
 
@@ -37,8 +43,8 @@ function shop(s: SquadState, p: SquadPlayer, input: SquadInput) {
   if (input.type === 'buy') {
     if (!Object.hasOwn(ROSTER, input.kind)) return;
     const def = ROSTER[input.kind];
-    if (p.coins < def.cost || p.units.length >= 6) return;
-    const cell = Array.from({ length: 6 }, (_, i) => i).find(c => !p.units.some(u => u.cell === c))!;
+    if (p.coins < def.cost || p.units.length >= MAX_UNITS) return;
+    const cell = Array.from({ length: DEPLOY_CELLS }, (_, i) => i).find(c => !p.units.some(u => u.cell === c))!;
     p.units.push({ id: s.nextId++, kind: input.kind, tier: 1, cell }); p.coins -= def.cost;
     s.events.push({ type: 'squad-buy', id: p.id }); return;
   }
@@ -55,8 +61,8 @@ function shop(s: SquadState, p: SquadPlayer, input: SquadInput) {
 }
 
 function fighters(units: SquadUnit[], side: 0 | 1): Fighter[] {
-  return units.map(u => ({ ...u, side, x: side === 0 ? u.cell % 3 : 7 - u.cell % 3,
-    z: Math.floor(u.cell / 3), hp: unitHp(u), maxHp: unitHp(u) }));
+  return units.map(u => ({ ...u, side, ...deploymentPosition(u.cell, side), facing: side === 0 ? Math.PI : 0,
+    hp: unitHp(u), maxHp: unitHp(u) }));
 }
 
 function startBattle(s: SquadState) {
@@ -67,7 +73,7 @@ function startBattle(s: SquadState) {
       id: -n - 1, kind: (['soldier', 'robot', 'hare'] as UnitKind[])[(n + s.round) % 3], tier: s.round === 3 && n === 0 ? 2 : 1, cell: n,
     }));
     return { owner: p.id, opponent: order.length > 1 ? opponent.id : 'clockwork',
-      fighters: [...fighters(p.units, 0), ...fighters(enemy, 1)], done: false, outcome: null, health: 0 };
+      fighters: [...fighters(p.units, 0), ...fighters(enemy, 1)], done: false, outcome: null, health: 0, attacks: [], tick: 0 };
   });
   s.phase = 'battle'; s.phaseEnds = s.t + s.config.battleMs; s.nextTick = s.t + s.config.tickMs;
   s.events.push({ type: 'squad-battle', round: s.round });
@@ -89,15 +95,21 @@ export function tickBattle(b: Battle) {
   finishBattle(b); if (b.done) return;
   const live = b.fighters.filter(u => u.hp > 0);
   const hits = new Map<Fighter, number>();
+  b.attacks = []; b.tick = (b.tick ?? 0) + 1;
   const moves: { unit: Fighter; x: number; z: number }[] = [];
   for (const unit of live) {
     const enemy = live.filter(u => u.side !== unit.side).sort((a, c) => dist(unit, a) - dist(unit, c) || a.id - c.id)[0];
     if (!enemy) continue;
-    if (dist(unit, enemy) <= ROSTER[unit.kind].range) hits.set(enemy, (hits.get(enemy) ?? 0) + damage(unit));
+    unit.facing = Math.atan2(enemy.x - unit.x, enemy.z - unit.z);
+    if (dist(unit, enemy) <= ROSTER[unit.kind].range) {
+      hits.set(enemy, (hits.get(enemy) ?? 0) + damage(unit));
+      b.attacks.push({ serial: b.tick * 32 + b.attacks.length, from: unit.id, to: enemy.id,
+        kind: unit.kind, x: unit.x, z: unit.z, tx: enemy.x, tz: enemy.z });
+    }
     else {
-      const dx = Math.sign(enemy.x - unit.x) * 0.5, dz = Math.sign(enemy.z - unit.z);
+      const dx = Math.sign(enemy.x - unit.x) * 0.5, dz = Math.sign(enemy.z - unit.z) * 0.5;
       const choices = [{ x: unit.x + dx, z: unit.z }, { x: unit.x, z: unit.z + dz }]
-        .filter(c => c.x >= 0 && c.x <= 7 && c.z >= 0 && c.z <= 1 && (c.x !== unit.x || c.z !== unit.z)
+        .filter(c => c.x >= 0 && c.x < BOARD_SIZE && c.z >= 0 && c.z < BOARD_SIZE && (c.x !== unit.x || c.z !== unit.z)
           && !live.some(u => u.x === c.x && u.z === c.z));
       if (choices[0]) moves.push({ unit, ...choices[0] });
     }

@@ -178,11 +178,11 @@ export const MINIGAMES: MinigameDefinition[] = [
     eligibility: { tournament: false, ranked: false, casual: true },
     scoring: 'score',
     tieBreak: 'Remaining unit health',
-    controls: [{ keys: 'Click / Tab + Enter', action: 'Buy toys, select a unit and choose a formation square; upgrade, sell or ready' }],
+    controls: [{ keys: 'Drag / Click / Tab + Enter', action: 'Buy toys, drag them onto your half of the 8×8 board; formation drawer provides keyboard placement and upgrades' }],
     inputs: ['keyboard', 'mouse', 'touch'], bots: 'available', recordUnit: 'points',
     touch: { movement: 'none', look: 'none', orientation: 'any',
       buttons: [{ id: 'buy', label: 'Buy' }, { id: 'place', label: 'Formation square' }, { id: 'upgrade', label: 'Upgrade' }, { id: 'sell', label: 'Sell' }, { id: 'ready', label: 'Ready' }],
-      notes: 'Tap a shop toy to buy. Select it on the formation board, then tap a square to move or swap. Upgrade costs 3 coins. Ready locks your formation. Three rounds; wins give 3 points, draws 1.' },
+      notes: 'Tap a shop toy to buy, then drag the 3D toy onto your half of the 8×8 board. Dropping onto a friendly toy swaps them. Open Formation & upgrades for tap placement or upgrades. Ready locks your formation.' },
     status: 'playable', load: () => import('./toysquad').then(m => m.default),
   },
   planned({

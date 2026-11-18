@@ -2,13 +2,28 @@ import { describe, expect, it } from 'vitest';
 import { PAINT_JOBS } from '../../src/game/palette';
 import type { Contestant } from '../../src/minigames/types';
 import { seededRng } from '../../src/minigames/rng';
-import { squadRules, tickBattle, type Battle, type SquadInput, type SquadState } from '../../src/minigames/toysquad/rules';
+import { squadRules, tickBattle, deploymentPosition, type Battle, type SquadInput, type SquadState } from '../../src/minigames/toysquad/rules';
+import { boardToWorld, worldToDeployment } from '../../src/minigames/toysquad/board';
 import { createSquadBot } from '../../src/minigames/toysquad/bot';
 const people: Contestant[] = Array.from({ length: 3 }, (_, i) => ({ id: `p${i}`, name: `Toy ${i}`, paint: PAINT_JOBS[0], hat: 'none', keySkin: 'classic', isLocal: i === 0, bot: 'normal' }));
 const fresh = () => squadRules.init(people, 123);
 const send = (s: SquadState, ...inputs: SquadInput[]) => squadRules.step(s, { p0: inputs }, 1);
 
 describe('Toy Squad', () => {
+  it('deploys across all 32 home squares on an 8×8 board and rejects enemy/outside drops', () => {
+    for (let cell = 0; cell < 32; cell++) {
+      const home = deploymentPosition(cell, 0), away = deploymentPosition(cell, 1);
+      expect(home.x).toBeGreaterThanOrEqual(0); expect(home.x).toBeLessThan(8);
+      expect(home.z).toBeGreaterThanOrEqual(4); expect(home.z).toBeLessThan(8);
+      expect(away.z).toBe(7 - home.z);
+      expect(worldToDeployment(boardToWorld(home.x), boardToWorld(home.z))).toBe(cell);
+    }
+    expect(worldToDeployment(boardToWorld(2), boardToWorld(3))).toBeNull();
+    expect(worldToDeployment(boardToWorld(8), boardToWorld(5))).toBeNull();
+    const s = fresh(); send(s, { type: 'buy', kind: 'soldier' });
+    send(s, { type: 'move', unit: 1, cell: 31 }); expect(s.players[0].units[0].cell).toBe(31);
+    send(s, { type: 'move', unit: 1, cell: 32 }); expect(s.players[0].units[0].cell).toBe(31);
+  });
   it('buys within budget and board capacity, rejecting invalid kinds', () => {
     const s = fresh(); send(s, { type: 'buy', kind: 'soldier' }, { type: 'buy', kind: 'hare' }, { type: 'buy', kind: 'robot' });
     expect(s.players[0].units).toHaveLength(2); expect(s.players[0].coins).toBe(3);
@@ -47,6 +62,8 @@ describe('Toy Squad', () => {
       { id: 2, kind: 'soldier', tier: 1, side: 1, x: 4, z: 0, hp: 2, maxHp: 8 },
     ] };
     tickBattle(b); expect(b.fighters.map(u => u.hp)).toEqual([0, 0]); expect(b.outcome).toBe('draw');
+    expect(b.fighters.map(u => u.facing)).toEqual([Math.PI / 2, -Math.PI / 2]);
+    expect(b.attacks).toHaveLength(2); expect(b.attacks![0]).toMatchObject({ from: 1, to: 2, x: 3, tx: 4 });
   });
   it('closes a gap and fights without overlap or first-side bias', () => {
     const b: Battle = { owner: 'p0', opponent: 'p1', done: false, outcome: null, health: 0, fighters: [

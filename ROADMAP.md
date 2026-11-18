@@ -27,6 +27,9 @@ shop, formation, upgrades/selling, automatic battles, solo clockwork opponents a
 on Midnight and Inferno. Six local catalogue entries still lack runtime modules; Claude's separate
 work includes some of these and the owner reports Music Box Rhythm is now underway there.
 Three-round scoring and snapshot matchups are provisional; see `src/minigames/toysquad/README.md`.
+Owner board revision: Toy Squad now uses an 8×8 battlefield, 32 home deployment squares,
+direct 3D mouse/touch drag-and-drop, target-facing rotation and attack particles. The existing
+six-unit cap and casual-only eligibility remain in place.
 
 **Toy Squad branch update:** `astra/toy-squad` adds a fifth local playable game, casual-only:
 shop, formation, upgrades/selling, automatic battles, solo clockwork opponents and bots. It builds
