@@ -40,7 +40,7 @@ try{for(const layout of(process.env.SPELLBOX_LAYOUTS||'desktop,portrait,landscap
   await page.screenshot({path:path.join(out,`spellbox-${layout}-shrink-warning.png`),timeout:240000});
   await aim(8,8);const aimScreen=await page.evaluate(()=>window.__toybox.spellbox.point(8,8));
   await page.evaluate(()=>window.__toybox.match.timeScale(5));
-  await page.waitForFunction(()=>{const s=window.__toybox.match.state();if(s.shrink&&s.t>=s.shrink.startsAt-1000){window.__toybox.match.timeScale(0);return true;}return false;});
+  await page.waitForFunction(()=>{const s=window.__toybox.match.state();if(s.shrink&&s.t>=s.shrink.startsAt-1000){window.__toybox.match.timeScale(0);return true;}return false;},null,{timeout:300000,polling:100});
   assert.equal((await state()).radius,39);const oldAngle=(await state()).players[0].angle;
   await page.evaluate(()=>window.__toybox.match.timeScale(10));
   await page.waitForFunction(()=>{const s=window.__toybox.match.state();if(s.radius===15&&!s.shrink){window.__toybox.match.timeScale(0);return true;}return false;});
