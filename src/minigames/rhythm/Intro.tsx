@@ -52,11 +52,11 @@ export function RhythmIntro({ practice }: { practice: boolean }) {
       <div className="setting mbr-offset">
         <span>Timing offset</span>
         <div className="mbr-stepper">
-          <button aria-label="Earlier" data-testid="mbr-offset-down" disabled={offset <= OFFSET_MIN} onClick={() => (sfx.tick(), setOffset(offset - 5))}>
+          <button aria-label="Earlier" data-testid="mbr-offset-down" disabled={offset <= OFFSET_MIN} onClick={() => (sfx.tick(), setNote(''), setOffset(offset - 5))}>
             −
           </button>
           <output data-testid="mbr-offset">{fmt(offset)}</output>
-          <button aria-label="Later" data-testid="mbr-offset-up" disabled={offset >= OFFSET_MAX} onClick={() => (sfx.tick(), setOffset(offset + 5))}>
+          <button aria-label="Later" data-testid="mbr-offset-up" disabled={offset >= OFFSET_MAX} onClick={() => (sfx.tick(), setNote(''), setOffset(offset + 5))}>
             +
           </button>
           <button className="mbr-test" data-testid="mbr-taptest" onClick={() => (setNote(''), setTesting(true))} disabled={testing}>

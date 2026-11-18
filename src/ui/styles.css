@@ -2679,7 +2679,7 @@ canvas {
     gap: 2px;
   }
   .mbr-banner-wrap {
-    top: calc(58px + env(safe-area-inset-top));
+    top: calc(64px + env(safe-area-inset-top));
   }
   .mbr-banner {
     padding: 3px 14px;
