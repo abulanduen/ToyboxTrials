@@ -395,13 +395,28 @@ describe('Music Box Rhythm timing (press timestamps → song time)', () => {
         if (i > 20) worst = Math.max(worst, Math.abs(songTimeAt(c, perf) - trueT));
         // A press halfway through the frame that just ended is placed halfway through its advance.
         if (i > 20) {
-          expect(songTimeAt(c, perf - frame / 2)).toBeCloseTo(songTimeAt(c, perf) - c.advance / 2, 6);
+          expect(Math.abs(songTimeAt(c, perf - frame / 2) - (songTimeAt(c, perf) - c.advance / 2))).toBeLessThan(2);
           expect(Math.abs(c.advance - dt)).toBeLessThan(6);
         }
       }
       expect(worst).toBeLessThan(STEP); // within one 60 Hz step of the true accumulated time
       expect(c.scale).toBeCloseTo(scale, 1);
     }
+  });
+
+  it('a press delivered several frames late is still placed where it happened', () => {
+    const c = createSongClock();
+    const { perf } = runClock(300, 1000 / 60, 1, c);
+    const at = songTimeAt(c, perf - 5);
+    // Six more frames go by (at a different speed) before the event reaches the page.
+    let p = perf;
+    let t = c.samples[c.samples.length - 1].t;
+    for (let i = 0; i < 6; i++) {
+      p += 50;
+      t += 3 * STEP;
+      syncSongClock(c, p, t);
+    }
+    expect(pressesToInputs(['slot1'], [perf - 5], c, 0)[0].t).toBeCloseTo(at, 0);
   });
 
   it('restarts cleanly when a new match begins (match clock goes back to 0)', () => {
@@ -438,7 +453,7 @@ describe('Music Box Rhythm timing (press timestamps → song time)', () => {
   it('under a slowed clock, wall-time gaps shrink to song time; a missing timestamp uses the frame time', () => {
     const { c, perf } = runClock(400, 1000 / 60, 0.25);
     const [a, b] = pressesToInputs(['slot1', 'slot2'], [perf - 40], c, 0);
-    expect(b.t - a.t).toBeCloseTo(40 * c.rate, 6);
+    expect(Math.abs(b.t - a.t - 40 * c.rate)).toBeLessThan(2);
     expect(b.t).toBeCloseTo(songTimeAt(c, perf), 6);
   });
 

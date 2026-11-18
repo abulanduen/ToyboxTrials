@@ -20,6 +20,7 @@ const HOST_MAX_FRAME_MS = 100;
 const SCALE_WINDOW_MS = 400;
 /** Larger disagreements than this are a jump (pause, hitch, time-scale change): snap. */
 const SNAP_MS = 40;
+const HISTORY = 48;
 
 export interface SongClock {
   /** Estimated song time at `perf`. */
@@ -35,9 +36,15 @@ export interface SongClock {
   started: boolean;
   /** Recent syncs: wall time, match clock, and the (capped) duration of the frame that started there. */
   samples: { perf: number; t: number; frame: number }[];
+  /**
+   * The estimate at each recent sync (oldest first). An input event can be handed to the page a
+   * few frames after it happened (touch input is frame-aligned; a janky frame delays it further),
+   * so a press time is looked up in this history rather than extrapolated from the last frame.
+   */
+  history: { perf: number; est: number }[];
 }
 
-export const createSongClock = (): SongClock => ({ est: 0, perf: 0, scale: 1, rate: 1, advance: 0, started: false, samples: [] });
+export const createSongClock = (): SongClock => ({ est: 0, perf: 0, scale: 1, rate: 1, advance: 0, started: false, samples: [], history: [] });
 
 export function resetSongClock(c: SongClock) {
   c.est = 0;
@@ -47,6 +54,7 @@ export function resetSongClock(c: SongClock) {
   c.advance = 0;
   c.started = false;
   c.samples.length = 0;
+  c.history.length = 0;
 }
 
 /**
@@ -63,6 +71,7 @@ export function syncSongClock(c: SongClock, perfNow: number, matchT: number) {
     c.est = matchT;
     c.perf = perfNow;
     c.samples.push({ perf: perfNow, t: matchT, frame: 0 });
+    c.history.push({ perf: perfNow, est: c.est });
     return;
   }
   const dPerf = perfNow - c.perf;
@@ -102,14 +111,29 @@ export function syncSongClock(c: SongClock, perfNow: number, matchT: number) {
   c.est += Math.abs(err) > SNAP_MS ? err : err * 0.08;
   c.est += c.advance;
   c.perf = perfNow;
+  c.history.push({ perf: perfNow, est: c.est });
+  if (c.history.length > HISTORY) c.history.shift();
 }
 
 /**
  * Song time at wall time `perf`. Presses are converted after the frame's sync, so `perf` is
- * normally at or before it (interpolation). Looking ahead of the sync is capped at one frame's
- * advance: the match clock can't move further than that before the next sync corrects it.
+ * normally at or before it: the time is interpolated between the two syncs around it. Looking
+ * ahead of the last sync is capped at one frame's advance: the match clock can't move further
+ * than that before the next sync corrects it.
  */
-export const songTimeAt = (c: SongClock, perf: number) => c.est + Math.min((perf - c.perf) * c.rate, Math.max(c.advance, 0));
+export function songTimeAt(c: SongClock, perf: number): number {
+  if (perf >= c.perf) return c.est + Math.min((perf - c.perf) * c.rate, Math.max(c.advance, 0));
+  const h = c.history;
+  for (let i = h.length - 1; i >= 1; i--) {
+    const a = h[i - 1];
+    if (perf < a.perf) continue;
+    const b = h[i];
+    // A snap (pause, restart) can make the estimate step backwards: never interpolate through one.
+    if (b.est < a.est) return b.est;
+    return a.est + ((perf - a.perf) / (b.perf - a.perf)) * (b.est - a.est);
+  }
+  return h.length ? h[0].est : c.est;
+}
 
 const SLOTS: Action[] = ['slot1', 'slot2', 'slot3', 'slot4'];
 
