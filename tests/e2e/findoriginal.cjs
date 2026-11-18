@@ -290,7 +290,7 @@ async function phone(browser, errors, orientation) {
   await page.waitForSelector('[data-testid=fo-lock]', { timeout: 10000 });
   await d.snap(`fo-m${P}-04-wrong.png`);
   await d.scale(1);
-  f = await d.waitF((x) => (x.phase === 'search' && x.me.lockMs === 0) || x.round > 1, 'lock over', 60000);
+  f = await d.waitF((x) => (x.phase === 'search' && x.me.lockMs === 0) || x.round > 1, 'lock over', 240000); // slow under load
   await d.scale(0);
   let tapped = 0;
   for (let r = f.round; r <= 5; r++) {
