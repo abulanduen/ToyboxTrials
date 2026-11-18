@@ -44,6 +44,10 @@ Applies to Codex, Claude Code and other contributors. Read this file before edit
 - Use `MiniContender` for opponents/crowds and the full `WindupBot` for the local character. Debug hooks are test aids, never gameplay dependencies.
 - Every feature must support keyboard/mouse and touch, portrait and landscape where practical. Declare a real minigame touch layout; `TOUCH_TBD` blocks shipping. Use safe-area-aware controls with targets at least 56 px; touch defaults to Low quality.
 - Follow `ART_DIRECTION.md`. Keep content original. Synthesise sound effects; original/licensed music is allowed for Music Box Rhythm. Record external/generated assets and licences in `public/assets/asset-manifest.json`.
+- The owner declined the parallax trial and requested 3D town concept art for Claude Code.
+  Use `docs/assets/town-concept-v1/HANDOFF.md` and its four views for visual direction; preserve
+  source anchors, interaction points, collision and working games. The drawings are not measured
+  blueprints or authorization to change mechanics. Parallax work remains on a separate local branch.
 - Keep the browser client statically deployable. Future multiplayer requires a separate authoritative server; local bots or database polling are not online multiplayer.
 
 ## Validation and reporting

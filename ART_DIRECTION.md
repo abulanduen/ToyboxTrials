@@ -47,5 +47,8 @@ Keep scenery lower in contrast and saturation than characters. Prefer restrained
   generation prompts are recorded in `docs/assets/spellbox-icon-prompts.md`. Keep names live text.
 - Concepts in `public/assets/concepts/` are references and excluded from production output. Older cream-mascot concepts do not override the current contender design.
 - Proposed generated room assets, including the dog, remain future work. Use compressed GLB, lazy loading, a Low-tier fallback and source/licence records. Keep the toy layer code-built; never copy reference-game characters, levels or audio.
-- A layered 2.5D playroom is a proposal, illustrated in `docs/assets/parallax-playroom-concept.md`.
-  Tabletop gameplay and nearby props remain 3D; no backdrop replacement is implemented.
+- The owner declined the parallax direction. Its experiment is preserved on local branch
+  `astra/parallax-trial`; this branch retains the original 3D room.
+- Current town visual references: `docs/assets/town-concept-v1/HANDOFF.md` and four accompanying
+  views. They guide 3D town polish; source anchors/collision and the character blueprint take
+  precedence over illustrative dimensions or staging. Decorative cottages are proposals.

@@ -443,6 +443,50 @@
       "license": "AI-generated project concept artwork",
       "prompt": "docs/assets/parallax-playroom-concept.md",
       "intendedUse": "Proposed layered playroom backdrop direction; excluded from production output"
+    },
+    {
+      "id": "town-concept-v1-1",
+      "file": "../../docs/assets/town-concept-v1/01-layout-overview.png",
+      "status": "reference-only",
+      "width": 1541,
+      "height": 1021,
+      "source": "OpenAI built-in image_gen; original project prompt",
+      "license": "AI-generated project reference artwork; no third-party reference artwork supplied",
+      "prompt": "docs/assets/town-concept-v1/PROMPTS.md",
+      "intendedUse": "3D town visual direction for Claude Code; not runtime artwork or a measured blueprint"
+    },
+    {
+      "id": "town-concept-v1-2",
+      "file": "../../docs/assets/town-concept-v1/02-south-overview.png",
+      "status": "reference-only",
+      "width": 1536,
+      "height": 1024,
+      "source": "OpenAI built-in image_gen; generated layout overview supplied as design reference",
+      "license": "AI-generated project reference artwork; no third-party reference artwork supplied",
+      "prompt": "docs/assets/town-concept-v1/PROMPTS.md",
+      "intendedUse": "3D town visual direction for Claude Code; not runtime artwork or a measured blueprint"
+    },
+    {
+      "id": "town-concept-v1-3",
+      "file": "../../docs/assets/town-concept-v1/03-north-reverse.png",
+      "status": "reference-only",
+      "width": 1540,
+      "height": 1021,
+      "source": "OpenAI built-in image_gen; generated layout overview supplied as design reference",
+      "license": "AI-generated project reference artwork; no third-party reference artwork supplied",
+      "prompt": "docs/assets/town-concept-v1/PROMPTS.md",
+      "intendedUse": "3D town visual direction for Claude Code; not runtime artwork or a measured blueprint"
+    },
+    {
+      "id": "town-concept-v1-4",
+      "file": "../../docs/assets/town-concept-v1/04-player-approach.png",
+      "status": "reference-only",
+      "width": 1672,
+      "height": 941,
+      "source": "OpenAI built-in image_gen; generated layout overview supplied as design reference",
+      "license": "AI-generated project reference artwork; no third-party reference artwork supplied",
+      "prompt": "docs/assets/town-concept-v1/PROMPTS.md",
+      "intendedUse": "3D town visual direction for Claude Code; not runtime artwork or a measured blueprint"
     }
   ],
   "codeGenerated": [

@@ -33,7 +33,9 @@ Visual follow-up adds eight generated ability icons to Spellbox draft/loadout/co
 and disables focus blur during all minigames at every graphics tier. Hub focus effects remain.
 Audio follow-up replaces Spellbox's repeated bells/cranks with eight short material sounds,
 limits overlapping cues and quiets distant opponents; UI clicks and footsteps are softer.
-A generated layered-playroom concept is reference only; a 2.5D backdrop is not implemented.
+The owner declined the later parallax trial, preserved separately on local `astra/parallax-trial`.
+The current direction is 3D town polish guided by `docs/assets/town-concept-v1/HANDOFF.md` and
+four reference views. No town geometry was rebuilt as part of the concept pack.
 Four games remain absent here: Claude's Find the Original, Red Light/Green Light, Wind-Up Dash
 and Music Box Rhythm. Recover/review that work before integration; do not recreate it.
 
