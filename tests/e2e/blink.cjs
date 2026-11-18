@@ -35,7 +35,7 @@ const out=path.join(__dirname,'output');fs.mkdirSync(out,{recursive:true});
     if(mobile)await click('blink-attack');else {const p=await page.evaluate(()=>window.__toybox.blink.point(14.95,15.5));await page.mouse.click(p.x,p.y);}
     await page.waitForFunction(()=>!window.__toybox.match.state().players[1].alive);assert.equal((await state()).players[0].alive,true);assert.equal((await state()).players[0].kills,1);
     await page.waitForSelector('.results');const record=await page.evaluate(()=>JSON.parse(localStorage.getItem('toybox-trials:prototype:v1')).state.records['blink-duel']);assert.equal(record.plays,1);
-    await page.waitForTimeout(800);await click('results-again');await page.waitForFunction(()=>window.__toybox.match.phase()==='playing');assert.equal((await state()).players[0].blinks,0);
+    await page.waitForTimeout(800);await click('results-again');await page.waitForFunction(()=>window.__toybox.match.phase()==='countdown');await page.evaluate(()=>window.__toybox.match.timeScale(10));await page.waitForFunction(()=>window.__toybox.match.phase()==='playing');await page.evaluate(()=>window.__toybox.match.timeScale(1));assert.equal((await state()).players[0].blinks,0);
     await page.getByRole('button',{name:'Pause',exact:true}).click();await page.waitForTimeout(800);await page.locator('.pause__actions .toy-btn').nth(1).click();await page.waitForSelector('.hud-sign');
     assert.deepEqual(errors,[]);console.log(`PASS Blink ${layout}: entry, movement, consecutive no-cooldown blinks, pause, locked wind-up, sideways cancel, one-hit elimination, results, record, restart, hub return; no console/page errors`);await page.close();
   }}finally{await browser.close();}

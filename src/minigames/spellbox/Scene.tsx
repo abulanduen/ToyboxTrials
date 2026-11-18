@@ -87,7 +87,9 @@ export function SpellboxScene({getState,localId,contestants}:MinigameSceneProps<
     return()=>{off();clear();gl.domElement.style.touchAction=old;gl.domElement.removeEventListener('pointermove',aim);gl.domElement.removeEventListener('pointerdown',down);gl.domElement.removeEventListener('pointerleave',leave);window.removeEventListener('blur',clear);};
   },[camera,gl,getState,localId,pointerRay,floorPlane]);
   useEffect(()=>matchBus.on('event',createSpellboxAudio(localId,getState)),[localId,getState]);
-  useEffect(()=>{exposeDebug({spellbox:{point:(x:number,z:number,height=.1)=>{const p=new THREE.Vector3(x,height,z).project(camera),r=gl.domElement.getBoundingClientRect();return{x:r.left+(p.x+1)*r.width/2,y:r.top+(1-p.y)*r.height/2};}}});},[camera,gl]);
+  useEffect(()=>{exposeDebug({spellbox:{point:(x:number,z:number,height=.1)=>{const p=new THREE.Vector3(x,height,z).project(camera),r=gl.domElement.getBoundingClientRect();return{x:r.left+(p.x+1)*r.width/2,y:r.top+(1-p.y)*r.height/2};},
+    /** Ground point under a screen position (test hook: checks aim against the live camera). */
+    ground:(sx:number,sy:number)=>{const r=gl.domElement.getBoundingClientRect(),ray=new THREE.Raycaster(),hit=new THREE.Vector3();ray.setFromCamera(new THREE.Vector2((sx-r.left)/r.width*2-1,1-(sy-r.top)/r.height*2),camera);return ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),0),hit)?{x:hit.x,z:hit.z}:null;}}});},[camera,gl]);
   const fit=useRef({key:'',d:60}),view=useRef({x:0,z:0,d:60,ready:false}),lookAt=useMemo(()=>new THREE.Vector3(),[]);
   useFrame((_,dt)=>{
     const cam=camera as THREE.PerspectiveCamera,aspect=cam.aspect,fov=fovFor(aspect);if(cam.fov!==fov){cam.fov=fov;cam.updateProjectionMatrix();}

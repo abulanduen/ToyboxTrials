@@ -38,20 +38,24 @@ try{for(const layout of(process.env.SPELLBOX_LAYOUTS||'desktop,portrait,landscap
   await page.waitForFunction(()=>{if(window.__toybox.match.state().shrink){window.__toybox.match.timeScale(0);return true;}return false;});
   s=await state();assert.equal(s.radius,39);assert.equal(s.shrink.to,15);assert.ok(s.shrink.startsAt-s.t>=9800);await page.waitForSelector('[data-testid="spellbox-shrink"]');
   await page.screenshot({path:path.join(out,`spellbox-${layout}-shrink-warning.png`)});
-  await aim(8,8);
+  await aim(8,8);const aimScreen=await page.evaluate(()=>window.__toybox.spellbox.point(8,8));
   await page.evaluate(()=>window.__toybox.match.timeScale(5));
   await page.waitForFunction(()=>{const s=window.__toybox.match.state();if(s.shrink&&s.t>=s.shrink.startsAt-1000){window.__toybox.match.timeScale(0);return true;}return false;});
   assert.equal((await state()).radius,39);const oldAngle=(await state()).players[0].angle;
   await page.evaluate(()=>window.__toybox.match.timeScale(10));
   await page.waitForFunction(()=>{const s=window.__toybox.match.state();if(s.radius===15&&!s.shrink){window.__toybox.match.timeScale(0);return true;}return false;});
   await page.waitForSelector('[data-testid="spellbox-shrink"]',{state:'detached'});
-  const newAngle=(await state()).players[0].angle; if(!mobile)assert.ok(Math.abs(newAngle-oldAngle)>.03,'mouse aim follows the pointer through the zoom');else assert.ok(Math.abs(newAngle-oldAngle)<.03,'touch keeps its chosen world target');
+  const newAngle=(await state()).players[0].angle;
+  // Mouse aim re-targets the ground point now under the (unmoved) cursor; touch keeps its chosen world point.
+  {const me=(await state()).players[0],dAng=(a,b)=>Math.abs(Math.atan2(Math.sin(a-b),Math.cos(a-b)));
+   if(!mobile){const g=await page.evaluate(c=>window.__toybox.spellbox.ground(c.x,c.y),aimScreen);assert.ok(g&&dAng(newAngle,Math.atan2(g.x-me.x,g.z-me.z))<.05,'mouse aim follows the pointer through the zoom');}
+   else assert.ok(dAng(newAngle,Math.atan2(8-me.x,8-me.z))<.05&&Math.abs(newAngle-oldAngle)<.03,'touch keeps its chosen world target');}
   await page.screenshot({path:path.join(out,`spellbox-${layout}-duel-size.png`)});
   await page.evaluate(()=>{const s=window.__toybox.match.state(),p=s.players[0],q=s.players[1];Object.assign(p,{x:8,z:0,vx:0,vz:0,moveX:0,moveZ:0,angle:Math.PI/2,cast:null,nextAction:0,stunnedUntil:0,cooldowns:[0,0,0]});Object.assign(q,{x:14.3,z:0,vx:0,vz:0,moveX:0,moveZ:0,damage:100,cast:null,stunnedUntil:1e9});s.projectiles=[];window.__toybox.match.timeScale(1);});
   await aim(14.8,0);if(mobile)await cast(0);else{const p=await page.evaluate(()=>window.__toybox.spellbox.point(14.8,0));await page.mouse.click(p.x,p.y);}
   await page.waitForFunction(()=>!window.__toybox.match.state().players[1].alive);assert.equal((await state()).players[0].alive,true);await page.waitForSelector('.results');
   const record=await page.evaluate(()=>JSON.parse(localStorage.getItem('toybox-trials:prototype:v1')).state.records['spellbox-showdown']);assert.equal(record.plays,1);
-  await page.waitForTimeout(800);await click('results-again');await page.waitForFunction(()=>window.__toybox.match.phase()==='playing');assert.equal((await state()).phase,'draft');assert.equal((await state()).players[0].damage,0);
+  await page.waitForTimeout(800);await click('results-again');await page.waitForFunction(()=>window.__toybox.match.phase()==='countdown');await page.evaluate(()=>window.__toybox.match.timeScale(10));await page.waitForFunction(()=>window.__toybox.match.phase()==='playing');await page.evaluate(()=>window.__toybox.match.timeScale(1));assert.equal((await state()).phase,'draft');assert.equal((await state()).players[0].damage,0);
   await page.getByRole('button',{name:'Pause',exact:true}).click();await page.waitForTimeout(800);await page.locator('.pause__actions .toy-btn').nth(1).click();await page.waitForSelector('.hud-sign');
   assert.deepEqual(errors,[]);console.log(`PASS Spellbox ${layout}: eight generated icons, three offers per button, eight-player arena, ten-second shrink warning, two-player arena, movement/aim, Q/E/R and click/touch casts, projectile damage/knockback, cooldowns, repair, ring-out, pause, results, record, restart, hub return; no console/page errors`);await page.close();
 }}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});
