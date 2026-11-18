@@ -269,9 +269,11 @@ export function SquadScene({ getState, localId }: MinigameSceneProps<SquadState>
     const building = getState()?.phase === 'build';
     const aspect = (camera as THREE.PerspectiveCamera).aspect;
     // Battles have no shop dock, so narrow (portrait) screens can frame the board tighter than the build view.
-    const distance = Math.max(building ? size.height < 500 ? 66 : 53 : 42, (building ? 31 : 23) / aspect);
+    // Phone landscape: the shop dock takes the lower third, so aim further forward to keep the reserves above it.
+    const short = size.height < 500;
+    const distance = Math.max(building ? short ? 68 : 53 : 42, (building ? 31 : 23) / aspect);
     camera.position.set(0, distance, distance * 0.58);
-    camera.lookAt(0, 0, building ? 11 : 2.5);
+    camera.lookAt(0, 0, building ? short ? 15 : 11 : 2.5);
     if (gallery) { const x = boardToWorld(gallery.x), z = boardToWorld(gallery.z); camera.position.set(x, gallery.distance, z + gallery.distance * 0.58); camera.lookAt(x, 0, z); }
     if (drag.current && !editable(getState(), localId)) cancel();
     const d = drag.current; highlight.current.visible = !!d && !d.sell;

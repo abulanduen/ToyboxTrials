@@ -127,7 +127,7 @@
   .squad-card__picture { width:44px; height:44px; }
   .squad-card__text strong { font-size:10.5px; hyphens:auto; }
   .squad-card__meta { justify-content:center; gap:1px 2px; }
-  .squad-card__rarity,.squad-card__more,.squad-hint { display:none !important; }
+  .squad-card .squad-card__rarity,.squad-card__more,.squad-hint { display:none !important; }
   .squad-owned,.squad-upgrade-label { justify-content:center; font-size:9.5px !important; }
   .squad-shop-actions { flex-direction:row; }
   .squad-passive-options { grid-template-columns:minmax(0,1fr); }
@@ -136,6 +136,10 @@
   .squad-tooltip p { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; overflow:hidden; margin:3px 0; }
   .squad-tooltip>small:last-child { display:none; }
   .squad-handbook__list { grid-template-columns:minmax(0,1fr); }
+  /* Compact filters so the list keeps most of the screen: five rarity columns, then trait symbols only (names stay as labels). */
+  .squad-filters--rarity { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); }
+  .squad-hud .squad-filters--rarity button { justify-content:center; padding:2px; font-size:10.5px; min-width:0; }
+  .squad-filters--traits { display:grid; grid-template-columns:repeat(auto-fill,minmax(56px,1fr)); }
   .squad-damage { width:210px; max-height:44%; }
 }
 /* Phone landscape: one compact row, actions side by side. */
@@ -152,7 +156,7 @@
   .squad-card__text strong { font-size:11.5px; }
   .squad-shop-actions { flex-direction:row; gap:4px; }
   .squad-hud button { font-size:12px; padding:3px; }
-  .squad-card__rarity,.squad-card__more,.squad-hint { display:none !important; }
+  .squad-card .squad-card__rarity,.squad-card__more,.squad-hint { display:none !important; }
   .squad-owned,.squad-upgrade-label { font-size:10px !important; }
   .squad-banner { padding:4px 8px; font-size:12px; }
   .squad-handbook-open { width:56px; height:56px; }
@@ -164,3 +168,12 @@
   .squad-modal__card p { margin:2px 0 6px; font-size:12px; }
   .squad-hud .squad-passive-options button { min-height:72px; padding:6px; }
 }
+/* Phones: the whole handbook scrolls as one (title and Close stay pinned), and trait filters show their symbols only. */
+@media(max-width:600px),(max-height:500px) {
+  .squad-handbook__card { display:block; overflow:auto; padding:10px; }
+  .squad-handbook__card .squad-panel__head { position:sticky; top:-10px; z-index:1; margin:-10px -10px 0; padding:8px 10px 6px; background:#F4E8CE; }
+  .squad-handbook__list { overflow:visible; }
+  .squad-hud .squad-filters--traits button { justify-content:center; padding:2px; }
+  .squad-filters--traits button span { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+}
+@media(max-height:500px) { .squad-handbook__card>p { display:none; } }

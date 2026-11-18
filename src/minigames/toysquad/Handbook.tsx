@@ -21,11 +21,11 @@ export const Handbook = memo(function Handbook({ onClose }: { onClose: () => voi
         <button ref={close} className="squad-close" data-testid="squad-handbook-close" onClick={onClose}><CloseIcon /> Close</button>
       </header>
       <p>Star the toys you want. A starred toy shows a star on its shop card whenever it is offered.</p>
-      <div className="squad-filters" aria-label="Filter by rarity">
+      <div className="squad-filters squad-filters--rarity" aria-label="Filter by rarity">
         {RARITIES.map(r => <button key={r} data-testid={`squad-filter-rarity-${r}`} aria-pressed={rarity === r} style={{ '--rarity': RARITY_COLOURS[r] } as CSSProperties} onClick={() => setRarity(rarity === r ? null : r)}>{r}</button>)}
       </div>
-      <div className="squad-filters" aria-label="Filter by trait">
-        {TRAITS.map(t => <button key={t} data-testid={`squad-filter-trait-${t}`} aria-pressed={trait === t} onClick={() => setTrait(trait === t ? null : t)}><TraitIcon trait={t} size={22} />{t}</button>)}
+      <div className="squad-filters squad-filters--traits" aria-label="Filter by trait">
+        {TRAITS.map(t => <button key={t} data-testid={`squad-filter-trait-${t}`} aria-pressed={trait === t} onClick={() => setTrait(trait === t ? null : t)}><TraitIcon trait={t} size={22} /><span>{t}</span></button>)}
       </div>
       <ul className="squad-handbook__list">
         {ids.map(id => {
