@@ -1,13 +1,13 @@
 /**
  * The reference card ("BALDWYN"), drawn on its own small canvas on top of the game canvas.
  *
- * Why not in the 3D scene: the scene's post-processing is focused on the crowd (Balanced tilt-shift
- * blurs everything away from the middle band of the screen, High depth of field blurs anything
- * near the camera), and the Low tier renders the whole scene at ≤ 1.25× device pixels without
- * antialiasing. A card drawn inside the scene was therefore blurred or soft on every tier. Here
- * the figure gets its own antialiased canvas at the screen's full pixel ratio, with no post
- * effects, so it is crisp on desktops and high-DPR phones alike. The card's frame and name are
- * plain DOM, so they are as sharp as the HUD text.
+ * Why not in the 3D scene: the card used to be drawn there, 40 cm in front of the camera, so the
+ * hub's focus effects (Balanced tilt-shift, High depth of field, both focused on the crowd) blurred
+ * it, and the Low tier — the default on phones — renders the whole scene at ≤ 1.25× device pixels
+ * without antialiasing, which looks soft on a 3× phone screen. (Minigames now skip the focus
+ * effects anyway, see PlayroomScene.) Here the figure gets its own antialiased canvas at the
+ * screen's full pixel ratio (up to 3×) with no post effects, so it is crisp on every tier. The
+ * card's frame and name are plain DOM, so they are as sharp as the HUD text.
  *
  * Same model, same light: the figure is built from the crowd's own parts table (figure.ts), lit by
  * copies of the room's lights and environment, tone-mapped like the main canvas, and seen from the

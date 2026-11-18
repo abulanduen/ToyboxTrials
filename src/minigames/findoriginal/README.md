@@ -42,8 +42,9 @@ part and hides the parts nobody in the round has; the card builds a stand-alone 
 `card.ts` draws the card on its own small canvas over the game canvas (DOM frame and name, WebGL figure). The
 figure gets the screen's full pixel ratio (up to 3×), antialiasing and no post-processing, with copies of the
 room's lights and environment and the crowd camera's elevation. It used to be part of the 3D scene, where the
-Balanced tier's tilt-shift and the High tier's depth of field (focused on the crowd) blurred it, and the Low tier
-rendered it at ≤ 1.25× without antialiasing, which looks soft on phones. Once the card arrives it is placed on
+Balanced tier's tilt-shift and the High tier's depth of field (focused on the crowd) blurred it (minigames now skip
+those effects), and the Low tier, the phone default, rendered it at ≤ 1.25× without antialiasing, which looks
+soft on a 3× screen. Once the card arrives it is placed on
 whole device pixels with no CSS scaling, so it is not resampled. If PlayroomScene's lights or `<Environment>`
 change, update `card.ts` to match.
 
