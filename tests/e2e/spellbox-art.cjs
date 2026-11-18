@@ -14,7 +14,7 @@ await page.getByTestId('spellbox-ready').click();await page.evaluate(()=>window.
 // DOM/host state can advance before a software-rendered canvas has presented the new camera.
 await page.waitForFunction(()=>{const p=window.__toybox.spellbox?.point(0,0);return p&&Math.abs(p.x-innerWidth/2)<5&&Math.abs(p.y-innerHeight/2)<30;});
 await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
-await page.waitForSelector('.spellbox-casts');await page.screenshot({path:path.join(out,`spellbox-${quality}-sharp.png`)});
+await page.waitForSelector('.spellbox-casts');await page.locator('.spellbox-casts img').evaluateAll(images=>Promise.all(images.map(img=>img.decode())));await page.screenshot({path:path.join(out,`spellbox-${quality}-sharp.png`)});
 await page.getByRole('button',{name:'Pause',exact:true}).click();await page.waitForTimeout(800);await page.locator('.pause__actions .toy-btn').nth(1).click();await page.waitForSelector('.hud-sign');await page.waitForFunction(()=>window.__toybox.postprocessing.state().focusBlurMounted);assert.equal((await effects()).focusBlur,true);
 assert.deepEqual(errors,[]);await page.close();console.log(`PASS ${quality}: icons decode, minigame focus blur unmounted, hub blur restored; no console/page errors`);}
 }finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

@@ -92,7 +92,8 @@ function Effects({ quality, sharp }: { quality: Quality; sharp: boolean }) {
   useEffect(() => { exposeDebug({ postprocessing: { state: () => ({ quality, focusBlur: !sharp && q.post !== 'none', focusBlurMounted: !!dofRef.current || !!tiltRef.current }) } }); }, [quality, sharp, q.post]);
   if (q.post === 'none') return null;
   return (
-    <EffectComposer multisampling={q.aa ? 4 : 0} enableNormalPass={false}>
+    // Recreate the pass chain when removing DOF so High never keeps the previous scene buffer.
+    <EffectComposer key={sharp ? 'minigame' : 'hub'} multisampling={q.aa ? 4 : 0} enableNormalPass={false}>
       {!sharp && (q.post === 'dof' ? (
         <DepthOfField ref={dofRef as never} target={target} worldFocusRange={38} bokehScale={4.5} resolutionScale={0.5} />
       ) : (
