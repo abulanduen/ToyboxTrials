@@ -22,6 +22,13 @@ them. The completed/next sections below describe only the older local clone.
 
 ## Completed first passes
 
+**Blink Duel branch update:** `astra/blink-duel` adds the sixth local playable game: no-cooldown
+blinks, one-hit sword eliminations, striped wind-up cones, simultaneous hits, solid living bodies,
+bots, keyboard/mouse/touch and local tournament/record integration. See its module README for
+provisional range/timing, cancellation and tie rules. Five catalogue games still lack local modules:
+Claude's Find the Original, Red Light/Green Light, Wind-Up Dash and Music Box Rhythm work, plus
+Spellbox Showdown. Recover/review Claude's work before integration; do not recreate it.
+
 **Toy Squad branch update:** `astra/toy-squad` adds the fifth local playable game, casual-only.
 It now has ten rounds, a 62-unit five-rarity shop using the owner’s exact level odds, paid rerolls,
 two-copy merges up to three stars, eight reserves, level-based 3–10 board slots, and passive
@@ -34,13 +41,13 @@ online/ranked integration remains future work.
 Owner UX revision: pairs merge automatically; reserves sit below the player board; hover shows
 details; Q sells hovered/selected toys, R rerolls, E readies. Gold rings preview shop recipients.
 See `src/minigames/toysquad/README.md` and `CATALOGUE.md` for mechanics and provisional balance.
-This branch includes Midnight/Inferno; six other local catalogue entries lack modules, including
+At that Toy Squad revision, six other local catalogue entries lacked modules, including
 work the owner reports Claude is handling separately.
 
 **Midnight branch update:** `astra/midnight-hunger` adds the fourth local playable minigame:
 night/day energy rules, N−1 battery targets, shelters, bots, keyboard/touch controls and tournament
 integration. Balance/interpretations are in `src/minigames/midnight/README.md`. It is based on the
-Inferno branch; merge that work first. Seven catalogue entries remain planned in this clone;
+Inferno branch; merge that work first. At that revision seven catalogue entries remained planned;
 Claude's separate work is still described in the handoff section above.
 
 Owner revision: Midnight now has solid player/target collision, pushes with opposite-input
@@ -55,17 +62,19 @@ and review those separately. This branch has not been merged or deployed.
 - **M1–M3:** art direction, procedural tabletop/room, wind-up character, third-person exploration, collision, interactions/secrets, synthesised sound, menu, Workshop, settings and local persistence; keyboard/mouse and touch controls.
 - **M4:** modular minigame host, intro/countdown/pause/results, local records, bot opponents, seeded Blitz (3), Normal (5), Treasure (8) tournaments, standings/final results and local history.
 - **Copycat Conductor:** seeded growing sequences, four ASJK/touch instruments, elimination, solo/bot play and rules tests. Preserve its working functionality.
-- **M5 partial:** Jack-in-the-Box rules, category bank/matching, bots, scene/HUD and tournament inclusion. Nine catalogue entries remain unimplemented.
+- **Historical M5 baseline:** Jack-in-the-Box rules, category bank/matching, bots, scene/HUD and tournament inclusion. At that point nine catalogue entries remained unimplemented.
 
 ## Current milestone and priorities
 
-**M5: broaden the local minigame foundation; Find the Original is next in the existing roadmap.** No new features are authorized by this documentation task.
+**Current milestone: integrate and playtest the six local games; recover Claude's separate work.**
+Spellbox Showdown is the remaining unassigned game; implement it only when the owner requests it.
 
-1. Reconcile the owner's separately supplied authoritative specification with existing design amendments. It has not yet been provided in this chat.
-2. Establish a fresh baseline for Copycat, Jack-in-the-Box, tournaments, menu/Workshop, persistence and mobile controls before future code changes.
-3. Complete Find the Original as one independent module with rules, bots, readable touch interaction, results integration and meaningful tests.
-4. Continue **M6:** Red Light, Green Light and Wind-Up Dash, one complete game at a time.
-5. **M7:** real-device performance, mobile usability, audio mix and accessibility. Work from measurements, not historical headless FPS.
+1. Recover and review Claude's games and room pass, including uncommitted/untracked cloud work.
+2. Integrate reviewed Astra/Claude branches into main with regression checks for the existing games,
+   tournament flow, mobile controls and saved data.
+3. Reconcile the separately supplied authoritative specification when available; do not invent it.
+4. Human playtesting for Blink combat feel and Toy Squad balance, followed by measured fixes.
+5. Real-device performance, mobile usability, audio mix and accessibility; then the online proof of concept.
 
 ## Future stages
 
@@ -75,7 +84,7 @@ and review those separately. This branch has not been merged or deployed.
 | M9 | Friends rooms/codes, public casual, configurable Custom Party, guest nicknames and bot fill |
 | M10 | Ranked ratings, history and leaderboards. Blitz/Normal/Treasure must have independent ratings; older plan stages launch one ladder first as population allows |
 | M11 | Emotes, inspection, parties, lobby instancing and interest management; grow toward the unverified 500-player lobby-server goal |
-| Remaining games | Music Box Rhythm, Inferno Escape, Midnight Hunger, Toy Squad, Blink Duel, Spellbox Showdown; music rights and combat bots require additional work |
+| Remaining local games | Find the Original, Red Light/Green Light, Wind-Up Dash, Music Box Rhythm (Claude's separate work, unverified here), and Spellbox Showdown |
 | Optional room polish | Room dog pending asset/delivery; denser village, evening lighting and other visual ideas remain proposals |
 
 ## Decisions and information still missing
@@ -83,7 +92,7 @@ and review those separately. This branch has not been merged or deployed.
 - Separate authoritative conversation/specification, including any changes to the existing 11-game catalogue. Do not reconstruct missing conversation history from guesses.
 - Confirm launch sequencing for the three independent ranked modes: older amendment A3 launches one ladder first; the current request specifies three independent modes without deciding release timing.
 - Rating algorithm, first ranked format, ranked identity/guest policy, ranked bot policy and disconnect/reconnect rules. The older plan proposes no ranked bots; that is not implemented enforcement.
-- Final balance, durations and tie/forfeit policies; Red Light penalty choice; Toy Squad victory condition/round count; final eligibility (Toy Squad is currently excluded from tournaments/ranked in metadata).
+- Final balance, durations and tie/forfeit policies; Red Light penalty choice; Toy Squad scoring/eligibility (its ten rounds are owner-confirmed; it is currently excluded from tournaments/ranked).
 - Server provider/cost, networking protocol and tested lobby capacity. Multiplayer proof game remains to be chosen between the existing Copycat scope and Jack's candidacy.
 - Music source/licensing, room dog asset, hardware/device validation and any external competition requirements.
 

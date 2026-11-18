@@ -16,9 +16,11 @@ game-design conversation, which has not yet been provided in this chat. Do not i
 Current owner instructions take precedence over historical amendments: preserve the working Copycat
 Conductor implementation. Amendment A1 records the earlier Base44 decision, not permission to rewrite it now.
 
-**Implemented in source:** explorable 3D hub, menu, Workshop, local persistence, Copycat Conductor,
-Jack-in-the-Box, practice/bots and local unranked Blitz/Normal/Treasure tournaments. **Not implemented:**
-the other nine games, online multiplayer, matchmaking, ranked ratings or online leaderboards.
+**Implemented in this branch:** explorable 3D hub, menu, Workshop, local persistence, Copycat
+Conductor, Jack-in-the-Box, Inferno Escape, Midnight Hunger, Toy Squad and Blink Duel, with local
+practice/bots. Local unranked Blitz/Normal/Treasure tournaments include all except Toy Squad.
+**Not implemented here:** the other five games (including Claude's separate work), online
+multiplayer, matchmaking, ranked ratings or online leaderboards.
 Registry eligibility flags describe intended use, not available online/ranked modes.
 
 The planned ranked modes have three independent ratings: **Blitz (3 rounds), Normal (5 rounds),
@@ -231,6 +233,12 @@ Each contender's energy drains continuously, and play alternates between two pha
 
 **Toybox:** wind-up ninja toys with oversized toy swords, and blinks shown as a spring-pop burst.
 **Tech:** server-authoritative hits, with blink destinations validated inside the arena.
+**Implemented local first pass on `astra/blink-duel`:** seeded 2–8 player rules, bots, sword
+telegraphs, keyboard/mouse and touch, records and local tournament integration. Space blinks;
+J/left-click swings; WASD/arrows move; mouse/tap aims. Blink cancels wind-up and may cross toys,
+but its endpoint must be free and inside the arena. Simultaneous hits resolve together.
+Wind-up/recovery/range, the 90-second limit and tie policy are provisional; see
+`src/minigames/blink/README.md`. Online authority and real PvP remain future work.
 
 ### 07 · Wind-Up Dash (Racing / Obstacles · 2–8)
 - A narrow course of tight passages, moving hazards, timing obstacles, and traps that slow, stun or reset.

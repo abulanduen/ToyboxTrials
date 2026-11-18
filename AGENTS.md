@@ -24,6 +24,9 @@ Applies to Codex, Claude Code and other contributors. Read this file before edit
   cloud worktrees. Do not recreate or overwrite that work; recover and review it before integration.
   Toy Squad now has 62 individual passive/spell pairs and 11 formation traits. Preserve kit
   coverage, deterministic mana/status resolution and the separate run-wide passive choices.
+  Blink Duel is authorized on `astra/blink-duel`, based on Toy Squad. Preserve no-cooldown
+  blinking, one-hit eliminations and clear wind-up cues. Balance/cancel/tie choices are provisional
+  in its module README. Claude's assigned games remain separate.
 
 ## Coding conventions
 

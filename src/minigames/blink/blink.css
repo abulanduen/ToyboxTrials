@@ -1,0 +1,23 @@
+.blink-hud { position:absolute; inset:0; pointer-events:none; color:#2B2433; }
+.blink-banner { position:absolute; top:max(10px,env(safe-area-inset-top)); left:50%; transform:translateX(-50%); width:min(460px,calc(100% - 130px)); padding:8px 12px; background:#F4E8CE; border:3px solid #574D69; border-radius:10px; text-align:center; box-shadow:0 3px 0 #C9A57A; }
+.blink-banner strong,.blink-banner span,.blink-banner small { display:block; }
+.blink-banner strong { font:600 16px Fredoka,sans-serif; }
+.blink-banner span { font-size:13px; margin:3px 0; }
+.blink-banner small { font-size:11px; }
+.blink-charge { height:6px; margin:5px 0; background:#C9A57A; border-radius:5px; overflow:hidden; }
+.blink-charge>div { height:100%; background:#E76B62; }
+.blink-roster { position:absolute; top:140px; left:max(10px,env(safe-area-inset-left)); display:flex; flex-direction:column; gap:3px; }
+.blink-roster span { background:#F4E8CE; padding:3px 7px; border-radius:5px; font-size:11px; }
+.blink-roster .out { opacity:.5; text-decoration:line-through; }
+.blink-move { position:absolute; bottom:max(14px,env(safe-area-inset-bottom)); left:max(12px,env(safe-area-inset-left)); text-align:center; }
+.blink-move>div { display:flex; gap:4px; margin-top:4px; }
+.blink-hud button { pointer-events:auto; min-width:56px; min-height:56px; border:3px solid #574D69; border-radius:10px; color:#2B2433; background:#F4E8CE; font:600 14px Fredoka,sans-serif; touch-action:none; user-select:none; box-shadow:0 3px 0 #574D69; }
+.blink-hud button:focus-visible { outline:3px solid #6BA7C8; outline-offset:3px; }
+.blink-hud button:disabled { opacity:.55; box-shadow:none; }
+.blink-actions { position:absolute; bottom:max(14px,env(safe-area-inset-bottom)); right:max(12px,env(safe-area-inset-right)); display:flex; flex-direction:column; gap:7px; }
+.blink-actions button { width:112px; min-height:62px; background:#EFAE45; }
+.blink-actions button:first-child { background:#E76B62; }
+.blink-actions small { display:block; font:11px Nunito,sans-serif; }
+.blink-hint { position:absolute; left:50%; transform:translateX(-50%); bottom:18px; max-width:390px; text-align:center; font-size:12px; padding:6px 10px; background:#F4E8CE; border-radius:8px; }
+@media(max-width:650px) { .blink-banner strong { font-size:12px; } .blink-banner { padding:6px; } .blink-banner span { font-size:11px; } .blink-roster { top:155px; } .blink-hint { bottom:155px; width:calc(100% - 30px); font-size:11px; } }
+@media(max-height:500px) { .blink-banner { padding:4px 8px; } .blink-banner small { display:none; } .blink-roster { top:88px; } .blink-hint { max-width:360px; bottom:14px; font-size:10px; } }

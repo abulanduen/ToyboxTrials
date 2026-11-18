@@ -124,7 +124,7 @@ export const MINIGAMES: MinigameDefinition[] = [
     tieBreak: 'Finish time, then distance',
     controls: [],
   }),
-  planned({
+  {
     id: 'blink-duel',
     title: 'Blink Duel',
     tagline: 'Teleport, bait, strike.',
@@ -136,8 +136,12 @@ export const MINIGAMES: MinigameDefinition[] = [
     eligibility: { tournament: true, ranked: true, casual: true },
     scoring: 'elimination-order',
     tieBreak: 'Out later ranks higher',
-    controls: [],
-  }),
+    controls: [{ keys: 'WASD / arrows', action: 'Move and face; mouse / tap arena aims' }, { keys: 'Space', action: 'Blink forward instantly; no cooldown. Cancels your wind-up.' }, { keys: 'J / left click', action: 'Commit a telegraphed sword swing; one hit eliminates' }],
+    inputs: ['keyboard','mouse','touch'], bots: 'available', recordUnit: 'seconds',
+    touch: { movement: 'none', look: 'none', orientation: 'any', buttons: [{id:'forward',label:'Up',hold:true},{id:'left',label:'Left',hold:true},{id:'back',label:'Down',hold:true},{id:'right',label:'Right',hold:true},{id:'slot1',label:'Blink'},{id:'slot2',label:'Swing'}],
+      notes: 'Hold direction pads to move/face, or tap the arena to aim. Tap Blink repeatedly with no cooldown; Swing has a visible 0.95-second wind-up. Blinking cancels it. Last toy standing wins; simultaneous eliminations and timeout survivors tie.' },
+    status: 'playable', load: () => import('./blink').then(m => m.default),
+  },
   planned({
     id: 'wind-up-dash',
     title: 'Wind-Up Dash',

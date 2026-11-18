@@ -4,6 +4,18 @@ Source audit: 18 November 2026, starting commit `59744b7`. Source-inspected, not
 
 ## Implemented client
 
+Blink Duel: sixth playable local module on `astra/blink-duel`. Pure rules use a 10 ms internal
+quantum, validated blink endpoints, solid living bodies and exact circle/sector hit tests.
+Telegraphed swings commit origin/facing, allow blink cancellation, and resolve simultaneous hits
+from one living snapshot. Seeded delayed bots react to visible attacks. Shared actions plus a
+bounded pointer queue drive keyboard/mouse/touch; R3F reads mutable simulation state for cones,
+toy swords and bounded blink/strike effects. Existing host, records and tournament scoring remain
+unchanged. This is local simulation, not an authoritative online server. Details and provisional
+balance are in `src/minigames/blink/README.md`.
+Validation: 112 unit tests and production build pass; desktop/portrait/landscape Blink browser
+flows and the existing Copycat/Jack plus seeded Blink/Jack/Copycat Blitz regressions pass without
+console/page errors. Real-device performance, combat balance and online latency remain unverified.
+
 Toy Squad: fifth local playable module, casual-only. The owner’s ten-round format uses a
 62-unit weighted shop, reserves, two-copy star merges, level-based deployment limits and
 passive offers on rounds 3/6/9. `catalogue.ts` stores exact odds/unit/passive data; `rules.ts`
@@ -18,7 +30,7 @@ Toy Squad purchases now auto-merge pairs and chain to three stars, preferring de
 Merge previews and capacity checks share pure rules helpers. Reserves render in a physical row
 below the board and use the same validated move/drop command as deployment. Q/R/E use shared
 action bindings; an ephemeral UI store coordinates hover/selection, details and upgrade rings.
-Current validation: 98 unit tests and production build pass; ten-round desktop/portrait/landscape
+Prior Toy Squad revision validation: 98 unit tests and production build passed; ten-round desktop/portrait/landscape
 checks pass automatic merges, hover kits, Q/R/E, reserve drags/swaps, spells, records and restart.
 No host, storage-key/schema, multiplayer or ranked-system changes are needed. Exact design and
 provisional economy/balance are in the module README and CATALOGUE.md.
