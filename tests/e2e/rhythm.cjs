@@ -1,5 +1,5 @@
 /* Music Box Rhythm — desktop (keyboard) and an emulated phone (real touch), portrait + landscape.
-   Run: npx vite preview --port 4178 &  node tests/e2e/rhythm.cjs
+   Run: npm run preview -- --port 4173 &  node tests/e2e/rhythm.cjs
    The game is opened with the ?debug hook match.practice(id).
 
    Timing: the match runs slowed down (timeScale) so presses can be aimed at a note from outside
@@ -11,7 +11,7 @@ const path = require('path');
 const fs = require('fs');
 const OUT = process.env.OUT_DIR || path.join(__dirname, 'output');
 fs.mkdirSync(OUT, { recursive: true });
-const BASE = process.env.BASE_URL || 'http://localhost:4178/';
+const BASE = process.env.BASE_URL || 'http://localhost:4173/';
 const ARGS = ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'];
 const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
 /** Slow enough to aim inside the ±45 ms Perfect window even when a frame is capped at 100 ms. */

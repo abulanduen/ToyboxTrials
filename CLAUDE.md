@@ -81,5 +81,6 @@ node tests/e2e/movement.cjs     # Red Light, Green Light + Wind-Up Dash, desktop
 node tests/e2e/inferno.cjs      # Inferno Escape, desktop + phone portrait
 node tests/e2e/midnight.cjs     # Midnight Hunger, desktop + phone portrait/landscape
 node tests/e2e/toysquad.cjs     # Toy Squad, desktop + phone portrait/landscape
+node tests/e2e/rhythm.cjs       # Music Box Rhythm, desktop + phone portrait/landscape (slow: ONLY=desktop|portrait|landscape)
 npm test                        # vitest unit tests for rules cores, scoring, tournament selection
 ```
