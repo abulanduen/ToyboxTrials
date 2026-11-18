@@ -48,4 +48,11 @@ export function createToyAnim(): ToyAnim {
 
 export const INTERACT_DURATION = 0.75;
 export const ELIM_DURATION = 2.4;
+/**
+ * Where a minigame holds a knocked-out toy: lying on its back, before the hub's shrink-to-respawn
+ * (which ends at zero height and would break lighting if it were held there).
+ */
+export const ELIM_REST = 2.0;
+/** Elimination clock for a toy that stays out (minigames): counts up, then rests at ELIM_REST. */
+export const restingElimT = (t: number) => Math.min(ELIM_REST, Math.max(0, t));
 export const RESPAWN_DURATION = 0.6;

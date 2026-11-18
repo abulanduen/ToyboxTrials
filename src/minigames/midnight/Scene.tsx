@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { PALETTE } from '../../game/palette';
 import { sfx } from '../../game/audio';
 import { WindupBot } from '../../character/WindupBot';
-import { createToyAnim } from '../../character/anim';
+import { createToyAnim, restingElimT } from '../../character/anim';
 import { MiniContender, createMiniAnim } from '../../character/MiniContender';
 import { matchBus } from '../session';
 import type { Contestant, MinigameSceneProps } from '../types';
@@ -24,7 +24,7 @@ function Toy({ c, getState }: { c: Contestant; getState: () => HungerState | nul
     if (moved) mini.current.hopT = 0;
     full.current.speed = moved ? 8 : full.current.speed * Math.exp(-dt * 12);
     full.current.stepPhase += full.current.speed * dt;
-    full.current.elimT = p.alive ? -1 : Math.max(0, full.current.elimT) + dt;
+    full.current.elimT = p.alive ? -1 : restingElimT(Math.max(0, full.current.elimT) + dt);
     if (!p.alive && mini.current.outT < 0) mini.current.outT = 0;
     previous.current = { x: p.x, z: p.z };
     root.current.position.set(coord(p.x), 0.2, coord(p.z));

@@ -173,7 +173,7 @@ export function WindupBot({ anim, paint, hat = 'none', keySkin = 'classic' }: Pr
       if (e > ELIM_DURATION - 0.25) {
         // fade-out scale before respawn
         const q = clamp((ELIM_DURATION - e) / 0.25, 0, 1);
-        scaleY *= q;
+        scaleY *= Math.max(q, 0.01); // never exactly flat: a zero scale breaks the lighting (NaN → black screen through bloom)
       }
     }
 

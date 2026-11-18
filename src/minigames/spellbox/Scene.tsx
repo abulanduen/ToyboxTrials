@@ -7,7 +7,7 @@ import { unlockAudio } from '../../game/audio';
 import { createSpellboxAudio } from './audio';
 import { exposeDebug } from '../../game/debug';
 import { WindupBot } from '../../character/WindupBot';
-import { createToyAnim } from '../../character/anim';
+import { createToyAnim, restingElimT } from '../../character/anim';
 import { MiniContender, createMiniAnim } from '../../character/MiniContender';
 import { useMatch, matchBus } from '../session';
 import type { Contestant, MinigameSceneProps } from '../types';
@@ -24,7 +24,7 @@ function MageToy({c,getState}:{c:Contestant;getState:()=>SpellboxState|null}){
     const s=getState(),p=s?.kind==='spellbox-showdown'?s.players.find(p=>p.id===c.id):undefined;
     root.current.visible=!!p;zone.current.visible=false;if(!p||!s)return;
     const dt=Math.max(.01,(s.t-previous.current.t)/1000),moved=Math.hypot(p.x-previous.current.x,p.z-previous.current.z);
-    full.current.speed=p.alive?Math.min(8,moved/dt):0;full.current.stepPhase+=full.current.speed*dt;full.current.elimT=p.alive?-1:(s.t-p.outAt)/1000;mini.current.outT=p.alive?-1:(s.t-p.outAt)/1000;
+    full.current.speed=p.alive?Math.min(8,moved/dt):0;full.current.stepPhase+=full.current.speed*dt;full.current.elimT=p.alive?-1:restingElimT((s.t-p.outAt)/1000);mini.current.outT=p.alive?-1:(s.t-p.outAt)/1000;
     previous.current={x:p.x,z:p.z,t:s.t};root.current.position.set(p.x,p.alive?.18:.18-Math.min(8,(s.t-p.outAt)/1000*9),p.z);root.current.rotation.y=p.cast?.angle??p.angle;
     shield.current.visible=p.alive&&p.shieldUntil>s.t;
     (halo.current.material as THREE.MeshBasicMaterial).color.set(p.lastHit>=0&&s.t-p.lastHit<150?PALETTE.white:p.damage>100?PALETTE.coral:p.damage>40?PALETTE.honey:c.isLocal?PALETTE.toyBlue:PALETTE.cream);

@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { PALETTE } from '../../game/palette';
 import { sfx } from '../../game/audio';
 import { WindupBot } from '../../character/WindupBot';
-import { createToyAnim } from '../../character/anim';
+import { createToyAnim, restingElimT } from '../../character/anim';
 import { MiniContender, createMiniAnim } from '../../character/MiniContender';
 import { matchBus } from '../session';
 import type { Contestant, MinigameSceneProps } from '../types';
@@ -42,7 +42,7 @@ function Toy({ c, getState }: { c: Contestant; getState: () => InfernoState | nu
     if (!p) return;
     root.current.position.set(coord(p.x), 0.2, coord(p.z));
     root.current.rotation.y = Math.PI - p.facing * Math.PI / 2;
-    if (!p.alive) { full.current.elimT = Math.max(0, full.current.elimT) + dt; if (mini.current.outT < 0) mini.current.outT = 0; }
+    if (!p.alive) { full.current.elimT = restingElimT(Math.max(0, full.current.elimT) + dt); if (mini.current.outT < 0) mini.current.outT = 0; }
     else { full.current.elimT = -1; mini.current.outT = -1; }
     marker.current.visible = c.isLocal && p.alive;
   });

@@ -5,7 +5,7 @@ import { PALETTE } from '../../game/palette';
 import { sfx, unlockAudio } from '../../game/audio';
 import { exposeDebug } from '../../game/debug';
 import { WindupBot } from '../../character/WindupBot';
-import { createToyAnim } from '../../character/anim';
+import { createToyAnim, restingElimT } from '../../character/anim';
 import { MiniContender, createMiniAnim } from '../../character/MiniContender';
 import type { Contestant, MinigameSceneProps } from '../types';
 import { matchBus, useMatch } from '../session';
@@ -36,7 +36,7 @@ function Toy({c,getState}:{c:Contestant;getState:()=>BlinkState|null}) {
     if(!p||!s)return;
     const dt=Math.max(0,(s.t-previous.current.t)/1000),distance=Math.hypot(p.x-previous.current.x,p.z-previous.current.z);
     full.current.speed=p.alive&&!p.attack?Math.min(8,distance/Math.max(.01,dt)):0;full.current.stepPhase+=full.current.speed*dt;
-    full.current.elimT=p.alive?-1:(s.t-p.outAt)/1000;mini.current.outT=p.alive?-1:(s.t-p.outAt)/1000;
+    full.current.elimT=p.alive?-1:restingElimT((s.t-p.outAt)/1000);mini.current.outT=p.alive?-1:(s.t-p.outAt)/1000;
     previous.current={x:p.x,z:p.z,t:s.t};root.current.position.set(p.x,.18,p.z);root.current.rotation.y=p.angle;
     const charge=p.attack?(s.t-p.attack.start)/s.config.windupMs:0;
     blade.current.visible=p.alive;
