@@ -58,7 +58,7 @@ The build output in `dist/` is a static folder with relative paths. Host it anyw
 Things to find in the Playroom:
 - **Copycat Conductor gate** (honey arch): play Copycat Conductor solo or against bots.
 - **Jack-in-the-Box gate** (coral arch): a hot-potato word game against 1–7 bots. Each round has a category ("Name a fruit"). Type an answer nobody has said yet to crank the box and pass it on. When the jack pops, whoever is holding it is out.
-- **Tournament Pavilion** (striped tent): run a Blitz (3), Normal (5) or Treasure (8) tournament against bots.
+- **Tournament Pavilion** (striped tent): run a Blitz (3), Normal (5) or Treasure (8) tournament against bots, or practise any single trial, including **Find the Original** (spot the real Baldwyn in a crowd of look-alikes).
 - **Workshop** (pencil case): opens the Workshop screen. Name your contender and pick a paint job, hat and key skin. Secrets unlock extra items.
 - **Scoreboard** (domino wall): tracks secrets.
 - **Four hidden secrets.** Look behind the pavilion, near the fountain, behind the workshop, and on top of the book tower (jump: domino → book → eraser → block).
