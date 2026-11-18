@@ -105,7 +105,7 @@ interface Head {
 }
 const HEADS: Record<string, Head> = {
   round: { y: 3.05, eyeX: 0.4, eyeY: 3.22, eyeZ: 0.88, faceZ: 0.98, noseY: 2.98, noseZ: 1.02, tacheY: 2.68, tacheZ: 0.9, hatY: 3.78 },
-  square: { y: 3.08, eyeX: 0.42, eyeY: 3.27, eyeZ: 0.86, faceZ: 0.86, noseY: 3.0, noseZ: 0.93, tacheY: 2.7, tacheZ: 0.9, hatY: 3.8 },
+  square: { y: 3.08, eyeX: 0.42, eyeY: 3.27, eyeZ: 0.86, faceZ: 0.86, noseY: 3.0, noseZ: 0.93, tacheY: 2.7, tacheZ: 0.9, hatY: 3.95 },
   tall: { y: 3.18, eyeX: 0.34, eyeY: 3.38, eyeZ: 0.88, faceZ: 0.94, noseY: 3.08, noseZ: 0.99, tacheY: 2.76, tacheZ: 0.88, hatY: 4.1 },
 };
 const head = (look: Look) => HEADS[part(look, 'head')];
