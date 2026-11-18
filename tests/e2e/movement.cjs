@@ -18,7 +18,7 @@ const ARGS = ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swif
 const SEED = () => {
   if (!sessionStorage.getItem('seeded')) {
     sessionStorage.setItem('seeded', '1');
-    localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { quality: 'low' }, version: 0 }));
+    localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { quality: 'low', tutorials: false }, version: 0 }));
   }
 };
 

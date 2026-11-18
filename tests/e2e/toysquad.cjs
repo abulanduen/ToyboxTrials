@@ -9,7 +9,7 @@ const out = path.join(__dirname,'output'); fs.mkdirSync(out,{recursive:true});
       const mobile = layout !== 'desktop', viewport = layout === 'portrait' ? {width:390,height:844} : layout === 'landscape' ? {width:844,height:390} : {width:1280,height:800};
       const page = await browser.newPage({viewport,hasTouch:mobile,isMobile:mobile}); page.setDefaultTimeout(120000);
       const errors = []; page.on('pageerror',e=>errors.push(e.message)); page.on('console',m=>{if(m.type()==='error') errors.push(m.text());});
-      await page.addInitScript(()=>localStorage.setItem('toybox-trials:prototype:v1',JSON.stringify({state:{quality:'low'},version:0})));
+      await page.addInitScript(()=>localStorage.setItem('toybox-trials:prototype:v1',JSON.stringify({state:{quality:'low',tutorials:false},version:0})));
       const state = () => page.evaluate(()=>window.__toybox.match.state());
       const click = async id => {const b=page.getByTestId(id); if(mobile) await b.tap(); else await b.click();};
       const drag = async (from,toX,toZ) => {

@@ -12,7 +12,7 @@ fs.mkdirSync(out, { recursive: true });
       const page = await browser.newPage({ viewport: mobile ? { width: 390, height: 844 } : { width: 1280, height: 800 }, hasTouch: mobile, isMobile: mobile });
       page.setDefaultTimeout(60000);
       const errors = []; page.on('pageerror', e => errors.push(e.message));
-      await page.addInitScript(() => localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { quality: 'low' }, version: 0 })));
+      await page.addInitScript(() => localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { quality: 'low', tutorials: false }, version: 0 })));
       await page.goto((process.env.BASE_URL || 'http://localhost:4173/') + '?debug#play');
       await page.waitForSelector('.loading', { state: 'detached' });
       await page.evaluate(() => window.__toybox.teleport(0, -12.6, Math.PI));
