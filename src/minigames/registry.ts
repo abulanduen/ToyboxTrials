@@ -8,7 +8,8 @@ import type { MinigameDefinition, MinigameId, TouchLayout } from './types';
 /** Placeholder for planned games: must be replaced with a real layout before a game ships. */
 const TOUCH_TBD: TouchLayout = { movement: 'none', look: 'none', buttons: [], orientation: 'any', notes: 'To be designed with the minigame.' };
 
-const planned = (d: Omit<MinigameDefinition, 'status' | 'touch' | 'inputs' | 'bots' | 'recordUnit'> & { touch?: TouchLayout }): MinigameDefinition => ({
+/** For catalogue entries that are announced but not built yet (none at the moment: all eleven are playable). */
+export const planned = (d: Omit<MinigameDefinition, 'status' | 'touch' | 'inputs' | 'bots' | 'recordUnit'> & { touch?: TouchLayout }): MinigameDefinition => ({
   touch: TOUCH_TBD,
   recordUnit: 'points',
   inputs: ['keyboard', 'mouse', 'touch'],
@@ -158,7 +159,7 @@ export const MINIGAMES: MinigameDefinition[] = [
     status: 'playable',
     load: () => import('./redlight').then((m) => m.default),
   },
-  planned({
+  {
     id: 'blink-duel',
     title: 'Blink Duel',
     tagline: 'Teleport, bait, strike.',
@@ -170,8 +171,12 @@ export const MINIGAMES: MinigameDefinition[] = [
     eligibility: { tournament: true, ranked: true, casual: true },
     scoring: 'elimination-order',
     tieBreak: 'Out later ranks higher',
-    controls: [],
-  }),
+    controls: [{ keys: 'WASD / arrows', action: 'Move and face; mouse / tap arena aims' }, { keys: 'Space', action: 'Blink forward instantly; no cooldown. Cancels your wind-up.' }, { keys: 'J / left click', action: 'Commit a telegraphed sword swing; one hit eliminates' }],
+    inputs: ['keyboard','mouse','touch'], bots: 'available', recordUnit: 'seconds',
+    touch: { movement: 'none', look: 'none', orientation: 'any', buttons: [{id:'forward',label:'Up',hold:true},{id:'left',label:'Left',hold:true},{id:'back',label:'Down',hold:true},{id:'right',label:'Right',hold:true},{id:'slot1',label:'Blink'},{id:'slot2',label:'Swing'}],
+      notes: 'Hold direction pads to move/face, or tap the arena to aim. Tap Blink repeatedly with no cooldown; Swing has a visible 0.95-second wind-up. Blinking cancels it. Last toy standing wins; simultaneous eliminations and timeout survivors tie.' },
+    status: 'playable', load: () => import('./blink').then(m => m.default),
+  },
   {
     id: 'wind-up-dash',
     title: 'Wind-Up Dash',
@@ -258,7 +263,7 @@ export const MINIGAMES: MinigameDefinition[] = [
       notes: 'Tap an offer to buy; reroll costs coins. Drag equal-star matching toys together to merge (maximum 3 stars); nonmatching toys swap. Formation drawer manages your reserves. Choose a passive on rounds 3, 6 and 9 before Ready.' },
     status: 'playable', load: () => import('./toysquad').then(m => m.default),
   },
-  planned({
+  {
     id: 'spellbox-showdown',
     title: 'Spellbox Showdown',
     tagline: 'Knock rivals out of the ring with toy spells.',
@@ -270,8 +275,11 @@ export const MINIGAMES: MinigameDefinition[] = [
     eligibility: { tournament: true, ranked: true, casual: true },
     scoring: 'elimination-order',
     tieBreak: 'Out later ranks higher',
-    controls: [],
-  }),
+    controls: [{keys:'WASD / arrows',action:'Move and face; mouse / tap arena aims'},{keys:'Q / E / R',action:'Cast your equipped spells; click also casts Q'},{keys:'Build cards',action:'Choose one of three options for each button, then lock your build'}],
+    inputs:['keyboard','mouse','touch'],bots:'available',recordUnit:'seconds',
+    touch:{movement:'none',look:'none',orientation:'any',buttons:[{id:'forward',label:'Up',hold:true},{id:'left',label:'Left',hold:true},{id:'back',label:'Down',hold:true},{id:'right',label:'Right',hold:true},{id:'slot1',label:'Spell Q'},{id:'slot2',label:'Spell E'},{id:'slot3',label:'Spell R'}],notes:'Each spell button has three draft choices. Hold pads to move, tap arena to aim, then tap spells to cast. Larger fields start on larger rings. After eliminations, a 10s warning marks the next smaller edge. Stay inside; last toy wins.'},
+    status:'playable',load:()=>import('./spellbox').then(m=>m.default),
+  },
   {
     id: 'jack-in-the-box',
     title: 'Jack-in-the-Box',

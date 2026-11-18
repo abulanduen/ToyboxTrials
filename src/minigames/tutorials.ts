@@ -56,6 +56,16 @@ export const TUTORIALS: Partial<Record<MinigameId, TutorialStep[]>> = {
     { title: 'Play on the beat', text: 'Press A, S, J or K as a pin crosses the line in its lane.', touch: 'Tap the matching pad as a pin crosses the line in its lane. Use both thumbs.' },
     { title: 'Build a combo', text: 'Perfect and Good hits build your combo up to ×4. A miss or a stray tap breaks it. Highest score wins. Taps feel late? Adjust the timing offset on this card.' },
   ],
+  'blink-duel': [
+    { title: 'One hit and you are out', text: 'Swords knock a toy out in a single hit. Last toy standing wins.' },
+    { title: 'Blink to dodge', text: 'Space blinks you forward instantly, with no cooldown. Aim with W A S D or the mouse.', touch: 'Tap Blink to teleport forward instantly, with no cooldown. Steer to aim, or tap the arena.' },
+    { title: 'Read the wind-up', text: 'A swing (J or click) charges for almost a second, and a striped cone shows where it will land. Blink out of cones, and blinking cancels your own swing.', touch: 'Swing charges for almost a second, and a striped cone shows where it will land. Blink out of cones, and blinking cancels your own swing.' },
+  ],
+  'spellbox-showdown': [
+    { title: 'Pick your build', text: 'Before the fight, choose one spell for each of your three buttons, then press Ready.' },
+    { title: 'Push them out', text: 'Hits add damage, and the more damage a toy has, the further it flies. Cast with Q, E and R; aim with the mouse.', touch: 'Hits add damage, and the more damage a toy has, the further it flies. Tap your three spell buttons; tap the arena to aim.' },
+    { title: 'Stay in the ring', text: 'Cross the edge and you are out. The ring shrinks as toys fall, with a warning first. Last toy inside wins.' },
+  ],
   'toy-squad': [
     { title: 'Buy toys', text: 'Spend coins on toys from the shop. Rerolling shows new offers for a few coins. Your level decides which rarities appear.' },
     { title: 'Merge for stars', text: 'Collecting matching toys merges them automatically, up to three stars. Stronger toys hit harder and last longer.' },

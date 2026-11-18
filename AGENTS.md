@@ -24,6 +24,15 @@ Applies to Codex, Claude Code and other contributors. Read this file before edit
   cloud worktrees. Do not recreate or overwrite that work; recover and review it before integration.
   Toy Squad now has 62 individual passive/spell pairs and 11 formation traits. Preserve kit
   coverage, deterministic mana/status resolution and the separate run-wide passive choices.
+  Blink Duel is authorized on `astra/blink-duel`, based on Toy Squad. Preserve no-cooldown
+  blinking, one-hit eliminations and clear wind-up cues. Balance/cancel/tie choices are provisional
+  in its module README. Claude's assigned games remain separate.
+  Spellbox Showdown is authorized on `astra/spellbox-showdown`, based on Blink. Preserve
+  three-slot build selection, per-spell cooldowns, damage-scaled knockback and ring-out victory.
+  Its eight-spell roster and numerical balance are provisional; see the module README.
+  Owner revision: arena bands are 2 / 3 / 4–5 / 6–7 / 8 survivors, with 10-second shrink
+  warnings. Each Q/E/R button has three legal draft offers. Keep rules, bots, geometry and
+  camera in agreement; preserve the distinction between configured duel radius and live radius.
 
 ## Coding conventions
 
@@ -35,6 +44,10 @@ Applies to Codex, Claude Code and other contributors. Read this file before edit
 - Use `MiniContender` for opponents/crowds and the full `WindupBot` for the local character. Debug hooks are test aids, never gameplay dependencies.
 - Every feature must support keyboard/mouse and touch, portrait and landscape where practical. Declare a real minigame touch layout; `TOUCH_TBD` blocks shipping. Use safe-area-aware controls with targets at least 56 px; touch defaults to Low quality.
 - Follow `ART_DIRECTION.md`. Keep content original. Synthesise sound effects; original/licensed music is allowed for Music Box Rhythm. Record external/generated assets and licences in `public/assets/asset-manifest.json`.
+- The owner declined the parallax trial and requested 3D town concept art for Claude Code.
+  Use `docs/assets/town-concept-v1/HANDOFF.md` and its four views for visual direction; preserve
+  source anchors, interaction points, collision and working games. The drawings are not measured
+  blueprints or authorization to change mechanics. Parallax work remains on a separate local branch.
 - Keep the browser client statically deployable. Future multiplayer requires a separate authoritative server; local bots or database polling are not online multiplayer.
 
 ## Validation and reporting

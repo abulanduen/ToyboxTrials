@@ -225,6 +225,8 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   await page.click('[data-testid=format-blitz]');
   await page.click('.intro-options .segmented >> nth=0 >> button >> nth=0'); // 1 bot
   await page.click('.intro-options .segmented >> nth=1 >> button >> nth=0'); // easy
+  // A repeatable draw covers both combat modules and Copycat; Jack practice is checked above.
+  await page.evaluate(() => { Math.random = () => 15 / 4294967296; });
   await page.click('[data-testid=tournament-start]');
   const games = [];
   for (let round = 1; round <= 3; round++) {
@@ -243,6 +245,7 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
     // Find the Original: never pick, and the bot outscores us.
     // Inferno Escape: put our toy on the furnace and let the real rules/host resolve the loss.
     // Midnight Hunger: drain our energy and let the night knock us out first.
+    // Blink Duel / Spellbox Showdown: mark our toy out and let the rules finish the round.
     // Music Box Rhythm: never tap, and the bot outscores us.
     if (game.includes('Copycat')) await failRound();
     if (game.includes('Inferno')) {
@@ -256,6 +259,11 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
       // Never tap: every pin is a miss. Fast-forward the ~68 s song (music is muted off 1x).
       await page.waitForFunction(() => window.__toybox.match.phase() === 'playing', null, { timeout: 120000 });
       await page.evaluate(() => window.__toybox.match.timeScale(8));
+    }
+    if (game.includes('Blink') || game.includes('Spellbox')) {
+      // Knock our toy out and let the real rules resolve the round (Spellbox: skip the build draft).
+      await page.waitForFunction(() => window.__toybox.match.phase() === 'playing', null, { timeout: 120000 });
+      await page.evaluate(() => { const s = window.__toybox.match.state(); if (s.kind === 'spellbox-showdown') s.players.forEach((p) => { p.ready = true; }); s.players[0].alive = false; s.players[0].outAt = s.t; });
     }
     await page.waitForSelector('.results', { timeout: 300000 });
     await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing

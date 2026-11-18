@@ -9,16 +9,18 @@ inline and summarised first. Everything marked _proposal_ is not final.
 
 ---
 
-## Current status and source authority (18 November 2026)
+## Current status and source authority (19 November 2026)
 
 This existing specification is preserved pending the owner's separately supplied authoritative
 game-design conversation, which has not yet been provided in this chat. Do not invent missing mechanics.
 Current owner instructions take precedence over historical amendments: preserve the working Copycat
 Conductor implementation. Amendment A1 records the earlier Base44 decision, not permission to rewrite it now.
 
-**Implemented in source:** explorable 3D hub, menu, Workshop, local persistence, Copycat Conductor,
-Jack-in-the-Box, practice/bots and local unranked Blitz/Normal/Treasure tournaments. **Not implemented:**
-the other nine games, online multiplayer, matchmaking, ranked ratings or online leaderboards.
+**Implemented in this branch:** explorable 3D hub, menu, Workshop, local persistence, Copycat
+Conductor, Jack-in-the-Box, Inferno Escape, Midnight Hunger, Toy Squad, Blink Duel and Spellbox Showdown, with local
+practice/bots. Local unranked Blitz/Normal/Treasure tournaments include all except Toy Squad.
+**Not implemented here:** the other four games (Claude's separate work), online
+multiplayer, matchmaking, ranked ratings or online leaderboards.
 Registry eligibility flags describe intended use, not available online/ranked modes.
 
 The planned ranked modes have three independent ratings: **Blitz (3 rounds), Normal (5 rounds),
@@ -264,6 +266,12 @@ original clockwork referee on a turntable) at the far end.
 
 **Toybox:** wind-up ninja toys with oversized toy swords, and blinks shown as a spring-pop burst.
 **Tech:** server-authoritative hits, with blink destinations validated inside the arena.
+**Implemented local first pass on `astra/blink-duel`:** seeded 2–8 player rules, bots, sword
+telegraphs, keyboard/mouse and touch, records and local tournament integration. Space blinks;
+J/left-click swings; WASD/arrows move; mouse/tap aims. Blink cancels wind-up and may cross toys,
+but its endpoint must be free and inside the arena. Simultaneous hits resolve together.
+Wind-up/recovery/range, the 90-second limit and tie policy are provisional; see
+`src/minigames/blink/README.md`. Online authority and real PvP remain future work.
 
 ### 07 · Wind-Up Dash (Racing / Obstacles · 2–8)
 - A narrow course of tight passages, moving hazards, timing obstacles, and traps that slow, stun or reset.
@@ -358,6 +366,16 @@ balance remain provisional pending playtesting.
 
 **Toybox:** toy mages in a plastic-and-wood ring, with spells as toy explosions, springs, bubbles and fireworks.
 **Tech:** planar arena physics, authoritative damage and knockback, and a small spell roster to start.
+**Implemented local first pass on `astra/spellbox-showdown`:** a timed three-slot draft from eight
+spells, seeded bots, projectiles, AoE/cone blasts, pull, mines, ward and damage repair. Q/E/R cast;
+mouse/tap aims; WASD/arrows or touch pads move. Damage increases knockback, and crossing the
+circular edge eliminates. Records, local tournaments and both mobile orientations use the shared
+host. Spell values, draft length, momentum, hitstun and tie policies are provisional; exact data
+is in `src/minigames/spellbox/README.md`. Online authority and real PvP are not implemented.
+Owner revision: Q/E/R each offer three choices instead of the full roster. Arena size follows
+2 / 3 / 4–5 / 6–7 / 8 living-player bands, then contracts after a visible 10-second warning as
+players are eliminated. Default radii are 15/21/27/33/39 cm, with a 3-second transition; exact
+sizes and transition speed remain provisional. The marked edge, physics and camera agree.
 
 ### 11 · Jack-in-the-Box (Knowledge / Nerve · 2–8) — 🔧 Amended (A8), replaces Toybox Trivia
 A hot-potato category game. The contenders sit in a ring around a cranking jack-in-the-box.
