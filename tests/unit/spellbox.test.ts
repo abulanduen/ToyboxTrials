@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { PAINT_JOBS } from '../../src/game/palette';
 import type { Contestant } from '../../src/minigames/types';
 import { seededRng } from '../../src/minigames/rng';
-import { spellboxRules, segmentHit, coneHit, knockbackMultiplier, type SpellboxState, type SpellboxInput } from '../../src/minigames/spellbox/rules';
-import { SPELLS, SPELL_IDS, type SpellId } from '../../src/minigames/spellbox/spells';
+import { spellboxRules, arenaRadius, segmentHit, coneHit, knockbackMultiplier, type SpellboxState, type SpellboxInput } from '../../src/minigames/spellbox/rules';
+import { SLOT_OPTIONS, SPELLS, SPELL_IDS, type SpellId } from '../../src/minigames/spellbox/spells';
 import { createSpellboxBot } from '../../src/minigames/spellbox/bot';
 const people:Contestant[]=Array.from({length:8},(_,i)=>({id:`p${i}`,name:`Mage ${i}`,paint:PAINT_JOBS[i%5],hat:'none',keySkin:'classic',isLocal:i===0,bot:'normal'}));
 const fresh=(n=2)=>spellboxRules.init(people.slice(0,n),123);
@@ -15,18 +15,56 @@ function hit(s:SpellboxState){for(let i=0;i<180&&s.players[1].lastHit<0;i++)spel
 describe('Spellbox Showdown',()=>{
   it('has eight distinct spell kits with valid data and repeatable 2–8 player spawns',()=>{
     expect(SPELL_IDS).toHaveLength(8);expect(new Set(SPELL_IDS.map(id=>SPELLS[id].name)).size).toBe(8);
-    for(let n=2;n<=8;n++){const s=fresh(n);expect(fresh(n)).toEqual(s);for(const p of s.players){expect(Math.hypot(p.x,p.z)).toBeLessThan(s.config.radius-s.config.bodyRadius);expect(p.build).toHaveLength(3);}}
+    for(let n=2;n<=8;n++){const s=fresh(n);expect(fresh(n)).toEqual(s);for(const p of s.players){expect(Math.hypot(p.x,p.z)).toBeLessThan(s.radius-s.config.bodyRadius);expect(p.build).toHaveLength(3);}}
     expect(spellboxRules.init(people,456).players).not.toEqual(fresh(8).players);
     for(const id of SPELL_IDS){expect(SPELLS[id].cooldown).toBeGreaterThan(0);expect(SPELLS[id].description.length).toBeGreaterThan(30);}
     expect(()=>fresh(1)).toThrow();expect(()=>spellboxRules.init([people[0],people[0]],1)).toThrow();expect(()=>spellboxRules.init(people,1,{drag:NaN})).toThrow();expect(()=>spellboxRules.init(people,1,{draftMs:11})).toThrow();
   });
-  it('equips by slot, swaps duplicates, rejects invalid choices and locks a ready player',()=>{
+  it('offers exactly three legal choices per button, rejects cross-slot picks and locks Ready',()=>{
     const s=fresh(),p=s.players[0],other=[...s.players[1].build];
-    send(s,'p0',[{type:'equip',slot:1,spell:'pop-rocket'}]);expect(p.build).toEqual(['spring-fan','pop-rocket','bubble-ward']);
+    expect(SLOT_OPTIONS.map(options=>new Set(options).size)).toEqual([3,3,3]);
+    send(s,'p0',[{type:'equip',slot:1,spell:'pop-rocket'}]);expect(p.build).toEqual(['pop-rocket','spring-fan','bubble-ward']);
+    send(s,'p0',[{type:'equip',slot:0,spell:'marble-burst'}]);
     send(s,'p0',[{type:'equip',slot:2,spell:'repair-stitches'},{type:'equip',slot:3,spell:'button-mine'},{type:'equip',slot:0,spell:'nope' as SpellId}]);
-    expect(p.build).toEqual(['spring-fan','pop-rocket','repair-stitches']);expect(s.players[1].build).toEqual(other);
-    send(s,'p0',[{type:'ready'},{type:'equip',slot:0,spell:'button-mine'}]);expect(p.build[0]).toBe('spring-fan');expect(s.phase).toBe('draft');
-    send(s,'p1',[{type:'ready'}]);expect(s.phase).toBe('arena');send(s,'p0',[{type:'equip',slot:0,spell:'button-mine'}]);expect(p.build[0]).toBe('spring-fan');
+    expect(p.build).toEqual(['marble-burst','spring-fan','repair-stitches']);expect(s.players[1].build).toEqual(other);
+    send(s,'p0',[{type:'ready'},{type:'equip',slot:0,spell:'pop-rocket'}]);expect(p.build[0]).toBe('marble-burst');expect(s.phase).toBe('draft');
+    send(s,'p1',[{type:'ready'}]);expect(s.phase).toBe('arena');send(s,'p0',[{type:'equip',slot:0,spell:'pop-rocket'}]);expect(p.build[0]).toBe('marble-burst');
+  });
+  it('moves Mine between E and R while keeping every slot legal and the build unique',()=>{
+    const s=fresh(),p=s.players[0];send(s,'p0',[{type:'equip',slot:1,spell:'button-mine'}]);
+    send(s,'p0',[{type:'equip',slot:2,spell:'button-mine'}]);expect(p.build).toEqual(['pop-rocket','spring-fan','button-mine']);
+    send(s,'p0',[{type:'equip',slot:1,spell:'button-mine'}]);expect(p.build).toEqual(['pop-rocket','button-mine','bubble-ward']);
+    p.build.forEach((id,slot)=>expect(SLOT_OPTIONS[slot]).toContain(id));expect(new Set(p.build).size).toBe(3);
+  });
+  it('uses the requested population bands, preserving the old two-player size',()=>{
+    expect([2,3,4,5,6,7,8].map(n=>arenaRadius(n))).toEqual([15,21,27,27,33,33,39]);
+    for(let n=2;n<=8;n++)expect(fresh(n).radius).toBe(arenaRadius(n));
+    expect(fresh(8).radius**2/fresh(2).radius**2).toBeCloseTo(6.76);
+  });
+  it('waits the full ten seconds, then contracts smoothly over three seconds',()=>{
+    const s=arena(8);s.players[7].alive=false;s.players[7].outAt=s.t;spellboxRules.step(s,{},10);
+    const warning=structuredClone(s.shrink!);expect(warning.to).toBe(33);expect(warning.startsAt-s.t).toBe(10000);
+    spellboxRules.step(s,{},9990);expect(s.radius).toBe(39);spellboxRules.step(s,{},10);expect(s.radius).toBe(39);
+    spellboxRules.step(s,{},1500);expect(s.radius).toBe(36);spellboxRules.step(s,{},1500);expect(s.radius).toBe(33);expect(s.shrink).toBeNull();
+    const events=spellboxRules.drainEvents(s);expect(events.filter(e=>e.type==='spellbox-shrink-warning')).toHaveLength(1);expect(events.filter(e=>e.type==='spellbox-shrink-tick').map(e=>e.seconds)).toEqual([9,8,7,6,5,4,3,2,1,0]);
+  });
+  it('does not reset the warning within a band, but fully warns a newly smaller target',()=>{
+    const s=arena(8);s.players[7].alive=false;spellboxRules.step(s,{},10);const first=s.shrink!.startsAt;
+    s.players[6].alive=false;spellboxRules.step(s,{},1000);expect(s.shrink!.startsAt).toBe(first);
+    s.players[5].alive=false;spellboxRules.step(s,{},10);expect(s.shrink!.to).toBe(27);expect(s.shrink!.startsAt-s.t).toBe(10000);
+    spellboxRules.step(s,{},10010);s.players[4].alive=false;s.players[3].alive=false;spellboxRules.step(s,{},10);
+    expect(s.shrink!.to).toBe(27); // Finish the already-moving boundary first.
+    const remaining=s.shrink!.endsAt-s.t;spellboxRules.step(s,{},remaining);expect(s.radius).toBe(27);expect(s.shrink!.to).toBe(21);expect(s.shrink!.startsAt-s.t).toBe(10000);
+  });
+  it('eliminates outside the moving edge, removes unsupported mines and cancels a finished match warning',()=>{
+    const s=arena(8);s.players[7].alive=false;Object.assign(s.players[0],{x:38,z:0});s.mines.push({id:99,owner:'p1',x:38,z:0,armAt:1e9,expireAt:1e9});
+    spellboxRules.step(s,{},10530);expect(s.players[0].alive).toBe(false);expect(s.radius).toBeLessThan(38);expect(s.mines).toHaveLength(0);
+    s.players.slice(2).forEach(p=>{p.alive=false;});spellboxRules.step(s,{},10);expect(s.phase).toBe('ending');expect(s.shrink).toBeNull();
+  });
+  it('keeps shrink timing deterministic across step partitions and inert while time is stopped',()=>{
+    const a=arena(8);a.players[7].alive=false;spellboxRules.step(a,{},10);const b=structuredClone(a),copy=structuredClone(a);
+    spellboxRules.step(a,{},0);spellboxRules.step(a,{},NaN);expect(a).toEqual(copy);
+    spellboxRules.step(a,{},13000);for(const n of[3,7,40,9950,3000])spellboxRules.step(b,{},n);expect(a).toEqual(b);
   });
   it('keeps draft movement/casts inert, auto-locks at deadline and excludes draft from score',()=>{
     const s=fresh(),position=[s.players[0].x,s.players[0].z];send(s,'p0',[{type:'move',x:1,z:0},{type:'cast',slot:0}],20000);

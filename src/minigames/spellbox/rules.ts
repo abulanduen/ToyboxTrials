@@ -1,10 +1,13 @@
 import type { MatchEvent, RulesCore } from '../types';
 import { seededRng, shuffle } from '../rng';
 import { rankByKey } from '../scoring';
-import { DEFAULT_BUILD, SPELL_IDS, SPELLS, type SpellId } from './spells';
+import { DEFAULT_BUILD, SLOT_OPTIONS, SPELLS, type SpellId } from './spells';
 
-export interface SpellboxConfig { radius:number; bodyRadius:number; speed:number; drag:number; damageScale:number; maxVelocity:number; draftMs:number; durationMs:number; endingMs:number; hitstunMs:number }
-export const DEFAULT_CONFIG:SpellboxConfig={radius:15,bodyRadius:1.05,speed:8.5,drag:2.4,damageScale:70,maxVelocity:40,draftMs:20000,durationMs:90000,endingMs:1400,hitstunMs:180};
+export interface SpellboxConfig { radius:number; bodyRadius:number; speed:number; drag:number; damageScale:number; maxVelocity:number; draftMs:number; durationMs:number; endingMs:number; hitstunMs:number; shrinkWarningMs:number; shrinkMs:number }
+export const DEFAULT_CONFIG:SpellboxConfig={radius:15,bodyRadius:1.05,speed:8.5,drag:2.4,damageScale:70,maxVelocity:40,draftMs:20000,durationMs:90000,endingMs:1400,hitstunMs:180,shrinkWarningMs:10000,shrinkMs:3000};
+/** The configured radius remains the two-player baseline; larger bands grow arena area. */
+export function arenaRadius(players:number,base=DEFAULT_CONFIG.radius){return base*(players>=8?2.6:players>=6?2.2:players>=4?1.8:players>=3?1.4:1);}
+export interface ArenaShrink { from:number;to:number;startsAt:number;endsAt:number;lastSecond:number }
 export type SpellboxInput={type:'move'|'aim';x:number;z:number}|{type:'equip';slot:number;spell:SpellId}|{type:'cast';slot:number}|{type:'ready'};
 export interface Cast {spell:SpellId;slot:number;angle:number;start:number;until:number}
 export interface Mage {
@@ -14,7 +17,7 @@ export interface Mage {
 export interface Projectile {id:number;owner:string;spell:SpellId;x:number;z:number;dx:number;dz:number;remaining:number;sourceX:number;sourceZ:number}
 export interface Mine {id:number;owner:string;x:number;z:number;armAt:number;expireAt:number}
 export interface Effect {id:number;spell:SpellId;kind:'cast'|'hit'|'shield'|'repair'|'out';x:number;z:number;radius:number;at:number}
-export interface SpellboxState {kind:'spellbox-showdown';seed:number;config:SpellboxConfig;phase:'draft'|'arena'|'ending'|'over';t:number;remainder:number;arenaAt:number;finishAt:number;nextId:number;players:Mage[];projectiles:Projectile[];mines:Mine[];effects:Effect[];pending:Record<string,SpellboxInput[]>;events:MatchEvent[]}
+export interface SpellboxState {kind:'spellbox-showdown';seed:number;config:SpellboxConfig;radius:number;shrink:ArenaShrink|null;phase:'draft'|'arena'|'ending'|'over';t:number;remainder:number;arenaAt:number;finishAt:number;nextId:number;players:Mage[];projectiles:Projectile[];mines:Mine[];effects:Effect[];pending:Record<string,SpellboxInput[]>;events:MatchEvent[]}
 interface Hit {source:string;target:Mage;damage:number;force:number;dx:number;dz:number;spell:SpellId}
 const TICK=10,dt=TICK/1000;
 const normalize=(x:number,z:number)=>{const d=Math.hypot(x,z);return d>1?{x:x/d,z:z/d}:{x,z};};
@@ -38,7 +41,28 @@ function startArena(s:SpellboxState) {
   s.phase='arena';s.arenaAt=s.t;for(const p of s.players){p.ready=true;p.moveX=p.moveZ=0;}
   s.events.push({type:'spellbox-start'});
 }
-function end(s:SpellboxState) {s.phase='ending';s.finishAt=s.t;for(const p of s.players){p.cast=null;p.moveX=p.moveZ=0;}s.projectiles=[];s.mines=[];s.events.push({type:'spellbox-finish'});}
+function end(s:SpellboxState) {s.phase='ending';s.finishAt=s.t;s.shrink=null;for(const p of s.players){p.cast=null;p.moveX=p.moveZ=0;}s.projectiles=[];s.mines=[];s.events.push({type:'spellbox-finish'});}
+function scheduleShrink(s:SpellboxState){
+  const living=s.players.filter(p=>p.alive).length;if(living<2)return;
+  const target=arenaRadius(living,s.config.radius);
+  if(target>=s.radius-1e-8)return;
+  // A newly smaller advertised target gets its own full warning. During a transition, finish
+  // the announced boundary first; any further reduction receives a fresh countdown afterwards.
+  if(s.shrink&&(s.t>=s.shrink.startsAt||target>=s.shrink.to-1e-8))return;
+  const startsAt=s.t+s.config.shrinkWarningMs;
+  s.shrink={from:s.radius,to:target,startsAt,endsAt:startsAt+s.config.shrinkMs,lastSecond:Math.ceil(s.config.shrinkWarningMs/1000)};
+  s.events.push({type:'spellbox-shrink-warning',radius:target});
+}
+function updateArena(s:SpellboxState){
+  const shrink=s.shrink;if(!shrink)return;
+  const second=Math.max(0,Math.ceil((shrink.startsAt-s.t)/1000));
+  if(second!==shrink.lastSecond){shrink.lastSecond=second;s.events.push({type:'spellbox-shrink-tick',seconds:second});}
+  if(s.t<shrink.startsAt)return;
+  const progress=Math.min(1,(s.t-shrink.startsAt)/s.config.shrinkMs);
+  s.radius=shrink.from+(shrink.to-shrink.from)*progress;
+  if(s.t>=shrink.endsAt){s.radius=shrink.to;s.shrink=null;s.events.push({type:'spellbox-shrunk',radius:s.radius});}
+  s.mines=s.mines.filter(m=>Math.hypot(m.x,m.z)<=s.radius);
+}
 function splash(s:SpellboxState,hits:Hit[],owner:string,spell:SpellId,x:number,z:number,radius:number) {
   const def=SPELLS[spell];effect(s,spell,'hit',x,z,radius);
   for(const target of s.players)if(target.alive&&target.id!==owner&&Math.hypot(target.x-x,target.z-z)<=radius+s.config.bodyRadius){
@@ -57,7 +81,7 @@ function release(s:SpellboxState,p:Mage,hits:Hit[]) {
     effect(s,cast.spell,'hit',p.x+dx*3,p.z+dz*3,3);
   }else if(d.effect==='mine'){
     const owner=s.mines.filter(m=>m.owner===p.id);if(owner.length>=2)s.mines=s.mines.filter(m=>m.id!==owner[0].id);
-    let x=p.x+dx*d.range,z=p.z+dz*d.range;const distance=Math.hypot(x,z),limit=s.config.radius-.5;if(distance>limit){x=x/distance*limit;z=z/distance*limit;}
+    let x=p.x+dx*d.range,z=p.z+dz*d.range;const distance=Math.hypot(x,z),limit=s.radius-.5;if(distance>limit){x=x/distance*limit;z=z/distance*limit;}
     s.mines.push({id:s.nextId++,owner:p.id,x,z,armAt:s.t+600,expireAt:s.t+6000});
   }else if(s.projectiles.length<64)s.projectiles.push({id:s.nextId++,owner:p.id,spell:cast.spell,x:p.x,z:p.z,dx,dz,remaining:d.range,sourceX:p.x,sourceZ:p.z});
 }
@@ -67,8 +91,9 @@ function commands(s:SpellboxState,p:Mage) {
     if(s.phase==='draft'){
       if(p.ready)continue;
       if(input.type==='ready')p.ready=true;
-      if(input.type==='equip'&&validSlot(input.slot)&&SPELL_IDS.includes(input.spell)){
-        const other=p.build.indexOf(input.spell),old=p.build[input.slot];p.build[input.slot]=input.spell;if(other>=0&&other!==input.slot)p.build[other]=old;
+      if(input.type==='equip'&&validSlot(input.slot)&&SLOT_OPTIONS[input.slot].includes(input.spell)){
+        const other=p.build.indexOf(input.spell),old=p.build[input.slot];p.build[input.slot]=input.spell;
+        if(other>=0&&other!==input.slot)p.build[other]=SLOT_OPTIONS[other].includes(old)?old:SLOT_OPTIONS[other].find(id=>!p.build.includes(id))!;
       }
       continue;
     }
@@ -88,6 +113,7 @@ function tick(s:SpellboxState) {
   if(s.phase==='ending'){if(s.t>=s.finishAt+s.config.endingMs)s.phase='over';return;}
   for(const p of s.players)commands(s,p);
   if(s.phase==='draft'){if(s.players.every(p=>p.ready)||s.t>=s.config.draftMs)startArena(s);return;}
+  scheduleShrink(s);updateArena(s);
   const hits:Hit[]=[];
   for(const p of s.players)if(p.alive&&p.cast&&p.cast.until<=s.t)release(s,p,hits);
   const next:Projectile[]=[];
@@ -105,7 +131,7 @@ function tick(s:SpellboxState) {
       }
     }else{
       shot.x=tx;shot.z=tz;shot.remaining-=step;
-      if(shot.remaining<=1e-6||Math.hypot(tx,tz)>s.config.radius+2){if(d.effect==='bomb')splash(s,hits,shot.owner,shot.spell,tx,tz,d.radius);}
+      if(shot.remaining<=1e-6||Math.hypot(tx,tz)>s.radius+2){if(d.effect==='bomb')splash(s,hits,shot.owner,shot.spell,tx,tz,d.radius);}
       else next.push(shot);
     }
   }
@@ -131,15 +157,16 @@ function tick(s:SpellboxState) {
     if(free(x,z)){p.x=x;p.z=z;}else if(free(x,p.z))p.x=x;else if(free(p.x,z))p.z=z;else {p.vx*=.6;p.vz*=.6;}
     const decay=Math.exp(-s.config.drag*dt);p.vx*=decay;p.vz*=decay;
   }
-  for(const p of s.players)if(p.alive&&Math.hypot(p.x,p.z)>s.config.radius){p.alive=false;p.outAt=s.t;p.cast=null;p.moveX=p.moveZ=0;effect(s,'pop-rocket','out',p.x,p.z,2);s.events.push({type:'eliminated',id:p.id});}
-  if(s.players.filter(p=>p.alive).length<=1||s.t-s.arenaAt>=s.config.durationMs)end(s);
+  for(const p of s.players)if(p.alive&&Math.hypot(p.x,p.z)>s.radius){p.alive=false;p.outAt=s.t;p.cast=null;p.moveX=p.moveZ=0;effect(s,'pop-rocket','out',p.x,p.z,2);s.events.push({type:'eliminated',id:p.id});}
+  if(s.players.filter(p=>p.alive).length<=1||s.t-s.arenaAt>=s.config.durationMs)end(s);else scheduleShrink(s);
 }
 export const spellboxRules:RulesCore<SpellboxState,SpellboxInput,SpellboxConfig>={
   init(contestants,seed,config){
-    const cfg={...DEFAULT_CONFIG,...config};if(contestants.length<2||contestants.length>8||new Set(contestants.map(c=>c.id)).size!==contestants.length||Object.values(cfg).some(n=>!Number.isFinite(n)||n<=0)||cfg.bodyRadius>=cfg.radius/4||[cfg.draftMs,cfg.durationMs,cfg.endingMs,cfg.hitstunMs].some(n=>n%TICK!==0)||cfg.maxVelocity*dt>cfg.bodyRadius)throw new Error('Invalid Spellbox configuration.');
+    const cfg={...DEFAULT_CONFIG,...config};if(contestants.length<2||contestants.length>8||new Set(contestants.map(c=>c.id)).size!==contestants.length||Object.values(cfg).some(n=>!Number.isFinite(n)||n<=0)||cfg.bodyRadius>=cfg.radius/4||[cfg.draftMs,cfg.durationMs,cfg.endingMs,cfg.hitstunMs,cfg.shrinkWarningMs,cfg.shrinkMs].some(n=>n%TICK!==0)||cfg.maxVelocity*dt>cfg.bodyRadius)throw new Error('Invalid Spellbox configuration.');
     const rng=seededRng(seed),slots=shuffle(rng,contestants.map((_,i)=>i)),rotation=rng()*Math.PI*2;
-    return {kind:'spellbox-showdown',seed,config:cfg,phase:'draft',t:0,remainder:0,arenaAt:-1,finishAt:-1,nextId:1,projectiles:[],mines:[],effects:[],pending:{},events:[],players:contestants.map((c,i)=>{
-      const a=rotation+slots[i]*Math.PI*2/contestants.length;return{id:c.id,x:Math.sin(a)*cfg.radius*.58,z:Math.cos(a)*cfg.radius*.58,vx:0,vz:0,angle:a+Math.PI,moveX:0,moveZ:0,alive:true,outAt:-1,damage:0,build:[...DEFAULT_BUILD],ready:false,cooldowns:[0,0,0],nextAction:0,cast:null,shieldUntil:0,stunnedUntil:0,casts:0,hits:0,lastHit:-1};
+    const radius=arenaRadius(contestants.length,cfg.radius);
+    return {kind:'spellbox-showdown',seed,config:cfg,radius,shrink:null,phase:'draft',t:0,remainder:0,arenaAt:-1,finishAt:-1,nextId:1,projectiles:[],mines:[],effects:[],pending:{},events:[],players:contestants.map((c,i)=>{
+      const a=rotation+slots[i]*Math.PI*2/contestants.length;return{id:c.id,x:Math.sin(a)*radius*.58,z:Math.cos(a)*radius*.58,vx:0,vz:0,angle:a+Math.PI,moveX:0,moveZ:0,alive:true,outAt:-1,damage:0,build:[...DEFAULT_BUILD],ready:false,cooldowns:[0,0,0],nextAction:0,cast:null,shieldUntil:0,stunnedUntil:0,casts:0,hits:0,lastHit:-1};
     })};
   },
   step(s,inputs,dtMs){

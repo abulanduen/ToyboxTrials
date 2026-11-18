@@ -16,11 +16,20 @@ the shared palette, WindupBot/MiniContender and synthesised sound.
 
 These numerical choices and the eight spells are provisional designs for playtesting.
 
-- Draft lasts up to 20 seconds. Choose one of three slots, then a spell card. Equipping a spell
-  already in another slot swaps the slots, keeping three distinct spells. Ready locks the build;
-  all Ready starts combat early. The deadline keeps the current build. Choices reset each match.
-- Default build: Pop Rocket, Spring Fan, Bubble Ward. Bots use varied seeded builds with at least
-  one ranged spell and one close-range push. Human builds may freely combine any three spells.
+- Draft lasts up to 20 seconds. Each button has exactly **three options**, shown only when that
+  button is selected. Ready locks the build; all Ready starts combat early. Deadline keeps current
+  choices. Defaults are Pop Rocket, Spring Fan, Bubble Ward. Bots obey the same slot restrictions.
+
+| Button | Three options |
+| --- | --- |
+| Q · Ranged | Pop Rocket, Marble Burst, Ribbon Tether |
+| E · Area | Spring Fan, Pinwheel Storm, Button Mine |
+| R · Utility | Bubble Ward, Repair Stitches, Button Mine |
+
+Builds stay unique. Moving Button Mine between E and R resets the other button to its first
+available legal option (or swaps if legal). Spells outside a button's offers are rejected by the
+rules, not just hidden in the UI. This grouping is the current interpretation of the owner's
+three-options-per-button request; no ninth spell was added.
 
 | Spell | Damage | Base impulse | Wind-up | Cooldown | Effect |
 | --- | ---: | ---: | ---: | ---: | --- |
@@ -37,9 +46,33 @@ Mines are limited to two per owner and clamp placement inside the arena. Their b
 brass to coral when armed; a ground ring marks the trigger radius. Spell damage excludes its owner.
 Pull + mine and rocket + fan are intended combinations, not proven optimal builds.
 
+## Population scaling and shrinking
+
+The owner requested a larger arena for 3, 4–5, 6–7 and 8 players, retaining duel size for two.
+The following actual dimensions are first-pass tuning; the bands and 10-second warning are confirmed.
+
+| Living players | Radius | Diameter | Area relative to duel |
+| --- | ---: | ---: | ---: |
+| 2 | 15 cm | 30 cm | 1× |
+| 3 | 21 cm | 42 cm | 1.96× |
+| 4–5 | 27 cm | 54 cm | 3.24× |
+| 6–7 | 33 cm | 66 cm | 4.84× |
+| 8 | 39 cm | 78 cm | 6.76× |
+
+- Spawn spacing scales with the initial population; toy size, speed and spell reach stay unchanged.
+- Crossing a population band announces **10 seconds** before contraction. A dashed gold ring marks
+  the future edge. Then the physical floor, rim and ring-out boundary shrink together over 3 seconds.
+  Bodies outside the moving edge fall out; mines outside it are removed. The camera follows size.
+- Another lower band during the warning gets a fresh full 10-second warning to its new target;
+  eliminations within a band do not reset it. During contraction, finish the announced target first,
+  then warn for a further reduction. No shrink continues after the outcome is known.
+- Countdown, contraction and sound cues use simulation time and freeze on pause. Bots seek the
+  future safe area. Mouse aim is reprojected through the camera zoom; touch retains its tapped
+  world target. `config.radius` is the duel baseline; `state.radius` is the live boundary.
+
 ## Combat and provisional balance
 
-- Arena radius 15 cm; toy body radius 1.05 cm. Move at 8.5 cm/s with normalized diagonals.
+- Toy body radius 1.05 cm. Move at 8.5 cm/s with normalized diagonals.
   Living bodies block movement; dead toys do not. You can walk off the edge yourself.
 - Hits add damage, capped at 300. Impulse scales by **1 + post-hit damage / 70**. All hits in one
   tick use the same total, then vector-sum their impulses. Shield reduction applies to both damage
@@ -78,8 +111,8 @@ spell, collision, simultaneous impulses, draft locks, limits and natural seeded 
 The browser test uses controlled combat arrangements and real keyboard/mouse/touch adapters for
 draft, Q/E/R, damage, cooldown, repair, ring-out, pause, records, restart and hub return.
 
-Verified 19 November 2026: 130 unit tests and production build pass. Desktop, portrait-touch and
-landscape-touch Spellbox flows pass without console/page errors. The existing Copycat/Jack
-practice checks and a seeded Spellbox/Copycat/Blink Blitz pass results, scoring, standings,
-history and hub return. Real-device performance, audio quality, online behaviour and competitive
-balance are not established by these checks.
+Verified 19 November 2026: 136 unit tests and production build pass. Desktop/portrait/landscape
+checks cover three offers per button, eight-player sizing, the full warning and contraction to
+duel size, mouse/touch aim through zoom, casting, ring-outs, records and restart, without console
+or page errors. Copycat/Jack practice and a seeded Spellbox/Copycat/Blink Blitz also pass. Real-device
+performance, audio quality, online behaviour and competitive balance remain unverified.

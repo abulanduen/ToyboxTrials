@@ -298,6 +298,10 @@ mouse/tap aims; WASD/arrows or touch pads move. Damage increases knockback, and 
 circular edge eliminates. Records, local tournaments and both mobile orientations use the shared
 host. Spell values, draft length, momentum, hitstun and tie policies are provisional; exact data
 is in `src/minigames/spellbox/README.md`. Online authority and real PvP are not implemented.
+Owner revision: Q/E/R each offer three choices instead of the full roster. Arena size follows
+2 / 3 / 4–5 / 6–7 / 8 living-player bands, then contracts after a visible 10-second warning as
+players are eliminated. Default radii are 15/21/27/33/39 cm, with a 3-second transition; exact
+sizes and transition speed remain provisional. The marked edge, physics and camera agree.
 
 ### 11 · Jack-in-the-Box (Knowledge / Nerve · 2–8) — 🔧 Amended (A8), replaces Toybox Trivia
 A hot-potato category game. The contenders sit in a ring around a cranking jack-in-the-box.

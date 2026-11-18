@@ -30,6 +30,9 @@ Applies to Codex, Claude Code and other contributors. Read this file before edit
   Spellbox Showdown is authorized on `astra/spellbox-showdown`, based on Blink. Preserve
   three-slot build selection, per-spell cooldowns, damage-scaled knockback and ring-out victory.
   Its eight-spell roster and numerical balance are provisional; see the module README.
+  Owner revision: arena bands are 2 / 3 / 4–5 / 6–7 / 8 survivors, with 10-second shrink
+  warnings. Each Q/E/R button has three legal draft offers. Keep rules, bots, geometry and
+  camera in agreement; preserve the distinction between configured duel radius and live radius.
 
 ## Coding conventions
 

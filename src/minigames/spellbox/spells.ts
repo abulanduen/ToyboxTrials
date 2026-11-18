@@ -13,3 +13,9 @@ export const SPELLS:Record<SpellId,Spell>={
   'button-mine':{name:'Button Mine',effect:'mine',damage:16,force:17,range:3.5,radius:3,speed:0,cooldown:3800,windup:300,colour:PALETTE.brass,description:'Place an aimed mine. Arms in 0.6s, lasts 6s; at most two per owner.'},
 };
 export const DEFAULT_BUILD:SpellId[]=['pop-rocket','spring-fan','bubble-ward'];
+/** Three choices per button. Mine may move between E and R; builds stay unique. */
+export const SLOT_OPTIONS:readonly (readonly SpellId[])[]=[
+  ['pop-rocket','marble-burst','ribbon-tether'],
+  ['spring-fan','pinwheel-storm','button-mine'],
+  ['bubble-ward','repair-stitches','button-mine'],
+];

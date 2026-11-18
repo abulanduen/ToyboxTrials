@@ -201,9 +201,9 @@ export const MINIGAMES: MinigameDefinition[] = [
     eligibility: { tournament: true, ranked: true, casual: true },
     scoring: 'elimination-order',
     tieBreak: 'Out later ranks higher',
-    controls: [{keys:'WASD / arrows',action:'Move and face; mouse / tap arena aims'},{keys:'Q / E / R',action:'Cast your three equipped spells; click also casts slot Q'},{keys:'Build cards',action:'Choose three distinct spells, then lock your build'}],
+    controls: [{keys:'WASD / arrows',action:'Move and face; mouse / tap arena aims'},{keys:'Q / E / R',action:'Cast your equipped spells; click also casts Q'},{keys:'Build cards',action:'Choose one of three options for each button, then lock your build'}],
     inputs:['keyboard','mouse','touch'],bots:'available',recordUnit:'seconds',
-    touch:{movement:'none',look:'none',orientation:'any',buttons:[{id:'forward',label:'Up',hold:true},{id:'left',label:'Left',hold:true},{id:'back',label:'Down',hold:true},{id:'right',label:'Right',hold:true},{id:'slot1',label:'Spell Q'},{id:'slot2',label:'Spell E'},{id:'slot3',label:'Spell R'}],notes:'Choose three spells in the draft. Hold pads to move, tap arena to aim, and tap spell cards to cast. Damage increases knockback; cross the circular edge and you are out. Last toy in wins.'},
+    touch:{movement:'none',look:'none',orientation:'any',buttons:[{id:'forward',label:'Up',hold:true},{id:'left',label:'Left',hold:true},{id:'back',label:'Down',hold:true},{id:'right',label:'Right',hold:true},{id:'slot1',label:'Spell Q'},{id:'slot2',label:'Spell E'},{id:'slot3',label:'Spell R'}],notes:'Each spell button has three draft choices. Hold pads to move, tap arena to aim, then tap spells to cast. Larger fields start on larger rings. After eliminations, a 10s warning marks the next smaller edge. Stay inside; last toy wins.'},
     status:'playable',load:()=>import('./spellbox').then(m=>m.default),
   },
   {

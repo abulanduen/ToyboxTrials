@@ -11,8 +11,16 @@ one post-hit multiplier per target. Seeded bots choose builds and respond to pub
 Scene/HUD provide keyboard/mouse and touch; instanced effects cap at 64 projectiles/64 bursts and
 16 mines. Shared host, scoring and storage schemas remain unchanged. This is local simulation;
 server authority and online latency handling remain future work. Balance details are in the module README.
-Validation: 130 unit tests and production build pass; desktop/portrait/landscape Spellbox flows,
-Copycat/Jack practice and a seeded Spellbox/Copycat/Blink Blitz pass without console/page errors.
+Spellbox population revision: live `state.radius` derives from the initial field and contracts
+to surviving-player bands after a 10-second warning. Pure fixed-step rules drive contraction,
+ring-outs, unsupported mines and cues; the scene scales only the stage and camera, leaving toys
+and spell ranges unchanged. Camera zoom reprojects mouse aim, while touch keeps a world target.
+`SLOT_OPTIONS` validates exactly three offers per button for both humans and bots; Mine moves
+between E/R with a legal fallback, preserving unique builds.
+Validation: 136 unit tests and production build pass; desktop/portrait/landscape Spellbox checks
+cover three-option drafts, eight-player sizing, countdown/contraction, mouse/touch aim through
+zoom, casting and ring-outs. Copycat/Jack practice and seeded Spellbox/Copycat/Blink Blitz pass
+without console/page errors.
 Combat balance, real-device performance and online behaviour remain unverified.
 
 Blink Duel: sixth playable local module on `astra/blink-duel`. Pure rules use a 10 ms internal

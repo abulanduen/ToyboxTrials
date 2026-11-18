@@ -70,31 +70,43 @@ function Spells({getState}:{getState:()=>SpellboxState|null}){
 }
 export function SpellboxScene({getState,localId,contestants}:MinigameSceneProps<SpellboxState>){
   const{camera,gl}=useThree();const pointer=useRef<THREE.Vector3|null>(null);
+  const cursor=useRef<THREE.Vector2|null>(null),touchAim=useRef(false);
+  const pointerRay=useMemo(()=>new THREE.Raycaster(),[]),floorPlane=useMemo(()=>new THREE.Plane(new THREE.Vector3(0,1,0),0),[]);
+  const stage=useRef<THREE.Group>(null!),target=useRef<THREE.Group>(null!);
   useEffect(()=>{
-    const ray=new THREE.Raycaster(),ndc=new THREE.Vector2(),plane=new THREE.Plane(new THREE.Vector3(0,1,0),0),hit=new THREE.Vector3();
+    const ray=pointerRay,ndc=new THREE.Vector2(),plane=floorPlane,hit=new THREE.Vector3();
     const active=()=>{const s=getState();return s?.kind==='spellbox-showdown'&&s.phase==='arena'&&s.players.find(p=>p.id===localId)?.alive&&!useMatch.getState().paused&&useMatch.getState().phase==='playing';};
-    const aim=(e:PointerEvent)=>{if(!active())return;const r=gl.domElement.getBoundingClientRect();ndc.set((e.clientX-r.left)/r.width*2-1,1-(e.clientY-r.top)/r.height*2);ray.setFromCamera(ndc,camera);if(ray.ray.intersectPlane(plane,hit)){pointer.current=hit.clone();const p=getState()!.players.find(p=>p.id===localId)!;setSpellboxAim({x:hit.x-p.x,z:hit.z-p.z});}};
+    const aim=(e:PointerEvent)=>{if(!active())return;const r=gl.domElement.getBoundingClientRect();ndc.set((e.clientX-r.left)/r.width*2-1,1-(e.clientY-r.top)/r.height*2);cursor.current=ndc.clone();touchAim.current=e.pointerType==='touch';ray.setFromCamera(ndc,camera);if(ray.ray.intersectPlane(plane,hit)){pointer.current=hit.clone();const p=getState()!.players.find(p=>p.id===localId)!;setSpellboxAim({x:hit.x-p.x,z:hit.z-p.z});}};
     const retain=()=>{const p=getState()?.players.find(p=>p.id===localId);if(active()&&pointer.current&&p)queueSpellboxInput({type:'aim',x:pointer.current.x-p.x,z:pointer.current.z-p.z});};
     const down=(e:PointerEvent)=>{aim(e);retain();if(active()&&e.pointerType==='mouse'&&e.button===0){unlockAudio();queueSpellboxInput({type:'cast',slot:0});}};
-    const clear=()=>{pointer.current=null;clearSpellboxInput();};const leave=(e:PointerEvent)=>{if(e.pointerType==='touch')return;retain();pointer.current=null;setSpellboxAim(null);};
+    const clear=()=>{pointer.current=null;cursor.current=null;clearSpellboxInput();};const leave=(e:PointerEvent)=>{if(e.pointerType==='touch')return;retain();pointer.current=null;cursor.current=null;setSpellboxAim(null);};
     const off=useMatch.subscribe(s=>{if(s.paused||s.phase!=='playing')clear();});const old=gl.domElement.style.touchAction;gl.domElement.style.touchAction='none';
     gl.domElement.addEventListener('pointermove',aim);gl.domElement.addEventListener('pointerdown',down);gl.domElement.addEventListener('pointerleave',leave);window.addEventListener('blur',clear);
     return()=>{off();clear();gl.domElement.style.touchAction=old;gl.domElement.removeEventListener('pointermove',aim);gl.domElement.removeEventListener('pointerdown',down);gl.domElement.removeEventListener('pointerleave',leave);window.removeEventListener('blur',clear);};
-  },[camera,gl,getState,localId]);
-  useEffect(()=>matchBus.on('event',e=>{if(e.type==='spellbox-windup')sfx.crank(1);if(e.type==='spellbox-cast')sfx.bell();if(e.type==='spellbox-hit')sfx.bump();if(e.type==='eliminated')sfx.eliminate();}),[]);
+  },[camera,gl,getState,localId,pointerRay,floorPlane]);
+  useEffect(()=>matchBus.on('event',e=>{if(e.type==='spellbox-windup')sfx.crank(1);if(e.type==='spellbox-cast')sfx.bell();if(e.type==='spellbox-hit')sfx.bump();if(e.type==='eliminated')sfx.eliminate();if(e.type==='spellbox-shrink-warning')sfx.bell();if(e.type==='spellbox-shrink-tick')sfx.tick();}),[]);
   useEffect(()=>{exposeDebug({spellbox:{point:(x:number,z:number,height=.1)=>{const p=new THREE.Vector3(x,height,z).project(camera),r=gl.domElement.getBoundingClientRect();return{x:r.left+(p.x+1)*r.width/2,y:r.top+(1-p.y)*r.height/2};}}});},[camera,gl]);
   useFrame(()=>{
     const cam=camera as THREE.PerspectiveCamera,aspect=cam.aspect,fov=aspect<1?50+(1-aspect)*40:50;if(cam.fov!==fov){cam.fov=fov;cam.updateProjectionMatrix();}
-    const distance=Math.max(56,31/aspect);camera.position.set(0,distance,distance*.52);camera.lookAt(0,0,1);
-    const s=getState();if(s?.kind==='spellbox-showdown'&&pointer.current&&!useMatch.getState().paused){const p=s.players.find(p=>p.id===localId);if(p)setSpellboxAim({x:pointer.current.x-p.x,z:pointer.current.z-p.z});}
+    const s=getState(),radius=s?.kind==='spellbox-showdown'?s.radius:15;
+    const scale=radius/15,distance=Math.max(56,31/aspect)*scale;camera.position.set(0,distance,distance*.52);camera.lookAt(0,0,scale);
+    stage.current.scale.set(scale,1,scale);target.current.visible=s?.kind==='spellbox-showdown'&&!!s.shrink;
+    if(s?.kind==='spellbox-showdown'&&s.shrink)target.current.scale.set(s.shrink.to,1,s.shrink.to);
+    if(s?.kind==='spellbox-showdown'&&pointer.current&&!useMatch.getState().paused){
+      if(cursor.current&&!touchAim.current){camera.updateMatrixWorld();pointerRay.setFromCamera(cursor.current,camera);pointerRay.ray.intersectPlane(floorPlane,pointer.current);}
+      const p=s.players.find(p=>p.id===localId);if(p)setSpellboxAim({x:pointer.current.x-p.x,z:pointer.current.z-p.z});
+    }
   });
   return<group>
+    <group ref={stage}>
     <mesh position={[0,-.55,0]} receiveShadow><cylinderGeometry args={[15.4,15.6,1,64]}/><meshStandardMaterial color={PALETTE.woodMid}/></mesh>
     <mesh position={[0,.01,0]} receiveShadow><cylinderGeometry args={[15,15,.08,64]}/><meshStandardMaterial color={PALETTE.inkPurple} roughness={.8}/></mesh>
     <mesh rotation={[Math.PI/2,0,0]} position={[0,.07,0]}><torusGeometry args={[15,.16,6,64]}/><meshStandardMaterial color={PALETTE.cream}/></mesh>
     {[5,10].map(r=><mesh key={r} position={[0,.065,0]} rotation={[-Math.PI/2,0,0]}><ringGeometry args={[r-.03,r+.03,64]}/><meshBasicMaterial color={PALETTE.cardboard}/></mesh>)}
     {Array.from({length:12},(_,i)=>{const a=i*Math.PI/6;return<mesh key={i} position={[Math.sin(a)*14.5,.08,Math.cos(a)*14.5]} rotation={[-Math.PI/2,0,-a]}><planeGeometry args={[.15,.65]}/><meshBasicMaterial color={PALETTE.honey}/></mesh>;})}
     <mesh position={[0,.07,0]} rotation={[-Math.PI/2,0,0]}><circleGeometry args={[1.8,6]}/><meshBasicMaterial color={PALETTE.toyBlue}/></mesh>
+    </group>
+    <group ref={target} position={[0,.13,0]}>{Array.from({length:32},(_,i)=><mesh key={i} rotation={[-Math.PI/2,0,0]}><ringGeometry args={[.985,1.015,3,1,i*Math.PI/16,Math.PI/28]}/><meshBasicMaterial color={PALETTE.honey} side={THREE.DoubleSide} depthTest={false}/></mesh>)}</group>
     {contestants.map(c=><MageToy key={c.id} c={c} getState={getState}/>)}<Spells getState={getState}/>
   </group>;
 }

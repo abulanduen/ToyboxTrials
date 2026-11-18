@@ -4,7 +4,7 @@ import { unlockAudio } from '../../game/audio';
 import { useMatch } from '../session';
 import type { MinigameSceneProps } from '../types';
 import { clearSpellboxInput, queueSpellboxInput } from './local';
-import { SPELL_IDS, SPELLS } from './spells';
+import { SLOT_OPTIONS, SPELLS } from './spells';
 import type { SpellboxState } from './rules';
 import './spellbox.css';
 const directions:Action[]=['forward','back','left','right'];
@@ -21,14 +21,16 @@ export function SpellboxHud({getState,localId,contestants}:MinigameSceneProps<Sp
   const send=(input:Parameters<typeof queueSpellboxInput>[0])=>{if(active){unlockAudio();queueSpellboxInput(input);}};
   return<div className="spellbox-hud">
     <div className="spellbox-banner" aria-live="polite"><strong>{draft?'SPELLBOX · Choose your three spells':s.phase!=='arena'?'Showdown finished':!me.alive?'Ring-out · Watching the survivors':'SPELLBOX SHOWDOWN'}</strong>
-      <span>{draft?`${Math.ceil(Math.max(0,s.config.draftMs-s.t)/1000)}s to choose · ${me.ready?'Ready':'Pick a slot, then a spell'}`:`${s.players.filter(p=>p.alive).length} toys in · ${Math.ceil(Math.max(0,s.config.durationMs-(s.t-s.arenaAt))/1000)}s`}</span>
+      <span>{draft?`${Math.ceil(Math.max(0,s.config.draftMs-s.t)/1000)}s to choose · ${me.ready?'Ready':'Choose one of three for each button'}`:`${s.players.filter(p=>p.alive).length} toys in · ${Math.ceil(Math.max(0,s.config.durationMs-(s.t-s.arenaAt))/1000)}s`}</span>
       {!draft&&<strong className="spellbox-damage">{Math.round(me.damage)}% damage{me.shieldUntil>s.t?' · Warded':''}</strong>}
       {!draft&&<small>{me.cast?`Casting ${SPELLS[me.cast.spell].name}…`:me.alive?'More damage = stronger knockback. Stay inside the ring.':'Eliminated by ring-out.'}</small>}
     </div>
+    {!draft&&s.shrink&&<div className="spellbox-shrink" data-testid="spellbox-shrink" role="status"><strong>{s.t<s.shrink.startsAt?`ARENA SHRINKS IN ${Math.ceil((s.shrink.startsAt-s.t)/1000)}s`:'ARENA SHRINKING'}</strong><span>Move inside the dashed ring · Target diameter {Math.round(s.shrink.to*2)} cm</span></div>}
     {draft?<section className="spellbox-draft" aria-label="Choose spell build">
       <div className="spellbox-build">{me.build.map((id,i)=><button key={i} data-testid={`spellbox-slot-${i}`} disabled={!editable} aria-pressed={i===slot} onClick={()=>select(i)}><small>{['Q / click','E','R'][i]}</small><strong>{SPELLS[id].name}</strong></button>)}</div>
-      <div className="spellbox-catalogue">{SPELL_IDS.map(id=>{const d=SPELLS[id];return<button key={id} data-testid={`spellbox-equip-${id}`} disabled={!editable} aria-pressed={me.build[slot]===id} onClick={()=>send({type:'equip',slot,spell:id})} style={{borderColor:d.colour}}><strong>{d.name}</strong><small>{d.description}</small><span>{d.damage>0?`${d.damage} damage · ${d.force} ${d.effect==='pull'?'pull':'push'} · `:''}{d.cooldown/1000}s cooldown · {d.windup/1000}s cast</span></button>;})}</div>
-      <div className="spellbox-draft-footer"><small>Three distinct spells. Picking an equipped spell swaps slots. Deadline keeps your current build.</small><button data-testid="spellbox-ready" disabled={!editable} onClick={()=>send({type:'ready'})}>{me.ready?'Ready — waiting':'Lock build & fight'}</button></div>
+      <p className="spellbox-draft-label">Choose {['Q · Ranged','E · Area','R · Utility'][slot]} — one of these three</p>
+      <div className="spellbox-catalogue">{SLOT_OPTIONS[slot].map(id=>{const d=SPELLS[id],other=me.build.indexOf(id);return<button key={id} data-testid={`spellbox-equip-${id}`} disabled={!editable} aria-pressed={me.build[slot]===id} onClick={()=>send({type:'equip',slot,spell:id})} style={{borderColor:d.colour}}><strong>{d.name}</strong><small>{d.description}</small><span>{d.damage>0?`${d.damage} damage · ${d.force} ${d.effect==='pull'?'pull':'push'} · `:''}{d.cooldown/1000}s cooldown · {d.windup/1000}s cast</span>{other>=0&&other!==slot&&<small>Move from {['Q','E','R'][other]}; that button returns to an available option.</small>}</button>;})}</div>
+      <div className="spellbox-draft-footer"><small>Three options per button. Builds stay unique. Deadline keeps your current choices.</small><button data-testid="spellbox-ready" disabled={!editable} onClick={()=>send({type:'ready'})}>{me.ready?'Ready — waiting':'Lock build & fight'}</button></div>
     </section>:<>
       <div className="spellbox-roster" aria-label="Contender damage">{s.players.map(p=><span key={p.id} className={p.alive?'':'out'}>{p.id===localId?'You':contestants.find(c=>c.id===p.id)?.name} · {p.alive?`${Math.round(p.damage)}%`:'Out'}</span>)}</div>
       {playing&&<div className="spellbox-move" aria-label="Movement"><MoveButton action="forward" label="Up"/><div><MoveButton action="left" label="Left"/><MoveButton action="back" label="Down"/><MoveButton action="right" label="Right"/></div></div>}
