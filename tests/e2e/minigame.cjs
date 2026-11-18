@@ -133,7 +133,8 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   await page.waitForSelector('.hud-sign', { timeout: 60000 });
   await page.waitForTimeout(1500);
   const pos = await page.evaluate(() => window.__toybox.state());
-  check('quitting returns to the hub where you left it', Math.hypot(pos.x - 13.9, pos.z + 20.4) < 1.5, `x=${pos.x.toFixed(1)} z=${pos.z.toFixed(1)}`);
+  const cc = await page.evaluate(() => window.__toybox.hub.gates().find((g) => g.game === 'copycat-conductor'));
+  check('quitting returns to the hub where you left it', Math.hypot(pos.x - cc.standX, pos.z - cc.standZ) < 1.5, `x=${pos.x.toFixed(1)} z=${pos.z.toFixed(1)} (gate stand ${cc.standX.toFixed(1)}, ${cc.standZ.toFixed(1)})`);
 
   // --- Jack-in-the-Box practice via the coral gate: type real answers into the answer box
   const J = () => page.evaluate(() => {
