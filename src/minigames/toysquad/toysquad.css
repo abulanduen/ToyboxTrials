@@ -9,7 +9,17 @@
 .squad-workbench button:focus-visible,.squad-formation summary:focus-visible { outline:3px solid #6BA7C8; outline-offset:2px; }
 .squad-workbench button[aria-pressed=true] { background:#EFAE45; }
 .squad-workbench small { display:block; font:12px Nunito,sans-serif; margin:4px 0; }
-.squad-shop { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+.squad-shop { display:grid; grid-template-columns:repeat(5,minmax(120px,1fr)); gap:6px; overflow-x:auto; min-width:0; }
+.squad-shop span { display:block; font-size:11px; }
+.squad-shop-actions { grid-row:1; grid-column:2; display:flex; flex-direction:column; gap:5px; }
+.squad-passive-pick { grid-column:1 / -1; grid-row:1; }
+.squad-passive-pick>div { display:grid; grid-template-columns:repeat(3,minmax(120px,1fr)); gap:6px; overflow-x:auto; }
+.squad-workbench:has(.squad-passive-pick) { max-height:65%; }
+.squad-workbench:has(.squad-passive-pick) .squad-shop { grid-row:2; }
+.squad-workbench:has(.squad-passive-pick) .squad-shop-actions { grid-row:2; }
+.squad-workbench:has(.squad-passive-pick) .squad-formation { grid-row:3; }
+.squad-bench { display:grid; grid-template-columns:repeat(8,minmax(70px,1fr)); overflow-x:auto; gap:4px; border:2px dashed #574D69; padding:5px; }
+.squad-selection { font-size:13px; }
 .squad-shop small { font-size:11px; }
 .squad-formation { margin:5px 0; grid-column:1 / -1; grid-row:2; min-width:0; }
 .squad-formation summary { cursor:pointer; min-height:56px; padding:5px; font-family:Fredoka,sans-serif; }
@@ -23,5 +33,5 @@
 .squad-scoreboard { position:absolute; left:max(12px,env(safe-area-inset-left)); bottom:max(16px,env(safe-area-inset-bottom)); padding:10px; background:#F4E8CE; border:2px solid #C9A57A; border-radius:8px; max-width:calc(100% - 24px); }
 .squad-scoreboard span { display:block; font-size:13px; }
 .squad-scoreboard small { display:block; font-size:11px; }
-@media(max-width:600px) { .squad-banner { font-size:13px; } .squad-workbench button { font-size:12px; } .squad-shop small { display:none; } }
-@media(max-height:500px) { .squad-workbench { max-height:27%; padding:5px; } .squad-workbench:has(details[open]) { max-height:65%; } .squad-shop small,.squad-workbench>small { display:none; } .squad-banner { padding:4px 8px; font-size:13px; } }
+@media(max-width:600px) { .squad-banner { font-size:12px; } .squad-workbench button { font-size:12px; } .squad-workbench { max-height:35%; } }
+@media(max-height:500px) { .squad-workbench { max-height:32%; padding:5px; } .squad-workbench:has(details[open]),.squad-workbench:has(.squad-passive-pick) { max-height:65%; } .squad-workbench>small { display:none; } .squad-banner { padding:4px 8px; font-size:12px; } }

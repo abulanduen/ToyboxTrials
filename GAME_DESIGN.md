@@ -248,16 +248,14 @@ Each contender's energy drains continuously, and play alternates between two pha
 🔧 **Amended (A6):** music is exempt from the "synthesised only" rule.
 
 ### 09 · Toy Squad (Strategy / Auto-battler · 1–8)
-**Local first pass on `astra/toy-squad`:** shop, 8×8 battlefield with four deployment rows per side,
-drag-and-drop formations, turning units with attack particles, upgrades/selling, seeded
-snapshot opponents, deterministic auto-combat, bots and keyboard/touch UI. It remains casual-only.
-The provisional three-round format, points/health victory rules and unit balance are documented
-in `src/minigames/toysquad/README.md`; the final round count/victory condition remain open.
-
-**Local first pass on `astra/toy-squad`:** shop, six-square formations, upgrades/selling, seeded
-snapshot opponents, deterministic auto-combat, bots and keyboard/touch UI. It remains casual-only.
-The provisional three-round format, points/health victory rules and unit balance are documented
-in `src/minigames/toysquad/README.md`; the final round count/victory condition remain open.
+**Implemented on `astra/toy-squad`, revised by the owner:** ten rounds, an 8×8 battlefield,
+two-copy merges up to three stars, a five-slot weighted shop with paid rerolls, reserves,
+level-based deployment caps, and passive choices on rounds 3/6/9. The roster has 62 units:
+16 Common, 14 Uncommon, 13 Rare, 12 Epic, 7 Legendary. Level 1 starts with three deployed slots;
+each round increases level and cap by one, up to level 10 and ten deployed toys. Exact shop odds,
+the roster, passives and provisional balance are in `src/minigames/toysquad/README.md` and
+`src/minigames/toysquad/CATALOGUE.md`. Auto-combat, bots, dragging, particles and damage numbers
+are local; online play and ranked eligibility remain future work. Casual-only for now.
 
 A short, simple auto-battler. Each round, players:
 1. get some currency
@@ -267,7 +265,9 @@ A short, simple auto-battler. Each round, players:
 5. watch the auto-battle and get results
 
 **Toybox:** soldiers, wind-up animals, robots and plastic creatures on a tabletop strategy board.
-**Tech:** small roster, deterministic combat, balanced to avoid dominant combos. Round count and victory condition are open.
+**Tech:** deterministic combat with pathfinding around living units; dead units never block. Ten
+rounds are confirmed. Current scoring (wins 3, draws 1; surviving health breaks ties) and unit
+balance remain provisional pending playtesting.
 
 ### 10 · Spellbox Showdown (Arena / Builds / Knockback · 2–8)
 - Players pick spells to form a build, each with its own effects and cooldowns.

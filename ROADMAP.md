@@ -22,20 +22,14 @@ them. The completed/next sections below describe only the older local clone.
 
 ## Completed first passes
 
-**Toy Squad branch update:** `astra/toy-squad` adds a fifth local playable game, casual-only:
-shop, formation, upgrades/selling, automatic battles, solo clockwork opponents and bots. It builds
-on Midnight and Inferno. Six local catalogue entries still lack runtime modules; Claude's separate
-work includes some of these and the owner reports Music Box Rhythm is now underway there.
-Three-round scoring and snapshot matchups are provisional; see `src/minigames/toysquad/README.md`.
-Owner board revision: Toy Squad now uses an 8×8 battlefield, 32 home deployment squares,
-direct 3D mouse/touch drag-and-drop, target-facing rotation and attack particles. The existing
-six-unit cap and casual-only eligibility remain in place.
-
-**Toy Squad branch update:** `astra/toy-squad` adds a fifth local playable game, casual-only:
-shop, formation, upgrades/selling, automatic battles, solo clockwork opponents and bots. It builds
-on Midnight and Inferno. Six local catalogue entries still lack runtime modules; Claude's separate
-work includes some of these and the owner reports Music Box Rhythm is now underway there.
-Three-round scoring and snapshot matchups are provisional; see `src/minigames/toysquad/README.md`.
+**Toy Squad branch update:** `astra/toy-squad` adds the fifth local playable game, casual-only.
+It now has ten rounds, a 62-unit five-rarity shop using the owner’s exact level odds, paid rerolls,
+two-copy merges up to three stars, eight reserves, level-based 3–10 board slots, and passive
+choices on rounds 3/6/9. The 8×8 drag board retains turning/attack particles and adds hit numbers.
+Pathfinding now routes around living toys and resolves contested moves; dead toys never block.
+See `src/minigames/toysquad/README.md` and `CATALOGUE.md` for mechanics and provisional balance.
+This branch includes Midnight/Inferno; six other local catalogue entries lack modules, including
+work the owner reports Claude is handling separately.
 
 **Midnight branch update:** `astra/midnight-hunger` adds the fourth local playable minigame:
 night/day energy rules, N−1 battery targets, shelters, bots, keyboard/touch controls and tournament

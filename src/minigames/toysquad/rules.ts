@@ -1,145 +1,123 @@
-/** Toy Squad: pure shop, formation and simultaneous auto-combat rules. */
+/** Toy Squad progression, validated shop commands and round lifecycle. */
 import { seededRng, shuffle, subSeed } from '../rng';
 import { rankByKey } from '../scoring';
 import type { MatchEvent, RulesCore } from '../types';
-import { PALETTE } from '../../game/palette';
-
-export const ROSTER = {
-  soldier: { name: 'Tin Soldier', cost: 3, hp: 8, damage: 2, range: 1, colour: PALETTE.toyBlue, role: 'Balanced front line' },
-  robot: { name: 'Wind-up Robot', cost: 4, hp: 14, damage: 1, range: 1, colour: PALETTE.sage, role: 'Durable defender' },
-  hare: { name: 'Spring Hare', cost: 4, hp: 5, damage: 1, range: 3, colour: PALETTE.honey, role: 'Fragile ranged attacker' },
-} as const;
-export type UnitKind = keyof typeof ROSTER;
-export const BOARD_SIZE = 8;
-export const DEPLOY_CELLS = BOARD_SIZE * 4;
-export const MAX_UNITS = 6;
-export const deploymentPosition = (cell: number, side: 0 | 1) => ({ x: cell % BOARD_SIZE, z: side === 0 ? 4 + Math.floor(cell / BOARD_SIZE) : 3 - Math.floor(cell / BOARD_SIZE) });
+import { PASSIVES, ROSTER, SHOP_ODDS, UNIT_POOLS, type PassiveId, type UnitKind } from './catalogue';
+import { makeFighters, tickBattle } from './combat';
+export { ROSTER, type UnitKind } from './catalogue';
+export { tickBattle } from './combat';
+export const BOARD_SIZE = 8, DEPLOY_CELLS = 32, MAX_UNITS = 10, BENCH_SIZE = 8, SHOP_SIZE = 5;
+export const boardLimit = (level: number) => Math.min(MAX_UNITS, level + 2);
+export const deploymentPosition = (cell: number, side: 0 | 1) => ({ x: cell % 8, z: side === 0 ? 4 + Math.floor(cell / 8) : 3 - Math.floor(cell / 8) });
 export interface SquadUnit { id: number; kind: UnitKind; tier: number; cell: number }
 export interface SquadPlayer {
-  id: string; coins: number; units: SquadUnit[]; ready: boolean; points: number; health: number; wins: number;
+  id: string; level: number; coins: number; units: SquadUnit[]; ready: boolean; points: number; health: number; wins: number;
+  shop: (UnitKind | null)[]; roll: number; passives: PassiveId[]; passiveOffers: PassiveId[];
 }
-export type SquadInput = { type: 'buy'; kind: UnitKind } | { type: 'move'; unit: number; cell: number }
-  | { type: 'upgrade' | 'sell'; unit: number } | { type: 'ready' };
-export interface Fighter { id: number; kind: UnitKind; tier: number; side: 0 | 1; x: number; z: number; hp: number; maxHp: number; facing?: number }
+export type SquadInput = { type: 'buy'; slot: number } | { type: 'move'; unit: number; cell: number }
+  | { type: 'merge'; unit: number; other: number } | { type: 'sell' | 'bench'; unit: number }
+  | { type: 'ready' | 'reroll' } | { type: 'passive'; passive: PassiveId };
+export interface Fighter {
+  id: number; kind: UnitKind; tier: number; side: 0 | 1; x: number; z: number; hp: number; maxHp: number;
+  facing: number; armour: number; shield: number; poison: number; stunnedUntil: number; attacks: number;
+  bonusDamage: number; range: number;
+}
 export interface AttackEffect { serial: number; from: number; to: number; kind: UnitKind; x: number; z: number; tx: number; tz: number }
+export interface DamageEffect { serial: number; unit: number; x: number; z: number; amount: number }
 export interface Battle {
-  owner: string; opponent: string; fighters: Fighter[]; done: boolean;
-  outcome: 'win' | 'loss' | 'draw' | null; health: number;
-  attacks?: AttackEffect[]; tick?: number;
+  owner: string; opponent: string; fighters: Fighter[]; done: boolean; outcome: 'win' | 'loss' | 'draw' | null;
+  health: number; attacks: AttackEffect[]; damages: DamageEffect[]; tick: number; homePassives: PassiveId[]; awayPassives: PassiveId[];
 }
-export interface SquadConfig { rounds: number; buildMs: number; battleMs: number; recapMs: number; tickMs: number; income: number }
-export const DEFAULT_CONFIG: SquadConfig = { rounds: 3, buildMs: 30000, battleMs: 20000, recapMs: 3000, tickMs: 500, income: 10 };
+export interface SquadConfig { rounds: number; buildMs: number; battleMs: number; recapMs: number; tickMs: number; income: number; rerollCost: number }
+export const DEFAULT_CONFIG: SquadConfig = { rounds: 10, buildMs: 35000, battleMs: 25000, recapMs: 3000, tickMs: 500, income: 10, rerollCost: 2 };
 export interface SquadState {
   kind: 'toy-squad'; seed: number; config: SquadConfig; t: number; phase: 'build' | 'battle' | 'recap' | 'over';
   phaseEnds: number; nextTick: number; round: number; nextId: number; players: SquadPlayer[]; battles: Battle[]; events: MatchEvent[];
 }
-const validCell = (cell: number) => Number.isInteger(cell) && cell >= 0 && cell < DEPLOY_CELLS;
-export const unitHp = (u: Pick<SquadUnit, 'kind' | 'tier'>) => ROSTER[u.kind].hp + (u.tier - 1) * 5;
-const damage = (u: Fighter) => ROSTER[u.kind].damage + u.tier - 1;
-
+const validCell = (c: number) => Number.isInteger(c) && c >= -BENCH_SIZE && c < DEPLOY_CELLS;
+export const unitHp = (u: Pick<SquadUnit, 'kind' | 'tier'>) => ROSTER[u.kind].hp * 2 ** (u.tier - 1);
+export const rerollPrice = (s: SquadState, p: SquadPlayer) => Math.max(1, s.config.rerollCost - (p.passives.includes('bargain') ? 1 : 0));
+export function rollShop(seed: number, level: number): UnitKind[] {
+  const rng = seededRng(seed), odds = SHOP_ODDS[Math.min(10, Math.max(1, level)) - 1];
+  return Array.from({ length: SHOP_SIZE }, () => {
+    const roll = rng() * 100; let cumulative = 0, rarity = 0;
+    for (; rarity < 4; rarity++) { cumulative += odds[rarity]; if (roll < cumulative) break; }
+    const pool = UNIT_POOLS[rarity]; return pool[Math.floor(rng() * pool.length)];
+  });
+}
+function refresh(s: SquadState, p: SquadPlayer) { p.shop = rollShop(subSeed(s.seed, `${s.round}:${p.id}:${p.roll++}`), p.level); }
+function passiveOffers(s: SquadState, p: SquadPlayer) {
+  p.passiveOffers = [3, 6, 9].includes(s.round) ? shuffle(seededRng(subSeed(s.seed, `passive:${s.round}:${p.id}`)), (Object.keys(PASSIVES) as PassiveId[]).filter(id => !p.passives.includes(id))).slice(0, 3) : [];
+}
+const freeBench = (p: SquadPlayer) => Array.from({ length: BENCH_SIZE }, (_, i) => -i - 1).find(c => !p.units.some(u => u.cell === c));
+export const canMerge = (a: SquadUnit, b: SquadUnit) => a.id !== b.id && a.kind === b.kind && a.tier === b.tier && a.tier < 3;
+function merge(s: SquadState, p: SquadPlayer, source: SquadUnit, target: SquadUnit) {
+  if (!canMerge(source, target)) return;
+  target.tier++; p.units = p.units.filter(u => u !== source); s.events.push({ type: 'squad-upgrade', id: p.id });
+}
 function shop(s: SquadState, p: SquadPlayer, input: SquadInput) {
   if (p.ready) return;
-  if (input.type === 'ready') { p.ready = true; return; }
+  if (input.type === 'passive') {
+    if (p.passiveOffers.includes(input.passive)) { p.passives.push(input.passive); p.passiveOffers = []; }
+    return;
+  }
+  if (input.type === 'ready') { if (!p.passiveOffers.length) p.ready = true; return; }
+  if (input.type === 'reroll') { const cost = rerollPrice(s, p); if (p.coins >= cost) { p.coins -= cost; refresh(s, p); } return; }
   if (input.type === 'buy') {
-    if (!Object.hasOwn(ROSTER, input.kind)) return;
-    const def = ROSTER[input.kind];
-    if (p.coins < def.cost || p.units.length >= MAX_UNITS) return;
-    const cell = Array.from({ length: DEPLOY_CELLS }, (_, i) => i).find(c => !p.units.some(u => u.cell === c))!;
-    p.units.push({ id: s.nextId++, kind: input.kind, tier: 1, cell }); p.coins -= def.cost;
+    if (!Number.isInteger(input.slot) || input.slot < 0 || input.slot >= SHOP_SIZE) return;
+    const kind = p.shop[input.slot]; if (!kind || p.coins < ROSTER[kind].cost) return;
+    const board = p.units.filter(u => u.cell >= 0);
+    const cell = board.length < boardLimit(p.level) ? Array.from({ length: DEPLOY_CELLS }, (_, i) => i).find(c => !board.some(u => u.cell === c)) : freeBench(p);
+    if (cell === undefined) return;
+    p.units.push({ id: s.nextId++, kind, tier: 1, cell }); p.coins -= ROSTER[kind].cost; p.shop[input.slot] = null;
     s.events.push({ type: 'squad-buy', id: p.id }); return;
   }
-  const unit = p.units.find(u => u.id === input.unit);
-  if (!unit) return;
-  if (input.type === 'move' && validCell(input.cell)) {
+  if (!('unit' in input)) return;
+  const unit = p.units.find(u => u.id === input.unit); if (!unit) return;
+  if (input.type === 'merge') { const target = p.units.find(u => u.id === input.other); if (target) merge(s, p, unit, target); }
+  else if (input.type === 'bench') { const cell = freeBench(p); if (cell !== undefined) unit.cell = cell; }
+  else if (input.type === 'move' && validCell(input.cell)) {
     const other = p.units.find(u => u.cell === input.cell);
+    if (other && canMerge(unit, other)) { merge(s, p, unit, other); return; }
+    if (unit.cell < 0 && input.cell >= 0 && !other && p.units.filter(u => u.cell >= 0).length >= boardLimit(p.level)) return;
     if (other) other.cell = unit.cell; unit.cell = input.cell;
-  } else if (input.type === 'upgrade' && unit.tier < 3 && p.coins >= 3) {
-    unit.tier++; p.coins -= 3; s.events.push({ type: 'squad-upgrade', id: p.id });
   } else if (input.type === 'sell') {
-    p.units = p.units.filter(u => u !== unit); p.coins += Math.max(1, ROSTER[unit.kind].cost - 1);
+    p.units = p.units.filter(u => u !== unit); p.coins += Math.max(1, ROSTER[unit.kind].cost * 2 ** (unit.tier - 1) - 1);
   }
 }
-
-function fighters(units: SquadUnit[], side: 0 | 1): Fighter[] {
-  return units.map(u => ({ ...u, side, ...deploymentPosition(u.cell, side), facing: side === 0 ? Math.PI : 0,
-    hp: unitHp(u), maxHp: unitHp(u) }));
-}
-
 function startBattle(s: SquadState) {
   const order = shuffle(seededRng(subSeed(s.seed, s.round)), s.players);
+  for (const p of s.players) if (p.passiveOffers[0]) { p.passives.push(p.passiveOffers[0]); p.passiveOffers = []; }
   s.battles = order.map((p, i) => {
     const opponent = order[(i + 1) % order.length];
-    const enemy: SquadUnit[] = order.length > 1 ? opponent.units : Array.from({ length: s.round + 1 }, (_, n) => ({
-      id: -n - 1, kind: (['soldier', 'robot', 'hare'] as UnitKind[])[(n + s.round) % 3], tier: s.round === 3 && n === 0 ? 2 : 1, cell: n,
+    const enemy: SquadUnit[] = order.length > 1 ? opponent.units.filter(u => u.cell >= 0) : Array.from({ length: boardLimit(s.round) }, (_, n) => ({
+      id: -n - 1, kind: rollShop(subSeed(s.seed, `npc:${s.round}:${n}`), s.round)[0], tier: s.round >= 7 && n < 2 ? 2 : 1,
+      cell: n < 8 ? n : 8 + n % 8,
     }));
-    return { owner: p.id, opponent: order.length > 1 ? opponent.id : 'clockwork',
-      fighters: [...fighters(p.units, 0), ...fighters(enemy, 1)], done: false, outcome: null, health: 0, attacks: [], tick: 0 };
+    const awayPassives = order.length > 1 ? opponent.passives : [];
+    return { owner: p.id, opponent: order.length > 1 ? opponent.id : 'clockwork', fighters: [
+      ...makeFighters(p.units.filter(u => u.cell >= 0), 0, p.passives), ...makeFighters(enemy, 1, awayPassives),
+    ], done: false, outcome: null, health: 0, attacks: [], damages: [], tick: 0, homePassives: [...p.passives], awayPassives: [...awayPassives] };
   });
   s.phase = 'battle'; s.phaseEnds = s.t + s.config.battleMs; s.nextTick = s.t + s.config.tickMs;
   s.events.push({ type: 'squad-battle', round: s.round });
 }
-
-const dist = (a: Fighter, b: Fighter) => Math.abs(a.x - b.x) + Math.abs(a.z - b.z);
-function finishBattle(b: Battle, timeout = false) {
-  const home = b.fighters.filter(u => u.side === 0 && u.hp > 0);
-  const away = b.fighters.filter(u => u.side === 1 && u.hp > 0);
-  if (!timeout && home.length && away.length) return;
-  b.done = true;
-  b.health = home.reduce((n, u) => n + u.hp, 0);
-  b.outcome = home.length && !away.length ? 'win' : away.length && !home.length ? 'loss' : 'draw';
-}
-
-/** Attack intents use the same snapshot; damage is applied together to avoid first-strike bias. */
-export function tickBattle(b: Battle) {
-  if (b.done) return;
-  finishBattle(b); if (b.done) return;
-  const live = b.fighters.filter(u => u.hp > 0);
-  const hits = new Map<Fighter, number>();
-  b.attacks = []; b.tick = (b.tick ?? 0) + 1;
-  const moves: { unit: Fighter; x: number; z: number }[] = [];
-  for (const unit of live) {
-    const enemy = live.filter(u => u.side !== unit.side).sort((a, c) => dist(unit, a) - dist(unit, c) || a.id - c.id)[0];
-    if (!enemy) continue;
-    unit.facing = Math.atan2(enemy.x - unit.x, enemy.z - unit.z);
-    if (dist(unit, enemy) <= ROSTER[unit.kind].range) {
-      hits.set(enemy, (hits.get(enemy) ?? 0) + damage(unit));
-      b.attacks.push({ serial: b.tick * 32 + b.attacks.length, from: unit.id, to: enemy.id,
-        kind: unit.kind, x: unit.x, z: unit.z, tx: enemy.x, tz: enemy.z });
-    }
-    else {
-      const dx = Math.sign(enemy.x - unit.x) * 0.5, dz = Math.sign(enemy.z - unit.z) * 0.5;
-      const choices = [{ x: unit.x + dx, z: unit.z }, { x: unit.x, z: unit.z + dz }]
-        .filter(c => c.x >= 0 && c.x < BOARD_SIZE && c.z >= 0 && c.z < BOARD_SIZE && (c.x !== unit.x || c.z !== unit.z)
-          && !live.some(u => u.x === c.x && u.z === c.z));
-      if (choices[0]) moves.push({ unit, ...choices[0] });
-    }
-  }
-  // Competing moves into one square all wait; no dependence on player iteration order.
-  for (const move of moves) if (moves.filter(m => m.x === move.x && m.z === move.z).length === 1) {
-    move.unit.x = move.x; move.unit.z = move.z;
-  }
-  for (const [target, amount] of hits) target.hp = Math.max(0, target.hp - amount);
-  finishBattle(b);
-}
-
 function recap(s: SquadState) {
   for (const b of s.battles) {
-    finishBattle(b, true);
+    if (!b.done) { b.done = true; b.outcome = 'draw'; b.health = b.fighters.filter(u => u.side === 0 && u.hp > 0).reduce((n, u) => n + u.hp, 0); }
     const p = s.players.find(p => p.id === b.owner)!;
-    p.points += b.outcome === 'win' ? 3 : b.outcome === 'draw' ? 1 : 0;
-    p.health += b.health; if (b.outcome === 'win') p.wins++;
+    p.points += b.outcome === 'win' ? 3 : b.outcome === 'draw' ? 1 : 0; p.health += b.health;
+    if (b.outcome === 'win') p.wins++;
   }
-  s.phase = 'recap'; s.phaseEnds = s.t + s.config.recapMs;
-  s.events.push({ type: 'squad-recap', round: s.round });
+  s.phase = 'recap'; s.phaseEnds = s.t + s.config.recapMs; s.events.push({ type: 'squad-recap', round: s.round });
 }
-
 export const squadRules: RulesCore<SquadState, SquadInput, SquadConfig> = {
   init(contestants, seed, config) {
     const cfg = { ...DEFAULT_CONFIG, ...config };
     if (!contestants.length || contestants.length > 8 || Object.values(cfg).some(v => !Number.isFinite(v) || v <= 0) || !Number.isInteger(cfg.rounds) || !Number.isInteger(cfg.income)) throw new Error('Invalid Toy Squad configuration.');
-    return { kind: 'toy-squad', seed, config: cfg, t: 0, phase: 'build', phaseEnds: cfg.buildMs,
-      nextTick: 0, round: 1, nextId: 1, battles: [], events: [],
-      players: contestants.map(c => ({ id: c.id, coins: cfg.income, units: [], ready: false, points: 0, health: 0, wins: 0 })) };
+    const s: SquadState = { kind: 'toy-squad', seed, config: cfg, t: 0, phase: 'build', phaseEnds: cfg.buildMs, nextTick: 0, round: 1, nextId: 1, battles: [], events: [],
+      players: contestants.map(c => ({ id: c.id, level: 1, coins: cfg.income, units: [], ready: false, points: 0, health: 0, wins: 0, shop: [], roll: 0, passives: [], passiveOffers: [] })) };
+    for (const p of s.players) refresh(s, p); return s;
   },
   step(s, inputs, dtMs) {
     if (s.phase === 'over' || !Number.isFinite(dtMs) || dtMs <= 0) return s;
@@ -161,7 +139,7 @@ export const squadRules: RulesCore<SquadState, SquadInput, SquadConfig> = {
         else if (s.round >= s.config.rounds) { s.phase = 'over'; s.events.push({ type: 'over' }); break; }
         else {
           s.round++; s.phase = 'build'; s.phaseEnds = s.t + s.config.buildMs;
-          for (const p of s.players) { p.coins += s.config.income; p.ready = false; }
+          for (const p of s.players) { p.level = Math.min(10, s.round); p.coins += s.config.income + (p.passives.includes('allowance') ? 2 : 0); p.ready = false; p.roll = 0; refresh(s, p); passiveOffers(s, p); }
           s.events.push({ type: 'squad-build', round: s.round });
         }
       }
@@ -171,8 +149,7 @@ export const squadRules: RulesCore<SquadState, SquadInput, SquadConfig> = {
   isOver: s => s.phase === 'over',
   result(s) {
     const ordered = [...s.players].sort((a, b) => b.points - a.points || b.health - a.health);
-    return { durationMs: s.t, placements: rankByKey(ordered.map(p => ({ contestantId: p.id,
-      score: p.points, key: `${p.points}:${p.health}` }))), stats: { rounds: s.round } };
+    return { durationMs: s.t, placements: rankByKey(ordered.map(p => ({ contestantId: p.id, score: p.points, key: `${p.points}:${p.health}` }))), stats: { rounds: s.round } };
   },
   drainEvents(s) { const events = s.events; s.events = []; return events; },
 };

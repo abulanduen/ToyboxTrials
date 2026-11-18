@@ -4,25 +4,17 @@ Source audit: 18 November 2026, starting commit `59744b7`. Source-inspected, not
 
 ## Implemented client
 
-Toy Squad branch update: fifth local playable module, excluded from tournament/ranked pools by
-its existing metadata. Rules validate shop commands, own formation/currency, simulate independent
-snapshot battles with simultaneous damage, and return shared placements. HUD commands use the
-existing frame-to-fixed-step queue; no host, multiplayer or storage schema changes are required.
-Validation: 71 unit tests and production build pass; Toy Squad desktop/portrait/landscape flows
-and the existing mobile regression suite pass. Format, balance and real-device performance remain
-provisional. Browser-only timing fixes are documented in the module README.
-Board revision: 8×8 arena, validated 32-square home placement and swaps. Captured pointer drags
-preview positions locally and submit one shared-host move command on release; invalid/cancelled
-drops never alter rules state. Combat rules emit facing/attack metadata; the render layer smoothly
-turns models and displays a bounded instanced particle pool, with reduced-motion support.
-Revision validation: 72 unit tests and production build pass; desktop, portrait and landscape
-browser checks pass 3D drags, back-corner retrieval, invalid drops, swaps, facing/attack metadata
-and full rounds/results/restart without console/page errors.
-
-Toy Squad branch update: fifth local playable module, excluded from tournament/ranked pools by
-its existing metadata. Rules validate shop commands, own formation/currency, simulate independent
-snapshot battles with simultaneous damage, and return shared placements. HUD commands use the
-existing frame-to-fixed-step queue; no host, multiplayer or storage schema changes are required.
+Toy Squad: fifth local playable module, casual-only. The owner’s ten-round format uses a
+62-unit weighted shop, reserves, two-copy star merges, level-based deployment limits and
+passive offers on rounds 3/6/9. `catalogue.ts` stores exact odds/unit/passive data; `rules.ts`
+validates purchases, rerolls, merges and rounds; `combat.ts` runs living-unit pathfinding,
+contested movement and simultaneous ability damage. Dead units never block or render.
+The 8×8 drag board reuses the host queue; bounded particle/damage-number pools use match time.
+No host, storage-key/schema, multiplayer or ranked-system changes are needed. Exact design and
+provisional economy/balance are in the module README and CATALOGUE.md.
+Validation: 82 unit tests and production build pass; ten-round desktop/portrait/landscape checks
+and the existing mobile regression suite pass without console/page errors. Strategic balance,
+audio quality and real-device performance remain unverified.
 
 Midnight branch update: `astra/midnight-hunger` adds a fourth lazy-loaded local game. Its pure rules
 split elapsed time at phase, target-movement and energy-depletion boundaries; seeded target movement

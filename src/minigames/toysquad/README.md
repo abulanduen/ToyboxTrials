@@ -1,64 +1,76 @@
-# Toy Squad — local first pass
+# Toy Squad
 
-Entry: Tournament Pavilion → **Or practise one trial → Toy Squad**. Supports solo clockwork
-opponents and up to eight local contenders with bot fill. Casual-only: existing tournament/ranked
-eligibility stays off until this longer strategy game is balanced. No online play is added.
+Local casual auto-battler, 1–8 contenders with solo clockwork squads or bot fill. Entry: Tournament
+Pavilion → **Or practise one trial → Toy Squad**. Ten rounds; still excluded from ranked/tournament
+pools. Online play is not implemented. Full unit/passive designs: [CATALOGUE.md](CATALOGUE.md).
 
-Buy Tin Soldiers (balanced melee), Wind-up Robots (durable melee) and Spring Hares (fragile ranged).
-Drag the 3D toys onto squares in your near half of the 8×8 battlefield. Dropping on a friendly toy
-swaps them; enemy-side/off-board drops cancel. Dragging cancels on pause, focus loss or phase change.
-Open **Formation & upgrades** for keyboard/tap placement: select a toy, then a destination square.
-Upgrade a selected toy for 3 coins (maximum level 3), or sell it for a partial refund.
-Ready locks the squad and starts combat when everyone is ready; the timer starts it otherwise.
-Dragging supports mouse and touch; all management/placement also works with keyboard Tab/Enter.
+## Owner-defined progression
 
-## Provisional format and balance
+- 8×8 battlefield; deploy in the near four rows. Drag toys to place them. Nonmatching occupied
+  squares swap; enemy-side/off-board drops cancel. Mouse, touch and keyboard/tap placement work.
+- Combine **two identical toys at the same stars** for the next star: two 1-stars → one 2-star;
+  two 2-stars → one 3-star. Three stars is the maximum. Drag duplicates together or use the Merge
+  button in **Formation, reserves & merges**. Paid upgrades have been removed.
+- Start at Level 1 with three board slots. Level increases each round through Level 10; capacity
+  is `min(10, level + 2)`, giving 3/4/5/6/7/8/9/10/10/10 slots over the ten rounds.
+- Five shop offers roll independently using the exact odds below. A bought offer stays sold until
+  a reroll or next round. All units within a rarity are equally likely; this prototype has no finite
+  global shared-copy pool. Rarity counts are Common 16, Uncommon 14, Rare 13, Epic 12, Legendary 7.
+- On rounds **3, 6 and 9**, choose one of three unowned passives. It lasts for the run. Ready waits
+  for the choice; the build deadline selects the first offer if the player does not choose.
 
-- Three rounds. Each grants 10 coins; unused coins and units carry over. Units heal fully for each fight.
-- Build 30 seconds; battle maximum 20 seconds; round recap 3 seconds. A finished field ends combat early.
-- An 8×8 board with four deployment rows (32 squares) per side. Your front row is nearest the red
-  centre line; ranged units benefit from back positions. The existing six-unit cap is unchanged.
-  No combining mechanic yet; explicit upgrades provide the optional progression.
-- Units cost 3/4/4 coins. Upgrades add 5 health and 1 damage per level. Refund is base cost minus 1;
-  upgrade spending is not refunded. No interest, reroll, paid shop or permanent currency.
-- Combat ticks every 500 ms. Toys seek nearby enemies, advance, and automatically attack in range.
-  Damage uses simultaneous intents; mutually lethal attacks tie. Combat positions never overlap.
-  Toys turn toward targets. A bounded pool of instanced attack particles travels from attacker to
-  target, uses the simulation clock and reduces motion under the OS preference; it never changes damage.
-  A timeout with both squads alive is a draw, rather than arbitrarily declaring a health winner.
-- With several contenders, a seeded cyclic pairing gives each squad an independent battle against
-  a **snapshot** of the next contender's formation. Odd fields need no bye; results are not a shared
-  live PvP arena. Solo uses an explicit clockwork army that grows from 2 to 4 units over the rounds.
-- Win = 3 points; draw = 1; loss = 0. Highest total wins; accumulated surviving unit health breaks ties.
-  Equal totals/health share a placement. Local records store points; this is not a ranked rating.
+| Level | Common | Uncommon | Rare | Epic | Legendary |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 1 | 80% | 20% | 0% | 0% | 0% |
+| 2 | 70% | 30% | 0% | 0% | 0% |
+| 3 | 55% | 35% | 10% | 0% | 0% |
+| 4 | 45% | 40% | 15% | 0% | 0% |
+| 5 | 35% | 40% | 25% | 0% | 0% |
+| 6 | 25% | 35% | 35% | 5% | 0% |
+| 7 | 20% | 30% | 40% | 10% | 0% |
+| 8 | 18% | 24% | 35% | 20% | 3% |
+| 9 | 15% | 21% | 30% | 28% | 6% |
+| 10 | 12% | 18% | 28% | 32% | 10% |
 
-The round count, matchups, unit stats, costs and victory/scoring rules are first-pass choices for
-the open design questions, not final owner-approved balance.
+## Provisional economy and combat balance
 
-## Implementation and handoff
+- Ten coins each round; unused coins and owned units carry over. Units cost 1/2/3/4/5 by rarity.
+  A reroll costs **2 coins** (1 with Bargain Bin). Eight reserve slots hold purchases when deployed
+  capacity is full. Select reserves then a square to deploy or merge; To reserves removes a board unit.
+- Stars double base health and damage each step (1×/2×/4×). Selling refunds base cost × copies
+  represented minus 1, minimum 1. No interest or permanent economy is added.
+- Build 35 seconds, battle up to 25 seconds, recap 3 seconds. Ready locks the squad. Units heal
+  before combat. Dead units disappear and never block pathfinding or pick input.
+- Living-unit pathfinding seeks attack squares, routes around allies and resolves contested moves
+  rather than making every unit wait. Attacks apply simultaneously. Armour, shields, poison, stun,
+  healing, splash, chain, pierce, execute, fury and lifesteal are data-driven abilities.
+- Hit numbers and particles follow the simulation clock; reduced-motion uses stationary feedback.
+  Stars and rarity colours mark units. These visuals do not affect damage.
+- Solo faces level-weighted clockwork armies. Other fields use seeded cyclic **snapshot** opponents,
+  not a shared live PvP arena. Win 3 points, draw 1, loss 0; accumulated surviving health breaks ties.
+  A timeout with both armies alive is a draw. Records store points; no ranked ratings are awarded.
 
-Pure rules own currency, inventory, formation, ready locking, combat, round transitions and results.
-The HUD queues typed commands into the existing fixed-step host. Queue size is bounded and cleared
-on pause/unmount. Scene/HUD guard against other modules' retained state during loading/intro.
-The host retains countdown, pause, restart, results and local record persistence.
+The owner has specified ten rounds, the counts/odds, stars, capacity progression and passive timing.
+Unit stats/abilities, passive effects, costs/income, reserve size, timings and matchup/scoring balance
+are first-pass designs for playtesting, not claims of a finished competitive meta.
 
-Branch `astra/toy-squad` builds on `astra/midnight-hunger` (including Inferno). Merge/review those
-commits first. Runtime edits outside this folder are limited to Toy Squad's registry entry. Preserve
-Claude's work on Find the Original, movement games, Music Box Rhythm and the room when merging.
+## Implementation / handoff
 
-Checks: `npm test`, `npm run build`, `node tests/e2e/toysquad.cjs`, and the existing mobile regression
-against a preview server (Playwright/Chromium required). Real-device performance, sound mix,
-strategic balance and visual polish still need playtesting.
+`catalogue.ts`: 62 definitions, exact odds and 12 passive designs. `rules.ts`: validated commands,
+shop, merges, currency, progression and results. `combat.ts`: pathfinding, abilities and damage.
+HUD commands and 3D drops enter the existing fixed-step host. Input queues clear on pause/unmount;
+dragging cancels on pause, focus loss and phase change. Storage keys/schemas are unchanged.
 
-Verified 18 November 2026: 71 unit tests and production build pass. Desktop, touch portrait and
-touch landscape browser flows pass purchasing/budget limits, upgrades, formation, selling,
-pause, keyboard/touch Ready, three battles, next-round income, records, restart and hub return
-with no console/page errors. The portrait/short-screen editor scrolls to reach Ready.
-The existing mobile hub/Copycat/Jack/Workshop suite also passes. Its test now queues Copycat
-touches while debug simulation time is frozen and waits for Jack's actual interaction prompt,
-avoiding protocol-latency failures; production game rules were not changed for those checks.
+`astra/toy-squad` includes the preceding Midnight/Inferno commits. Preserve Claude's separate
+games and room pass when merging; runtime edits outside this module are only its registry entry.
 
-8×8 revision: 72 unit tests and production build pass. Mouse/touch checks cover dragging to
-and retrieving from the back corner, occupied-square swaps, rejected enemy-side drops,
-target-facing/attack metadata and the full shop-to-results loop. The short-landscape build camera
-shifts upward to keep deployment squares above the dock. Particle lifetime follows match time.
+Checks: `npm test`, `npm run build`, `node tests/e2e/toysquad.cjs` against a preview server with
+Playwright/Chromium. The test uses controlled duplicates to exercise real purchases, reserve limits
+and merges, then plays all ten rounds and chooses the three passives. Real-device performance,
+audio quality and strategic balance still need human playtesting.
+
+Verified 18 November 2026: 82 unit tests and production build pass. Desktop, portrait-touch and
+landscape-touch browser runs pass stocked purchases, board/reserves, manual merges through three
+stars, paid rerolls, hit numbers, ten level/round transitions, passive picks on 3/6/9, records,
+restart and hub return without console/page errors. The existing mobile hub/Copycat/Jack/Workshop
+regression suite passes too. Headless software rendering is not a real-device FPS measurement.
