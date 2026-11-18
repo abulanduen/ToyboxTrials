@@ -223,6 +223,24 @@ original clockwork referee on a turntable) at the far end.
 **Toybox:** a course built from train track, dominoes, ramps, springs and mechanical traps.
 **Tech:** simple collision, deterministic obstacle patterns, a clear camera and readable boundaries.
 
+**Built (first pass, M6):** one straight 106 cm sprint down a felt track, four obstacles, layout rolled from
+the match seed (the same seed gives every client the same course).
+1. **Domino rows:** three rows block the track except for two gaps each. Walking into a domino topples it
+   (about 0.3 s lost), and it stays down, so the leaders clear a path for the pack.
+2. **Spring pad and block wall:** the wall has one narrow gate. The spring pad on the other side throws a toy
+   17 cm, clean over the wall.
+3. **Ruler bridge:** a spill of jam cuts top speed to 38%. A ruler lies across it on a diagonal at full speed.
+4. **Snap jaws:** three rows of two jaws. Each rattles for 0.55 s, then snaps shut for 0.75 s. A toy inside is
+   stunned for 1.1 s and spat back out; a shut jaw blocks. The two jaws in a row are half a cycle apart, so one
+   side is always open.
+- First across the line wins. Once somebody finishes, the rest have 15 s. The clock is 75 s. Placement is finish
+  time, then distance. Score: finishers get 100 + seconds left on the clock, others get the percentage covered.
+- Toys don't collide with each other. Train track, ramps, laps and moving hazards are not built yet.
+- **Bots** aim at a line through each obstacle with sideways noise and time the jaws. Easy bots barge through
+  dominoes, wobble off the ruler and misjudge jaws. Hard bots hold a clean line.
+- **Untuned:** obstacle spacing, jam slow-down, stun length and jaw timing. A clean run is short (about 12–20 s),
+  so the course probably wants a second half or laps.
+
 ### 08 · Music Box Rhythm (Rhythm / Timing · 1–8)
 - A four-lane rhythm game on **A S J K**, with Perfect, Good and Miss judgements.
 - Includes combo multiplier, accuracy percentage, increasing complexity and multiple tracks. Ranked by score.
