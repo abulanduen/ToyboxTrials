@@ -55,6 +55,13 @@ export function screenLayout(w: number, h: number, inset = { left: 0, right: 0, 
     const ch = clamp(h * 0.17, 124, 170);
     card = { cx: inset.left + 12 + ch * 0.4, cy: top + ch / 2, h: ch };
     area = { x0: inset.left + 6, x1: w - inset.right - 6, y0: top + ch + 10, y1: h - inset.bottom - 14 };
+  } else if (short) {
+    // Phones in landscape: height is what limits the crowd, so the HUD sits in the left column
+    // above the reference card and the crowd gets (almost) the full height — keeps the final
+    // round's toys ≥ 56 px apart.
+    const ch = clamp(h * 0.34, 120, 230);
+    area = { x0: inset.left + 14 + ch * 0.8 + 12, x1: w - inset.right - 150, y0: inset.top + 10, y1: h - inset.bottom - 8 };
+    card = { cx: inset.left + 14 + ch * 0.4, cy: h - inset.bottom - 10 - ch / 2, h: ch };
   } else {
     const ch = clamp(h * 0.36, 130, 230);
     area = { x0: inset.left + 14 + ch * 0.8 + 12, x1: w - inset.right - 150, y0: top, y1: h - inset.bottom - 12 };
