@@ -53,7 +53,7 @@ pools. Online play is not implemented. Full unit/passive designs: [CATALOGUE.md]
 - Living-unit pathfinding seeks attack squares, routes around allies and resolves contested moves
   rather than making every unit wait. Attacks apply simultaneously. Armour, shields, poison, stun,
   healing, splash, chain, pierce, execute, fury and lifesteal are data-driven abilities.
-- Hit numbers and particles follow the simulation clock; reduced-motion uses stationary feedback.
+- Hit numbers and effects follow the simulation clock; reduced-motion uses stationary feedback.
   Stars and rarity colours mark units. These visuals do not affect damage.
 - Solo faces level-weighted clockwork armies. Other fields use seeded cyclic **snapshot** opponents,
   not a shared live PvP arena. Win 3 points, draw 1, loss 0; accumulated surviving health breaks ties.
@@ -100,6 +100,31 @@ Example formations: Tin Soldier marks a target for Paper Panther's marked-target
 Bottle-cap Captain shields Tin allies; Music-box Mage buffs allied spell power; Clockwork and
 Artificer mana bonuses help casters cycle. Venom Violinist poisons groups while Pendulum Paladin
 holds them with stun. These are strategic options, not established optimal builds.
+
+## Toys and effects (presentation only)
+
+- `models.ts` holds one part list per roster id, built from 17 shared primitives with palette
+  colours (tokens or blends of two tokens). `toys.ts` bakes each list into a single vertex-coloured
+  geometry, cached per id and drawn with one shared material, so a toy is one draw call. Clockwork
+  toys carry a brass key. Each toy also has an idle style (march, hop, float, rock and so on).
+- Teams are told apart by the stand: cream on toy blue for the local squad, coral on ink for the
+  opponent. The stand's notch marks the toy's front. Star tier, HP/mana bars, the gold upgrade ring
+  and glow, dragging, hover and facing work as before; fighters now glide between squares, lunge
+  when they attack, spin when they cast, squash when hit and topple when defeated.
+- `effects.ts` gives every unit a basic-attack look (shape, flight path, colours, impact) and a
+  spell look (shape, colours, cast flourish). `Fx.tsx` plays them from the battle's attack events
+  through one pool of 384 particles and one InstancedMesh per shape (18 shapes). Ability visuals:
+  splash and spell blast rings at the real radius, chain hop to the second target, pierce and line
+  beams, cleave arc, drain drops returning to the attacker, heal crosses to the healed ally.
+- Status feedback comes from what changed on each fighter that tick (health or shield up, stunned,
+  poisoned, newly marked or silenced, buffs), so it always matches the simulation.
+- `prefers-reduced-motion`: no idle motion, lunges or gliding; each attack and spell shows
+  stationary markers only (shape on the target, static radius ring or line).
+- `?debug` hooks: `__toybox.squad.gallery(yaw, x, z, distance)` shows all 62 toys on the board
+  (`null` to leave); `__toybox.squadFx.active()` / `.draws()` report live particles and effect draw calls.
+- Budget, counted from the geometry (not a frame-rate claim): toys average about 1,500 triangles
+  (largest about 2,700). A fighter is 4 or 5 draw calls (toy, stand, HP, stars, mana in battle).
+  Real-device frame rate has not been measured.
 
 ## Implementation / handoff
 
