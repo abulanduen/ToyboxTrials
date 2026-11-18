@@ -67,10 +67,10 @@ export const TUTORIALS: Partial<Record<MinigameId, TutorialStep[]>> = {
     { title: 'Stay in the ring', text: 'Cross the edge and you are out. The ring shrinks as toys fall, with a warning first. Last toy inside wins.' },
   ],
   'toy-squad': [
-    { title: 'Buy toys', text: 'Spend coins on toys from the shop. Rerolling shows new offers for a few coins. Your level decides which rarities appear.' },
-    { title: 'Merge for stars', text: 'Collecting matching toys merges them automatically, up to three stars. Stronger toys hit harder and last longer.' },
-    { title: 'Set your formation', text: 'Drag toys onto the board to deploy them, or keep them in reserve. Then press Ready and your squad battles on its own.', touch: 'Drag toys onto the board to deploy them, or keep them in reserve. Then tap Ready and your squad battles on its own.' },
-    { title: 'Ten rounds', text: 'A win scores 3 points and a draw 1. Most points after ten rounds wins. On rounds 3, 6 and 9, choose a passive bonus before you press Ready.' },
+    { title: 'Buy and sell toys', text: 'Spend coins on toys from the shop. Rerolling shows new offers. Drag a toy onto the shop, or select it and press Sell, to sell it. Card colours show rarity.', touch: 'Spend coins on toys from the shop. Rerolling shows new offers. Drag a toy onto the shop, or tap it and tap Sell, to sell it. Card colours show rarity.' },
+    { title: 'Merge for stars', text: 'Matching toys merge automatically, up to three stars. Shop cards show the copies you own. Open the Toy Handbook to browse every toy and star your favourites.' },
+    { title: 'Set your formation', text: 'Drag toys onto the board or keep them in reserve. Toys sharing a trait symbol earn bonuses, listed at the side. Then press Ready and your squad battles on its own.', touch: 'Drag toys onto the board or keep them in reserve. Toys sharing a trait symbol earn bonuses, listed at the side. Then tap Ready and your squad battles on its own.' },
+    { title: 'Ten rounds', text: 'A win scores 3 points and a draw 1. Most points after ten rounds wins. On rounds 3, 6 and 9, you must pick one of three passive bonuses before you can carry on.' },
   ],
 };
 

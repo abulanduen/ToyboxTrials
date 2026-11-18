@@ -55,6 +55,8 @@ interface SettingsSlice {
   rhythmOffsetMs: number;
   /** Show the quick "how to play" tutorial on each minigame's intro card. */
   tutorials: boolean;
+  /** Toy Squad: roster ids the player starred in the Toy Handbook (marked on shop cards). */
+  squadFavourites: string[];
 }
 
 interface SessionSlice {
@@ -116,6 +118,7 @@ export const useGame = create<GameState>()(
       tournamentHistory: [],
       rhythmOffsetMs: 0,
       tutorials: true,
+      squadFavourites: [],
 
       // session
       screen: 'menu',
@@ -177,6 +180,7 @@ export const useGame = create<GameState>()(
         tournamentHistory: s.tournamentHistory,
         rhythmOffsetMs: s.rhythmOffsetMs,
         tutorials: s.tutorials,
+        squadFavourites: s.squadFavourites,
       }),
     },
   ),

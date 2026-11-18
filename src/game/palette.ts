@@ -81,6 +81,15 @@ export const ROOM = {
   fairyLight: '#FFD9A0',
 } as const;
 
+/** Toy Squad rarity colours: common grey, uncommon green, rare blue, epic purple, legendary yellow. */
+export const RARITY = {
+  common: '#A9A6AE',
+  uncommon: PALETTE.sage,
+  rare: PALETTE.toyBlue,
+  epic: '#9A78C9',
+  legendary: PALETTE.honey,
+} as const;
+
 /** Paint jobs available at the Workshop. Body / trim / accent. */
 export const PAINT_JOBS = [
   { name: 'Toy Blue', body: PALETTE.toyBlue, trim: PALETTE.honey, accent: PALETTE.coral },

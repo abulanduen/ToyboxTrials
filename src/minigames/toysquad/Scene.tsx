@@ -2,29 +2,36 @@ import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { PALETTE } from '../../game/palette';
-import { sfx, unlockAudio } from '../../game/audio';
+import { playToyCue, sfx, unlockAudio } from '../../game/audio';
 import { exposeDebug } from '../../game/debug';
 import { matchBus, useMatch } from '../session';
 import type { MinigameSceneProps } from '../types';
 import { BENCH_SIZE, MAX_UNITS, ROSTER, purchaseUpgradeTargets, type Battle, type Fighter, type SquadPlayer, type SquadState, type SquadUnit } from './rules';
 import { boardToWorld, CELL_SIZE, placementPosition, reservePosition, worldToDeployment } from './board';
-import { submitSquadInput, useSquadUI } from './local';
+import { setLocalPlayer, submitSquadInput, useSquadUI } from './local';
+import { drawQueuedPortrait } from './portraits';
+import { audibleBattle, combatVoices, eventCue, type CombatVoice } from './sounds';
 import { RARITY_COLOURS } from './catalogue';
 import { TOY_SPECS, type Motion } from './models';
-import { STAND_GEOMETRY, TIER_GEOMETRY, TOY_GLOW_MATERIAL, TOY_MATERIAL, UNLIT_VERTEX_MATERIAL, toyGeometry } from './toys';
+import { TIER_GEOMETRY, TOY_GLOW_MATERIAL, TOY_MATERIAL, UNLIT_VERTEX_MATERIAL, standGeometry, toyGeometry } from './toys';
 import { SquadFx, cueKey, unitCues } from './Fx';
 
-interface Drag { unit: number; pointer: number; x: number; z: number; cell: number | null; release: () => void }
+interface Drag { unit: number; pointer: number; x: number; z: number; cell: number | null; shop: DOMRect | null; sell: boolean; sx: number; sy: number; moved: boolean; release: () => void }
 type PointerHandler = (e: ThreeEvent<PointerEvent>, id?: number) => void;
 const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.1);
-const editable = (s: SquadState | null, id: string) => s?.kind === 'toy-squad' && s.phase === 'build'
-  && !s.players.find(p => p.id === id)?.ready && !useMatch.getState().paused && useMatch.getState().phase === 'playing';
+/** Squad edits are open: build phase, not readied, not paused, and no passive choice waiting. */
+const editable = (s: SquadState | null, id: string) => {
+  if (s?.kind !== 'toy-squad' || s.phase !== 'build' || useMatch.getState().paused || useMatch.getState().phase !== 'playing') return false;
+  const p = s.players.find(p => p.id === id); return !!p && !p.ready && !p.passiveOffers.length;
+};
 // Shared by every piece: one pick volume (never drawn), bars and the upgrade ring.
 const PICK_GEOMETRY = new THREE.BoxGeometry(2.7, 2.5, 2.7);
 const PICK_MATERIAL = new THREE.MeshBasicMaterial({ visible: false });
 const BAR_GEOMETRY = new THREE.BoxGeometry(1.6, 0.2, 0.2), MANA_GEOMETRY = new THREE.BoxGeometry(1.6, 0.12, 0.2);
 const UPGRADE_GEOMETRY = new THREE.RingGeometry(1.42, 1.68, 24);
 const UPGRADE_MATERIAL = new THREE.MeshBasicMaterial({ color: PALETTE.honey, side: THREE.DoubleSide });
+const SELECT_GEOMETRY = new THREE.RingGeometry(1.5, 1.76, 28);
+const SELECT_MATERIAL = new THREE.MeshBasicMaterial({ color: PALETTE.white, side: THREE.DoubleSide, toneMapped: false });
 const MANA_MATERIAL = new THREE.MeshBasicMaterial({ color: PALETTE.toyBlue });
 const reducedMotion = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const easeInOut = (t: number) => t * t * (3 - 2 * t);
@@ -37,6 +44,7 @@ function readView(s: SquadState, localId: string, stamp: number): View {
   if (stamp === viewStamp && view.state === s && view.t === s.t && view.phase === s.phase) return view;
   viewStamp = stamp; view.state = s; view.t = s.t; view.phase = s.phase;
   view.player = s.players.find(p => p.id === localId); view.battle = s.battles.find(b => b.owner === localId);
+  setLocalPlayer(view.player ?? null);
   view.sides[0].length = 0; view.sides[1].length = 0; view.board.length = 0; view.reserve.length = 0;
   for (const u of view.battle?.fighters ?? []) view.sides[u.side].push(u);
   for (const u of view.player?.units ?? []) (u.cell < 0 ? view.reserve : view.board).push(u);
@@ -69,6 +77,7 @@ function Piece({ slot, side, getState, localId, drag, down, move, up, cancel }: 
 }) {
   const root = useRef<THREE.Group>(null!); const model = useRef<THREE.Group>(null!); const toy = useRef<THREE.Mesh>(null!);
   const hp = useRef<THREE.Mesh>(null!); const mana = useRef<THREE.Mesh>(null!); const stars = useRef<THREE.Mesh>(null!); const upgrade = useRef<THREE.Mesh>(null!);
+  const stand = useRef<THREE.Mesh>(null!);
   const hpMaterial = useMemo(() => new THREE.MeshBasicMaterial({ color: PALETTE.sage }), []);
   useEffect(() => () => hpMaterial.dispose(), [hpMaterial]);
   const currentId = useRef<number | null>(null); const yaw = useRef(0);
@@ -92,7 +101,7 @@ function Piece({ slot, side, getState, localId, drag, down, move, up, cancel }: 
     currentId.current = buildUnit?.id ?? null; root.current.visible = true;
     const def = ROSTER[unit.kind];
     if (look.kind !== unit.kind) { look.kind = unit.kind; toy.current.geometry = toyGeometry(unit.kind); }
-    if (look.rarity !== def.rarity) { look.rarity = def.rarity; hpMaterial.color.set(RARITY_COLOURS[def.rarity]); }
+    if (look.rarity !== def.rarity) { look.rarity = def.rarity; hpMaterial.color.set(RARITY_COLOURS[def.rarity]); stand.current.geometry = standGeometry(side, def.rarity); }
     if (look.tier !== unit.tier) { look.tier = unit.tier; stars.current.geometry = TIER_GEOMETRY[Math.min(3, Math.max(1, unit.tier)) - 1]; }
     const pos = buildUnit ? placementPosition(buildUnit.cell) : fighter!;
     const dragging = buildUnit && drag.current?.unit === buildUnit.id ? drag.current : null;
@@ -142,7 +151,7 @@ function Piece({ slot, side, getState, localId, drag, down, move, up, cancel }: 
     onPointerMove={move} onPointerUp={up} onPointerCancel={cancel} onLostPointerCapture={cancel}>
     <mesh ref={upgrade} position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => {}} geometry={UPGRADE_GEOMETRY} material={UPGRADE_MATERIAL} dispose={null} />
     <mesh position={[0, 1.1, 0]} geometry={PICK_GEOMETRY} material={PICK_MATERIAL} dispose={null} />
-    <mesh geometry={STAND_GEOMETRY[side]} material={TOY_MATERIAL} raycast={() => {}} receiveShadow dispose={null} />
+    <mesh ref={stand} geometry={standGeometry(side, 'Common')} material={TOY_MATERIAL} raycast={() => {}} receiveShadow dispose={null} />
     <group ref={model}><mesh ref={toy} geometry={toyGeometry('soldier')} material={TOY_MATERIAL} raycast={() => {}} castShadow dispose={null} /></group>
     <mesh ref={hp} position={[0, 3.9, 0]} geometry={BAR_GEOMETRY} material={hpMaterial} raycast={() => {}} dispose={null} />
     <mesh ref={mana} position={[0, 3.62, 0]} geometry={MANA_GEOMETRY} material={MANA_MATERIAL} raycast={() => {}} dispose={null} />
@@ -150,10 +159,12 @@ function Piece({ slot, side, getState, localId, drag, down, move, up, cancel }: 
   </group>;
 }
 
+const playVoice = (voice: CombatVoice) => playToyCue(voice === 'spell' ? 'stitch' : voice === 'heavy' ? 'button' : 'hit', voice === 'hit' ? 0.45 : 0.6);
+
 /** `?debug` only: every roster toy on the board at once, for contact-sheet screenshots. */
 function ToyGallery({ yaw }: { yaw: number }) {
   return <group>{Object.keys(ROSTER).map((kind, i) => <group key={kind} position={[boardToWorld(i % 8), 0.3, boardToWorld(Math.floor(i / 8))]}>
-    <mesh geometry={STAND_GEOMETRY[0]} material={TOY_MATERIAL} dispose={null} />
+    <mesh geometry={standGeometry(0, ROSTER[kind].rarity)} material={TOY_MATERIAL} dispose={null} />
     <mesh geometry={toyGeometry(kind)} material={TOY_MATERIAL} rotation={[0, yaw, 0]} castShadow dispose={null} />
   </group>)}</group>;
 }
@@ -192,11 +203,21 @@ export function SquadScene({ getState, localId }: MinigameSceneProps<SquadState>
   const { camera, gl } = useThree(); const drag = useRef<Drag | null>(null); const highlight = useRef<THREE.Mesh>(null!);
   const [gallery, setGallery] = useState<{ yaw: number; x: number; z: number; distance: number } | null>(null);
   const point = useRef(new THREE.Vector3());
-  const cancel = () => { const previous = drag.current; drag.current = null; gl.domElement.style.cursor = ''; previous?.release(); };
+  const selection = useRef<THREE.Mesh>(null!);
+  const heard = useRef<{ battle: Battle | null; tick: number }>({ battle: null, tick: 0 });
+  const cancel = () => {
+    const previous = drag.current; drag.current = null; gl.domElement.style.cursor = ''; previous?.release();
+    if (useSquadUI.getState().dragging !== null) useSquadUI.setState({ dragging: null, overShop: false });
+  };
   const move: PointerHandler = e => {
     const d = drag.current; if (!d || e.pointerId !== d.pointer) return;
     e.stopPropagation(); if (!editable(getState(), localId)) { cancel(); return; }
     if (e.ray.intersectPlane(floorPlane, point.current)) { d.x = point.current.x; d.z = point.current.z; d.cell = worldToDeployment(d.x, d.z); }
+    // The shop strip doubles as the sell target while a toy is being dragged.
+    const x = e.nativeEvent.clientX, y = e.nativeEvent.clientY, shop = d.shop;
+    if (!d.moved && Math.hypot(x - d.sx, y - d.sy) > 8) { d.moved = true; useSquadUI.setState({ dragging: d.unit }); }
+    d.sell = d.moved && !!shop && x >= shop.left && x <= shop.right && y >= shop.top && y <= shop.bottom;
+    if (d.sell !== useSquadUI.getState().overShop) useSquadUI.setState({ overShop: d.sell });
   };
   const down: PointerHandler = (e, id) => {
     if (id === undefined || drag.current || !editable(getState(), localId)) return;
@@ -205,25 +226,31 @@ export function SquadScene({ getState, localId }: MinigameSceneProps<SquadState>
     const target = e.target as unknown as { setPointerCapture(id: number): void; releasePointerCapture(id: number): void };
     target.setPointerCapture(e.pointerId); e.ray.intersectPlane(floorPlane, point.current);
     drag.current = { unit: id, pointer: e.pointerId, x: point.current.x, z: point.current.z, cell: worldToDeployment(point.current.x, point.current.z),
+      shop: document.querySelector('.squad-workbench')?.getBoundingClientRect() ?? null, sell: false, sx: e.nativeEvent.clientX, sy: e.nativeEvent.clientY, moved: false,
       release: () => { try { target.releasePointerCapture(e.pointerId); } catch { /* capture already released */ } } };
     gl.domElement.style.cursor = 'grabbing';
   };
   const up: PointerHandler = e => {
     if (!drag.current || e.pointerId !== drag.current.pointer) return;
     move(e); const d = drag.current;
-    if (d && d.cell !== null && editable(getState(), localId)) submitSquadInput({ type: 'move', unit: d.unit, cell: d.cell });
+    if (d && editable(getState(), localId)) {
+      if (d.sell) { submitSquadInput({ type: 'sell', unit: d.unit }); useSquadUI.setState({ selected: null }); }
+      else if (d.cell !== null) submitSquadInput({ type: 'move', unit: d.unit, cell: d.cell });
+    }
     cancel();
   };
   useEffect(() => {
     const previousTouch = gl.domElement.style.touchAction; gl.domElement.style.touchAction = 'none';
     const off = useMatch.subscribe(s => { if (s.paused || s.phase !== 'playing') cancel(); });
     const blur = () => cancel(); window.addEventListener('blur', blur);
-    return () => { off(); window.removeEventListener('blur', blur); cancel(); gl.domElement.style.touchAction = previousTouch; };
+    return () => { off(); window.removeEventListener('blur', blur); cancel(); setLocalPlayer(null); gl.domElement.style.touchAction = previousTouch; };
   }, [gl]);
+  // Only your own purchases and upgrades make a sound; the other contenders' boards stay silent.
   useEffect(() => matchBus.on('event', e => {
-    if (e.type === 'squad-buy') sfx.click(); if (e.type === 'squad-upgrade') sfx.reward();
-    if (e.type === 'squad-battle') sfx.bell(); if (e.type === 'squad-recap') sfx.musicBox();
-  }), []);
+    const cue = eventCue(e, localId);
+    if (cue === 'buy') sfx.click(); if (cue === 'upgrade') sfx.reward();
+    if (cue === 'battle') sfx.bell(); if (cue === 'recap') sfx.musicBox();
+  }), [localId]);
   useEffect(() => {
     exposeDebug({ squad: { point: (x: number, z: number, height = 0.1) => {
       const projected = new THREE.Vector3(boardToWorld(x), height, boardToWorld(z)).project(camera);
@@ -231,16 +258,30 @@ export function SquadScene({ getState, localId }: MinigameSceneProps<SquadState>
       return { x: rect.left + (projected.x + 1) * rect.width / 2, y: rect.top + (1 - projected.y) * rect.height / 2 };
     }, gallery: (yaw: number | null, x = 3.5, z = 3.8, distance = 36) => setGallery(yaw === null ? null : { yaw, x, z, distance }), names: () => Object.values(ROSTER).map(d => d.name) } });
   }, [camera, gl]);
-  useFrame(({ size }) => {
+  useFrame(({ size, gl: renderer }) => {
+    drawQueuedPortrait(renderer);
+    // Combat sounds come from your own battle only, a few voices per tick at most.
+    const now = getState(), watched = now?.kind === 'toy-squad' && now.phase === 'battle' ? audibleBattle(now.battles, localId) : undefined;
+    if (watched && (watched !== heard.current.battle || watched.tick !== heard.current.tick)) {
+      heard.current.battle = watched; heard.current.tick = watched.tick;
+      if (!useMatch.getState().paused) for (const voice of combatVoices(watched.attacks)) playVoice(voice);
+    }
     const building = getState()?.phase === 'build';
     const aspect = (camera as THREE.PerspectiveCamera).aspect;
     // Battles have no shop dock, so narrow (portrait) screens can frame the board tighter than the build view.
-    const distance = Math.max(building ? size.height < 500 ? 66 : 53 : 42, (building ? 31 : 23) / aspect);
+    // Phone landscape: the shop dock takes the lower third, so aim further forward to keep the reserves above it.
+    const short = size.height < 500;
+    const distance = Math.max(building ? short ? 68 : 53 : 42, (building ? 31 : 23) / aspect);
     camera.position.set(0, distance, distance * 0.58);
-    camera.lookAt(0, 0, building ? 11 : 2.5);
+    camera.lookAt(0, 0, building ? short ? 15 : 11 : 2.5);
     if (gallery) { const x = boardToWorld(gallery.x), z = boardToWorld(gallery.z); camera.position.set(x, gallery.distance, z + gallery.distance * 0.58); camera.lookAt(x, 0, z); }
     if (drag.current && !editable(getState(), localId)) cancel();
-    const d = drag.current; highlight.current.visible = !!d;
+    const d = drag.current; highlight.current.visible = !!d && !d.sell;
+    // A white ring marks the selected toy (the one Sell, Q and the arrow keys act on).
+    const picked = building ? useSquadUI.getState().selected : null, s = getState();
+    const chosen = picked !== null && s?.kind === 'toy-squad' && d?.unit !== picked ? s.players.find(p => p.id === localId)?.units.find(u => u.id === picked) : undefined;
+    selection.current.visible = !!chosen;
+    if (chosen) { const pos = placementPosition(chosen.cell); selection.current.position.set(boardToWorld(pos.x), 0.26, boardToWorld(pos.z)); }
     if (d) {
       const pos = d.cell !== null ? placementPosition(d.cell) : null;
       highlight.current.position.set(pos ? boardToWorld(pos.x) : d.x, 0.15, pos ? boardToWorld(pos.z) : d.z);
@@ -248,7 +289,7 @@ export function SquadScene({ getState, localId }: MinigameSceneProps<SquadState>
     }
   });
   return <group>
-    <mesh position={[0, -0.5, 0]} receiveShadow><boxGeometry args={[30, 1, 30]} /><meshStandardMaterial color={PALETTE.woodMid} /></mesh>
+    <mesh position={[0, -0.5, 0]} receiveShadow onPointerDown={() => { if (!drag.current && useSquadUI.getState().selected !== null) useSquadUI.setState({ selected: null }); }}><boxGeometry args={[30, 1, 30]} /><meshStandardMaterial color={PALETTE.woodMid} /></mesh>
     {Array.from({ length: 64 }, (_, i) => <mesh key={i} position={[boardToWorld(i % 8), 0.06, boardToWorld(Math.floor(i / 8))]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
       <planeGeometry args={[CELL_SIZE - 0.12, CELL_SIZE - 0.12]} /><meshStandardMaterial color={(i % 8 + Math.floor(i / 8)) % 2 ? PALETTE.cardboard : PALETTE.cream} />
     </mesh>)}
@@ -257,6 +298,7 @@ export function SquadScene({ getState, localId }: MinigameSceneProps<SquadState>
       const pos = reservePosition(-i - 1);
       return <mesh key={`bench-${i}`} position={[boardToWorld(pos.x), -0.04, boardToWorld(pos.z)]} receiveShadow><boxGeometry args={[3.25, 0.35, 3.25]} /><meshStandardMaterial color={PALETTE.woodMid} /></mesh>;
     })}
+    <mesh ref={selection} rotation={[-Math.PI / 2, 0, 0]} raycast={() => {}} geometry={SELECT_GEOMETRY} material={SELECT_MATERIAL} dispose={null} />
     <mesh ref={highlight} rotation={[-Math.PI / 2, 0, 0]} raycast={() => {}}><planeGeometry args={[3.3, 3.3]} /><meshBasicMaterial transparent opacity={0.5} depthWrite={false} /></mesh>
     {/* Effects subscribe to the frame loop first, so pieces read this frame's animation cues. */}
     <SquadFx getState={getState} localId={localId} />

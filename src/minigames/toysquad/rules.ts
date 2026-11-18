@@ -22,6 +22,8 @@ export interface Fighter {
   id: number; kind: UnitKind; tier: number; side: 0 | 1; x: number; z: number; hp: number; maxHp: number;
   facing: number; armour: number; shield: number; poison: number; stunnedUntil: number; attacks: number;
   bonusDamage: number; range: number;
+  /** Read-only battle tally for the damage overview: health damage dealt (all, and the part from spells and passives) and taken. Never read by the rules. */
+  stats: { dealt: number; spell: number; taken: number };
   magic: {
     mana: number; maxMana: number; nextCast: number; casts: number; lastSpell: string; baseRange: number;
     spellPower: number; healPower: number; attackMana: number; markBonus: number;
@@ -72,6 +74,8 @@ export function purchaseUpgradeTargets(p: SquadPlayer, kind: UnitKind): SquadUni
   }
   return targets;
 }
+/** Coins refunded for selling a unit: its base cost times the copies it represents, minus one (minimum 1). */
+export const sellValue = (unit: Pick<SquadUnit, 'kind' | 'tier'>) => Math.max(1, ROSTER[unit.kind].cost * 2 ** (unit.tier - 1) - 1);
 export function canBuy(p: SquadPlayer, kind: UnitKind) {
   return p.coins >= ROSTER[kind].cost && (purchaseUpgradeTargets(p, kind).length > 0 || p.units.filter(u => u.cell >= 0).length < boardLimit(p.level) || freeBench(p) !== undefined);
 }
@@ -114,7 +118,7 @@ function shop(s: SquadState, p: SquadPlayer, input: SquadInput) {
     if (unit.cell < 0 && input.cell >= 0 && !other && p.units.filter(u => u.cell >= 0).length >= boardLimit(p.level)) return;
     if (other) other.cell = unit.cell; unit.cell = input.cell;
   } else if (input.type === 'sell') {
-    p.units = p.units.filter(u => u !== unit); p.coins += Math.max(1, ROSTER[unit.kind].cost * 2 ** (unit.tier - 1) - 1);
+    p.units = p.units.filter(u => u !== unit); p.coins += sellValue(unit);
   }
 }
 function startBattle(s: SquadState) {

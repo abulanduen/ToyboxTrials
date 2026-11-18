@@ -1,45 +1,185 @@
-.squad-hud { position:absolute; inset:0; pointer-events:none; color:#2B2433; }
-.squad-banner { position:absolute; left:50%; transform:translateX(-50%); top:max(10px,env(safe-area-inset-top)); width:min(440px,calc(100% - 128px)); background:#F4E8CE; padding:8px 12px; border:3px solid #89B78A; border-radius:10px; text-align:center; box-shadow:0 3px 0 #574D69; }
+.squad-hud { position:absolute; inset:0; pointer-events:none; color:#2B2433; --dock:36%; }
+.squad-icon { display:inline-block; vertical-align:middle; flex:none; }
+.squad-sr { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+.squad-banner { position:absolute; left:50%; transform:translateX(-50%); top:max(10px,env(safe-area-inset-top)); width:min(440px,calc(100% - 144px)); background:#F4E8CE; padding:8px 12px; border:3px solid #89B78A; border-radius:10px; text-align:center; box-shadow:0 3px 0 #574D69; }
 .squad-banner strong,.squad-banner span,.squad-banner small { display:block; }
 .squad-banner strong { font-family:Fredoka,sans-serif; }
-.squad-workbench { display:grid; grid-template-columns:3fr 1fr; gap:5px; pointer-events:auto; position:absolute; bottom:max(12px,env(safe-area-inset-bottom)); left:max(12px,env(safe-area-inset-left)); right:max(12px,env(safe-area-inset-right)); max-height:30%; overflow:auto; overscroll-behavior:contain; background:#F4E8CE; border:3px solid #C9A57A; border-radius:12px; padding:8px; box-shadow:0 4px 0 #574D69; }
-.squad-workbench:has(details[open]) { max-height:48%; }
-.squad-workbench button { min-width:56px; min-height:56px; color:#2B2433; border:2px solid #574D69; border-radius:8px; background:#FFF9EE; padding:6px; font:600 14px Fredoka,sans-serif; cursor:pointer; touch-action:manipulation; }
-.squad-workbench button:disabled { opacity:.5; cursor:default; }
-.squad-workbench button:focus-visible,.squad-formation summary:focus-visible { outline:3px solid #6BA7C8; outline-offset:2px; }
-.squad-workbench button[aria-pressed=true] { background:#EFAE45; }
-.squad-workbench small { display:block; font:12px Nunito,sans-serif; margin:4px 0; }
-.squad-shop { display:grid; grid-template-columns:repeat(5,minmax(120px,1fr)); gap:6px; overflow-x:auto; min-width:0; }
-.squad-shop span { display:block; font-size:11px; }
-.squad-shop-actions { grid-row:1; grid-column:2; display:flex; flex-direction:column; gap:5px; }
-.squad-passive-pick { grid-column:1 / -1; grid-row:1; }
-.squad-passive-pick>div { display:grid; grid-template-columns:repeat(3,minmax(120px,1fr)); gap:6px; overflow-x:auto; }
-.squad-workbench:has(.squad-passive-pick) { max-height:65%; }
-.squad-workbench:has(.squad-passive-pick) .squad-shop { grid-row:2; }
-.squad-workbench:has(.squad-passive-pick) .squad-shop-actions { grid-row:2; }
-.squad-workbench:has(.squad-passive-pick) .squad-formation { grid-row:3; }
-.squad-bench { display:grid; grid-template-columns:repeat(8,minmax(70px,1fr)); overflow-x:auto; gap:4px; border:2px dashed #574D69; padding:5px; }
-.squad-selection { font-size:13px; }
+
+/* Shared button look for the dock, panels and modals. */
+.squad-hud button { min-width:56px; min-height:56px; color:#2B2433; border:2px solid #574D69; border-radius:8px; background:#FFF9EE; padding:6px; font:600 14px Fredoka,sans-serif; cursor:pointer; touch-action:manipulation; pointer-events:auto; }
+.squad-hud button:disabled { opacity:.5; cursor:default; }
+.squad-hud button:focus-visible { outline:3px solid #6BA7C8; outline-offset:2px; }
+.squad-hud button[aria-pressed=true] { background:#EFAE45; }
+
+/* Toy Handbook button and the trait column sit at the left edge. */
+.squad-handbook-open { position:absolute; left:max(8px,env(safe-area-inset-left)); top:max(10px,env(safe-area-inset-top)); width:60px; height:60px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; box-shadow:0 3px 0 #574D69; }
+.squad-handbook-open span { font-size:12px; line-height:1; }
+.squad-trait-column { position:absolute; left:max(8px,env(safe-area-inset-left)); top:calc(max(10px,env(safe-area-inset-top)) + 68px); bottom:calc(var(--dock) + 20px); display:flex; flex-direction:column; flex-wrap:wrap; align-content:flex-start; gap:4px; }
+.squad-hud .squad-trait-column button { width:56px; height:56px; padding:2px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0; background:rgba(255,249,238,.9); font-size:12px; line-height:1.1; }
+.squad-hud .squad-trait-column button.is-active { background:#EFAE45; border-width:3px; }
+.squad-hud .squad-trait-column button[aria-pressed=true] { outline:3px solid #6BA7C8; outline-offset:1px; }
+
+/* Side panels: unit details and trait details. Both have a Close button. */
+.squad-panel { position:absolute; background:#FFF9EE; border:3px solid var(--rarity,#EFAE45); border-radius:10px; padding:8px 10px; font-size:12px; box-shadow:0 3px 0 #574D69; overflow:auto; }
+.squad-panel p { margin:5px 0; }
+.squad-panel small { display:block; font-size:11px; }
+.squad-panel__head { display:flex; align-items:center; gap:8px; }
+.squad-panel__head strong { flex:1; font:600 15px Fredoka,sans-serif; text-align:left; }
+.squad-hud .squad-close { flex:none; display:inline-flex; align-items:center; gap:5px; padding:6px 10px; background:#F4E8CE; }
+.squad-tooltip { top:100px; right:12px; width:min(330px,calc(100% - 24px)); max-height:calc(100% - var(--dock) - 124px); pointer-events:none; }
+.squad-trait-detail { top:calc(max(10px,env(safe-area-inset-top)) + 68px); left:calc(max(8px,env(safe-area-inset-left)) + 66px); width:min(340px,calc(100% - 90px)); max-height:calc(100% - var(--dock) - 100px); pointer-events:auto; border-color:#574D69; z-index:1; }
+.squad-trait-tags { display:flex; flex-wrap:wrap; gap:3px 8px; margin:3px 0; }
+.squad-trait-tags>span { display:inline-flex; align-items:center; gap:3px; font:700 11px Nunito,sans-serif; }
+.squad-trait-members span { display:inline-block; margin:1px 3px 1px 0; padding:0 4px; border-radius:4px; border-left:5px solid var(--rarity,#574D69); background:#F4E8CE; }
+.squad-trait-members span.is-owned { font-weight:800; background:#EFAE45; }
+
+/* Damage overview, on the right (opposite the traits). Folds into a tab; phones start folded. */
+.squad-damage-open { position:absolute; right:max(8px,env(safe-area-inset-right)); top:calc(max(10px,env(safe-area-inset-top)) + 68px); width:60px; height:60px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; box-shadow:0 3px 0 #574D69; }
+.squad-damage-open span { font-size:10.5px; line-height:1; }
+.squad-damage { right:max(8px,env(safe-area-inset-right)); top:calc(max(10px,env(safe-area-inset-top)) + 68px); width:250px; max-height:calc(100% - 200px); pointer-events:auto; border-color:#574D69; }
+.squad-damage .squad-panel__head button { flex:1; }
+.squad-damage .squad-panel__head .squad-close { flex:none; }
+.squad-damage ol { list-style:none; margin:6px 0 2px; padding:0; display:grid; gap:3px; }
+.squad-damage li { display:grid; grid-template-columns:28px minmax(0,1fr) auto; column-gap:6px; align-items:center; padding:2px 4px; border-radius:6px; background:#F4E8CE; }
+.squad-damage li.is-down { opacity:.6; }
+.squad-damage__picture { grid-row:1 / span 2; width:28px; height:28px; border-radius:5px; background:#C9A57A; display:block; }
+.squad-damage__picture img { width:100%; height:100%; display:block; }
+.squad-damage__name { font:700 11px Nunito,sans-serif; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.squad-damage li b { font:600 13px Fredoka,sans-serif; }
+.squad-damage__bar { grid-column:2 / span 2; height:7px; min-width:2px; border-radius:4px; background:#EFAE45; border:1px solid #574D69; display:block; overflow:hidden; }
+.squad-damage[data-mode=taken] .squad-damage__bar { background:#E76B62; }
+.squad-damage__bar i,.squad-damage__key { display:block; height:100%; background:#6BA7C8; }
+.squad-damage__key { display:inline-block; width:10px; height:8px; border:1px solid #574D69; border-radius:2px; vertical-align:middle; }
+/* A toy that just landed (or took) a hit flashes its row. */
+.squad-damage li.is-hit { animation:squad-hit .42s ease-out; }
+@keyframes squad-hit { 0% { background:#EFAE45; transform:scale(1.04); } 100% { background:#F4E8CE; transform:scale(1); } }
+.squad-damage[data-mode=taken] li.is-hit { animation-name:squad-hurt; }
+@keyframes squad-hurt { 0% { background:#E76B62; transform:translateX(-3px); } 40% { transform:translateX(3px); } 100% { background:#F4E8CE; transform:translateX(0); } }
+@media(prefers-reduced-motion:reduce) { .squad-damage li.is-hit { animation:none !important; outline:2px solid #574D69; } }
+
+/* Shop dock: five cards that always fit side by side (no sideways scrolling), then Reroll / Sell / Ready. */
+.squad-workbench { display:grid; grid-template-columns:minmax(0,1fr) 150px; gap:6px; pointer-events:auto; position:absolute; bottom:max(12px,env(safe-area-inset-bottom)); left:max(12px,env(safe-area-inset-left)); right:max(12px,env(safe-area-inset-right)); max-height:var(--dock); overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain; background:#F4E8CE; border:3px solid #C9A57A; border-radius:12px; padding:8px; box-shadow:0 4px 0 #574D69; }
+.squad-workbench small { display:block; font:12px Nunito,sans-serif; margin:2px 0; }
+.squad-shop { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:6px; min-width:0; }
+/* Rarity: a thick coloured border, a coloured picture panel and a coloured rarity label. */
+.squad-hud .squad-card { display:grid; grid-template-columns:52px minmax(0,1fr); gap:6px; align-items:start; text-align:left; padding:4px; min-width:0; border:3px solid var(--rarity,#574D69); box-shadow:inset 0 -4px 0 var(--rarity,transparent); }
+.squad-card__picture { position:relative; width:52px; height:52px; border-radius:6px; background:var(--rarity,#C9A57A); display:block; flex:none; }
+.squad-card__picture img { width:100%; height:100%; display:block; object-fit:contain; pointer-events:none; }
+.squad-card__star { position:absolute; top:-6px; right:-6px; line-height:0; filter:drop-shadow(0 1px 0 #574D69); }
+.squad-card__text { display:block; min-width:0; }
+.squad-card__text strong { display:block; line-height:1.12; overflow-wrap:anywhere; }
+.squad-card__meta { display:flex; flex-wrap:wrap; align-items:center; gap:2px 4px; margin:2px 0; }
+.squad-card__cost { font:800 12px Nunito,sans-serif; background:#EFAE45; border-radius:8px; padding:0 5px; }
+.squad-card__rarity { display:inline-block; font:700 11px Nunito,sans-serif; background:var(--rarity,transparent); border-radius:4px; padding:0 4px; }
 .squad-shop small { font-size:11px; }
-.squad-formation { margin:5px 0; grid-column:1 / -1; grid-row:2; min-width:0; }
-.squad-formation summary { cursor:pointer; min-height:56px; padding:5px; font-family:Fredoka,sans-serif; }
-.squad-grid { display:grid; grid-template-columns:repeat(8,minmax(56px,1fr)); gap:4px; margin:6px 0; overflow-x:auto; }
-.squad-grid button { font-size:11px; }
-.squad-grid span { display:block; font-size:10px; }
-.squad-unit-actions { display:flex; gap:6px; }
-.squad-unit-actions button { flex:1; }
-.squad-ready { grid-column:2; grid-row:1; width:100%; background:#89B78A !important; }
-.squad-workbench>small { grid-column:1 / -1; }
+.squad-owned { display:flex !important; flex-wrap:wrap; align-items:center; gap:1px 5px; font-weight:800 !important; }
+.squad-owned>span { display:inline-flex; align-items:center; white-space:nowrap; }
+.squad-upgrade-label { color:#574D69; background:#EFAE45; border-radius:3px; padding:0 3px; }
+.squad-upgrade-label__short { display:none; }
+.squad-shop-actions { display:flex; flex-direction:column; gap:5px; min-width:0; }
+.squad-shop-actions button { flex:1; }
+.squad-shop-actions small { font-size:11px; margin:0; font-weight:400; }
+.squad-hud .squad-sell:not(:disabled) { background:#E76B62; }
+.squad-hud .squad-ready { background:#89B78A; }
+.squad-hint { grid-column:1 / -1; }
+
+/* While a toy is dragged the whole dock becomes the sell target. */
+.squad-sell-drop { position:absolute; inset:0; z-index:2; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; pointer-events:none; border-radius:9px; background:rgba(244,232,206,.94); outline:4px dashed #E76B62; outline-offset:-8px; font-family:Fredoka,sans-serif; text-align:center; }
+.squad-sell-drop strong { font-size:20px; }
+.squad-sell-drop.is-over { background:#E76B62; color:#FFF9EE; outline-color:#FFF9EE; }
+
+/* Modals: the passive choice and the Toy Handbook, centred over a blurred and dimmed board. */
+.squad-modal { position:absolute; inset:0; z-index:3; pointer-events:auto; display:grid; place-items:center; padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left)); background:rgba(43,36,51,.5); -webkit-backdrop-filter:blur(7px); backdrop-filter:blur(7px); }
+.squad-modal__card { width:min(720px,100%); max-height:100%; overflow:auto; overscroll-behavior:contain; background:#F4E8CE; border:4px solid #EFAE45; border-radius:14px; padding:14px; box-shadow:0 6px 0 #574D69; text-align:center; }
+.squad-modal__card>strong { display:block; font:600 22px Fredoka,sans-serif; }
+.squad-modal__card p { margin:4px 0 10px; font-size:13px; }
+.squad-modal__card>small { display:block; margin-top:8px; font-size:12px; }
+.squad-passive-options { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+.squad-hud .squad-passive-options button { min-height:96px; padding:10px; border-width:3px; }
+.squad-passive-options button strong { display:block; font-size:16px; margin-bottom:4px; }
+.squad-passive-options button small { display:block; font:13px Nunito,sans-serif; }
+.squad-passive-options button:not(:disabled):hover { background:#EFAE45; }
+.squad-handbook__card { width:min(1040px,100%); height:100%; display:flex; flex-direction:column; text-align:left; padding:10px; }
+.squad-handbook__card .squad-panel__head strong { font-size:19px; }
+.squad-handbook__card>p { margin:4px 0; font-size:12px; }
+.squad-filters { display:flex; flex-wrap:wrap; gap:4px; margin:3px 0; }
+.squad-hud .squad-filters button { min-height:56px; display:inline-flex; align-items:center; gap:4px; padding:4px 8px; font-size:12px; border-bottom:5px solid var(--rarity,#574D69); }
+.squad-handbook__list { flex:1; min-height:0; overflow:auto; overscroll-behavior:contain; list-style:none; margin:6px 0 0; padding:0 2px 0 0; display:grid; grid-template-columns:repeat(auto-fill,minmax(290px,1fr)); gap:6px; align-content:start; }
+.squad-handbook__list li { display:grid; grid-template-columns:52px minmax(0,1fr) 56px; gap:8px; align-items:start; background:#FFF9EE; border:3px solid var(--rarity,#574D69); border-radius:8px; padding:5px; }
+.squad-handbook__text strong { display:block; font:600 14px Fredoka,sans-serif; }
+.squad-handbook__text small { display:block; font:11px Nunito,sans-serif; margin:2px 0; }
+.squad-hud .squad-star { width:56px; height:56px; padding:0; display:grid; place-items:center; }
+.squad-hud .squad-star[aria-pressed=true] { background:#574D69; border-color:#EFAE45; border-width:3px; }
+
 .squad-scoreboard { position:absolute; left:max(12px,env(safe-area-inset-left)); bottom:max(16px,env(safe-area-inset-bottom)); padding:10px; background:#F4E8CE; border:2px solid #C9A57A; border-radius:8px; max-width:calc(100% - 24px); }
 .squad-scoreboard span { display:block; font-size:13px; }
 .squad-scoreboard small { display:block; font-size:11px; }
 .squad-combat-kits { pointer-events:auto; max-height:24vh; overflow:auto; font-size:12px; }
 .squad-combat-kits summary { cursor:pointer; min-height:56px; display:flex; align-items:center; font-family:Fredoka,sans-serif; }
-.squad-traits p { margin:6px 0; }
-.squad-tooltip { position:absolute; top:100px; right:12px; width:min(330px,calc(100% - 24px)); max-height:calc(100% - 112px); overflow:auto; pointer-events:none; background:#FFF9EE; border:2px solid #EFAE45; border-radius:10px; padding:10px; font-size:12px; box-shadow:0 3px 0 #574D69; }
-.squad-tooltip small { display:block; font-size:11px; }
-.squad-tooltip p { margin:6px 0; }
-.squad-upgrade-label { color:#574D69; background:#EFAE45; border-radius:3px; }
-@media(max-height:500px) { .squad-tooltip { top:78px; max-height:calc(100% - 90px); width:245px; font-size:11px; } }
-@media(max-width:600px) { .squad-banner { font-size:12px; } .squad-workbench button { font-size:12px; } .squad-workbench { max-height:35%; } }
-@media(max-height:500px) { .squad-workbench { max-height:33%; padding:2px; border-width:2px; } .squad-workbench:has(details[open]),.squad-workbench:has(.squad-passive-pick) { max-height:65%; } .squad-workbench>small,.squad-shop small { display:none; } .squad-shop small.squad-upgrade-label { display:block; font-size:10px; } .squad-banner { padding:4px 8px; font-size:12px; } }
+
+/* Phone portrait: narrow upright cards (picture, name, cost, traits), actions in one row beneath. Panels tuck under the banner, over the far half of the board that is empty while building. */
+@media(max-width:600px) {
+  .squad-hud { --dock:40%; }
+  .squad-banner { font-size:12px; padding:6px 8px; }
+  .squad-workbench { grid-template-columns:minmax(0,1fr); padding:5px; gap:5px; left:max(6px,env(safe-area-inset-left)); right:max(6px,env(safe-area-inset-right)); }
+  .squad-hud button { font-size:12px; }
+  .squad-shop { gap:3px; }
+  .squad-hud .squad-card { grid-template-columns:minmax(0,1fr); justify-items:center; text-align:center; gap:2px; padding:3px 1px 6px; }
+  .squad-card__picture { width:44px; height:44px; }
+  .squad-card__text strong { font-size:10.5px; hyphens:auto; }
+  .squad-card__meta { justify-content:center; gap:1px 2px; }
+  .squad-card .squad-card__rarity,.squad-card__more,.squad-hint { display:none !important; }
+  .squad-owned,.squad-upgrade-label { justify-content:center; font-size:9.5px !important; }
+  .squad-shop-actions { flex-direction:row; }
+  .squad-passive-options { grid-template-columns:minmax(0,1fr); }
+  .squad-hud .squad-passive-options button { min-height:64px; }
+  .squad-tooltip,.squad-trait-detail { top:calc(max(10px,env(safe-area-inset-top)) + 70px); left:70px; right:6px; width:auto; max-height:25%; font-size:11px; padding:5px 8px; }
+  .squad-tooltip p { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; overflow:hidden; margin:3px 0; }
+  .squad-tooltip>small:last-child { display:none; }
+  .squad-handbook__list { grid-template-columns:minmax(0,1fr); }
+  /* Compact filters so the list keeps most of the screen: five rarity columns, then trait symbols only (names stay as labels). */
+  .squad-filters--rarity { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); }
+  .squad-hud .squad-filters--rarity button { justify-content:center; padding:2px; font-size:10.5px; min-width:0; }
+  .squad-filters--traits { display:grid; grid-template-columns:repeat(auto-fill,minmax(56px,1fr)); }
+  .squad-damage { width:210px; max-height:44%; }
+}
+/* Phone landscape: one compact row, actions side by side. */
+@media(max-height:500px) {
+  .squad-hud { --dock:38%; }
+  .squad-tooltip { top:70px; right:8px; width:260px; font-size:11px; padding:5px 8px; }
+  .squad-tooltip p { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; overflow:hidden; margin:3px 0; }
+  .squad-tooltip>small:last-child { display:none; }
+  .squad-trait-detail { width:300px; font-size:11px; }
+  .squad-workbench { grid-template-columns:minmax(0,1fr) 216px; padding:3px; border-width:2px; gap:4px; }
+  .squad-shop { gap:4px; }
+  .squad-hud .squad-card { grid-template-columns:40px minmax(0,1fr); gap:4px; padding:3px; }
+  .squad-card__picture { width:40px; height:40px; }
+  .squad-card__text strong { font-size:11.5px; }
+  .squad-shop-actions { flex-direction:row; gap:4px; }
+  .squad-hud button { font-size:12px; padding:3px; }
+  .squad-card .squad-card__rarity,.squad-card__more,.squad-hint { display:none !important; }
+  .squad-owned,.squad-upgrade-label { font-size:10px !important; }
+  .squad-banner { padding:4px 8px; font-size:12px; }
+  .squad-handbook-open { width:56px; height:56px; }
+  .squad-damage-open { top:calc(max(10px,env(safe-area-inset-top)) + 62px); width:56px; height:56px; }
+  .squad-damage { top:calc(max(10px,env(safe-area-inset-top)) + 62px); width:230px; max-height:calc(100% - 76px); }
+  .squad-trait-column { top:calc(max(10px,env(safe-area-inset-top)) + 60px); }
+  .squad-modal__card { padding:8px; }
+  .squad-modal__card>strong { font-size:17px; }
+  .squad-modal__card p { margin:2px 0 6px; font-size:12px; }
+  .squad-hud .squad-passive-options button { min-height:72px; padding:6px; }
+}
+/* Phones: the whole handbook scrolls as one (title and Close stay pinned), and trait filters show their symbols only. */
+@media(max-width:600px),(max-height:500px) {
+  .squad-handbook__card { display:block; overflow:auto; padding:10px; }
+  .squad-handbook__card .squad-panel__head { position:sticky; top:-10px; z-index:1; margin:-10px -10px 0; padding:8px 10px 6px; background:#F4E8CE; }
+  .squad-handbook__list { overflow:visible; }
+  .squad-hud .squad-filters--traits button { justify-content:center; padding:2px; }
+  .squad-filters--traits button span { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+}
+@media(max-height:500px) { .squad-handbook__card>p { display:none; } }
+/* Phones: the upgrade note shrinks to "Merge → 2 (star)" so the card does not grow taller than the dock. */
+@media(max-width:600px),(max-height:500px) {
+  .squad-upgrade-label__full { display:none; }
+  .squad-upgrade-label__short { display:inline-flex; align-items:center; gap:1px; white-space:nowrap; }
+}

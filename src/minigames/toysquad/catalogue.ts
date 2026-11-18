@@ -1,4 +1,4 @@
-import { PALETTE } from '../../game/palette';
+import { PALETTE, RARITY } from '../../game/palette';
 import { UNIT_KITS, type UnitKit } from './kits';
 
 export const RARITIES = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'] as const;
@@ -64,7 +64,8 @@ const groups: Record<Rarity, Entry[]> = {
     ['infinity-jack', 'Infinity Jack', 46, 10, 3, 'fury', 'robot'],
   ],
 };
-export const RARITY_COLOURS: Record<Rarity, string> = { Common: PALETTE.cream, Uncommon: PALETTE.sage, Rare: PALETTE.toyBlue, Epic: PALETTE.inkPurple, Legendary: PALETTE.honey };
+/** Grey / green / blue / purple / yellow, shown on shop cards, health bars and the outer band of each toy's stand. */
+export const RARITY_COLOURS: Record<Rarity, string> = { Common: RARITY.common, Uncommon: RARITY.uncommon, Rare: RARITY.rare, Epic: RARITY.epic, Legendary: RARITY.legendary };
 export const ROSTER: Record<string, UnitDefinition> = Object.fromEntries(RARITIES.flatMap((rarity, i) => groups[rarity].map(([id, name, hp, damage, range, ability, shape]) => [id, {
   name, rarity, cost: i + 1, hp, damage, range, ability, armour: ability === 'guard' ? i + 1 : 0,
   colour: [PALETTE.toyBlue, PALETTE.sage, PALETTE.honey, PALETTE.coral, PALETTE.inkPurple][i],
