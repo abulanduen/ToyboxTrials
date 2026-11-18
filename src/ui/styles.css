@@ -2471,7 +2471,16 @@ canvas {
   background: var(--honey);
   transition: width 0.12s linear;
 }
+.mbr-banner-wrap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(66px + env(safe-area-inset-top));
+  display: flex;
+  justify-content: center;
+}
 .mbr-banner {
+  max-width: calc(100vw - 24px);
   padding: 6px 16px;
   border-radius: 12px;
   border: 3px solid var(--ink-deep);
@@ -2626,14 +2635,27 @@ canvas {
 }
 @media (orientation: portrait) {
   .mbr-top {
-    top: calc(100px + env(safe-area-inset-top));
-    width: calc(100vw - 32px);
+    left: calc(156px + env(safe-area-inset-left));
+    right: calc(76px + env(safe-area-inset-right));
+    width: auto;
+    transform: none;
+  }
+  .mbr-track {
+    box-sizing: border-box;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.78rem;
+    white-space: nowrap;
+  }
+  .mbr-banner-wrap {
+    top: calc(114px + env(safe-area-inset-top));
   }
   .mbr-pads--touch .mbr-pad {
     min-height: 104px;
   }
   .mbr-field {
-    top: calc(168px + env(safe-area-inset-top));
+    top: calc(162px + env(safe-area-inset-top));
     grid-template-columns: repeat(2, auto);
     gap: 3px 6px;
   }
@@ -2653,8 +2675,14 @@ canvas {
     font-size: 1.35rem;
   }
   .mbr-field {
-    top: calc(96px + env(safe-area-inset-top));
+    top: calc(104px + env(safe-area-inset-top));
     gap: 2px;
+  }
+  .mbr-banner-wrap {
+    top: calc(58px + env(safe-area-inset-top));
+  }
+  .mbr-banner {
+    padding: 3px 14px;
   }
   .mbr-field .cc-chip {
     padding-top: 1px;
@@ -2679,8 +2707,8 @@ canvas {
   display: grid;
   justify-items: center;
   gap: 2px;
-  min-height: 64px;
-  padding: 6px 4px;
+  min-height: 52px;
+  padding: 5px 4px;
   border-radius: 12px;
   border: 2.5px solid var(--ink-deep);
   background: var(--paper);
@@ -2718,8 +2746,9 @@ canvas {
   gap: 6px;
 }
 .mbr-stepper button {
-  min-width: 44px;
-  min-height: 44px;
+  box-sizing: border-box;
+  min-width: 48px;
+  min-height: 48px;
   border-radius: 10px;
   border: 2.5px solid var(--ink-deep);
   background: var(--paper);

@@ -13,7 +13,7 @@ import {
 } from '../../src/minigames/rhythm/rules';
 import { TRACKS, TRACK_IDS, compileTrack, getSong, midiOf, parseBar, trackForSeed } from '../../src/minigames/rhythm/tracks';
 import { createRhythmBot } from '../../src/minigames/rhythm/bot';
-import { createSongClock, pressesToInputs, songTimeAt, syncSongClock } from '../../src/minigames/rhythm/timing';
+import { OFFSET_MAX, TAP_TEST, createSongClock, offsetFromTaps, pressesToInputs, songTimeAt, syncSongClock } from '../../src/minigames/rhythm/timing';
 import { makeBots } from '../../src/minigames/bots';
 import { seededRng, subSeed } from '../../src/minigames/rng';
 import { PAINT_JOBS } from '../../src/game/palette';
@@ -370,6 +370,40 @@ describe('Music Box Rhythm timing (press timestamps → song time)', () => {
     expect(Math.abs(c.est - before)).toBeLessThan(45);
   });
 
+  it('stays accurate through slow, irregular frames (the host caps a frame at 100 ms)', () => {
+    // A starved machine: frames of 30–900 ms. The host adds min(frame, 100) × scale per frame.
+    for (const scale of [1, 0.2]) {
+      const rng = seededRng(99);
+      const c = createSongClock();
+      let perf = 1000;
+      let t = 0;
+      let acc = 0;
+      let trueT = 0;
+      let worst = 0;
+      syncSongClock(c, perf, t);
+      for (let i = 0; i < 300; i++) {
+        const frame = 30 + rng() * rng() * 870;
+        perf += frame;
+        syncSongClock(c, perf, t);
+        const dt = Math.min(frame, 100) * scale;
+        acc += dt;
+        trueT += dt;
+        while (acc >= STEP) {
+          t += STEP;
+          acc -= STEP;
+        }
+        if (i > 20) worst = Math.max(worst, Math.abs(songTimeAt(c, perf) - trueT));
+        // A press halfway through the frame that just ended is placed halfway through its advance.
+        if (i > 20) {
+          expect(songTimeAt(c, perf - frame / 2)).toBeCloseTo(songTimeAt(c, perf) - c.advance / 2, 6);
+          expect(Math.abs(c.advance - dt)).toBeLessThan(6);
+        }
+      }
+      expect(worst).toBeLessThan(STEP); // within one 60 Hz step of the true accumulated time
+      expect(c.scale).toBeCloseTo(scale, 1);
+    }
+  });
+
   it('restarts cleanly when a new match begins (match clock goes back to 0)', () => {
     const { c, perf } = runClock(300, 1000 / 60);
     syncSongClock(c, perf + 16, 0);
@@ -434,5 +468,36 @@ describe('Music Box Rhythm timing (press timestamps → song time)', () => {
       frame(due);
     }
     expect(me(s)).toMatchObject({ perfect: 1, good: 1, miss: 1, stray: 1 });
+  });
+});
+
+describe('Music Box Rhythm latency calibration (tap test)', () => {
+  const t0 = 10_000;
+  const beat = (i: number) => t0 + i * TAP_TEST.beatMs;
+  const tapBeats = Array.from({ length: TAP_TEST.tapBeats }, (_, k) => TAP_TEST.listenBeats + k);
+
+  it('steady taps 40 ms late give +40 ms; early taps give a negative offset', () => {
+    expect(offsetFromTaps(tapBeats.map((i) => beat(i) + 40), t0)).toBe(40);
+    expect(offsetFromTaps(tapBeats.map((i) => beat(i) - 22), t0)).toBe(-20);
+  });
+
+  it('uses the median, so one wild tap does not skew it; rounds to 5 ms', () => {
+    const taps = tapBeats.map((i, k) => beat(i) + 60 + (k % 2 ? 4 : -4));
+    taps[3] = beat(tapBeats[3]) + 200;
+    expect(offsetFromTaps(taps, t0)).toBe(60);
+  });
+
+  it('ignores taps during the listening beats and after the end', () => {
+    const taps = [beat(0) + 150, beat(1) + 150, ...tapBeats.map((i) => beat(i) + 30), beat(TAP_TEST.listenBeats + TAP_TEST.tapBeats) + 30];
+    expect(offsetFromTaps(taps, t0)).toBe(30);
+  });
+
+  it('needs at least five usable taps, and clamps the result', () => {
+    expect(offsetFromTaps(tapBeats.slice(0, 4).map((i) => beat(i) + 30), t0)).toBeNull();
+    expect(offsetFromTaps([], t0)).toBeNull();
+    expect(offsetFromTaps(tapBeats.map((i) => beat(i) + 220), t0)).toBe(220);
+    expect(offsetFromTaps(tapBeats.map((i) => beat(i) + 220), t0)).toBeLessThanOrEqual(OFFSET_MAX);
+    // Half a beat out is ambiguous (late for this beat or early for the next?): not usable.
+    expect(offsetFromTaps(tapBeats.map((i) => beat(i) + 245), t0)).toBeNull();
   });
 });

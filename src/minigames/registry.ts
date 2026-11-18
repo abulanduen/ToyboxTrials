@@ -194,7 +194,7 @@ export const MINIGAMES: MinigameDefinition[] = [
     title: 'Music Box Rhythm',
     tagline: 'Four lanes. A S J K. Stay on the beat.',
     description:
-      'Inside a giant music box, pins ride the turning cylinder towards the comb. Play each pin as it meets the bright line: Perfect or Good builds your combo (up to ×4), a miss or a stray tap breaks it. Everyone plays the same tune. Highest score wins.',
+      'Pins ride the music box cylinder towards the comb. Play each pin as it meets the bright line. Perfect and Good build your combo (up to ×4); a miss or a stray tap breaks it. Highest score wins.',
     category: 'rhythm',
     accent: PALETTE.honey,
     players: { min: 1, max: 8 },

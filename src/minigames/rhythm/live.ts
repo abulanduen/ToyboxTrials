@@ -15,10 +15,7 @@ export const songNow = () => songTimeAt(songClock, performance.now());
 /** The local player's most recent judgement (written by the HUD; read by the `?debug` test hook). */
 export const lastLocalJudge = { judgement: '', delta: 0, count: 0 };
 
-/** Latency calibration limits (ms). */
-export const OFFSET_MIN = -150;
-export const OFFSET_MAX = 250;
-export const clampOffset = (ms: number) => Math.max(OFFSET_MIN, Math.min(OFFSET_MAX, Math.round(ms)));
+export { OFFSET_MAX, OFFSET_MIN, clampOffset } from './timing';
 
 /** Practice picks a track on the intro card; tournaments take one from the match seed. */
 export const useRhythmPrefs = create<{ track: TrackId; setTrack: (t: TrackId) => void }>()((set) => ({

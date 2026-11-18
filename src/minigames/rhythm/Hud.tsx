@@ -95,12 +95,14 @@ export function RhythmHud({ getState, contestants, localId }: MinigameSceneProps
         <div className="mbr-progress" aria-label="Track progress">
           <div style={{ width: `${progress * 100}%` }} />
         </div>
-        {leadIn && (
+      </div>
+      {leadIn && (
+        <div className="mbr-banner-wrap">
           <div className="mbr-banner" data-testid="mbr-banner">
             {touch ? 'Tap a pad as its pin meets the bright line' : 'Press A S J K as each pin meets the bright line'}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="mbr-judge" ref={judgeEl} data-testid="mbr-judge" aria-live="off">
         <strong />

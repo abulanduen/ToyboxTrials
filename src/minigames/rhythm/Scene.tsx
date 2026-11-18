@@ -37,8 +37,8 @@ const CY = R + 3; // axle height
 const LANE_W = LEN / 4;
 const LANE_X = [-1.5, -0.5, 0.5, 1.5].map((k) => k * LANE_W);
 /** Angles are measured from the top of the cylinder towards the camera. */
-const HIT = THREE.MathUtils.degToRad(50);
-const ARC = THREE.MathUtils.degToRad(104);
+const HIT = THREE.MathUtils.degToRad(46);
+const ARC = THREE.MathUtils.degToRad(98);
 const OMEGA = ARC / APPROACH_MS; // rad per ms
 const MAX_PINS = 56;
 const MAX_BEATS = 10;
@@ -52,7 +52,7 @@ const SHELF_Z = -14.5;
 /** In portrait the machine is squeezed sideways so the camera can come closer. */
 const PORTRAIT_SQUEEZE = 0.6;
 
-const steel = new THREE.MeshStandardMaterial({ color: '#C9CDD6', roughness: 0.32, metalness: 0.75 });
+const steel = new THREE.MeshStandardMaterial({ color: '#AEB4C0', roughness: 0.36, metalness: 0.7 });
 const brass = new THREE.MeshStandardMaterial({ color: PALETTE.brass, roughness: 0.35, metalness: 0.8 });
 const GREY = new THREE.Color('#6F6878');
 const LANE_COLORS = LANES.map((l) => new THREE.Color(l.color));
@@ -114,7 +114,7 @@ export function RhythmScene({ getState, contestants, localId }: MinigameScenePro
     const s = getState();
     const m = useMatch.getState();
     if (s) syncSongClock(songClock, performance.now(), s.t);
-    const audible = !!s && m.phase === 'playing' && !m.paused && !s.over && songClock.rate === 1;
+    const audible = !!s && m.phase === 'playing' && !m.paused && !s.over && songClock.scale === 1;
     driveMusic(s ? getSong(s.track) : null, s ? songNow() : 0, audible);
     const a = localAnim.current;
     a.landT += dt;
@@ -190,16 +190,16 @@ function CameraRig({ machine, band }: { machine: React.RefObject<THREE.Group>; b
     }
     const tanHalf = Math.tan(THREE.MathUtils.degToRad(fov / 2));
     const halfW = (LEN / 2 + 3.5) * squeeze;
-    const d = Math.max(portrait ? 32 : 47, halfW / (tanHalf * aspect));
+    const d = Math.max(portrait ? 32 : 43, halfW / (tanHalf * aspect));
     // Touch pads cover the bottom of the screen and the HUD the top: shift the picture up/down.
     const touch = useGame.getState().touchUI;
     const bottomPx = touch ? (portrait ? 150 : 96) : 74;
     const topPx = portrait ? 150 : 70;
     const shift = ((bottomPx - topPx) / size.height) * d * tanHalf; // world units at the target
-    const elev = THREE.MathUtils.degToRad(portrait ? 46 : 40);
+    const elev = THREE.MathUtils.degToRad(portrait ? 54 : 50);
     const t = s.clock.elapsedTime;
-    const ty = CY + 5.5 - shift * Math.cos(elev);
-    const tz = 2 + shift * Math.sin(elev);
+    const ty = CY + 5 - shift * Math.cos(elev);
+    const tz = 0.5 + shift * Math.sin(elev);
     cam.position.set(Math.sin(t * 0.09) * 0.5, ty + Math.sin(elev) * d, tz + Math.cos(elev) * d);
     cam.lookAt(0, ty, tz);
   });
@@ -256,14 +256,14 @@ function Cylinder({ getState, localId }: Pick<MinigameSceneProps<RhythmState>, '
   const lastNow = useRef(0);
   const idle = useRef(0);
   const tmp = useMemo(() => ({ m: new THREE.Matrix4(), q: new THREE.Quaternion(), p: new THREE.Vector3(), s: new THREE.Vector3(), x: new THREE.Vector3(1, 0, 0), c: new THREE.Color() }), []);
-  const pinGeo = useMemo(() => new THREE.BoxGeometry(LANE_W * 0.74, 1.0, 1.5).translate(0, 0.5, 0), []);
-  const beatGeo = useMemo(() => new THREE.BoxGeometry(LEN, 0.06, 0.16).translate(0, 0.03, 0), []);
-  const pinMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.35, emissive: '#3a3238', emissiveIntensity: 0.5 }), []);
+  const pinGeo = useMemo(() => new THREE.BoxGeometry(LANE_W * 0.74, 1.1, 1.8).translate(0, 0.55, 0), []);
+  const beatGeo = useMemo(() => new THREE.BoxGeometry(LEN, 0.05, 0.11).translate(0, 0.025, 0), []);
+  const pinMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.45 }), []);
   const beatMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.5, metalness: 0.4 }), []);
   const laneMats = useMemo(() => LANE_COLORS.map((c) => new THREE.MeshStandardMaterial({ color: new THREE.Color('#3B3346').lerp(c, 0.2), roughness: 0.5, metalness: 0.35 })), []);
   const teeth = useMemo(() => Array.from({ length: 14 }, (_, i) => (i / 14) * Math.PI * 2), []);
-  const barColor = useMemo(() => new THREE.Color('#F4E8CE'), []);
-  const beatColor = useMemo(() => new THREE.Color('#8E84A0'), []);
+  const barColor = useMemo(() => new THREE.Color('#B4A8C6'), []);
+  const beatColor = useMemo(() => new THREE.Color('#6A6080'), []);
 
   const place = (mesh: THREE.InstancedMesh, i: number, x: number, angle: number, scale: number, color: THREE.Color) => {
     tmp.q.setFromAxisAngle(tmp.x, angle);
@@ -312,7 +312,7 @@ function Cylinder({ getState, localId }: Pick<MinigameSceneProps<RhythmState>, '
         const angle = HIT - ahead * OMEGA;
         if (angle > HIT + 0.3) continue;
         const bar = i % song.beatsPerBar === 0;
-        place(beats.current, b++, 0, angle, bar ? 2.2 : 1, bar ? barColor : beatColor);
+        place(beats.current, b++, 0, angle, bar ? 1.8 : 1, bar ? barColor : beatColor);
       }
     }
     pins.current.count = k;
@@ -360,9 +360,16 @@ function Cylinder({ getState, localId }: Pick<MinigameSceneProps<RhythmState>, '
       {/* the strike line: fixed, bright, right across the cylinder */}
       <group rotation={[HIT, 0, 0]}>
         <mesh position={[0, R + 0.1, 0]}>
-          <boxGeometry args={[LEN + 0.6, 0.12, 0.42]} />
+          <boxGeometry args={[LEN + 0.6, 0.14, 0.6]} />
           <meshBasicMaterial color="#FFF7DC" toneMapped={false} />
         </mesh>
+        {/* end markers, so the line can't be mistaken for a beat line */}
+        {[-1, 1].map((s) => (
+          <mesh key={s} position={[s * (LEN / 2 + 0.75), R + 0.75, 0]} rotation={[0, 0, s * Math.PI * 0.5]}>
+            <coneGeometry args={[0.9, 1.5, 3]} />
+            <meshBasicMaterial color="#FFF7DC" toneMapped={false} />
+          </mesh>
+        ))}
       </group>
       <instancedMesh ref={beats} args={[beatGeo, beatMat, MAX_BEATS]} frustumCulled={false} />
       <instancedMesh ref={pins} args={[pinGeo, pinMat, MAX_PINS]} frustumCulled={false} castShadow />

@@ -12,27 +12,8 @@ import { pressStamp } from '../../game/input';
 import { music, sfx, unlockAudio } from '../../game/audio';
 import { TRACKS } from './tracks';
 import { OFFSET_MAX, OFFSET_MIN, clampOffset, useRhythmPrefs } from './live';
+import { TAP_TEST, offsetFromTaps } from './timing';
 
-const BEAT_MS = 500;
-const LISTEN_BEATS = 4;
-const TAP_BEATS = 8;
-const MIN_TAPS = 5;
-
-/** Median timing error of the taps against a steady beat, or null with too few usable taps. */
-export function offsetFromTaps(taps: number[], t0: number, beatMs = BEAT_MS, listen = LISTEN_BEATS, total = LISTEN_BEATS + TAP_BEATS): number | null {
-  const deltas: number[] = [];
-  for (const tap of taps) {
-    const i = Math.round((tap - t0) / beatMs);
-    if (i < listen || i >= total) continue;
-    const d = tap - (t0 + i * beatMs);
-    if (Math.abs(d) <= beatMs * 0.45) deltas.push(d);
-  }
-  if (deltas.length < MIN_TAPS) return null;
-  deltas.sort((a, b) => a - b);
-  const mid = deltas.length >> 1;
-  const median = deltas.length % 2 ? deltas[mid] : (deltas[mid - 1] + deltas[mid]) / 2;
-  return clampOffset(Math.round(median / 5) * 5);
-}
 
 const fmt = (ms: number) => `${ms > 0 ? '+' : ms < 0 ? '−' : ''}${Math.abs(ms)} ms`;
 
@@ -58,8 +39,9 @@ export function RhythmIntro({ practice }: { practice: boolean }) {
               onClick={() => (sfx.click(), setTrack(t.id))}
             >
               <strong>{t.title}</strong>
-              <span className={`mbr-diff mbr-diff--${t.difficulty}`}>{t.difficulty}</span>
-              <span>{t.bpm} bpm</span>
+              <span>
+                <span className={`mbr-diff mbr-diff--${t.difficulty}`}>{t.difficulty}</span> {t.bpm} bpm
+              </span>
             </button>
           ))}
         </div>
@@ -95,7 +77,7 @@ export function RhythmIntro({ practice }: { practice: boolean }) {
         />
       ) : (
         <p className="mbr-note" data-testid="mbr-offset-note">
-          {note || 'Notes feel late or early? Run the tap test, or nudge the offset: + if you keep getting "late".'}
+          {note || 'Hits keep reading "late"? Raise the offset, or run the tap test.'}
         </p>
       )}
     </div>
@@ -123,7 +105,7 @@ function TapTest({ onDone }: { onDone: (offsetMs: number | null, taps: number) =
     let scheduled = false;
     const start = performance.now() + 700;
     t0.current = start;
-    const total = LISTEN_BEATS + TAP_BEATS;
+    const total = TAP_TEST.listenBeats + TAP_TEST.tapBeats;
     const schedule = () => {
       // The context may still be resuming on the first frames after the gesture.
       const at = music.now();
@@ -132,22 +114,22 @@ function TapTest({ onDone }: { onDone: (offsetMs: number | null, taps: number) =
       music.setActive(true);
       const now = performance.now();
       for (let i = 0; i < total; i++) {
-        const when = at + (start + i * BEAT_MS - now) / 1000;
+        const when = at + (start + i * TAP_TEST.beatMs - now) / 1000;
         if (when > at) music.tick(when, i % 4 === 0);
       }
     };
     const loop = () => {
       const t = performance.now() - start;
       if (!scheduled && t < 0) schedule();
-      const beat = Math.floor(t / BEAT_MS);
-      const phase = t < 0 ? 1 : (t % BEAT_MS) / BEAT_MS;
+      const beat = Math.floor(t / TAP_TEST.beatMs);
+      const phase = t < 0 ? 1 : (t % TAP_TEST.beatMs) / TAP_TEST.beatMs;
       if (dot.current) dot.current.style.transform = `scale(${1 + 0.55 * Math.max(0, 1 - phase * 3.2)})`;
       if (label.current) {
         label.current.textContent =
-          t < 0 ? 'Get ready…' : beat < LISTEN_BEATS ? `Listen… ${LISTEN_BEATS - beat}` : beat < total ? `Tap along! ${total - beat}` : 'Done';
+          t < 0 ? 'Get ready…' : beat < TAP_TEST.listenBeats ? `Listen… ${TAP_TEST.listenBeats - beat}` : beat < total ? `Tap along! ${total - beat}` : 'Done';
       }
-      if (t > total * BEAT_MS + 250) {
-        done.current(offsetFromTaps(taps.current, start), taps.current.filter((x) => x >= start + (LISTEN_BEATS - 0.5) * BEAT_MS).length);
+      if (t > total * TAP_TEST.beatMs + 250) {
+        done.current(offsetFromTaps(taps.current, start), taps.current.filter((x) => x >= start + (TAP_TEST.listenBeats - 0.5) * TAP_TEST.beatMs).length);
         return;
       }
       raf = requestAnimationFrame(loop);
