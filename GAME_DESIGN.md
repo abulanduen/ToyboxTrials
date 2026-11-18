@@ -211,11 +211,11 @@ Each contender's energy drains continuously, and play alternates between two pha
 **Tech:** deterministic drain maths and server-controlled phase timing, with rates balanced in playtests.
 
 ### 04 · Find the Original (Observation / Speed · 1–8) — ✅ built (M5)
-- **Baldwyn** is an original wind-up tin gentleman: sage barrel body, honey belt, two cream buttons, cream head,
-  round ink eyes, coral nose, handlebar moustache, an ink-purple top hat with a coral band tipped over one ear,
-  and a brass key in his side. **Not-Baldwyns** get one to three details wrong, from obvious (blue body, coral
-  hat, no hat) through medium (belt, nose, moustache, key side, hat band) to subtle (a missing button, hat tipped
-  the other way, one eye shut).
+- **Baldwyn** is an original wind-up tin gentleman built from a different combination of toy parts every match
+  (seeded): body shape and paint, belt, buttons, head, eyes, nose, moustache, hat and its band and tilt, key
+  style and side, neckwear, eyewear and something held in a mitt. **Not-Baldwyns** are that match's Baldwyn with
+  one to three parts swapped, from obvious (body, paint, hat) through medium (belt, nose, key side, bow tie) to
+  subtle (a button more or less, hat tipped the other way, one eye shut). See `src/minigames/findoriginal/README.md`.
 - **Five rounds.** Each opens with a reference card ("This is Baldwyn"), which then stays in the corner of the
   screen. Crowds grow 6 → 12 → 15 → 20 → 24. Mistakes go from two or three obvious ones to a single subtle one,
   and from round 3 the crowd shuffles and turns on the spot.
@@ -234,7 +234,7 @@ function of the state, so all clients agree without sending positions. Portrait 
 turned on its side. The crowd is instanced (one draw call per body part). Picking is in screen space with
 finger-sized targets. All values above are first-pass and untuned with real players.
 🔧 **Amended (A5):** client-side anti-cheat is "impractical, not impossible". There is no target flag in the
-match state: a toy is Baldwyn only because its look has no mistakes.
+match state: a toy is Baldwyn only because its look equals that match's Baldwyn.
 
 ### 05 · Red Light, Green Light (Reflexes / Movement · 2–8)
 - A giant mechanical referee alternates green (move) and red (stop) on a toy-soldier runway.

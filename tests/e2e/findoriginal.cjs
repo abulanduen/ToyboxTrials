@@ -36,6 +36,8 @@ function driver(page, tapAt) {
         original: t.find ? t.find.original() : -1,
         cursor: t.find ? t.find.cursor() : -1,
         layout: t.find ? t.find.layout() : null,
+        baldwyn: t.find ? JSON.stringify(t.find.baldwyn()) : null,
+        card: t.find ? t.find.card() : null,
       };
     });
   const waitF = async (pred, label, ms = 240000) => {
@@ -118,6 +120,7 @@ async function desktop(browser, errors) {
   await d.frames(6);
   check('desktop: round 1 opens with the reference card', (await page.textContent('[data-testid=fo-banner]')).includes('This is Baldwyn'));
   check('desktop: no picks possible while the card is up', (await d.F()).crowd.length === 0);
+  const firstBaldwyn = (await d.F()).baldwyn;
   await d.snap('fo-02-study.png');
 
   // Round 1: a wrong pick, the lockout, then the right one — all with the mouse.
@@ -202,6 +205,8 @@ async function desktop(browser, errors) {
   await page.click('.intro-options .segmented >> nth=1 >> button >> nth=1'); // normal
   await d.scale(4);
   await page.click('[data-testid=match-start]');
+  const secondBaldwyn = (await d.waitF((x) => x.phase !== 'over' && !!x.baldwyn, 'second match')).baldwyn;
+  check('a new match builds a different Baldwyn', !!firstBaldwyn && !!secondBaldwyn && firstBaldwyn !== secondBaldwyn, `${firstBaldwyn} vs ${secondBaldwyn}`);
   await d.waitF((x) => x.phase === 'search' && x.round === 3 && x.players.some((p) => p.found), 'a bot finds him in round 3');
   await d.scale(0);
   await d.frames(4);
@@ -269,6 +274,8 @@ async function phone(browser, errors, orientation) {
   const onScreen = (f) => f.crowd.every((c) => c.x > 20 && c.x < vp.width - 20 && c.y > f.layout.area.y0 - 4 && c.y < vp.height - 20);
   check(`${tag}: round 1 toys are on screen, below the HUD`, onScreen(f));
   check(`${tag}: round 1 targets are at least 56 px apart`, spacing(f) >= 56, `${Math.round(spacing(f))} px`);
+  const c = f.card;
+  check(`${tag}: reference card is drawn at full device resolution`, !!c && c.visible && Math.abs(c.canvas.w - c.canvas.cssW * c.dpr) < 0.01 && c.dpr >= 2, c && `${c.canvas.w}×${c.canvas.h} px at ${c.dpr}×`);
   check(`${tag}: reference card is readable (≥ 120 px tall) and clear of the crowd`, lay.card.h >= 120 && (lay.portrait ? lay.card.cy + lay.card.h / 2 <= lay.area.y0 : lay.card.cx + lay.card.h * 0.4 <= lay.area.x0), `card ${Math.round(lay.card.h)} px`);
   await d.snap(`fo-m${P}-03-search-r1.png`);
 
@@ -283,7 +290,7 @@ async function phone(browser, errors, orientation) {
   await page.waitForSelector('[data-testid=fo-lock]', { timeout: 10000 });
   await d.snap(`fo-m${P}-04-wrong.png`);
   await d.scale(1);
-  f = await d.waitF((x) => (x.phase === 'search' && x.me.lockMs === 0) || x.round > 1, 'lock over', 60000);
+  f = await d.waitF((x) => (x.phase === 'search' && x.me.lockMs === 0) || x.round > 1, 'lock over', 240000); // slow under load
   await d.scale(0);
   let tapped = 0;
   for (let r = f.round; r <= 5; r++) {

@@ -1,7 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_CONFIG, findRules, originalIndex, toyPose, type FindInput, type FindState } from '../../src/minigames/findoriginal/rules';
+import * as THREE from 'three';
+import { DEFAULT_CONFIG, findRules, originalIndex, rollDecoy, toyPose, type FindInput, type FindState } from '../../src/minigames/findoriginal/rules';
 import { createFindBot } from '../../src/minigames/findoriginal/bot';
-import { TRAITS, T, isOriginal, normalise, traitCount } from '../../src/minigames/findoriginal/traits';
+import {
+  SLOTS,
+  SLOT_IDS,
+  canonical,
+  differences,
+  hidden,
+  lookKey,
+  makeBaldwyn,
+  opt,
+  sameLook,
+  swap,
+  swapsFor,
+  valid,
+  type Look,
+} from '../../src/minigames/findoriginal/looks';
+import { PARTS } from '../../src/minigames/findoriginal/figure';
 import { seededRng, subSeed } from '../../src/minigames/rng';
 import { PAINT_JOBS } from '../../src/game/palette';
 import type { BotDifficulty, Contestant } from '../../src/minigames/types';
@@ -20,7 +36,35 @@ function run(s: FindState, pred: (s: FindState) => boolean, inputs: Record<strin
   return s;
 }
 const toSearch = (s: FindState) => run(s, (x) => x.phase === 'search');
-const decoy = (s: FindState, skip: number[] = []) => s.toys.findIndex((t, i) => !isOriginal(t.traits) && !skip.includes(i));
+const isBaldwyn = (s: FindState, i: number) => sameLook(s.toys[i].look, s.baldwyn);
+const decoy = (s: FindState, skip: number[] = []) => s.toys.findIndex((_, i) => !isBaldwyn(s, i) && !skip.includes(i));
+
+/**
+ * What the renderer draws for a look: every part's matrix and colour (null = part not there).
+ * Two looks are visibly different if a part appears/disappears, moves, turns or changes size
+ * noticeably, or changes to a clearly different paint.
+ */
+function drawn(look: Look) {
+  const m = new THREE.Matrix4();
+  const rgb = { r: 0, g: 0, b: 0 };
+  return PARTS.map((p) => {
+    if (!p.place(look, 0.6, m)) return null;
+    p.colour(look).getRGB(rgb, THREE.SRGBColorSpace);
+    return { e: m.elements.slice(), c: [rgb.r, rgb.g, rgb.b] };
+  });
+}
+function visiblyDifferent(a: Look, b: Look) {
+  const da = drawn(a);
+  const db = drawn(b);
+  return da.some((x, i) => {
+    const y = db[i];
+    if (!x || !y) return x !== y;
+    const moved = x.e.some((v, k) => Math.abs(v - y.e[k]) > 0.08);
+    const repainted = Math.hypot(x.c[0] - y.c[0], x.c[1] - y.c[1], x.c[2] - y.c[2]) > 0.15;
+    return moved || repainted;
+  });
+}
+const baldwyns = (n: number) => Array.from({ length: n }, (_, i) => findRules.init([mk('you')], 1000 + i * 7919).baldwyn);
 const P = (s: FindState, id: string) => s.players.find((p) => p.id === id)!;
 
 /** A whole match with bots (and optionally a scripted human), exactly as the host runs it. */
@@ -58,17 +102,18 @@ describe('find the original: crowds', () => {
         run(s, (x) => x.phase === 'search' && x.round === r);
         const spec = DEFAULT_CONFIG.rounds[r - 1];
         expect(s.toys.length).toBe(spec.cols * spec.rows);
-        expect(s.toys.filter((t) => isOriginal(t.traits)).length).toBe(1);
+        expect(s.toys.filter((t) => sameLook(t.look, s.baldwyn)).length).toBe(1);
         expect(new Set(s.toys.map((t) => `${t.col},${t.row}`)).size).toBe(s.toys.length);
         for (const t of s.toys) {
           expect(Object.keys(t)).not.toContain('target');
-          if (isOriginal(t.traits)) continue;
-          expect(normalise(t.traits)).toBe(t.traits);
-          const n = traitCount(t.traits);
-          expect(n).toBeGreaterThanOrEqual(1);
-          expect(n).toBeLessThanOrEqual(spec.diffs[1]);
-          // Every decoy carries at least one mistake as readable as the round promises.
-          expect(TRAITS.some((d) => t.traits & d.bit && d.tier <= spec.needTier)).toBe(true);
+          if (sameLook(t.look, s.baldwyn)) continue;
+          expect(canonical({ ...t.look })).toEqual(t.look);
+          expect(valid(t.look)).toBe(true);
+          const d = differences(s.baldwyn, t.look);
+          expect(d.length).toBeGreaterThanOrEqual(spec.diffs[0]);
+          expect(d.length).toBeLessThanOrEqual(spec.diffs[1]);
+          // Every decoy carries at least one difference as readable as the round promises.
+          expect(d.some((x) => x.tier <= spec.needTier)).toBe(true);
         }
         findRules.step(s, { you: [{ pick: originalIndex(s) }] }, STEP);
       }
@@ -105,9 +150,107 @@ describe('find the original: crowds', () => {
     expect(moved).toBeGreaterThan(0.05);
   });
 
-  it('a missing hat hides the other hat mistakes', () => {
-    expect(normalise(T.noHat | T.tilt | T.band | T.belt)).toBe(T.noHat | T.belt);
-    expect(normalise(T.tilt | T.band)).toBe(T.tilt | T.band);
+  it('a missing hat hides its colour, band and tilt; a beret has no band', () => {
+    const look = makeBaldwyn(seededRng(3));
+    const bare = canonical({ ...look, hat: opt('hat', 'none'), hatPaint: 3, band: 2, tilt: 1 });
+    expect([bare.hatPaint, bare.band, bare.tilt]).toEqual([0, 0, 0]);
+    expect(hidden(bare, 'hatPaint')).toBe(true);
+    const beret = canonical({ ...look, hat: opt('hat', 'beret'), band: 2 });
+    expect(beret.band).toBe(0);
+    expect(hidden({ ...look, neck: opt('neck', 'none') }, 'neckPaint')).toBe(true);
+    // A new hat on a hatless toy counts once (its colour comes with it).
+    const hatted = { ...bare, hat: opt('hat', 'top'), hatPaint: 2, band: 1 };
+    expect(differences(bare, hatted).map((d) => d.slot)).toEqual(['hat']);
+  });
+});
+
+describe('find the original: a different Baldwyn every match', () => {
+  it('is built from the match seed (same seed, same Baldwyn)', () => {
+    expect(findRules.init([mk('you')], 4242).baldwyn).toEqual(findRules.init([mk('you'), mk('b', 'hard')], 4242).baldwyn);
+    expect(makeBaldwyn(seededRng(9))).toEqual(makeBaldwyn(seededRng(9)));
+  });
+
+  it('varies across seeds: nearly every match is a new combination, using every part', () => {
+    const all = baldwyns(100);
+    expect(new Set(all.map(lookKey)).size).toBeGreaterThanOrEqual(98);
+    for (const slot of SLOT_IDS) {
+      const seen = new Set(all.map((b) => b[slot]));
+      // Every option shows up (Baldwyn always wears some hat).
+      expect(seen.size, slot).toBe(slot === 'hat' ? SLOTS.hat.length - 1 : SLOTS[slot].length);
+    }
+    for (const b of all) {
+      expect(valid(b)).toBe(true);
+      expect(canonical({ ...b })).toEqual(b);
+      expect(b.hat).not.toBe(opt('hat', 'none'));
+    }
+  });
+
+  it('every single part swap is one visible difference that the renderer actually draws', () => {
+    const rng = seededRng(77);
+    let checked = 0;
+    for (const b of baldwyns(60)) {
+      for (const c of swapsFor(b, b)) {
+        const next = swap(b, c.slot, c.value, rng);
+        if (!next) continue; // would clash with a neighbouring paint
+        expect(differences(b, next), `${c.slot}`).toHaveLength(1);
+        expect(visiblyDifferent(b, next), `${lookKey(b)} ${c.slot}→${c.value}`).toBe(true);
+        checked++;
+      }
+    }
+    expect(checked).toBeGreaterThan(60 * 30);
+  });
+
+  it('every look-alike in every round differs visibly from that match\'s Baldwyn', () => {
+    for (let seed = 1; seed <= 60; seed++) {
+      const s = findRules.init([mk('you')], seed * 31337);
+      for (let r = 1; r <= DEFAULT_CONFIG.rounds.length; r++) {
+        run(s, (x) => x.phase === 'search' && x.round === r);
+        expect(s.toys.filter((t) => sameLook(t.look, s.baldwyn))).toHaveLength(1);
+        for (const t of s.toys) {
+          if (sameLook(t.look, s.baldwyn)) continue;
+          expect(visiblyDifferent(s.baldwyn, t.look), `seed ${seed} round ${r}`).toBe(true);
+        }
+        findRules.step(s, { you: [{ pick: originalIndex(s) }] }, STEP);
+      }
+    }
+  });
+
+  it('keeps the difficulty curve: many obvious differences early, one subtle one late', () => {
+    const stats = DEFAULT_CONFIG.rounds.map(() => ({ n: 0, diffs: 0, tiers: [0, 0, 0] }));
+    for (const b of baldwyns(150)) {
+      DEFAULT_CONFIG.rounds.forEach((spec, r) => {
+        const rng = seededRng(subSeed(lookKey(b).length + r, lookKey(b)));
+        for (let k = 0; k < 12; k++) {
+          const d = differences(b, rollDecoy(rng, spec, b));
+          stats[r].n++;
+          stats[r].diffs += d.length;
+          for (const x of d) stats[r].tiers[x.tier]++;
+        }
+      });
+    }
+    const avg = stats.map((x) => x.diffs / x.n);
+    const share = (r: number, tier: number) => stats[r].tiers[tier] / stats[r].diffs;
+    expect(avg[0]).toBeGreaterThanOrEqual(2);
+    for (let r = 1; r < avg.length; r++) expect(avg[r]).toBeLessThanOrEqual(avg[r - 1] + 1e-9);
+    expect(avg[4]).toBe(1);
+    // Obvious differences dominate round 1 and all but vanish from round 3 on; subtle ones take over.
+    expect(share(0, 0)).toBeGreaterThan(0.4);
+    for (const r of [2, 3, 4]) expect(share(r, 0)).toBeLessThan(0.01);
+    for (let r = 1; r < 5; r++) expect(share(r, 0)).toBeLessThanOrEqual(share(r - 1, 0) + 0.01);
+    for (let r = 2; r < 5; r++) expect(share(r, 2)).toBeGreaterThanOrEqual(share(r - 1, 2) - 0.02);
+    expect(share(1, 1)).toBeGreaterThan(0.5); // round 2 is mostly medium differences
+    expect(share(4, 2)).toBeGreaterThan(0.5); // the final round is mostly subtle ones
+  });
+
+  it('look-alikes are variations of this match\'s Baldwyn, not of a fixed one', () => {
+    const a = toSearch(findRules.init([mk('you')], 11));
+    const b = toSearch(findRules.init([mk('you')], 12));
+    expect(sameLook(a.baldwyn, b.baldwyn)).toBe(false);
+    // Most of each crowd shares most parts with its own Baldwyn, and the real one is in it.
+    for (const s of [a, b]) {
+      expect(s.toys.some((t) => sameLook(t.look, s.baldwyn))).toBe(true);
+      for (const t of s.toys) expect(differences(s.baldwyn, t.look).length).toBeLessThanOrEqual(3);
+    }
   });
 });
 

@@ -1,9 +1,10 @@
 /**
  * Find the Original — rules core (GAME_DESIGN.md §4 · 04). Deterministic; no DOM/three/timers.
  *
- * Five short rounds. Each round opens with a reference card ("This is Baldwyn"), then a crowd of
- * look-alikes appears and everyone races to pick the real one. Crowds grow (6 → 24), the decoys'
- * mistakes get fewer and subtler, and from round 3 the crowd shuffles about.
+ * Each match builds its own Baldwyn from a random combination of toy parts (looks.ts). Five short
+ * rounds: each opens with a reference card ("This is Baldwyn"), then a crowd of look-alikes, all
+ * variations of this match's Baldwyn, appears and everyone races to pick the real one. Crowds grow
+ * (6 → 24), the decoys' differences get fewer and subtler, and from round 3 the crowd shuffles about.
  *
  *  - Correct pick: points by finishing order (100/70/50/…) plus a speed bonus (up to +50).
  *  - Wrong pick: −15 points and a short "wound down" lockout that grows with each mistake that round.
@@ -17,7 +18,7 @@
 import { seededRng, shuffle, subSeed } from '../rng';
 import { rankByKey } from '../scoring';
 import type { Contestant, MatchEvent, RulesCore } from '../types';
-import { TRAITS, isOriginal, normalise, type Tier } from './traits';
+import { differences, lookKey, makeBaldwyn, sameLook, swap, swapsFor, type Look, type Tier } from './looks';
 
 export interface FindInput {
   /** Index of the toy picked in `state.toys`. */
@@ -28,11 +29,11 @@ export interface RoundSpec {
   /** Grid of standing spots (cols ≥ rows; the render layer may transpose it for portrait screens). */
   cols: number;
   rows: number;
-  /** How many details each decoy gets wrong [min, max]. */
+  /** How many parts each decoy has swapped [min, max]. */
   diffs: [number, number];
-  /** Relative chance of a wrong detail coming from each tier (obvious, medium, subtle). */
+  /** Relative chance of a swapped part coming from each tier (obvious, medium, subtle). */
   tierWeights: [number, number, number];
-  /** Every decoy has at least one mistake this easy to spot (or easier). */
+  /** Every decoy has at least one difference this easy to spot (or easier). */
   needTier: Tier;
   /** How far toys shuffle from their spot, as a fraction of a cell (0 = standing still). */
   drift: number;
@@ -86,8 +87,8 @@ export const DEFAULT_CONFIG: FindConfig = {
 };
 
 export interface Toy {
-  /** Deviations from Baldwyn (see traits.ts). 0 = the original. */
-  traits: number;
+  /** The toy's parts (looks.ts). It is Baldwyn if this equals the match's `baldwyn`. */
+  look: Look;
   col: number;
   row: number;
   /** Fixed offset from the centre of the spot, in cells, so the crowd isn't a perfect grid. */
@@ -124,6 +125,8 @@ export type Phase = 'intro' | 'study' | 'search' | 'reveal' | 'over';
 export interface FindState {
   config: FindConfig;
   seed: number;
+  /** This match's Baldwyn, built from the seed. */
+  baldwyn: Look;
   t: number;
   phase: Phase;
   phaseT: number;
@@ -157,42 +160,61 @@ export function toyPose(s: FindState, i: number, out = { u: 0, v: 0, yaw: 0 }) {
 }
 
 /** The index of the real Baldwyn, derived from the looks (there is no stored flag). */
-export const originalIndex = (s: FindState) => s.toys.findIndex((t) => isOriginal(t.traits));
+export const originalIndex = (s: FindState) => s.toys.findIndex((t) => sameLook(t.look, s.baldwyn));
 
-/** One decoy's set of mistakes. Never 0. */
-function rollDecoy(rng: () => number, spec: RoundSpec): number {
-  const pickFrom = (maxTier: number) => {
-    const pool = TRAITS.filter((t) => t.tier <= maxTier);
-    const weight = (tier: number) => spec.tierWeights[tier] + 0.0001;
-    let r = rng() * pool.reduce((n, t) => n + weight(t.tier), 0);
-    for (const t of pool) {
-      r -= weight(t.tier);
-      if (r <= 0) return t.bit;
-    }
-    return pool[pool.length - 1].bit;
-  };
-  // The guaranteed readable mistake first, then extras from the whole weighted pool.
-  let traits = pickFrom(spec.needTier);
+/**
+ * One decoy: Baldwyn with `diffs` parts swapped, each swap adding exactly one visible difference.
+ * The first swap is at least as easy to spot as the round promises (`needTier`); later ones come
+ * from any tier by the round's weights. Never equal to Baldwyn.
+ */
+export function rollDecoy(rng: () => number, spec: RoundSpec, baldwyn: Look): Look {
   const want = spec.diffs[0] + Math.floor(rng() * (spec.diffs[1] - spec.diffs[0] + 1));
-  for (let tries = 0, n = 1; n < want && tries < 12; tries++) {
-    const bit = pickFrom(2);
-    if (traits & bit) continue;
-    const next = normalise(traits | bit);
-    if (next === traits || next === 0) continue;
-    traits = next;
-    n++;
+  let look = baldwyn;
+  let count = 0;
+  for (let tries = 0; count < want && tries < 40; tries++) {
+    const maxTier = count === 0 ? spec.needTier : 2;
+    const pool = swapsFor(look, baldwyn).filter((c) => c.tier <= maxTier && look[c.slot] === baldwyn[c.slot]);
+    if (!pool.length) break;
+    // Weight by tier, shared out over each slot's options so slots with many options aren't favoured.
+    const perSlot = new Map<string, number>();
+    for (const c of pool) perSlot.set(c.slot, (perSlot.get(c.slot) ?? 0) + 1);
+    const weight = (c: (typeof pool)[number]) => (spec.tierWeights[c.tier] + 0.0001) / perSlot.get(c.slot)!;
+    let r = rng() * pool.reduce((n, c) => n + weight(c), 0);
+    let pick = pool[pool.length - 1];
+    for (const c of pool) {
+      r -= weight(c);
+      if (r <= 0) {
+        pick = c;
+        break;
+      }
+    }
+    const next = swap(look, pick.slot, pick.value, rng);
+    if (!next) continue;
+    const diffs = differences(baldwyn, next);
+    if (diffs.length !== count + 1 || !diffs.some((d) => d.tier <= spec.needTier)) continue;
+    look = next;
+    count++;
   }
-  return normalise(traits);
+  // Can't happen with the shipped part set, but a decoy must never be Baldwyn: swap the body shape.
+  if (count === 0) look = { ...baldwyn, body: (baldwyn.body + 1) % 4 };
+  return look;
 }
 
-function buildCrowd(seed: number, round: number, spec: RoundSpec): Toy[] {
+function buildCrowd(seed: number, round: number, spec: RoundSpec, baldwyn: Look): Toy[] {
   const rng = seededRng(subSeed(seed, `crowd-${round}`));
   const n = spec.cols * spec.rows;
-  const looks = [0];
-  while (looks.length < n) looks.push(rollDecoy(rng, spec));
+  const looks = [baldwyn];
+  const seen = new Set([lookKey(baldwyn)]);
+  while (looks.length < n) {
+    // Prefer decoys that differ from each other too (a few tries, then accept a twin).
+    let look = rollDecoy(rng, spec, baldwyn);
+    for (let k = 0; k < 4 && seen.has(lookKey(look)); k++) look = rollDecoy(rng, spec, baldwyn);
+    seen.add(lookKey(look));
+    looks.push(look);
+  }
   const order = shuffle(rng, looks);
-  return order.map((traits, i) => ({
-    traits,
+  return order.map((look, i) => ({
+    look: { ...look },
     col: i % spec.cols,
     row: Math.floor(i / spec.cols),
     // Static jitter + drift stay ≤ 0.14 cell per toy, so neighbours never come closer than
@@ -213,7 +235,7 @@ function setPhase(s: FindState, phase: Phase) {
 function startRound(s: FindState, round: number) {
   s.round = round;
   s.spec = s.config.rounds[round - 1];
-  s.toys = buildCrowd(s.seed, round, s.spec);
+  s.toys = buildCrowd(s.seed, round, s.spec, s.baldwyn);
   s.searchT = 0;
   s.limitMs = s.config.searchMs;
   s.foundCount = 0;
@@ -241,6 +263,7 @@ export const findRules: RulesCore<FindState, FindInput, FindConfig> = {
     return {
       config: cfg,
       seed,
+      baldwyn: makeBaldwyn(seededRng(subSeed(seed, 'baldwyn'))),
       t: 0,
       phase: 'intro',
       phaseT: 0,
@@ -297,7 +320,7 @@ export const findRules: RulesCore<FindState, FindInput, FindConfig> = {
           for (const inp of inputs[p.id] ?? []) {
             const i = inp?.pick;
             if (!Number.isInteger(i) || i < 0 || i >= s.toys.length || p.wrong.includes(i)) continue;
-            if (isOriginal(s.toys[i].traits)) {
+            if (sameLook(s.toys[i].look, s.baldwyn)) {
               finders.push(p);
             } else {
               p.wrong.push(i);
