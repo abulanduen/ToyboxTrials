@@ -2806,3 +2806,93 @@ canvas {
   background: var(--coral);
 }
 
+
+/* ---------------------------------------------------------------- minigame tutorial (intro card) */
+.tutorial {
+  margin: 0 0 1rem;
+  padding: 12px 14px 10px;
+  border-radius: 12px;
+  border: 3px solid var(--accent, var(--ink));
+  background: var(--paper);
+  box-shadow: 0 3px 0 rgba(43, 36, 51, 0.25);
+}
+.tutorial__head {
+  display: flex;
+  justify-content: space-between;
+  font: 700 0.82rem var(--font-body);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+.tutorial__title {
+  margin: 6px 0 4px;
+  font: 700 1.2rem var(--font-display, var(--font-body));
+  color: var(--ink-deep);
+}
+.tutorial__text {
+  margin: 0 0 8px;
+  min-height: 3.2em;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+.tutorial__dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.tutorial__dots span {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: rgba(87, 77, 105, 0.25);
+}
+.tutorial__dots span.on {
+  background: var(--accent, var(--ink));
+}
+.tutorial__nav {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 8px;
+}
+.tutorial button,
+.tutorial-open {
+  min-height: 56px;
+  border: 2px solid var(--ink);
+  border-radius: 10px;
+  background: var(--cream);
+  color: var(--ink-deep);
+  font: 700 1rem var(--font-body);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.tutorial button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.tutorial .tutorial__next {
+  background: var(--honey);
+}
+.tutorial .tutorial__never {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  border-color: transparent;
+  background: transparent;
+  font-weight: 600;
+  font-size: 0.92rem;
+  text-decoration: underline;
+}
+.tutorial-open {
+  margin: 0 0 1rem;
+  padding: 0 18px;
+}
+.tutorial-note {
+  margin: 0 0 1rem;
+  font-size: 0.92rem;
+  color: var(--ink);
+}
+@media (max-height: 500px) {
+  .tutorial { padding: 8px 10px 6px; }
+  .tutorial__text { min-height: 0; font-size: 0.92rem; }
+}

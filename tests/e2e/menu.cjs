@@ -52,6 +52,13 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
   await page.click('.segmented button >> text=balanced');
   await page.waitForTimeout(2500);
   check('switching quality tiers keeps the app alive', (await page.isVisible('.pause__grid')) && errors.length === 0, errors.slice(0, 2).join(' | '));
+  // Game tutorials can be switched off and back on here (the intro card's "Don't show again" turns them off).
+  const tutState = () => page.evaluate(() => JSON.parse(localStorage.getItem('toybox-trials:prototype:v1')).state.tutorials);
+  check('Game tutorials setting is on by default', await page.isChecked('[data-testid=setting-tutorials]'));
+  await page.click('[data-testid=setting-tutorials]');
+  const tutOffNow = await tutState();
+  await page.click('[data-testid=setting-tutorials]');
+  check('Game tutorials setting toggles and persists', tutOffNow === false && (await tutState()) === true && (await page.isChecked('[data-testid=setting-tutorials]')));
   await page.click('.pause__actions .toy-btn');
   await page.waitForTimeout(400);
 

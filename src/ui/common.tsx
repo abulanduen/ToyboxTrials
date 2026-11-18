@@ -109,6 +109,10 @@ export function SettingsForm() {
         <input type="checkbox" checked={s.showFps} onChange={(e) => s.set({ showFps: e.target.checked })} />
         <span>Show frame rate</span>
       </label>
+      <label className="setting setting--check">
+        <input type="checkbox" checked={s.tutorials} onChange={(e) => s.set({ tutorials: e.target.checked })} data-testid="setting-tutorials" />
+        <span>Game tutorials</span>
+      </label>
     </div>
   );
 }

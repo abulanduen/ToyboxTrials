@@ -24,6 +24,7 @@ import {
 import { FORMATS, type TournamentFormat } from '../minigames/tournament';
 import { pointsForPlace, rankStandings } from '../minigames/scoring';
 import type { BotDifficulty, Contestant } from '../minigames/types';
+import { tutorialFor, type TutorialStep } from '../minigames/tutorials';
 import { CardboardSheet, KeyCap, ToyButton } from './common';
 import { GearIcon, StarSticker, WindKeyIcon } from './icons';
 
@@ -123,6 +124,10 @@ function Intro({ touch }: { touch: boolean }) {
   const rec = useGame((s) => s.records[def.id]);
   const t = m.tournament;
   const isTournament = m.kind === 'tournament';
+  const steps = tutorialFor(def.id);
+  // Decided once per intro card: the setting only controls whether it opens by itself.
+  const [showTutorial, setShowTutorial] = useState(() => useGame.getState().tutorials);
+  const [turnedOff, setTurnedOff] = useState(false);
   return (
     <CardboardSheet title={def.title} className="match-intro" onBackdrop={undefined}>
       <div className="info-panel__sub" style={{ ['--accent' as string]: def.accent, background: def.accent }}>
@@ -132,18 +137,31 @@ function Intro({ touch }: { touch: boolean }) {
         <p className="panel__lead">{m.error}</p>
       ) : (
         <>
-          <p className="panel__lead">{def.description}</p>
-          <div className="intro-controls">
-            {touch ? (
-              <span>{def.touch.notes ?? 'Use the on-screen buttons.'}</span>
-            ) : (
-              def.controls.map((c) => (
-                <span key={c.keys} className="intro-controls__item">
-                  <KeyCap k={c.keys} /> {c.action}
-                </span>
-              ))
-            )}
-          </div>
+          {steps && showTutorial ? (
+            <Tutorial steps={steps} touch={touch} accent={def.accent} onClose={() => setShowTutorial(false)} onNever={() => (useGame.getState().set({ tutorials: false }), setShowTutorial(false), setTurnedOff(true))} />
+          ) : (
+            <>
+              <p className="panel__lead">{def.description}</p>
+              <div className="intro-controls">
+                {touch ? (
+                  <span>{def.touch.notes ?? 'Use the on-screen buttons.'}</span>
+                ) : (
+                  def.controls.map((c) => (
+                    <span key={c.keys} className="intro-controls__item">
+                      <KeyCap k={c.keys} /> {c.action}
+                    </span>
+                  ))
+                )}
+              </div>
+              {turnedOff ? (
+                <p className="tutorial-note" data-testid="tutorial-off-note">Tutorials are off. You can turn them back on in Settings.</p>
+              ) : steps ? (
+                <button className="tutorial-open" onClick={() => (sfx.click(), setShowTutorial(true))} data-testid="tutorial-open">
+                  How to play
+                </button>
+              ) : null}
+            </>
+          )}
           {!isTournament && (
             <div className="intro-options">
               <div className="setting">
@@ -186,6 +204,41 @@ function Intro({ touch }: { touch: boolean }) {
         </ToyButton>
       </div>
     </CardboardSheet>
+  );
+}
+
+/** Quick paged "how to play" for one minigame, shown inside the intro card. Start stays available. */
+function Tutorial({ steps, touch, accent, onClose, onNever }: { steps: TutorialStep[]; touch: boolean; accent: string; onClose: () => void; onNever: () => void }) {
+  const [i, setI] = useState(0);
+  const step = steps[i];
+  const last = i === steps.length - 1;
+  return (
+    <section className="tutorial" aria-label="How to play" data-testid="tutorial" style={{ ['--accent' as string]: accent }}>
+      <div className="tutorial__head">
+        <span>How to play</span>
+        <span aria-live="polite" data-testid="tutorial-step">
+          {i + 1} / {steps.length}
+        </span>
+      </div>
+      <h3 className="tutorial__title">{step.title}</h3>
+      <p className="tutorial__text">{(touch && step.touch) || step.text}</p>
+      <div className="tutorial__dots" aria-hidden>
+        {steps.map((_, k) => (
+          <span key={k} className={k === i ? 'on' : ''} />
+        ))}
+      </div>
+      <div className="tutorial__nav">
+        <button onClick={() => (sfx.click(), setI(i - 1))} disabled={i === 0} data-testid="tutorial-back">
+          Back
+        </button>
+        <button className="tutorial__next" onClick={() => (sfx.click(), last ? onClose() : setI(i + 1))} data-testid="tutorial-next">
+          {last ? 'Got it' : 'Next'}
+        </button>
+      </div>
+      <button className="tutorial__never" onClick={() => (sfx.click(), onNever())} data-testid="tutorial-never">
+        Don’t show tutorials again
+      </button>
+    </section>
   );
 }
 

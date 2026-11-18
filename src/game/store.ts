@@ -53,6 +53,8 @@ interface SettingsSlice {
    * the music the player hears (subtracted from every press time before judging). Negative = early.
    */
   rhythmOffsetMs: number;
+  /** Show the quick "how to play" tutorial on each minigame's intro card. */
+  tutorials: boolean;
 }
 
 interface SessionSlice {
@@ -113,6 +115,7 @@ export const useGame = create<GameState>()(
       tournamentWins: {},
       tournamentHistory: [],
       rhythmOffsetMs: 0,
+      tutorials: true,
 
       // session
       screen: 'menu',
@@ -173,6 +176,7 @@ export const useGame = create<GameState>()(
         tournamentWins: s.tournamentWins,
         tournamentHistory: s.tournamentHistory,
         rhythmOffsetMs: s.rhythmOffsetMs,
+        tutorials: s.tutorials,
       }),
     },
   ),

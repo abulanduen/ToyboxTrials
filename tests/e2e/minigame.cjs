@@ -68,8 +68,27 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   await page.waitForSelector('.match-intro', { timeout: 60000 });
   await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
   check('gate opens the Copycat intro card (lazy-loaded module)', (await page.textContent('.match-intro h2')).includes('Copycat'));
+  // Quick tutorial: opens by itself, pages through, and can be turned off.
+  check('tutorial opens on the intro card', await page.isVisible('[data-testid=tutorial]'));
+  check('tutorial starts at step 1 of 3', (await page.textContent('[data-testid=tutorial-step]')).replace(/\s/g, '') === '1/3');
+  check('first step names the goal', (await page.textContent('.match-intro')).includes('Watch the conductor'));
+  await page.screenshot({ path: `${OUT}/m4-00-tutorial.png` });
+  await page.click('[data-testid=tutorial-next]');
+  check('desktop step uses the keys', (await page.textContent('.tutorial__text')).includes('A, S, J and K'));
+  await page.click('[data-testid=tutorial-next]');
+  check('last tutorial step offers Got it', (await page.textContent('[data-testid=tutorial-next]')).includes('Got it'));
+  await page.click('[data-testid=tutorial-back]');
+  check('Back goes to the previous step', (await page.textContent('.tutorial__text')).includes('A, S, J and K'));
+  await page.click('[data-testid=tutorial-next]');
+  await page.click('[data-testid=tutorial-next]');
+  check('Got it closes the tutorial and shows the description', !(await page.isVisible('[data-testid=tutorial]')) && (await page.isVisible('[data-testid=tutorial-open]')));
   check('intro shows keyboard controls', (await page.$$('.intro-controls .keycap')).length === 4);
   await page.screenshot({ path: `${OUT}/m4-01-intro.png` });
+  await page.click('[data-testid=tutorial-open]');
+  check('How to play reopens the tutorial', await page.isVisible('[data-testid=tutorial]'));
+  await page.click('[data-testid=tutorial-never]');
+  const tutOff = await page.evaluate(() => JSON.parse(localStorage.getItem('toybox-trials:prototype:v1')).state.tutorials);
+  check('Never show again turns tutorials off (persisted) and points to Settings', tutOff === false && (await page.textContent('[data-testid=tutorial-off-note]')).includes('Settings'));
   await page.click('[data-testid=match-start]');
   await page.waitForSelector('.countdown', { timeout: 30000 });
   check('countdown appears', true);
@@ -138,6 +157,7 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   await page.waitForSelector('.match-intro', { timeout: 60000 });
   await page.waitForTimeout(900);
   check('gate opens the Jack-in-the-Box intro card', (await page.textContent('.match-intro h2')).includes('Jack'));
+  check('with tutorials off the intro skips the tutorial but still offers How to play', !(await page.isVisible('[data-testid=tutorial]')) && (await page.isVisible('[data-testid=tutorial-open]')));
   const opts = await page.$$eval('.intro-options .segmented >> nth=0 >> button', (els) => els.map((e) => e.textContent));
   check('Jack practice needs company: no Solo option, bots by default', !opts.includes('Solo') && (await page.textContent('.intro-options .segmented .on'))?.includes('3 bots'), opts.join(','));
   await page.click('.intro-options .segmented >> nth=0 >> button >> nth=0'); // 1 bot

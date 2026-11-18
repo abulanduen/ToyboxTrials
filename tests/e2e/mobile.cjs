@@ -89,6 +89,12 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
   await page.waitForSelector('.match-intro', { timeout: 60000 }).catch(() => null);
   await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
   check('Interact button opens the Copycat intro', await page.isVisible('.match-intro'));
+  await page.tap('[data-testid=tutorial-next]');
+  check('phone tutorial uses touch wording', (await page.textContent('.tutorial__text').catch(() => ''))?.includes('tapping the four instrument pads'));
+  const tutTargets = await page.$$eval('.tutorial button', (bs) => bs.map((b) => b.getBoundingClientRect().height));
+  check('tutorial buttons are at least 56 px tall', tutTargets.length === 3 && tutTargets.every((h) => h >= 56), tutTargets.join(','));
+  await page.screenshot({ path: `${OUT}/mobile-02b-tutorial.png` });
+  await page.locator('[data-testid=match-start]').scrollIntoViewIfNeeded();
   await page.tap('[data-testid=match-start]');
   const MS = () =>
     page.evaluate(() => {
