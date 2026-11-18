@@ -180,6 +180,18 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   await page.waitForSelector('.hud-sign', { timeout: 60000 });
   await page.waitForTimeout(1200);
 
+  // --- The blue gate opens Wind-Up Dash (the race itself is covered by tests/e2e/movement.cjs)
+  await page.evaluate(() => window.__toybox.teleport(30.6, -7.1, Math.PI - 1.3428));
+  await page.waitForTimeout(2500);
+  check('blue gate prompt says Play Wind-Up Dash', (await page.textContent('.prompt'))?.includes('Wind-Up Dash'), await page.textContent('.prompt'));
+  await page.keyboard.press('KeyE');
+  await page.waitForSelector('.match-intro', { timeout: 60000 });
+  await page.waitForTimeout(900);
+  check('blue gate opens the Wind-Up Dash intro card', (await page.textContent('.match-intro h2')).includes('Dash'));
+  await page.click('[data-testid=match-leave]');
+  await page.waitForSelector('.hud-sign', { timeout: 60000 });
+  await page.waitForTimeout(1200);
+
   // --- Tournament (Blitz, 1 easy bot): lose each trial on purpose to exercise the flow
   await page.evaluate(() => window.__toybox.teleport(0, -12.6, Math.PI));
   await page.waitForTimeout(2500);

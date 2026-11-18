@@ -70,5 +70,7 @@ node tests/e2e/secrets.cjs
 node tests/e2e/mobile.cjs       # touch/phone checks
 node tests/e2e/menu.cjs         # main menu, Workshop, unlocks, persistence, deep links
 node tests/e2e/minigame.cjs     # Copycat + Jack-in-the-Box practice, full Blitz tournament flow
+node tests/e2e/findoriginal.cjs # Find the Original, desktop + phone portrait
+node tests/e2e/movement.cjs     # Red Light, Green Light + Wind-Up Dash, desktop + phone joystick
 npm test                        # vitest unit tests for rules cores, scoring, tournament selection
 ```

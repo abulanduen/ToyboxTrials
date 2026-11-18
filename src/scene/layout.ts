@@ -24,7 +24,7 @@ export const FINGERPOST = { x: -5.5, z: 14 };
 export const GATES = [
   { id: 'gate-copycat', x: 15, z: -24, color: PALETTE.honey, active: true },
   { id: 'gate-jack', x: 26.5, z: -18.5, color: PALETTE.coral, active: true },
-  { id: 'gate-dash', x: 34.5, z: -8, color: PALETTE.toyBlue, active: false },
+  { id: 'gate-dash', x: 34.5, z: -8, color: PALETTE.toyBlue, active: true },
 ].map((g) => ({ ...g, rot: Math.atan2(-g.x, -g.z) }));
 export const GATE = { width: 9, pillar: 2.6, height: 8.5, depth: 3 };
 

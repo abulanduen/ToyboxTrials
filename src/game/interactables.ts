@@ -39,7 +39,7 @@ const gate = (id: string) => {
 export const INTERACTABLES: Interactable[] = [
   { id: 'gate-copycat', ...gate('gate-copycat'), radius: 4.5, verb: 'Play', label: 'Copycat Conductor' },
   { id: 'gate-jack', ...gate('gate-jack'), radius: 4.5, verb: 'Play', label: 'Jack-in-the-Box' },
-  { id: 'gate-dash', ...gate('gate-dash'), radius: 4.5, verb: 'Peek at', label: 'Wind-Up Dash' },
+  { id: 'gate-dash', ...gate('gate-dash'), radius: 4.5, verb: 'Play', label: 'Wind-Up Dash' },
   { id: 'pavilion', ...frontOf(PAVILION.x, PAVILION.z, 0, PAVILION.d / 2 + 3), radius: 4.5, verb: 'Enter', label: 'the Tournament Pavilion' },
   { id: 'workshop', ...frontOf(WORKSHOP.x, WORKSHOP.z, WORKSHOP.rot, WORKSHOP.d / 2 + 2.5), radius: 5, verb: 'Tinker at', label: 'the Workshop' },
   { id: 'shop', ...frontOf(SHOP.x, SHOP.z, SHOP.rot, SHOP.d / 2 + 6), radius: 5, verb: 'Browse', label: 'Odds & Ends Shop' },
@@ -88,14 +88,9 @@ export function interact(id: string, facing: { x: number; z: number }) {
       openPractice('jack-in-the-box');
       break;
     case 'gate-dash':
-      sfx.click();
-      g.openPanel({
-        kind: 'preview',
-        title: 'Wind-Up Dash',
-        subtitle: 'Track still being laid',
-        body: 'A sprint through dominoes, ramps and snapping traps. Fully wound contestants only.',
-        accent: PALETTE.toyBlue,
-      });
+      sfx.interact();
+      events.emit('gate:open', { id });
+      openPractice('wind-up-dash');
       break;
     case 'pavilion':
       sfx.click();
