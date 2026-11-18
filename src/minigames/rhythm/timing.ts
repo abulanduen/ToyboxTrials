@@ -1,0 +1,92 @@
+/**
+ * Music Box Rhythm — timing helpers (pure; unit-tested).
+ *
+ * The host's match clock (`state.t`, advanced in fixed 60 Hz steps) is authoritative, so pause
+ * and the `timeScale` test hook keep working. But a 60 Hz step is ±8 ms of noise, too coarse for
+ * a ±45 ms Perfect window. `SongClock` follows the match clock smoothly against the
+ * high-resolution wall clock (performance.now), so that
+ *   - a press stamped at wall time P can be converted to the song time it happened at, and
+ *   - the pins and the music can be placed between steps.
+ */
+import type { Action } from '../../game/input';
+import type { RhythmInput } from './rules';
+import type { Lane } from './tracks';
+
+const STEP_MS = 1000 / 60;
+/** The match clock is on average half a step behind the true accumulated time. */
+const HALF_STEP = STEP_MS / 2;
+const RATE_WINDOW_MS = 250;
+/** Larger disagreements than this are a jump (pause, hitch, time-scale change): snap. */
+const SNAP_MS = 40;
+
+export interface SongClock {
+  /** Estimated song time at `perf`. */
+  est: number;
+  /** Wall time (performance.now) of the last sync. */
+  perf: number;
+  /** Song ms per wall ms (1 in normal play; 0 when frozen/paused; k under `timeScale(k)`). */
+  rate: number;
+  started: boolean;
+  /** Recent (wall, match) samples for the rate estimate. */
+  samples: { perf: number; t: number }[];
+}
+
+export const createSongClock = (): SongClock => ({ est: 0, perf: 0, rate: 1, started: false, samples: [] });
+
+export function resetSongClock(c: SongClock) {
+  c.est = 0;
+  c.perf = 0;
+  c.rate = 1;
+  c.started = false;
+  c.samples.length = 0;
+}
+
+/** Call once (or more) per rendered frame with the wall time and the match clock. */
+export function syncSongClock(c: SongClock, perfNow: number, matchT: number) {
+  const last = c.samples[c.samples.length - 1];
+  if (!c.started || !last || matchT < last.t || perfNow < c.perf) {
+    c.started = true;
+    c.est = matchT + (matchT > 0 ? HALF_STEP : 0);
+    c.perf = perfNow;
+    c.rate = 1;
+    c.samples.length = 0;
+    c.samples.push({ perf: perfNow, t: matchT });
+    return;
+  }
+  const dPerf = perfNow - c.perf;
+  if (dPerf < 0.5) return; // second call in the same frame
+  c.samples.push({ perf: perfNow, t: matchT });
+  while (c.samples.length > 2 && perfNow - c.samples[1].perf >= RATE_WINDOW_MS) c.samples.shift();
+  const first = c.samples[0];
+  const span = perfNow - first.perf;
+  if (span >= 60) {
+    const r = (matchT - first.t) / span;
+    c.rate = Math.abs(r - 1) < 0.08 ? 1 : Math.max(0, r);
+  }
+  c.est += c.rate * dPerf;
+  c.perf = perfNow;
+  const err = matchT + HALF_STEP * Math.min(1, c.rate) - c.est;
+  if (Math.abs(err) > SNAP_MS) c.est += err;
+  else c.est += err * 0.08;
+}
+
+/** Song time at wall time `perf` (at or shortly before/after the last sync). */
+export const songTimeAt = (c: SongClock, perf: number) => c.est + (perf - c.perf) * c.rate;
+
+const SLOTS: Action[] = ['slot1', 'slot2', 'slot3', 'slot4'];
+
+/**
+ * Turn the frame's ordered press log + parallel high-resolution press times into rules inputs.
+ * `offsetMs` is the player's latency calibration: how late their taps arrive (subtracted).
+ * A missing timestamp falls back to the time of the last clock sync.
+ */
+export function pressesToInputs(presses: readonly Action[], times: readonly number[], clock: SongClock, offsetMs: number): RhythmInput[] {
+  const out: RhythmInput[] = [];
+  for (let i = 0; i < presses.length; i++) {
+    const lane = SLOTS.indexOf(presses[i]);
+    if (lane < 0) continue;
+    const perf = times[i] ?? clock.perf;
+    out.push({ lane: lane as Lane, t: songTimeAt(clock, perf) - offsetMs });
+  }
+  return out;
+}

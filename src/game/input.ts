@@ -58,9 +58,29 @@ const down = new Set<string>();
 const pressedThisFrame = new Set<string>();
 /** Every action press since the last frame, in the order it happened (keys, taps, touch buttons). */
 const pressLog: Action[] = [];
+/**
+ * High-resolution time of each press in `pressLog` (same index), on the performance.now() clock.
+ * Timing-critical games (Music Box Rhythm) judge against these instead of the frame they are read in.
+ */
+const pressTimes: number[] = [];
 
-function logKeyPress(code: string) {
-  for (const a of Object.keys(bindings) as Action[]) if (bindings[a].includes(code)) pressLog.push(a);
+/**
+ * Best timestamp for a press: the event's own timeStamp when it is on the performance.now()
+ * timeline and recent (it is taken when the OS delivered the input, before any main-thread
+ * queueing); otherwise the time the handler ran.
+ */
+function pressStamp(eventTime?: number): number {
+  const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  return eventTime !== undefined && eventTime > 0 && eventTime <= now + 1 && now - eventTime < 500 ? eventTime : now;
+}
+
+function logPress(a: Action, eventTime?: number) {
+  pressLog.push(a);
+  pressTimes.push(pressStamp(eventTime));
+}
+
+function logKeyPress(code: string, eventTime?: number) {
+  for (const a of Object.keys(bindings) as Action[]) if (bindings[a].includes(code)) logPress(a, eventTime);
 }
 let mouseDX = 0;
 let mouseDY = 0;
@@ -86,7 +106,7 @@ function onKeyDown(e: KeyboardEvent) {
   if (isTypingTarget(e.target)) return;
   if (!down.has(e.code)) {
     pressedThisFrame.add(e.code);
-    if (!e.repeat) logKeyPress(e.code);
+    if (!e.repeat) logKeyPress(e.code, e.timeStamp);
   }
   down.add(e.code);
   // Stop the page scrolling on Space / arrows while playing.
@@ -152,10 +172,11 @@ export function setStick(x: number, y: number) {
   stick.x = x;
   stick.y = y;
 }
-export function pressVirtual(a: Action) {
+/** `eventTime`: the pointer/touch event's timeStamp, for timing-critical games (optional). */
+export function pressVirtual(a: Action, eventTime?: number) {
   if (!virtualDown.has(a)) {
     virtualPressed.add(a);
-    pressLog.push(a);
+    logPress(a, eventTime);
   }
   virtualDown.add(a);
 }
@@ -163,14 +184,19 @@ export function releaseVirtual(a: Action) {
   virtualDown.delete(a);
 }
 /** One-shot tap (press + release on the next frame). */
-export function tapVirtual(a: Action) {
+export function tapVirtual(a: Action, eventTime?: number) {
   virtualPressed.add(a);
-  pressLog.push(a);
+  logPress(a, eventTime);
 }
 
 /** Ordered presses since the last frame (for minigames where order matters, e.g. Copycat). */
 export function getPressLog(): readonly Action[] {
   return pressLog;
+}
+
+/** performance.now()-clock time of each entry in `getPressLog()` (parallel array, same frame lifetime). */
+export function getPressTimes(): readonly number[] {
+  return pressTimes;
 }
 
 export function addMouseDelta(dx: number, dy: number) {
@@ -189,6 +215,7 @@ export function endFrame() {
   pressedThisFrame.clear();
   virtualPressed.clear();
   pressLog.length = 0;
+  pressTimes.length = 0;
 }
 
 /** Used by UI layers (pause menu) to drop held keys so the toy doesn't keep walking. */
@@ -198,6 +225,7 @@ export function clearInput() {
   virtualDown.clear();
   virtualPressed.clear();
   pressLog.length = 0;
+  pressTimes.length = 0;
   stick.x = stick.y = 0;
   mouseDX = 0;
   mouseDY = 0;
