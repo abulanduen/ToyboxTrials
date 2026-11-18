@@ -218,7 +218,11 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
     // Lose on purpose. Copycat: play a wrong note. Jack: never answer, and the jack pops on us.
     // The races (Red Light Green Light, Wind-Up Dash): never leave the start line.
     // Find the Original: never pick, and the bot outscores us.
+    // Inferno Escape: put our toy on the furnace and let the real rules/host resolve the loss.
     if (game.includes('Copycat')) await failRound();
+    if (game.includes('Inferno')) {
+      await page.evaluate(() => { const s = window.__toybox.match.state(); s.players[0].x = s.furnace.x; s.players[0].z = s.furnace.z; });
+    }
     await page.waitForSelector('.results', { timeout: 300000 });
     await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
     const rows = await page.$$eval('.results-list li', (els) => els.map((e) => e.textContent));
@@ -248,6 +252,7 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   check('no console/page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
   console.log(res.join('\n'));
   await browser.close();
+  if (res.some(line => line.startsWith('FAIL'))) process.exitCode = 1;
 })().catch((e) => {
   console.log(res.join('\n'));
   console.log('FAIL  aborted: ' + e.message);
