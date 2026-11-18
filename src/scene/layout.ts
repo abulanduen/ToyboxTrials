@@ -33,7 +33,7 @@ export const TRACK = { x: 19, z: 21.5, rx: 11, rz: 6.5 };
 export const MUSICBOX = { x: 11, z: -27.5 };
 export const JACK = { x: -35, z: -22 };
 /** Wooden fingerpost near spawn pointing at every destination. */
-export const FINGERPOST = { x: -5.5, z: 14, h: 16.4 };
+export const FINGERPOST = { x: -5.5, z: 14, h: 14.6 };
 
 /**
  * Minigame gates: one building-block arch per playable trial, standing on the Trials Ring around
@@ -41,28 +41,33 @@ export const FINGERPOST = { x: -5.5, z: 14, h: 16.4 };
  * interacting at a gate opens that trial's lobby (the shared practice intro card).
  * Positions are data: add a playable game to the registry and give it a spot here.
  */
-const GATE_SPOTS: Record<MinigameId, { x: number; z: number; spoke: boolean }> = {
+type District = 'north-west' | 'north-east' | 'east' | 'west';
+const GATE_SPOTS: Record<MinigameId, { x: number; z: number; spoke: boolean; district: District; short: string }> = {
   // north arc, west → east
-  'jack-in-the-box': { x: -38, z: -30, spoke: true },
-  'toy-squad': { x: -23, z: -36, spoke: true },
-  'midnight-hunger': { x: 0, z: -38.5, spoke: false }, // tucked in the Pavilion's shadow
-  'copycat-conductor': { x: 21.5, z: -36.5, spoke: true },
-  'music-box-rhythm': { x: 35, z: -25.5, spoke: true },
+  'jack-in-the-box': { x: -38, z: -30, spoke: true, district: 'north-west', short: 'Jack' },
+  'toy-squad': { x: -23, z: -36, spoke: true, district: 'north-west', short: 'Toy Squad' },
+  'midnight-hunger': { x: 0, z: -38.5, spoke: false, district: 'north-west', short: 'Midnight' }, // tucked in the Pavilion's shadow
+  'copycat-conductor': { x: 21.5, z: -36.5, spoke: true, district: 'north-east', short: 'Copycat' },
+  'music-box-rhythm': { x: 35, z: -25.5, spoke: true, district: 'north-east', short: 'Music Box' },
   // east side
-  'wind-up-dash': { x: 41.5, z: -9, spoke: true },
-  'blink-duel': { x: 42, z: 8.5, spoke: false }, // behind the Scoreboard
-  'red-light-green-light': { x: 39, z: 25, spoke: false }, // beside the toy railway
+  'wind-up-dash': { x: 41.5, z: -9, spoke: true, district: 'east', short: 'Dash' },
+  'blink-duel': { x: 42, z: 8.5, spoke: false, district: 'east', short: 'Blink Duel' }, // behind the Scoreboard
+  'red-light-green-light': { x: 39, z: 25, spoke: false, district: 'east', short: 'Red Light' }, // beside the toy railway
   // west side
-  'inferno-escape': { x: -43.5, z: -13, spoke: false }, // behind the Workshop
-  'find-the-original': { x: -43.5, z: 5, spoke: true },
-  'spellbox-showdown': { x: -41, z: 26, spoke: false },
+  'inferno-escape': { x: -43.5, z: -13, spoke: false, district: 'west', short: 'Inferno' }, // behind the Workshop
+  'find-the-original': { x: -43.5, z: 5, spoke: true, district: 'west', short: 'Find the Original' },
+  'spellbox-showdown': { x: -41, z: 26, spoke: false, district: 'west', short: 'Spellbox' },
 };
+
+const CATEGORY_LABEL: Record<string, string> = { pvp: 'Versus' };
 
 export interface HubGate {
   /** Interactable id, `gate-<game id>`. */
   id: string;
   game: MinigameId;
   title: string;
+  /** Short name for the fingerpost. */
+  short: string;
   /** Short line under the title on the gate's name board. */
   sub: string;
   x: number;
@@ -72,22 +77,34 @@ export interface HubGate {
   color: string;
   /** Has its own street straight from the fountain plaza (the others are reached along the ring road). */
   spoke: boolean;
+  district: District;
 }
 
 export const GATES: HubGate[] = MINIGAMES.filter((g) => g.status === 'playable' && GATE_SPOTS[g.id]).map((g) => {
   const p = GATE_SPOTS[g.id];
+  const cat = CATEGORY_LABEL[g.category] ?? `${g.category[0].toUpperCase()}${g.category.slice(1)}`;
+  const players = g.players.min === g.players.max ? `${g.players.min}` : `${g.players.min}–${g.players.max}`;
   return {
     id: `gate-${g.id}`,
     game: g.id,
     title: g.title,
-    sub: `${g.category[0].toUpperCase()}${g.category.slice(1)} trial`,
+    short: p.short,
+    sub: `${cat} · ${players} players`,
     x: p.x,
     z: p.z,
     rot: Math.atan2(FOUNTAIN.x - p.x, FOUNTAIN.z - p.z),
     color: g.accent,
     spoke: p.spoke,
+    district: p.district,
   };
 });
+/** The fingerpost's trial boards: one per district, west → east. */
+export const GATE_DISTRICTS: { id: District; label: string }[] = [
+  { id: 'west', label: 'West trials' },
+  { id: 'north-west', label: 'North-west trials' },
+  { id: 'north-east', label: 'North-east trials' },
+  { id: 'east', label: 'East trials' },
+];
 export const gateFor = (game: MinigameId) => GATES.find((g) => g.game === game);
 export const GATE = { width: 9, pillar: 2.6, height: 8.5, depth: 3 };
 /** Where the player stands to use a gate, and where the ring road passes (cm in front of the arch). */
@@ -162,7 +179,11 @@ export function hubColliders(): Collider[] {
     const lz = SHOP.d / 2 + 2.2;
     list.push({ kind: 'box', id: 'shop-counter', x: SHOP.x + lz * s, z: SHOP.z + lz * c, hx: SHOP.w / 2 - 0.5, hz: 2.2, rot: SHOP.rot, top: 1.8 });
   }
-  list.push({ kind: 'box', id: 'scoreboard', x: SCOREBOARD.x, z: SCOREBOARD.z, hx: SCOREBOARD.w / 2, hz: 0.9, rot: SCOREBOARD.rot, top: SCOREBOARD.h });
+  {
+    // the frame and its feet (1.3 cm out front) and rear braces (2.3 cm behind)
+    const c = frontOf(SCOREBOARD.x, SCOREBOARD.z, SCOREBOARD.rot, -0.5);
+    list.push({ kind: 'box', id: 'scoreboard', x: c.x, z: c.z, hx: SCOREBOARD.w / 2, hz: 1.8, rot: SCOREBOARD.rot, top: SCOREBOARD.h });
+  }
   for (const g of GATES) {
     for (const side of [-1, 1]) {
       const p = gateLocal(g, side * (GATE.width / 2 - GATE.pillar / 2), 0);

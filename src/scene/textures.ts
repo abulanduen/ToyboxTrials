@@ -175,27 +175,28 @@ export function blobShadowTexture() {
 }
 
 /** Big flat graphic for the scoreboard card / gate signs (pips, laurels). */
-export function cardFaceTexture(title: string, sub: string, accent: string) {
-  return memo(`cardface:${title}:${sub}:${accent}`, () => {
+export function cardFaceTexture(title: string, sub: string, accent: string, aspect = 1.6) {
+  return memo(`cardface:${title}:${sub}:${accent}:${aspect}`, () => {
     const c = document.createElement('canvas');
+    const H = Math.round(512 / aspect);
     c.width = 512;
-    c.height = 320;
+    c.height = H;
     const g = c.getContext('2d')!;
     g.fillStyle = '#F4E8CE';
-    g.fillRect(0, 0, 512, 320);
+    g.fillRect(0, 0, 512, H);
     g.strokeStyle = accent;
     g.lineWidth = 14;
-    g.strokeRect(14, 14, 484, 292);
+    g.strokeRect(14, 14, 484, H - 28);
     g.strokeStyle = 'rgba(87,77,105,0.35)';
     g.lineWidth = 3;
-    g.strokeRect(34, 34, 444, 252);
+    g.strokeRect(34, 34, 444, H - 68);
     g.fillStyle = '#574D69';
     g.textAlign = 'center';
     g.font = '700 64px Fredoka, "Trebuchet MS", sans-serif';
-    g.fillText(title, 256, 150);
+    g.fillText(title, 256, H * 0.47, 430);
     g.font = '600 30px Nunito, "Trebuchet MS", sans-serif';
     g.fillStyle = accent;
-    g.fillText(sub, 256, 215);
+    g.fillText(sub, 256, H * 0.67);
     const t = new THREE.CanvasTexture(c);
     t.colorSpace = THREE.SRGBColorSpace;
     t.anisotropy = 4;

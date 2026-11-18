@@ -4,6 +4,10 @@ import { MINIGAMES } from '../../src/minigames/registry';
 import { DOMINO, DOMINO_UV, dominoGeometry, dominoRestY } from '../../src/scene/domino';
 import { FOUNTAIN, GATE, GATES, GATE_DECOR, GATE_ROAD, GATE_STAND, SCOREBOARD, TABLE, gateLocal, hubColliders } from '../../src/scene/layout';
 import { hubFence, hubPathLines, hubPathTiles, tilesOverlap, TILE_STEP } from '../../src/scene/paths';
+import { GATE_THEMES } from '../../src/scene/gateDecor';
+import { Kit } from '../../src/scene/kit';
+import { SignAtlas } from '../../src/scene/signAtlas';
+import type { DominoSpec } from '../../src/scene/domino';
 
 const PLAYER_R = 0.85;
 const colliders = hubColliders();
@@ -140,7 +144,9 @@ describe('hub bounds and fence', () => {
     expect([at('pavilion').x, at('pavilion').z]).toEqual([0, -21]);
     expect([at('workshop').x, at('workshop').z]).toEqual([-26, -9]);
     expect([at('shop').x, at('shop').z]).toEqual([-30, 11]);
-    expect([at('scoreboard').x, at('scoreboard').z]).toEqual([31, 7]);
+    expect([SCOREBOARD.x, SCOREBOARD.z]).toEqual([31, 7]);
+    // its collider is shifted back a little to cover the rear braces
+    expect(Math.hypot(at('scoreboard').x - 31, at('scoreboard').z - 7)).toBeLessThan(1);
     expect([at('jack').x, at('jack').z]).toEqual([-35, -22]);
     expect([at('musicbox').x, at('musicbox').z]).toEqual([11, -27.5]);
     expect(at('tower-block').top).toBe(5);
@@ -193,5 +199,74 @@ describe('dominoes', () => {
     expect(dominoRestY({ x: 0, z: 0, rot: 0, roll: Math.PI / 2, s: 2 })).toBeCloseTo(DOMINO.w, 9);
     expect(SCOREBOARD.w / (DOMINO.h * SCOREBOARD.s)).toBeCloseTo(3, 9);
     expect(SCOREBOARD.h / SCOREBOARD.s).toBeCloseTo(2 * DOMINO.h + DOMINO.w, 9);
+  });
+});
+
+describe('gate surroundings', () => {
+  const tiles = hubPathTiles();
+  const tileHalf = 0.95;
+  const onTile = (x: number, z: number) =>
+    tiles.some((t) => {
+      // into the tile's frame (three.js rotation.y)
+      const dx = x - t.x;
+      const dz = z - t.z;
+      const c = Math.cos(t.rot);
+      const s = Math.sin(t.rot);
+      const lx = dx * c - dz * s;
+      const lz = dx * s + dz * c;
+      return Math.abs(lx) < tileHalf && Math.abs(lz) < tileHalf;
+    });
+
+  it('every playable game has a theme, and each theme builds its own props', () => {
+    for (const g of GATES) {
+      expect(GATE_THEMES[g.game], g.game).toBeTypeOf('function');
+      const k = new Kit();
+      const extras = { dominoes: [] as DominoSpec[] };
+      k.push(g.x, 0, g.z, g.rot);
+      GATE_THEMES[g.game](k, new SignAtlas(), g, extras);
+      k.pop();
+      const c = k.counts();
+      expect(c.solid + c.decal + extras.dominoes.length, g.game).toBeGreaterThan(5);
+    }
+  });
+
+  it('anything taller than a step stands inside the gate’s two solid spots; flat decals keep off the path tiles', () => {
+    for (const g of GATES) {
+      const k = new Kit();
+      const extras = { dominoes: [] as DominoSpec[] };
+      k.push(g.x, 0, g.z, g.rot);
+      GATE_THEMES[g.game](k, new SignAtlas(), g, extras);
+      k.pop();
+      const geos = k.build();
+      const spots = Object.values(GATE_DECOR).map((d) => ({ ...gateLocal(g, d.lx, d.lz), r: d.r + 0.35, top: d.top + 0.6 }));
+      for (const [layer, geo] of Object.entries(geos)) {
+        const pos = geo!.attributes.position;
+        const v = [0, 1, 2].map(() => ({ x: 0, y: 0, z: 0 }));
+        for (let t = 0; t < pos.count; t += 3) {
+          for (let j = 0; j < 3; j++) v[j] = { x: pos.getX(t + j), y: pos.getY(t + j), z: pos.getZ(t + j) };
+          for (const { x, y, z } of v) {
+            if (y > GATE.height - 2.5) continue; // the lintel stickers sit on the arch itself
+            const spot = spots.find((sp) => Math.hypot(x - sp.x, z - sp.z) <= sp.r);
+            if (y > STEP_HEIGHT) {
+              expect(spot, `${g.game} ${layer} vertex at ${x.toFixed(2)}, ${y.toFixed(2)}, ${z.toFixed(2)}`).toBeDefined();
+              expect(y, g.game).toBeLessThanOrEqual(spot!.top);
+            } else if (!spot) {
+              expect(onTile(x, z), `${g.game} ${layer} piece at ${x.toFixed(2)}, ${z.toFixed(2)} lies on a path tile`).toBe(false);
+            }
+          }
+          // upward-facing flat faces near the felt (0.075) would z-fight with it: keep them ≥ 0.04 above
+          const ux = v[1].x - v[0].x, uy = v[1].y - v[0].y, uz = v[1].z - v[0].z;
+          const wx = v[2].x - v[0].x, wy = v[2].y - v[0].y, wz = v[2].z - v[0].z;
+          const nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx;
+          const up = ny / (Math.hypot(nx, ny, nz) || 1);
+          if (up > 0.99 && v[0].y < STEP_HEIGHT) expect(v[0].y, `${g.game} ${layer} flat face at ${v[0].x.toFixed(2)}, ${v[0].z.toFixed(2)}`).toBeGreaterThanOrEqual(0.075 + 0.04 - 1e-6);
+        }
+      }
+      // real dominoes (Wind-Up Dash) stand in the hero spot
+      for (const d of extras.dominoes) {
+        const hero = spots[0];
+        expect(Math.hypot(d.x - hero.x, d.z - hero.z), g.game).toBeLessThan(hero.r);
+      }
+    }
   });
 });

@@ -9,7 +9,7 @@ import { useGame } from './store';
 import { PALETTE } from './palette';
 import { rewardForSecret } from './cosmetics';
 import { openPractice } from '../minigames/session';
-import { GATES, JACK, MUSICBOX, PAVILION, SCOREBOARD, SHOP, TOWER, WORKSHOP, frontOf } from '../scene/layout';
+import { GATES, GATE_STAND, JACK, MUSICBOX, PAVILION, SCOREBOARD, SHOP, TOWER, WORKSHOP, frontOf } from '../scene/layout';
 
 export interface Interactable {
   id: string;
@@ -31,15 +31,9 @@ export const SECRET_IDS = ['musicbox', 'marble', 'jack', 'key'] as const;
 let keyCooldownUntil = 0;
 export const keyAvailable = () => performance.now() > keyCooldownUntil;
 
-const gate = (id: string) => {
-  const g = GATES.find((x) => x.id === id)!;
-  return frontOf(g.x, g.z, g.rot, 2.2);
-};
-
 export const INTERACTABLES: Interactable[] = [
-  { id: 'gate-copycat', ...gate('gate-copycat'), radius: 4.5, verb: 'Play', label: 'Copycat Conductor' },
-  { id: 'gate-jack', ...gate('gate-jack'), radius: 4.5, verb: 'Play', label: 'Jack-in-the-Box' },
-  { id: 'gate-dash', ...gate('gate-dash'), radius: 4.5, verb: 'Play', label: 'Wind-Up Dash' },
+  // one gate per playable trial: E / Interact opens that trial's lobby (the practice intro card)
+  ...GATES.map((g) => ({ id: g.id, ...frontOf(g.x, g.z, g.rot, GATE_STAND), radius: 4.5, verb: 'Play', label: g.title })),
   { id: 'pavilion', ...frontOf(PAVILION.x, PAVILION.z, 0, PAVILION.d / 2 + 3), radius: 4.5, verb: 'Enter', label: 'the Tournament Pavilion' },
   { id: 'workshop', ...frontOf(WORKSHOP.x, WORKSHOP.z, WORKSHOP.rot, WORKSHOP.d / 2 + 2.5), radius: 5, verb: 'Tinker at', label: 'the Workshop' },
   { id: 'shop', ...frontOf(SHOP.x, SHOP.z, SHOP.rot, SHOP.d / 2 + 6), radius: 5, verb: 'Browse', label: 'Odds & Ends Shop' },
@@ -76,22 +70,15 @@ export function interact(id: string, facing: { x: number; z: number }) {
   const g = useGame.getState();
   events.emit('player:interact');
 
+  const gate = GATES.find((x) => x.id === id);
+  if (gate) {
+    sfx.interact();
+    events.emit('gate:open', { id });
+    openPractice(gate.game);
+    return;
+  }
+
   switch (id) {
-    case 'gate-copycat':
-      sfx.interact();
-      events.emit('gate:open', { id });
-      openPractice('copycat-conductor');
-      break;
-    case 'gate-jack':
-      sfx.interact();
-      events.emit('gate:open', { id });
-      openPractice('jack-in-the-box');
-      break;
-    case 'gate-dash':
-      sfx.interact();
-      events.emit('gate:open', { id });
-      openPractice('wind-up-dash');
-      break;
     case 'pavilion':
       sfx.click();
       g.openPanel({ kind: 'tournament', title: 'Tournament Pavilion', subtitle: 'Pick a format', accent: PALETTE.inkPurple });
