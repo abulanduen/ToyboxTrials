@@ -23,6 +23,9 @@ fs.mkdirSync(out, { recursive: true });
       await page.getByTestId('match-start').waitFor({ state: 'visible' });
       await page.waitForTimeout(900);
       await page.getByTestId('match-start').click();
+      // Software GL can render at ~1 fps under load; fast-forward the 3 s countdown.
+      await page.waitForFunction(() => window.__toybox.match.phase() === 'countdown');
+      await page.evaluate(() => window.__toybox.match.timeScale(10));
       await page.waitForFunction(() => window.__toybox.match.phase() === 'playing');
       // Freeze time for a readable visual checkpoint, then resume for real input.
       await page.evaluate(() => window.__toybox.match.timeScale(0));
