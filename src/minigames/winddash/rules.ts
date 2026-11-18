@@ -1,32 +1,61 @@
 /**
  * Wind-Up Dash — rules core (GAME_DESIGN.md §4 · 07). Deterministic; no DOM/three/timers.
  *
- * A straight sprint down a strip of tabletop props, first across the line wins:
+ * A sprint down a strip of tabletop props, first across the line wins. Every match gets its own
+ * course from the match seed (`course.ts`): a road that bends, narrows and widens, carrying four
+ * or five trap sections picked from this catalogue:
  *
- *   1. Domino rows   standing dominoes block the way except for two gaps per row. Walk into one
- *                    and it topples (and stops blocking), so the leaders clear a path.
- *   2. Spring + wall a block wall with a narrow gate on one side. A spring pad on the other side
- *                    throws a toy clean over it.
- *   3. Ruler bridge  a spill of jam slows toys to a crawl; a ruler lies across it at an angle.
- *   4. Snap jaws     three rows of clockwork jaws that rattle, then snap shut. A toy inside when
- *                    one shuts is stunned; a shut jaw blocks the way. Each row always has one
- *                    side open.
+ *   Domino rows    standing dominoes block the way except for gaps. Walk into one and it topples
+ *                  (and stops blocking), so the leaders clear a path.
+ *   Spring pad     a block wall with a narrow gate on one side; the pad on the other side throws
+ *                  a toy clean over it.
+ *   Sticky jam     a spill that slows toys to a crawl, with a ruler (or two) lying across it.
+ *   Snap jaws      rows of clockwork jaws that rattle, then snap shut. A toy inside is stunned; a
+ *                  shut jaw blocks. Each row always has one side open.
+ *   Crayon gates   a fence with three doorways whose crayon barriers lift in turn.
+ *   Marble run     marbles roll across the road in lanes. One bowls a toy over; hop them or time it.
+ *   Pendulum       a bead on a long string swings across the road and knocks toys back.
+ *   Spinning tops  wandering tops that bounce a toy away on touch.
+ *   Tape belts     tape-measure conveyor belts: one carries you forward, the others back.
+ *   Book steps     books across the road: hop up, or queue for the ramp at the side.
  *
- * The layout (gap positions, sides, ruler angle, jaw timing) is rolled from the seed. Obstacle
- * timing depends only on match time, never on inputs. Toys don't collide with each other.
+ * Trap timing depends only on match time, never on inputs. Toys don't collide with each other.
  * Placement: finish time, then distance along the course.
  */
-import { seededRng, randInt } from '../rng';
 import { rankByKey } from '../scoring';
 import type { Contestant, MatchEvent, RulesCore } from '../types';
 import { NO_INPUT, TOY_TUNING, createMover, latchInput, stepMover, type MoveInput, type MoveWorld, type Mover, type Solid } from '../shared/movement';
+import {
+  CRAYON_TOP,
+  DOMINO,
+  JAW_TOP,
+  MARBLE_CLEAR_Y,
+  MARBLE_R,
+  POST_TOP,
+  START_HW,
+  TOP_HEIGHT,
+  WALL_TOP,
+  beltAt,
+  bobX,
+  crayonPhase,
+  generateCourse,
+  inJam,
+  jawPhase,
+  marbleX,
+  onRuler,
+  roadCx,
+  roadHw,
+  sectionAt,
+  topX,
+  topZ,
+  type Course,
+  type Jaw,
+  type PlanItem,
+} from './course';
 
 export type DashInput = MoveInput;
 
 export interface DashConfig {
-  startZ: number;
-  finishZ: number;
-  halfWidth: number;
   introMs: number;
   limitMs: number;
   /** Time left for everyone else once the first toy finishes. */
@@ -35,57 +64,52 @@ export interface DashConfig {
   toppleMs: number;
   /** Top-speed multiplier in the jam. */
   jamSlow: number;
-  springDist: number;
   springMs: number;
+  /** Stun after a snap jaw bites. */
   stunMs: number;
+  /** A marble or the pendulum bowls a toy back for this long, then it sits dazed for `bonkStunMs`. */
+  bonkMs: number;
+  bonkStunMs: number;
+  /** Speed a spinning top throws a toy off at (cm/s). */
+  bumpSpeed: number;
+  /** Tests and tuning only: force the trap list instead of rolling it from the seed. */
+  plan: PlanItem[] | null;
 }
 
 export const DEFAULT_CONFIG: DashConfig = {
-  startZ: 53,
-  finishZ: -53,
-  halfWidth: 11,
   introMs: 500,
   limitMs: 75000,
   closingMs: 15000,
   toppleMs: 320,
   jamSlow: 0.38,
-  springDist: 17,
   springMs: 650,
   stunMs: 1100,
+  bonkMs: 420,
+  bonkStunMs: 350,
+  bumpSpeed: 15,
+  plan: null,
 };
 
 export interface Domino {
   x: number;
   z: number;
+  /** Section index and row within it. */
+  sec: number;
   row: number;
   state: 'up' | 'falling' | 'down';
   /** Match time it was knocked (ms). */
   at: number;
 }
 
-export interface Jaw {
-  x: number;
-  z: number;
-  hx: number;
-  hz: number;
-  periodMs: number;
-  offsetMs: number;
-}
-
-export const JAW_WARN_MS = 550;
-export const JAW_SHUT_MS = 750;
-export const DOMINO = { hx: 1.0, hz: 0.32, top: 4, spacing: 2.4 };
-export const WALL_TOP = 3.2;
-
-export interface Course {
-  /** Per domino row: its z and the x of each gap (for bots and the Scene). */
-  rows: { z: number; gaps: number[] }[];
-  wall: { z: number; hz: number; gateX: number; gateHalf: number };
-  pad: { x: number; z: number; hx: number; hz: number };
-  /** Jam between z0 (near side) and z1 (far side); the ruler runs from (x0, z0) to (x1, z1). */
-  jam: { z0: number; z1: number };
-  ruler: { x0: number; x1: number; half: number };
-  jaws: Jaw[];
+export interface Toss {
+  t: number;
+  ms: number;
+  fromZ: number;
+  toZ: number;
+  /** Height of the arc (cm), for the render layer. */
+  h: number;
+  /** Stun on landing (ms). */
+  stun: number;
 }
 
 export interface DashPlayer {
@@ -94,12 +118,16 @@ export interface DashPlayer {
   input: MoveInput;
   finished: boolean;
   finishT: number;
-  /** Ms of stun left (snapped by a jaw). */
+  /** Ms of stun left (snapped by a jaw, or dazed after a knock). */
   stunMs: number;
-  /** In the air off the spring pad. */
-  toss: { t: number; fromZ: number; toZ: number } | null;
+  /** In the air: off the spring pad, or bowled over by a marble or the pendulum. */
+  toss: Toss | null;
   snaps: number;
   toppled: number;
+  /** Times bowled over (marbles, pendulum). */
+  bonks: number;
+  /** Times bounced off a spinning top. */
+  bumps: number;
 }
 
 export type Phase = 'intro' | 'race' | 'over';
@@ -114,87 +142,53 @@ export interface DashState {
   course: Course;
   dominoes: Domino[];
   players: DashPlayer[];
-  /** Walls that never change (the block wall either side of its gate). */
+  /** Walls and floors that never change (block wall, fence posts, books and their ramps). */
   fixed: Solid[];
   events: MatchEvent[];
 }
 
 export function progressOf(s: DashState, p: DashPlayer): number {
-  const c = s.config;
+  const c = s.course;
   return Math.max(0, Math.min(1, (c.startZ - p.m.z) / (c.startZ - c.finishZ)));
 }
 
-/** Where a jaw is in its cycle at match time `t`. */
-export function jawPhase(j: Jaw, t: number): 'open' | 'warn' | 'shut' {
-  const k = (((t + j.offsetMs) % j.periodMs) + j.periodMs) % j.periodMs;
-  const shutAt = j.periodMs - JAW_SHUT_MS;
-  return k >= shutAt ? 'shut' : k >= shutAt - JAW_WARN_MS ? 'warn' : 'open';
+/** Is a grounded toy at (x, z) wading through jam (in the spill and off the ruler)? */
+export function stuckInJam(course: Course, x: number, z: number): boolean {
+  const sec = sectionAt(course, z);
+  return !!sec && sec.kind === 'jam' && inJam(sec, z) && !onRuler(sec, x, z);
 }
-
-/** x of the ruler's centre line at depth z (clamped to its ends). */
-export function rulerX(c: Course, z: number): number {
-  const k = Math.max(0, Math.min(1, (c.jam.z0 - z) / (c.jam.z0 - c.jam.z1)));
-  return c.ruler.x0 + (c.ruler.x1 - c.ruler.x0) * k;
-}
-
-export const inJam = (c: Course, z: number) => z < c.jam.z0 && z > c.jam.z1;
-export const onRuler = (c: Course, x: number, z: number) => Math.abs(x - rulerX(c, z)) <= c.ruler.half + 0.35;
 
 const inRect = (x: number, z: number, r: { x: number; z: number; hx: number; hz: number }) => Math.abs(x - r.x) <= r.hx && Math.abs(z - r.z) <= r.hz;
 
-/** Start grid: two rows so eight toys fit the narrow course. */
-export function gridSlot(i: number, n: number, cfg: DashConfig): { x: number; z: number } {
+/** Start grid: two rows so eight toys fit the road. */
+export function gridSlot(i: number, n: number, course: Course): { x: number; z: number } {
   const perRow = Math.min(4, n);
   const row = Math.floor(i / perRow);
   const inRow = Math.min(perRow, n - row * perRow);
   const col = i % perRow;
-  const gap = Math.min(4.4, (cfg.halfWidth * 2 - 4) / Math.max(1, inRow - 1));
-  return { x: (col - (inRow - 1) / 2) * gap, z: cfg.startZ + row * 3 };
+  const gap = Math.min(4.4, (START_HW * 2 - 4) / Math.max(1, inRow - 1));
+  return { x: (col - (inRow - 1) / 2) * gap, z: course.startZ + row * 3 };
 }
 
-function buildCourse(rng: () => number, cfg: DashConfig): { course: Course; dominoes: Domino[]; fixed: Solid[] } {
-  const hw = cfg.halfWidth;
-  // 1. Domino rows.
-  const perRow = Math.floor((hw * 2 - 0.4) / DOMINO.spacing);
-  const x0 = -((perRow - 1) / 2) * DOMINO.spacing;
-  const dominoes: Domino[] = [];
-  const rows: Course['rows'] = [];
-  [39, 33, 27].forEach((z, row) => {
-    const a = randInt(rng, perRow);
-    let b = randInt(rng, perRow - 3);
-    if (b >= a - 1) b += 3; // second gap at least two dominoes away from the first
-    const gaps = [a, b].map((i) => x0 + i * DOMINO.spacing);
-    rows.push({ z, gaps });
-    for (let i = 0; i < perRow; i++) if (i !== a && i !== b) dominoes.push({ x: x0 + i * DOMINO.spacing, z, row, state: 'up', at: 0 });
-  });
-  // 2. Spring pad on one side, the wall's gate on the other.
-  const side = rng() < 0.5 ? -1 : 1;
-  const gateHalf = 1.7;
-  const gateX = -side * (hw - gateHalf - 0.6);
-  const wall = { z: 9, hz: 0.7, gateX, gateHalf };
-  const pad = { x: side * hw * 0.5, z: 17.5, hx: hw * 0.5 - 1, hz: 1.7 };
-  const fixed: Solid[] = [];
-  const addWall = (from: number, to: number) => {
-    if (to - from > 0.2) fixed.push({ kind: 'box', id: 'wall', x: (from + to) / 2, z: wall.z, hx: (to - from) / 2, hz: wall.hz, rot: 0, top: WALL_TOP });
-  };
-  addWall(-hw, gateX - gateHalf);
-  addWall(gateX + gateHalf, hw);
-  // 3. Jam and ruler.
-  const span = hw - 3.5;
-  const rx0 = (rng() * 2 - 1) * span;
-  let rx1 = (rng() * 2 - 1) * span;
-  if (Math.abs(rx1 - rx0) < 4) rx1 = rx0 > 0 ? rx0 - 6 : rx0 + 6; // always a real diagonal
-  const jam = { z0: -3, z1: -23 };
-  const ruler = { x0: rx0, x1: rx1, half: 1.7 };
-  // 4. Snap jaws: two per row, half a period apart, so one side is always open.
-  const jaws: Jaw[] = [];
-  for (const z of [-31, -38.5, -46]) {
-    const periodMs = 2700 + rng() * 700;
-    const offsetMs = rng() * periodMs;
-    const flip = rng() < 0.5 ? 0 : 1;
-    [-1, 1].forEach((sx, i) => jaws.push({ x: (sx * hw) / 2, z, hx: hw / 2 - 0.25, hz: 1.5, periodMs, offsetMs: offsetMs + ((i + flip) % 2) * (periodMs / 2) }));
+function fixedSolids(course: Course): Solid[] {
+  const out: Solid[] = [];
+  const box = (id: string, x: number, z: number, hx: number, hz: number, top: number) => out.push({ kind: 'box', id, x, z, hx, hz, rot: 0, top });
+  for (const sec of course.sections) {
+    if (sec.kind === 'spring') {
+      const { wall } = sec;
+      const span = (from: number, to: number) => {
+        if (to - from > 0.2) box('wall', (from + to) / 2, wall.z, (to - from) / 2, wall.hz, WALL_TOP);
+      };
+      span(sec.cx - sec.hw, wall.gateX - wall.gateHalf);
+      span(wall.gateX + wall.gateHalf, sec.cx + sec.hw);
+    } else if (sec.kind === 'crayons') {
+      for (const row of sec.rows) for (const p of row.posts) box('post', p.x, row.z, p.hx, row.hz + 0.25, POST_TOP);
+    } else if (sec.kind === 'books') {
+      for (const b of sec.books) box('book', b.x, b.z, b.hx, b.hz, b.top);
+      for (const st of sec.steps) box('step', st.x, st.z, st.hx, st.hz, st.top);
+    }
   }
-  return { course: { rows, wall, pad, jam, ruler, jaws }, dominoes, fixed };
+  return out;
 }
 
 function finish(s: DashState, p: DashPlayer) {
@@ -208,10 +202,23 @@ function finish(s: DashState, p: DashPlayer) {
   }
 }
 
+/** Bowled over: thrown back to `toZ`, then dazed for a moment. */
+function knock(s: DashState, p: DashPlayer, toZ: number, by: string) {
+  const c = s.config;
+  p.toss = { t: 0, ms: c.bonkMs, fromZ: p.m.z, toZ: Math.max(p.m.z, toZ), h: 3, stun: c.bonkStunMs };
+  p.m.vx = p.m.vz = p.m.vy = 0;
+  p.m.y = 0;
+  p.m.grounded = true;
+  p.bonks++;
+  s.events.push({ type: 'bonk', id: p.id, by });
+}
+
 export const dashRules: RulesCore<DashState, DashInput, DashConfig> = {
   init(contestants: Contestant[], seed: number, config?: Partial<DashConfig>): DashState {
     const cfg = { ...DEFAULT_CONFIG, ...config };
-    const built = buildCourse(seededRng(seed), cfg);
+    const course = generateCourse(seed, cfg.plan);
+    const dominoes: Domino[] = [];
+    for (const sec of course.sections) if (sec.kind === 'dominoes') for (const d of sec.dominoes) dominoes.push({ x: d.x, z: d.z, sec: sec.index, row: d.row, state: 'up', at: 0 });
     const n = contestants.length;
     return {
       config: cfg,
@@ -220,12 +227,12 @@ export const dashRules: RulesCore<DashState, DashInput, DashConfig> = {
       phaseT: 0,
       endAt: cfg.limitMs,
       finishers: 0,
-      course: built.course,
-      dominoes: built.dominoes,
-      fixed: built.fixed,
+      course,
+      dominoes,
+      fixed: fixedSolids(course),
       players: contestants.map((c, i) => {
-        const g = gridSlot(i, n, cfg);
-        return { id: c.id, m: createMover(g.x, g.z), input: NO_INPUT, finished: false, finishT: 0, stunMs: 0, toss: null, snaps: 0, toppled: 0 };
+        const g = gridSlot(i, n, course);
+        return { id: c.id, m: createMover(g.x, g.z), input: NO_INPUT, finished: false, finishT: 0, stunMs: 0, toss: null, snaps: 0, toppled: 0, bonks: 0, bumps: 0 };
       }),
       events: [],
     };
@@ -234,6 +241,7 @@ export const dashRules: RulesCore<DashState, DashInput, DashConfig> = {
   step(s, inputs, dtMs) {
     if (s.phase === 'over') return s;
     const c = s.config;
+    const course = s.course;
     const prevT = s.t;
     s.t += dtMs;
     s.phaseT += dtMs;
@@ -243,39 +251,55 @@ export const dashRules: RulesCore<DashState, DashInput, DashConfig> = {
       s.events.push({ type: 'start' });
     }
 
-    // ---- obstacles that run on the clock
-    for (const d of s.dominoes) if (d.state === 'falling' && s.t - d.at >= c.toppleMs) d.state = 'down';
-    const shutNow: number[] = [];
-    s.course.jaws.forEach((j, i) => {
-      const was = jawPhase(j, prevT);
-      const now = jawPhase(j, s.t);
-      if (was === now) return;
-      if (now === 'warn') s.events.push({ type: 'jaw-warn', jaw: i });
-      if (now === 'shut') {
-        shutNow.push(i);
-        s.events.push({ type: 'jaw-shut', jaw: i });
-      }
-    });
-
-    // ---- this step's walls
+    // ---- traps that run on the clock, and this step's walls
     const solids: Solid[] = s.fixed.slice();
-    s.dominoes.forEach((d, i) => {
+    for (let i = 0; i < s.dominoes.length; i++) {
+      const d = s.dominoes[i];
+      if (d.state === 'falling' && s.t - d.at >= c.toppleMs) d.state = 'down';
       if (d.state !== 'down') solids.push({ kind: 'box', id: `dom:${i}`, x: d.x, z: d.z, hx: DOMINO.hx, hz: DOMINO.hz, rot: 0, top: DOMINO.top });
-    });
-    s.course.jaws.forEach((j, i) => {
-      if (jawPhase(j, s.t) === 'shut') solids.push({ kind: 'box', id: `jaw:${i}`, x: j.x, z: j.z, hx: j.hx, hz: j.hz, rot: 0, top: 3.4 });
-    });
-    const world: MoveWorld = { solids, bounds: { minX: -c.halfWidth, maxX: c.halfWidth, minZ: c.finishZ - 5, maxZ: c.startZ + 6 } };
+    }
+    const shutNow: Jaw[] = [];
+    for (const sec of course.sections) {
+      if (sec.kind === 'jaws') {
+        for (const j of sec.jaws) {
+          const was = jawPhase(j, prevT);
+          const now = jawPhase(j, s.t);
+          if (was !== now) {
+            if (now === 'warn') s.events.push({ type: 'jaw-warn', jaw: j.id });
+            if (now === 'shut') {
+              shutNow.push(j);
+              s.events.push({ type: 'jaw-shut', jaw: j.id });
+            }
+          }
+          if (now === 'shut') solids.push({ kind: 'box', id: `jaw:${j.id}`, x: j.x, z: j.z, hx: j.hx, hz: j.hz, rot: 0, top: JAW_TOP });
+        }
+      } else if (sec.kind === 'crayons') {
+        for (const row of sec.rows) {
+          for (let d = 0; d < row.doors.length; d++) {
+            const now = crayonPhase(row, d, s.t);
+            if (now !== 'shut') continue;
+            if (crayonPhase(row, d, prevT) !== 'shut') s.events.push({ type: 'crayon-shut', row: row.id, door: d });
+            solids.push({ kind: 'box', id: `crayon:${row.id}:${d}`, x: row.doors[d].x, z: row.z, hx: row.doors[d].half, hz: row.hz, rot: 0, top: CRAYON_TOP });
+          }
+        }
+      } else if (sec.kind === 'tops') {
+        for (const tp of sec.tops) solids.push({ kind: 'circle', id: `top:${tp.id}`, x: topX(tp, s.t), z: topZ(tp, s.t), r: tp.r, top: TOP_HEIGHT });
+      }
+    }
+    const world: MoveWorld = { solids, bounds: { minX: -1000, maxX: 1000, minZ: course.finishZ - 5, maxZ: course.startZ + 6 } };
+    const R = TOY_TUNING.radius;
 
     for (const p of s.players) {
       p.input = latchInput(p.input, inputs[p.id]);
 
       if (p.toss) {
-        // Thrown by the spring: straight over the wall, no steering, no collisions.
-        p.toss.t += dtMs;
-        const k = Math.min(1, p.toss.t / c.springMs);
-        p.m.z = p.toss.fromZ + (p.toss.toZ - p.toss.fromZ) * k;
+        // Thrown: by the spring (straight over the wall) or bowled back. No steering, no collisions.
+        const tz = p.toss;
+        tz.t += dtMs;
+        const k = Math.min(1, tz.t / tz.ms);
+        p.m.z = tz.fromZ + (tz.toZ - tz.fromZ) * k;
         if (k >= 1) {
+          p.stunMs = Math.max(p.stunMs, tz.stun);
           p.toss = null;
           s.events.push({ type: 'land', id: p.id, impact: 1.4 });
         }
@@ -283,45 +307,93 @@ export const dashRules: RulesCore<DashState, DashInput, DashConfig> = {
       }
 
       // A jaw snapping shut on a toy stuns it and spits it back out the near side.
-      for (const i of shutNow) {
-        const j = s.course.jaws[i];
-        if (p.finished || !inRect(p.m.x, p.m.z, { ...j, hx: j.hx + 0.3, hz: j.hz + 0.5 })) continue;
+      for (const j of shutNow) {
+        if (p.finished || Math.abs(p.m.x - j.x) > j.hx + 0.3 || Math.abs(p.m.z - j.z) > j.hz + 0.5) continue;
         p.stunMs = c.stunMs;
         p.snaps++;
-        p.m.z = j.z + j.hz + TOY_TUNING.radius + 0.6;
+        p.m.z = j.z + j.hz + R + 0.6;
         p.m.vx = p.m.vz = 0;
-        s.events.push({ type: 'snap', id: p.id, jaw: i });
+        s.events.push({ type: 'snap', id: p.id, jaw: j.id });
       }
 
       let input = p.input;
-      if (p.finished) input = p.m.z > c.finishZ - 3 ? { ax: 0, ay: 0.7, run: false, jump: false } : NO_INPUT;
+      if (p.finished) input = p.m.z > course.finishZ - 3 ? { ax: 0, ay: 0.7, run: false, jump: false } : NO_INPUT;
       else if (s.phase === 'intro') input = NO_INPUT;
       else if (p.stunMs > 0) {
         p.stunMs = Math.max(0, p.stunMs - dtMs);
         input = NO_INPUT;
       }
-      const slow = !p.finished && p.m.grounded && inJam(s.course, p.m.z) && !onRuler(s.course, p.m.x, p.m.z);
+      const slow = !p.finished && p.m.grounded && stuckInJam(course, p.m.x, p.m.z);
       const rep = stepMover(p.m, input, dtMs, world, TOY_TUNING, slow ? c.jamSlow : 1);
       if (rep.jumped) s.events.push({ type: 'jump', id: p.id });
       if (rep.landed) s.events.push({ type: 'land', id: p.id, impact: rep.landed });
+
+      // The road's own edges (it bends and changes width, so they depend on where the toy is).
+      const cx = roadCx(course, p.m.z);
+      const reach = roadHw(course, p.m.z) - R;
+      if (p.m.x < cx - reach) {
+        p.m.x = cx - reach;
+        if (p.m.vx < 0) p.m.vx = 0;
+      } else if (p.m.x > cx + reach) {
+        p.m.x = cx + reach;
+        if (p.m.vx > 0) p.m.vx = 0;
+      }
+
       if (rep.hit?.startsWith('dom:')) {
-        const d = s.dominoes[Number(rep.hit.slice(4))];
+        const i = Number(rep.hit.slice(4));
+        const d = s.dominoes[i];
         if (d.state === 'up') {
           d.state = 'falling';
           d.at = s.t;
           p.toppled++;
-          s.events.push({ type: 'domino', index: Number(rep.hit.slice(4)), id: p.id });
+          s.events.push({ type: 'domino', index: i, id: p.id });
         }
       }
       if (p.finished) continue;
 
-      if (p.m.grounded && p.stunMs <= 0 && inRect(p.m.x, p.m.z, s.course.pad)) {
-        p.toss = { t: 0, fromZ: p.m.z, toZ: p.m.z - c.springDist };
-        p.m.vx = 0;
-        p.m.vz = -TOY_TUNING.run; // lands running
-        p.m.yaw = Math.PI;
-        s.events.push({ type: 'spring', id: p.id });
-      } else if (p.m.z <= c.finishZ) finish(s, p);
+      const sec = sectionAt(course, p.m.z);
+      if (sec) {
+        if (sec.kind === 'tops' && rep.hit?.startsWith('top:')) {
+          // Bounced off: thrown directly away from the top it touched.
+          const id = Number(rep.hit.slice(4));
+          const tp = sec.tops.find((x) => x.id === id);
+          if (tp) {
+            const dx = p.m.x - topX(tp, s.t);
+            const dz = p.m.z - topZ(tp, s.t);
+            const d = Math.hypot(dx, dz) || 1;
+            p.m.vx = (dx / d) * c.bumpSpeed;
+            p.m.vz = (dz / d) * c.bumpSpeed;
+            p.bumps++;
+            s.events.push({ type: 'bump', id: p.id, top: id });
+          }
+        } else if (sec.kind === 'conveyor' && p.m.grounded) {
+          p.m.z -= beltAt(sec, p.m.x, p.m.z) * (dtMs / 1000);
+        } else if (sec.kind === 'marbles' && p.m.y < MARBLE_CLEAR_Y) {
+          const reachM = MARBLE_R + R - 0.2;
+          for (const lane of sec.lanes) {
+            const dz = p.m.z - lane.z;
+            if (Math.abs(dz) >= reachM) continue;
+            let hit = false;
+            for (let i = 0; i < lane.count && !hit; i++) hit = Math.hypot(p.m.x - marbleX(lane, i, s.t), dz) < reachM;
+            if (hit) knock(s, p, lane.z + 2.7, 'marble');
+            break;
+          }
+        } else if (sec.kind === 'pendulum') {
+          for (const arm of sec.arms) {
+            if (Math.abs(p.m.z - arm.z) < arm.hz && Math.abs(p.m.x - bobX(arm, s.t)) < arm.r + 0.55) {
+              knock(s, p, arm.z + arm.hz + R + 1.2, 'pendulum');
+              break;
+            }
+          }
+        } else if (sec.kind === 'spring' && p.m.grounded && p.stunMs <= 0 && inRect(p.m.x, p.m.z, sec.pad)) {
+          p.toss = { t: 0, ms: c.springMs, fromZ: p.m.z, toZ: p.m.z - sec.dist, h: 7.5, stun: 0 };
+          p.m.vx = 0;
+          p.m.vz = -TOY_TUNING.run; // lands running
+          p.m.yaw = Math.PI;
+          s.events.push({ type: 'spring', id: p.id });
+        }
+      }
+      if (!p.toss && p.m.z <= course.finishZ) finish(s, p);
     }
 
     if (s.finishers === s.players.length || s.t >= s.endAt) {
@@ -356,7 +428,13 @@ export const dashRules: RulesCore<DashState, DashInput, DashConfig> = {
     return {
       placements: rankByKey(ordered),
       durationMs: s.t,
-      stats: { finishers: s.finishers, snaps: s.players.reduce((n, p) => n + p.snaps, 0), dominoes: s.dominoes.filter((d) => d.state !== 'up').length },
+      stats: {
+        finishers: s.finishers,
+        snaps: s.players.reduce((n, p) => n + p.snaps, 0),
+        bonks: s.players.reduce((n, p) => n + p.bonks, 0),
+        dominoes: s.dominoes.filter((d) => d.state !== 'up').length,
+        traps: s.course.sections.length,
+      },
     };
   },
 

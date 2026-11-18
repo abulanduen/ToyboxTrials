@@ -38,8 +38,8 @@ export const TUTORIALS: Partial<Record<MinigameId, TutorialStep[]>> = {
   ],
   'wind-up-dash': [
     { title: 'Sprint to the finish', text: 'Race across a tabletop obstacle course. Move with W A S D or the arrows, and jump with Space.', touch: 'Race across a tabletop obstacle course. Steer with the joystick and tap Jump to hop.' },
-    { title: 'Use the course', text: 'Barge through the dominoes, bounce off the spring pad over the wall, and stay on the ruler to cross the sticky jam.' },
-    { title: 'Mind the jaws', text: 'The snap jaws rattle before they bite. Wait for them to open, then dash through. First toy across the line wins.' },
+    { title: 'A new course every race', text: 'The road and its traps are dealt fresh each time. Look ahead: arrows, ramps and rulers show the quick way through, and a hop clears low things.' },
+    { title: 'Watch what moves', text: 'Anything that rattles, rolls, swings or lifts runs on a rhythm. Wait for your gap, then go. First toy across the line wins.' },
   ],
   'inferno-escape': [
     { title: 'Dig in', text: 'You start in the middle of a field of blocks. Move with W A S D and press Space to break the block you are facing.', touch: 'You start in the middle of a field of blocks. Push the joystick to move and turn, and tap Break to clear the block you are facing.' },

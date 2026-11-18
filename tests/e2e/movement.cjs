@@ -38,28 +38,28 @@ function kit(page) {
       if (!s || !s.players) return { host: window.__toybox.match.phase(), s: null };
       const p = s.players.find((x) => x.id === 'you');
       const c = s.config;
-      const prog = c.startZ !== undefined ? Math.max(0, Math.min(1, (c.startZ - p.m.z) / (c.startZ - c.finishZ))) : 0;
-      const dash = s.course
+      // Red Light keeps its runway in the config; Wind-Up Dash deals a course per match.
+      const course = s.course && s.course.road ? s.course : null;
+      const startZ = course ? course.startZ : c.startZ;
+      const finishZ = course ? course.finishZ : c.finishZ;
+      const prog = startZ !== undefined ? Math.max(0, Math.min(1, (startZ - p.m.z) / (startZ - finishZ))) : 0;
+      const dash = course
         ? {
-            rows: s.course.rows,
-            wall: s.course.wall,
-            pad: s.course.pad,
-            jam: s.course.jam,
-            ruler: s.course.ruler,
+            seed: course.seed,
+            startZ,
+            finishZ,
+            road: course.road,
+            sections: course.sections,
+            // What makes one course different from another: which traps, where, on what road.
+            key: course.sections.map((q) => `${q.kind}${q.level}@${q.z0}:${q.cx}/${q.hw}`).join(' '),
             down: s.dominoes.filter((d) => d.state !== 'up').length,
-            // Per jaw: ms until it next shuts (0 = shut now).
-            jaws: s.course.jaws.map((j) => {
-              const k = (((s.t + j.offsetMs) % j.periodMs) + j.periodMs) % j.periodMs;
-              const shutAt = j.periodMs - 750;
-              return { x: j.x, z: j.z, hx: j.hx, hz: j.hz, untilShut: k >= shutAt ? 0 : shutAt - k };
-            }),
           }
         : null;
       return {
         host: window.__toybox.match.phase(),
         dash,
         s: { phase: s.phase, phaseT: s.phaseT, t: s.t, cycle: s.cycle, n: s.players.length },
-        me: { x: p.m.x, y: p.m.y, z: p.m.z, vx: p.m.vx, speed: Math.hypot(p.m.vx, p.m.vz), grounded: p.m.grounded, caught: p.caught, held: p.held, fling: !!p.fling, finished: p.finished, prog, stun: p.stunMs, snaps: p.snaps, toppled: p.toppled, toss: !!p.toss },
+        me: { x: p.m.x, y: p.m.y, z: p.m.z, vx: p.m.vx, speed: Math.hypot(p.m.vx, p.m.vz), grounded: p.m.grounded, caught: p.caught, held: p.held, fling: !!p.fling, finished: p.finished, prog, stun: p.stunMs, snaps: p.snaps, toppled: p.toppled, bonks: p.bonks, bumps: p.bumps, toss: !!p.toss },
       };
     });
   const waitFor = async (pred, label, ms = 240000, every = 60) => {
@@ -300,6 +300,173 @@ async function phoneRlgl(browser) {
 }
 
 // ============================================================================ desktop: Dash
+/** Every trap kind the generator can deal (src/minigames/winddash/course.ts). */
+const DASH_KINDS = ['dominoes', 'spring', 'jam', 'jaws', 'crayons', 'marbles', 'pendulum', 'tops', 'conveyor', 'books'];
+
+/**
+ * Dash helpers. The course is different every match, so nothing here knows where anything is:
+ * it all comes from the generated course in `__toybox.match.state().course`.
+ */
+function dashKit(page, R, waitFor) {
+  /** Stand the local toy somewhere on the course (test-only: the ?debug hook exposes the live state). */
+  const put = (x, z) =>
+    page.evaluate(
+      ([x, z]) => {
+        const p = window.__toybox.match.state().players.find((q) => q.id === 'you');
+        Object.assign(p.m, { x, z, vx: 0, vz: 0, y: 0, vy: 0, grounded: true });
+        p.stunMs = 0;
+        p.toss = null;
+      },
+      [x, z],
+    );
+  /** This scripted run dawdles (and software rendering is slow), so stop the clock ending the race. */
+  const holdClock = () =>
+    page.evaluate(() => {
+      const s = window.__toybox.match.state();
+      s.config.closingMs = s.config.limitMs = s.endAt = 3600000;
+    });
+  const rulerX = (sec, z) => {
+    const p = sec.path;
+    if (z >= p[0].z) return p[0].x;
+    for (let i = 1; i < p.length; i++) if (z >= p[i].z) return p[i - 1].x + ((p[i].x - p[i - 1].x) * (p[i - 1].z - z)) / (p[i - 1].z - p[i].z);
+    return p[p.length - 1].x;
+  };
+  const key = (k, on) => page.keyboard[on ? 'down' : 'up'](k);
+
+  /** One real-input check per trap kind, each starting from a spot read out of the course data. */
+  const traps = {
+    async dominoes(sec) {
+      const d = await page.evaluate((i) => window.__toybox.match.state().dominoes.find((q) => q.sec === i && q.state === 'up'), sec.index);
+      const before = (await R()).me.toppled;
+      await put(d.x, d.z + 2.5);
+      await key('KeyW', true);
+      const r = await waitFor((r) => r.me.z < d.z - 1.5, 'through a domino');
+      await key('KeyW', false);
+      check('Dash dominoes: walking into one topples it and lets you through', r.me.toppled > before && r.dash.down >= 1, `toppled ${before} → ${r.me.toppled}`);
+      const gap = sec.rows[0].gaps[0];
+      await put(gap, sec.rows[0].z + 2.5);
+      const t0 = (await R()).me.toppled;
+      await key('KeyW', true);
+      const g = await waitFor((r) => r.me.z < sec.rows[0].z - 1.2, 'through a gap');
+      await key('KeyW', false);
+      check('Dash dominoes: a gap lets you through without toppling anything', g.me.toppled === t0, `toppled ${t0} → ${g.me.toppled}`);
+    },
+    async spring(sec) {
+      await put(sec.pad.x, sec.pad.z + sec.pad.hz + 1.5);
+      await key('KeyW', true);
+      let r = await waitFor((r) => r.me.toss || r.me.z < sec.wall.z, 'onto the spring pad');
+      await key('KeyW', false);
+      check('Dash spring: the pad launches the toy', r.me.toss);
+      r = await waitFor((r) => !r.me.toss, 'landed');
+      check('Dash spring: …and it lands beyond the block wall', r.me.z < sec.wall.z - 1, `z=${r.me.z.toFixed(1)} wall=${sec.wall.z}`);
+      const away = sec.cx + (sec.wall.gateX > sec.cx ? -1.5 : 1.5);
+      await put(away, sec.wall.z + 2.5);
+      await key('KeyW', true);
+      r = await waitFor((r) => r.me.z < sec.wall.z + 1.8 && r.me.speed < 0.5, 'up against the wall');
+      await key('KeyW', false);
+      check('Dash spring: the wall itself blocks', r.me.z > sec.wall.z + sec.wall.hz);
+    },
+    async jam(sec, textHas) {
+      const mid = (sec.jam.z0 + sec.jam.z1) / 2;
+      const off = sec.cx + (rulerX(sec, mid) > sec.cx ? -1 : 1) * (sec.hw - 1.5);
+      await put(off, mid + 1.5);
+      await key('KeyW', true);
+      let r = await waitFor((r) => r.me.z < mid + 0.6, 'wading through jam');
+      check('Dash jam: jam slows the toy to a crawl', r.me.speed < 7, `speed=${r.me.speed.toFixed(1)} cm/s`);
+      check('Dash jam: the HUD says to find the ruler', await textHas('[data-testid=wd-banner]', 'ruler'));
+      await key('KeyW', false);
+      await put(rulerX(sec, mid + 1.5), mid + 1.5);
+      await key('KeyW', true);
+      r = await waitFor((r) => r.me.z < mid + 0.1, 'along the ruler');
+      await key('KeyW', false);
+      check('Dash jam: the ruler is full speed', r.me.speed > 9, `speed=${r.me.speed.toFixed(1)} cm/s`);
+    },
+    async jaws(sec, textHas) {
+      const j = sec.jaws[0];
+      const before = (await R()).me.snaps;
+      await put(j.x, j.z);
+      const r = await waitFor((r) => r.me.snaps > before, 'snapped by a jaw');
+      check('Dash jaws: a jaw snapping shut on the toy stuns it and spits it back', r.me.stun > 0 && r.me.z > j.z + j.hz, `stun=${r.me.stun.toFixed(0)}ms`);
+      check('Dash jaws: the HUD says Snapped!', await textHas('[data-testid=wd-banner]', 'Snapped'));
+    },
+    async crayons(sec) {
+      const row = sec.rows[0];
+      const door = row.doors[1];
+      await put(door.x, row.z + 2.5);
+      await key('KeyW', true);
+      // Whatever the gate is doing now, holding forward gets through once its turn comes round.
+      const r = await waitFor((r) => r.me.z < row.z - 1.5, 'through a crayon gate');
+      await key('KeyW', false);
+      check('Dash crayon gates: a gate lets the toy through when it lifts', r.me.z < row.z - 1.5);
+      const post = row.posts[1];
+      await put(post.x, row.z + 2.5);
+      await key('KeyW', true);
+      const b = await waitFor((r) => r.me.z < row.z + 2 && r.me.speed < 0.5, 'up against the fence');
+      await key('KeyW', false);
+      check('Dash crayon gates: the fence between the doorways blocks', b.me.z > row.z);
+    },
+    async marbles(sec, textHas) {
+      const lane = sec.lanes[0];
+      const before = (await R()).me.bonks;
+      await put(sec.cx, lane.z);
+      let r = await waitFor((r) => r.me.bonks > before, 'bowled over by a marble');
+      check('Dash marbles: a marble bowls a toy standing in its lane back', r.me.bonks === before + 1);
+      check('Dash marbles: the HUD says Bonk!', await textHas('[data-testid=wd-banner]', 'Bonk'));
+      r = await waitFor((r) => !r.me.toss, 'landed');
+      check('Dash marbles: …and it lands clear of the lane', r.me.z > lane.z + 1.8, `z=${r.me.z.toFixed(1)} lane=${lane.z}`);
+    },
+    async pendulum(sec) {
+      const arm = sec.arms[0];
+      const before = (await R()).me.bonks;
+      await put(arm.x, arm.z);
+      let r = await waitFor((r) => r.me.bonks > before, 'knocked by the pendulum');
+      r = await waitFor((r) => !r.me.toss, 'landed');
+      check('Dash pendulum: the bead knocks a toy in its path back out', r.me.bonks === before + 1 && r.me.z > arm.z + arm.hz, `z=${r.me.z.toFixed(1)} arm=${arm.z}`);
+    },
+    async tops(sec) {
+      const tp = sec.tops[0];
+      const before = (await R()).me.bumps;
+      await put(tp.x, tp.z + 3.4);
+      await key('KeyW', true);
+      const r = await waitFor((r) => r.me.bumps > before, 'bounced off a top');
+      await key('KeyW', false);
+      check('Dash tops: touching a spinning top bounces the toy off', r.me.bumps > before && r.me.z > tp.z);
+    },
+    async conveyor(sec, textHas) {
+      const back = sec.belts.find((b) => b.v < 0);
+      const fwd = sec.belts.find((b) => b.v > 0);
+      const zb = (back.z0 + back.z1) / 2 - 2;
+      await put(back.x, zb);
+      let r = await waitFor((r) => r.me.z > zb + 1.5 || r.me.z < zb - 1.5, 'carried by a belt');
+      check('Dash belts: a backwards belt carries a standing toy back', r.me.z > zb + 1.5, `z ${zb.toFixed(1)} → ${r.me.z.toFixed(1)}`);
+      await put(back.x, zb);
+      check('Dash belts: the HUD says to switch lanes', await textHas('[data-testid=wd-banner]', 'belt'));
+      const zf = (fwd.z0 + fwd.z1) / 2 + 2;
+      await put(fwd.x, zf);
+      r = await waitFor((r) => r.me.z > zf + 1.5 || r.me.z < zf - 1.5, 'carried by a belt');
+      check('Dash belts: the forward belt carries it on', r.me.z < zf - 1.5, `z ${zf.toFixed(1)} → ${r.me.z.toFixed(1)}`);
+    },
+    async books(sec) {
+      const f = sec.faces[0];
+      await put(2 * sec.cx - f.rampX, f.z + 2.5); // the side away from the ramp
+      await key('KeyW', true);
+      let r = await waitFor((r) => r.me.z < f.z + 1.5 && r.me.speed < 0.5, 'up against the book');
+      check('Dash books: a book across the road blocks a walking toy', r.me.z > f.z && r.me.y === 0, `z=${r.me.z.toFixed(2)} face=${f.z}`);
+      // Hop (again if a slow frame swallowed the first) until the toy is standing on the book.
+      const t0 = Date.now();
+      while (Date.now() - t0 < 120000) {
+        r = await R();
+        if (r.me.grounded && r.me.y > f.top - 0.05) break;
+        if (r.me.grounded) await page.keyboard.press('Space');
+        await page.waitForTimeout(60);
+      }
+      await key('KeyW', false);
+      check('Dash books: a hop gets the toy up onto the book', r.me.grounded && Math.abs(r.me.y - f.top) < 0.05, `y=${r.me.y.toFixed(2)} top=${f.top}`);
+    },
+  };
+  return { put, holdClock, traps };
+}
+
 async function desktopDash(browser) {
   const page = await browser.newPage({ viewport: { width: 1024, height: 600 } });
   page.setDefaultTimeout(120000);
@@ -308,139 +475,59 @@ async function desktopDash(browser) {
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   await page.addInitScript(SEED);
   const { scale, snap, R, waitFor, open, textHas } = kit(page);
-  const held = { KeyW: false, KeyS: false, KeyA: false, KeyD: false };
-  const key = async (k, on) => {
-    if (held[k] === on) return;
-    held[k] = on;
-    await page.keyboard[on ? 'down' : 'up'](k);
-  };
-  const stop = async () => { for (const k of Object.keys(held)) await key(k, false); };
-  /** Run forward steering towards aim(r) (an x, or null for "stand still") until done(r). */
-  const drive = async (aim, done, label, ms = 300000) => {
-    const t0 = Date.now();
-    let r = await R();
-    while (Date.now() - t0 < ms) {
-      r = await R();
-      if (!r.s || r.host !== 'playing' || done(r)) break;
-      const a = aim(r);
-      const x = a && typeof a === 'object' ? a.x : a;
-      if (x === null) await stop();
-      else {
-        await key('KeyW', !(a && (a.sidestep || a.back))); // sidestep: line up first, don't run forward yet
-        await key('KeyS', !!(a && a.back));
-        // Keys are all-or-nothing, so let go early enough to coast to a stop on the line.
-        const dx = x - r.me.x;
-        const closing = Math.sign(dx) === Math.sign(r.me.vx);
-        const need = Math.abs(dx) - (closing ? (r.me.vx * r.me.vx) / 110 + Math.abs(r.me.vx) * 0.08 : 0);
-        const band = a && a.sidestep ? 0.2 : 0.5;
-        await key('KeyD', need > band && dx > 0);
-        await key('KeyA', need > band && dx < 0);
-      }
-      await page.waitForTimeout(30);
-    }
-    if (Date.now() - t0 >= ms) throw new Error('timeout driving: ' + label);
-    return r;
-  };
-  const rulerX = (d, z) => {
-    const k = Math.max(0, Math.min(1, (d.jam.z0 - z) / (d.jam.z0 - d.jam.z1)));
-    return d.ruler.x0 + (d.ruler.x1 - d.ruler.x0) * k;
-  };
+  const { put, holdClock, traps } = dashKit(page, R, waitFor);
+  const stop = async () => { for (const k of ['KeyW', 'KeyA', 'KeyD']) await page.keyboard.up(k); };
 
   await page.goto(BASE + '?debug#play');
   await page.waitForSelector('.loading', { state: 'detached' });
-  await page.waitForTimeout(1500);
+  await page.waitForFunction(() => window.__toybox && window.__toybox.match);
   await open('wind-up-dash');
   check('Dash: practice hook opens the intro card (lazy-loaded module)', (await page.textContent('.match-intro h2')).includes('Wind-Up Dash'));
   await page.click('.intro-options .segmented >> nth=1 >> button >> nth=0'); // easy bots
   await page.screenshot({ path: `${OUT}/m6-20-dash-intro.png` });
   await page.click('[data-testid=match-start]');
-  let r = await waitFor((r) => r.host === 'playing' && r.s && r.s.phase === 'race', 'race start');
-  // This scripted run dawdles on purpose (and software rendering is slow), so stop the clock from
-  // closing the race once the bots are home. Test-only: the ?debug hook exposes the live state.
-  await page.evaluate(() => {
-    const s = window.__toybox.match.state();
-    s.config.closingMs = 3600000;
-    s.config.limitMs = 3600000;
-    s.endAt = 3600000;
-  });
-  const d = r.dash;
-  check('Dash: four toys on the grid, course built from the seed', r.s.n === 4 && d.rows.length === 3 && d.jaws.length === 6);
+  let r = await waitFor((r) => r.host === 'playing' && r.s && r.dash && r.s.phase === 'race', 'race start');
+  await holdClock();
+  const first = r.dash;
+  const kinds = first.sections.map((q) => q.kind);
+  check('Dash: four toys on the grid of a course built from the seed', r.s.n === 4 && first.road.length >= 6 && Math.abs(r.me.z - first.startZ) < 4, `seed ${first.seed}`);
+  check('Dash: the course has 4–5 different traps from the catalogue', kinds.length >= 4 && kinds.length <= 5 && new Set(kinds).size === kinds.length && kinds.every((k) => DASH_KINDS.includes(k)), kinds.join(' → '));
+  const ordered = first.sections.every((q, i) => q.z0 > q.z1 && (i === 0 ? first.startZ - q.z0 >= 5 : first.sections[i - 1].z1 - q.z0 >= 5)) && first.sections[kinds.length - 1].z1 - first.finishZ >= 5;
+  check('Dash: traps come one after another with clear road between, start to finish', ordered);
+  const len = first.startZ - first.finishZ;
+  check('Dash: course length is close to the original 106 cm sprint', len >= 92 && len <= 122, `${len} cm`);
+  check('Dash: the progress strip marks every trap', (await page.$$('.mv-track__mark')).length === kinds.length);
 
-  // 1. Dominoes: barge straight into one in the first row, then use the gaps for the other rows.
-  const nearestGap = (row, x) => row.gaps.reduce((b, g) => (Math.abs(g - x) < Math.abs(b - x) ? g : b), row.gaps[0]);
-  const solidX = d.rows[0].gaps.some((g) => Math.abs(g) < 0.1) ? 2.4 : 0; // a spot in row 1 with a domino standing in it
-  r = await drive(() => solidX, (r) => r.me.z < d.rows[0].z + 6, 'approach row 1');
-  await snap('m6-21-dash-dominoes.png');
-  r = await drive(() => solidX, (r) => r.me.z < d.rows[0].z - 1.5, 'through row 1');
-  check('Dash: walking into a domino topples it and lets you through', r.me.toppled >= 1 && r.dash.down >= 1, `toppled=${r.me.toppled}`);
-  const before = r.me.toppled;
-  // Slow motion here: lining up with a 2.8 cm gap needs finer control than one look per 100 ms of game time.
-  await scale(0.3);
-  let gapX = null;
-  let gapRow = -1;
-  r = await drive(
-    (r) => {
-      const i = r.me.z > d.rows[1].z - 1 ? 1 : 2;
-      if (i !== gapRow) {
-        gapRow = i;
-        gapX = nearestGap(d.rows[i], r.me.x); // pick once per row, then line up before walking through
-      }
-      const committed = r.me.z < d.rows[i].z + 1.0;
-      return { x: gapX, sidestep: !committed && (Math.abs(r.me.x - gapX) > 0.3 || Math.abs(r.me.vx) > 2) };
-    },
-    (r) => r.me.z < d.rows[2].z - 1.5,
-    'rows 2-3 by the gaps',
-  );
-  await scale(1);
-  check('Dash: the gaps let you through without toppling anything', r.me.toppled === before, `toppled ${before} → ${r.me.toppled}`);
-
-  // 2. Spring pad: over the wall.
-  r = await drive(() => d.pad.x, (r) => r.me.toss || r.me.z < d.wall.z, 'onto the spring pad');
-  check('Dash: the spring pad launches the toy', r.me.toss);
-  await page.waitForTimeout(250);
-  await snap('m6-22-dash-spring.png');
+  // Real keys on the opening straight (the first 8 cm of every course are clear road).
+  const z0 = r.me.z;
+  await page.keyboard.down('KeyW');
+  r = await waitFor((r) => r.me.z < z0 - 3, 'running off the line');
+  await page.keyboard.down('KeyD');
+  const x0 = r.me.x;
+  r = await waitFor((r) => r.me.x > x0 + 0.8 || r.me.z < z0 - 7.5, 'steering right');
   await stop();
-  r = await waitFor((r) => !r.me.toss, 'landed');
-  check('Dash: …and it lands beyond the block wall', r.me.z < d.wall.z - 1, `z=${r.me.z.toFixed(1)} wall=${d.wall.z}`);
+  check('Dash: W runs down the road and D steers right', r.me.z < z0 - 3 && r.me.x > x0 + 0.8, `z ${z0.toFixed(1)} → ${r.me.z.toFixed(1)}, x ${x0.toFixed(1)} → ${r.me.x.toFixed(1)}`);
+  await snap('m6-21-dash-start.png');
 
-  // 3. Jam: wade in off the ruler (slow), then finish the crossing on the ruler (fast).
-  const off = (z) => (rulerX(d, z) > 0 ? -1 : 1) * 8.5;
-  r = await drive((r) => off(r.me.z), (r) => r.me.z < d.jam.z0 - 4, 'into the jam');
-  check('Dash: jam slows the toy to a crawl', r.me.speed < 7, `speed=${r.me.speed.toFixed(1)} cm/s`);
-  check('Dash: the HUD says to find the ruler', await textHas('[data-testid=wd-banner]', 'ruler'));
-  await snap('m6-23-dash-jam.png');
-  r = await drive((r) => rulerX(d, r.me.z - 1.5), (r) => r.me.z < d.jam.z1 + 5 && Math.abs(r.me.x - rulerX(d, r.me.z)) < 1.2, 'along the ruler');
-  check('Dash: the ruler is full speed', r.me.speed > 10, `speed=${r.me.speed.toFixed(1)} cm/s`);
-  r = await drive((r) => rulerX(d, r.me.z - 1.5), (r) => r.me.z < d.jam.z1 - 1, 'off the far end');
+  // Every trap this course dealt, each from a spot read out of the course data.
+  const done = new Set();
+  const runTraps = async (dash, shot) => {
+    for (const sec of dash.sections) {
+      if (done.has(sec.kind)) continue;
+      await put(sec.cx, sec.z0 + 3);
+      if (shot) await snap(`m6-22-dash-trap${sec.index + 1}-${sec.kind}.png`);
+      await traps[sec.kind](sec, textHas);
+      await stop();
+      done.add(sec.kind);
+    }
+  };
+  await runTraps(first, true);
 
-  // 4. Snap jaws. First row: stand in one on purpose and get snapped.
-  const j0 = d.jaws[r.me.x > 0 ? 1 : 0];
-  // Park in the middle of the jaw (backing up if the toy overshoots) and wait for it to bite.
-  await scale(0.5);
-  r = await drive((r) => (r.me.z > j0.z + 0.6 ? j0.x : r.me.z < j0.z - 0.6 ? { x: j0.x, back: true } : null), (r) => r.me.snaps > 0, 'snapped by the first jaw');
-  await scale(1);
-  await stop();
-  check('Dash: a jaw snapping shut on the toy stuns it and spits it back', r.me.snaps === 1 && r.me.stun > 0 && r.me.z > j0.z + j0.hz, `stun=${r.me.stun.toFixed(0)}ms`);
-  check('Dash: the HUD says Snapped!', await textHas('[data-testid=wd-banner]', 'Snapped'));
-  await snap('m6-24-dash-snapped.png');
-  // Then cross all three rows properly: wait short of the jaw until it has just re-opened.
-  for (let row = 0; row < 3; row++) {
-    const ji = row * 2 + (r.me.x > 0 ? 1 : 0);
-    const j = d.jaws[ji];
-    const line = j.z + j.hz + 2.2;
-    r = await drive(
-      (r) => {
-        const clear = r.dash.jaws[ji].untilShut > 1100; // open for long enough to walk through
-        if (r.me.z > line + 0.6) return j.x; // walk up to the line
-        if (r.me.z < j.z + j.hz + 0.6) return j.x; // already committed
-        return clear ? j.x : null;
-      },
-      (r) => r.me.z < j.z - j.hz - 1.2,
-      `jaw row ${row + 1}`,
-    );
-  }
-  check('Dash: waiting for the jaws to open gets you through all three rows unsnapped', r.me.snaps === 1, `snaps=${r.me.snaps}`);
-  r = await drive(() => 0, (r) => r.me.finished, 'finish');
+  // The run to the line.
+  const endCx = first.road[first.road.length - 1].cx;
+  await put(endCx, first.finishZ + 4);
+  await page.keyboard.down('KeyW');
+  r = await waitFor((r) => r.me.finished || r.host !== 'playing', 'finish');
   await stop();
   check('Dash: crossing the line finishes the race', r.me.finished || r.host === 'results');
   await scale(6);
@@ -451,9 +538,24 @@ async function desktopDash(browser) {
   await page.screenshot({ path: `${OUT}/m6-25-dash-results.png` });
   const rec = await page.evaluate(() => JSON.parse(localStorage.getItem('toybox-trials:prototype:v1')).state.records['wind-up-dash']);
   check('Dash: record saved (finishers score 100 or more)', rec?.best >= 100 && rec?.plays === 1, JSON.stringify(rec));
-  await page.click('[data-testid=results-leave]');
+
+  // Play again: a new seed deals a different course.
+  await page.click('[data-testid=results-again]');
+  r = await waitFor((r) => r.host === 'playing' && r.s && r.dash && r.s.phase === 'race' && r.dash.seed !== first.seed, 'second race');
+  await holdClock();
+  await scale(1);
+  const second = r.dash;
+  check('Dash: a new match has a new seed and a different course', second.seed !== first.seed && second.key !== first.key, `${first.key}  ≠  ${second.key}`);
+  check('Dash: the second course is laid out afresh (toys back on its start line)', Math.abs(r.me.z - second.startZ) < 4 && (await page.$$('.mv-track__mark')).length === second.sections.length);
+  await snap('m6-26-dash-second-course.png');
+  await runTraps(second, false); // only the trap kinds the first course did not have
+  console.log(`      (trap kinds exercised with real input this run: ${[...done].join(', ')})`);
+
+  await page.keyboard.press('Escape');
+  await page.waitForSelector('.pause', { timeout: 30000 });
+  await page.click('.pause__actions .toy-btn >> nth=1');
   await page.waitForSelector('.hud-sign', { timeout: 60000 });
-  check('Dash: leaving returns to the Playroom', true);
+  check('Dash: quitting returns to the Playroom', true);
   check('Dash desktop: no console/page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
   await page.close();
 }
@@ -470,6 +572,7 @@ async function phoneDash(browser) {
   const cdp = await ctx.newCDPSession(page);
   const touch = (type, points) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: points.map(([x, y, id = 0]) => ({ x, y, id })) });
   const { scale, snap, R, waitFor, open } = kit(page);
+  const { put, holdClock } = dashKit(page, R, waitFor);
   const inView = (b, w, h) => b && b.x >= 0 && b.y >= 0 && b.x + b.width <= w && b.y + b.height <= h;
   const overlap = (a, b) => a && b && a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 
@@ -478,17 +581,18 @@ async function phoneDash(browser) {
   await open('wind-up-dash');
   check('Dash phone: intro explains the touch controls', (await page.textContent('.intro-controls')).includes('joystick'));
   await page.tap('[data-testid=match-start]');
-  let r = await waitFor((r) => r.host === 'playing' && r.s && r.s.phase === 'race', 'race start');
+  let r = await waitFor((r) => r.host === 'playing' && r.s && r.dash && r.s.phase === 'race', 'race start');
+  await holdClock();
   const jb = await page.locator('[data-testid=mv-jump]').boundingBox();
   check('Dash phone: joystick zone and a ≥ 56 px Jump button are on screen', (await page.isVisible('.touch-stick-zone')) && jb.width >= 56 && jb.height >= 56 && inView(jb, 915, 412));
   const z0 = r.me.z;
   await touch('touchStart', [[130, 300]]);
   await touch('touchMove', [[130, 270]]);
   await touch('touchMove', [[130, 236]]);
-  r = await waitFor((r) => r.me.z < z0 - 8, 'moving (landscape)');
+  r = await waitFor((r) => r.me.z < z0 - 6, 'moving (landscape)'); // every course opens with 8 cm of clear road
   await snap('m6-30-dash-phone-landscape.png');
   await touch('touchEnd', []);
-  check('Dash phone: the joystick runs the toy down the course (landscape)', r.me.z < z0 - 8, `z ${z0.toFixed(1)} → ${r.me.z.toFixed(1)}`);
+  check('Dash phone: the joystick runs the toy down the course (landscape)', r.me.z < z0 - 6, `z ${z0.toFixed(1)} → ${r.me.z.toFixed(1)}`);
   await touch('touchStart', [[jb.x + jb.width / 2, jb.y + jb.height / 2, 2]]);
   let peak = 0;
   for (let i = 0; i < 30; i++) {
@@ -504,15 +608,17 @@ async function phoneDash(browser) {
   const pause = await page.locator('.match-pause').boundingBox();
   const jb2 = await page.locator('[data-testid=mv-jump]').boundingBox();
   check('Dash phone: portrait HUD fits and clears the pause button', inView(top, 412, 915) && !overlap(top, pause) && inView(jb2, 412, 915), JSON.stringify(top));
+  // Back to the start line, so the stretch ahead is clear road whatever this course's first trap is.
+  await put(0, r.dash.startZ);
   r = await R();
   const z1 = r.me.z;
   await touch('touchStart', [[120, 760, 3]]);
   await touch('touchMove', [[120, 730, 3]]);
   await touch('touchMove', [[120, 696, 3]]);
-  r = await waitFor((r) => r.me.z < z1 - 6 || r.me.toss || r.host !== 'playing', 'moving (portrait)');
+  r = await waitFor((r) => r.me.z < z1 - 5 || r.host !== 'playing', 'moving (portrait)');
   await snap('m6-31-dash-phone-portrait.png');
   await touch('touchEnd', []);
-  check('Dash phone: the joystick runs the toy in portrait too', r.me.z < z1 - 3 || r.me.toss, `z ${z1.toFixed(1)} → ${r.me.z.toFixed(1)}`);
+  check('Dash phone: the joystick runs the toy in portrait too', r.me.z < z1 - 3, `z ${z1.toFixed(1)} → ${r.me.z.toFixed(1)}`);
   await scale(1);
   if (await page.isVisible('.match-pause')) {
     await page.tap('.match-pause');

@@ -280,23 +280,35 @@ Wind-up/recovery/range, the 90-second limit and tie policy are provisional; see
 **Toybox:** a course built from train track, dominoes, ramps, springs and mechanical traps.
 **Tech:** simple collision, deterministic obstacle patterns, a clear camera and readable boundaries.
 
-**Built (first pass, M6):** one straight 106 cm sprint down a felt track, four obstacles, layout rolled from
-the match seed (the same seed gives every client the same course).
-1. **Domino rows:** three rows block the track except for two gaps each. Walking into a domino topples it
-   (about 0.3 s lost), and it stays down, so the leaders clear a path for the pack.
-2. **Spring pad and block wall:** the wall has one narrow gate. The spring pad on the other side throws a toy
-   17 cm, clean over the wall.
-3. **Ruler bridge:** a spill of jam cuts top speed to 38%. A ruler lies across it on a diagonal at full speed.
-4. **Snap jaws:** three rows of two jaws. Each rattles for 0.55 s, then snaps shut for 0.75 s. A toy inside is
-   stunned for 1.1 s and spat back out; a shut jaw blocks. The two jaws in a row are half a cycle apart, so one
-   side is always open.
+**Built (M6, generated courses):** every match deals its own course from the match seed, so the same seed
+gives every client (and a future game server) the same course and no two races are alike. The generator is
+pure TypeScript (`src/minigames/winddash/course.ts`); the rules core, the bots and the Scene all read its output.
+- **Road:** one felt strip, 92–122 cm long, whose width (17–23 cm) and centre line change from trap to trap,
+  joined by gentle bends. Seeded tabletop clutter (blocks, buttons, cotton reels, pencils, felt trees) lines it
+  and never affects play.
+- **Traps:** four or five per course out of ten, never the same kind twice, each at level 1–3 from a fixed
+  budget (never all hard, never level 3 first, two timing traps never back to back).
+  1. **Domino rows:** rows block the road except for gaps; a domino you walk into topples (about 0.3 s lost)
+     and stays down, so leaders clear a path.
+  2. **Spring pad:** a block wall with one narrow gate; the pad on the other side throws a toy 15 cm over it.
+  3. **Sticky jam:** top speed drops to 38%; a ruler (two in a dog-leg at level 3) crosses it at full speed.
+  4. **Snap jaws:** rows of two jaws that rattle for 0.55 s then shut for 0.75 s. A toy inside is stunned for
+     1.1 s and spat out; one jaw of each pair is always open.
+  5. **Crayon gates:** a fence with three doorways whose crayon barriers lift in turn; a shut gate just blocks.
+  6. **Marble run:** marbles roll across in lanes. One bowls a toy back and dazes it; a hop clears them.
+  7. **Pendulum:** a bead on a long string sweeps the road and knocks toys back.
+  8. **Spinning tops:** wandering tops that bounce a toy away on touch; they never block.
+  9. **Tape-measure belts:** three lanes of conveyor, one forwards and the rest backwards (or still); the quick
+     lane moves between stretches.
+  10. **Book steps:** books lie across the road. Hop up (1.5 cm, then 1.2 cm more), or use the ramp at the side.
 - First across the line wins. Once somebody finishes, the rest have 15 s. The clock is 75 s. Placement is finish
   time, then distance. Score: finishers get 100 + seconds left on the clock, others get the percentage covered.
-- Toys don't collide with each other. Train track, ramps, laps and moving hazards are not built yet.
-- **Bots** aim at a line through each obstacle with sideways noise and time the jaws. Easy bots barge through
-  dominoes, wobble off the ruler and misjudge jaws. Hard bots hold a clean line.
-- **Untuned:** obstacle spacing, jam slow-down, stun length and jaw timing. A clean run is short (about 12–20 s),
-  so the course probably wants a second half or laps.
+- Toys don't collide with each other. Train track and laps are not built.
+- **Bots** read the course data: they pick a line through the next trap with sideways noise and time whatever
+  moves. Easy bots barge, queue for ramps and walk into things; hard bots hold a clean line and wait properly.
+- **Checked by unit tests, not by people:** 300 seeds give valid courses and bots of every difficulty finish
+  240 of them (headless bot runs take about 10–21 s). **Untuned:** trap spacing and timing, level budget, how
+  each trap feels to a human, and whether a race this short wants laps.
 
 ### 08 · Music Box Rhythm (Rhythm / Timing · 1–8)
 - A four-lane rhythm game on **A S J K**, with Perfect, Good and Miss judgements.
