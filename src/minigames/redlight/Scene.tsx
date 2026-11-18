@@ -4,7 +4,7 @@
  * on go, key ratcheting as it swings round (the tell), then facing the runway with its red paddle
  * up. The rail lamps and its beacon show the same signal for toys too far away to see its face.
  */
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { PALETTE } from '../../game/palette';
@@ -31,7 +31,13 @@ const signalOf = (s: RlglState | null) => (!s || s.phase === 'intro' || s.phase 
 
 const smooth = (k: number) => k * k * (3 - 2 * k);
 
-export function RlglScene({ getState, contestants, localId }: MinigameSceneProps<RlglState>) {
+export function RlglScene({ getState: rawState, contestants, localId }: MinigameSceneProps<RlglState>) {
+  // In a tournament the host still holds the previous trial's state while this trial's intro card
+  // is up, so only accept a state that is really ours.
+  const getState = useCallback(() => {
+    const s = rawState() as RlglState | null;
+    return s && 'cycles' in s ? s : null;
+  }, [rawState]);
   const course = useRef<THREE.Group>(null);
   const swat = useRef(-99); // clock time of the last catch (the Signalman lunges)
   // Before the first countdown there is no state yet: show the empty runway from the start line.

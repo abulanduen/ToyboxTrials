@@ -3,7 +3,7 @@
  * dominoes, a spring pad beside a toy-block wall, a ruler across a spill of jam, three rows of
  * clockwork snap jaws, and a chequered finish. Everything is driven by the rules state.
  */
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { PALETTE } from '../../game/palette';
@@ -27,7 +27,13 @@ const JAM = `#${new THREE.Color(PALETTE.coral).offsetHSL(-0.04, 0.1, -0.17).getH
 const LANDSCAPE: ChaseShot = { height: 13, back: 17, ahead: 11, lookY: 2.2, followX: 0.7 };
 const PORTRAIT: ChaseShot = { height: 21, back: 29, ahead: 14, lookY: 3, followX: 0.9 };
 
-export function DashScene({ getState, contestants, localId }: MinigameSceneProps<DashState>) {
+export function DashScene({ getState: rawState, contestants, localId }: MinigameSceneProps<DashState>) {
+  // In a tournament the host still holds the previous trial's state while this trial's intro card
+  // is up, so only accept a state that is really ours.
+  const getState = useCallback(() => {
+    const s = rawState() as DashState | null;
+    return s && 'course' in s ? s : null;
+  }, [rawState]);
   const frame = useRef<THREE.Group>(null);
   const padHit = useRef(-99);
   // Before the first countdown there's no state: show a sample course so the table isn't bare.
