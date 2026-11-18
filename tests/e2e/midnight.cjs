@@ -18,8 +18,13 @@ const out = path.join(__dirname, 'output'); fs.mkdirSync(out, { recursive: true 
       await page.evaluate(() => window.__toybox.teleport(0, -12.6, Math.PI));
       await page.waitForSelector('.prompt');
       if (mobile) await page.locator('.prompt').tap(); else await page.keyboard.press('KeyE');
-      await page.getByTestId('practice-midnight-hunger').click(); await page.waitForTimeout(800);
+      await page.getByTestId('practice-midnight-hunger').click();
+      // The module loads lazily and match buttons ignore taps for 0.7 s after they appear.
+      await page.getByTestId('match-start').waitFor({ state: 'visible' }); await page.waitForTimeout(900);
       await page.getByTestId('match-start').click();
+      // Software GL can render at ~1 fps under load; fast-forward the 3 s countdown.
+      await page.waitForFunction(() => window.__toybox.match.phase() === 'countdown');
+      await page.evaluate(() => window.__toybox.match.timeScale(10));
       await page.waitForFunction(() => window.__toybox.match.phase() === 'playing');
       await page.evaluate(() => window.__toybox.match.timeScale(0));
       assert.equal(await page.evaluate(() => { const s = window.__toybox.match.state(); return s.batteries.length === s.players.length - 1; }), true);
@@ -59,9 +64,10 @@ const out = path.join(__dirname, 'output'); fs.mkdirSync(out, { recursive: true 
       await page.waitForFunction(() => document.querySelector('.hunger-banner')?.textContent.includes('Sheltered'));
       await page.screenshot({ path: path.join(out, `midnight-${layout}-day.png`) });
       const energy = await page.evaluate(() => window.__toybox.match.state().players[0].energy);
-      await page.evaluate(() => window.__toybox.match.timeScale(1)); await page.waitForTimeout(600);
-      const after = await page.evaluate(() => window.__toybox.match.state().players[0].energy);
-      assert.ok(after < energy, 'shelter slows drain without stopping it');
+      await page.evaluate(() => window.__toybox.match.timeScale(1));
+      // Wait on the condition rather than a fixed delay: slow frames can run no step in 600 ms.
+      await page.waitForFunction(e => window.__toybox.match.state().players[0].energy < e, energy);
+      assert.ok(await page.evaluate(e => window.__toybox.match.state().players[0].energy < e, energy), 'shelter slows drain without stopping it');
       await page.evaluate(() => window.__toybox.match.timeScale(40));
       await page.waitForSelector('.results');
       const record = await page.evaluate(() => JSON.parse(localStorage.getItem('toybox-trials:prototype:v1')).state.records['midnight-hunger']);

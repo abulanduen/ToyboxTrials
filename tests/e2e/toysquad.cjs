@@ -29,8 +29,13 @@ const out = path.join(__dirname,'output'); fs.mkdirSync(out,{recursive:true});
       await page.goto((process.env.BASE_URL||'http://127.0.0.1:4174/')+'?debug#play');
       await page.waitForSelector('.loading',{state:'detached'}); await page.evaluate(()=>window.__toybox.teleport(0,-12.6,Math.PI));
       await page.waitForSelector('.prompt'); if(mobile) await page.locator('.prompt').tap(); else await page.keyboard.press('KeyE');
-      await click('practice-toy-squad'); await page.waitForTimeout(800); await click('match-start');
+      await click('practice-toy-squad');
+      // Lazy module load + 0.7 s tap guard on match buttons; then fast-forward the countdown (slow software GL).
+      await page.getByTestId('match-start').waitFor({state:'visible'}); await page.waitForTimeout(900); await click('match-start');
+      await page.waitForFunction(()=>window.__toybox.match.phase()==='countdown');
+      await page.evaluate(()=>window.__toybox.match.timeScale(10));
       await page.waitForFunction(()=>window.__toybox.match.phase()==='playing');
+      await page.evaluate(()=>window.__toybox.match.timeScale(1));
       assert.equal((await state()).config.rounds,10); assert.equal((await state()).players[0].level,1);
       assert.equal((await state()).players[0].shop.length,5);
       // Stocked purchases automatically pair and chain to three stars.

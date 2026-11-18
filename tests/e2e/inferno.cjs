@@ -37,6 +37,8 @@ fs.mkdirSync(out, { recursive: true });
       await page.waitForFunction(x => window.__toybox.match.state().players[0].x > x, start.x);
       // Face the boundary without moving; then face back to a guaranteed vacant spawn tile.
       if (mobile) await page.getByRole('button', { name: 'Left', exact: true }).tap(); else await page.keyboard.press('KeyA');
+      // Let that queued press land first; with slow frames it could otherwise turn the toy after the setup below.
+      await page.waitForFunction(() => window.__toybox.match.state().players[0].facing === 3);
       await page.evaluate(() => {
         const s = window.__toybox.match.state(); const p = s.players[0];
         p.x = 4; p.z = 4; p.facing = 0;
