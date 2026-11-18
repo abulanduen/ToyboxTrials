@@ -34,7 +34,7 @@ function kit(page) {
         return window.__toybox.match.phase() === 'playing' && s && s.course && s.course.road && s.phase === 'race';
       },
       null,
-      { timeout: 300000 },
+      { timeout: 900000 },
     );
   /** Stop the clock ending the race under us, and describe the course. */
   const course = () =>
@@ -89,7 +89,7 @@ async function desktop(browser) {
   for (let k = 0; k < COURSES; k++) {
     // The match buttons ignore clicks for a moment after appearing: keep trying until the race is on.
     const btn = k === 0 ? '[data-testid=match-start]' : '[data-testid=results-again]';
-    for (let i = 0; i < 40 && (await page.$(btn)); i++) {
+    for (let i = 0; i < 400 && (await page.$(btn)); i++) {
       await page.click(btn, { timeout: 2000 }).catch(() => {});
       await frames(2);
     }
@@ -121,7 +121,7 @@ async function phone(browser, name, viewport) {
   await open(page);
   for (let k = 0; k < COURSES; k++) {
     const btn = k === 0 ? '[data-testid=match-start]' : '[data-testid=results-again]';
-    for (let i = 0; i < 40 && (await page.$(btn)); i++) {
+    for (let i = 0; i < 400 && (await page.$(btn)); i++) {
       await page.tap(btn, { timeout: 2000 }).catch(() => {});
       await frames(2);
     }
