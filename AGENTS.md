@@ -18,6 +18,10 @@ Applies to Codex, Claude Code and other contributors. Read this file before edit
 - Do not implement planned features merely because they appear in documentation. This documentation task authorizes no gameplay changes.
 - Subsequent owner authorization: Astra may implement Inferno Escape on `astra/inferno-escape`.
   Midnight Hunger is also authorized on `astra/midnight-hunger`, based on the Inferno branch.
+  Toy Squad is authorized on `astra/toy-squad`, based on Midnight. Keep its unresolved format and
+  balance choices configurable and labelled provisional. The owner reports Claude is handling Music Box Rhythm.
+  Toy Squad is authorized on `astra/toy-squad`, based on Midnight. Keep its unresolved format and
+  balance choices configurable and labelled provisional. The owner reports Claude is handling Music Box Rhythm.
   Claude owns Find the Original, Red Light/Green Light, Wind-Up Dash and the room pass in separate
   cloud worktrees. Do not recreate or overwrite that work; recover and review it before integration.
 

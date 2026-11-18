@@ -22,6 +22,18 @@ them. The completed/next sections below describe only the older local clone.
 
 ## Completed first passes
 
+**Toy Squad branch update:** `astra/toy-squad` adds a fifth local playable game, casual-only:
+shop, formation, upgrades/selling, automatic battles, solo clockwork opponents and bots. It builds
+on Midnight and Inferno. Six local catalogue entries still lack runtime modules; Claude's separate
+work includes some of these and the owner reports Music Box Rhythm is now underway there.
+Three-round scoring and snapshot matchups are provisional; see `src/minigames/toysquad/README.md`.
+
+**Toy Squad branch update:** `astra/toy-squad` adds a fifth local playable game, casual-only:
+shop, formation, upgrades/selling, automatic battles, solo clockwork opponents and bots. It builds
+on Midnight and Inferno. Six local catalogue entries still lack runtime modules; Claude's separate
+work includes some of these and the owner reports Music Box Rhythm is now underway there.
+Three-round scoring and snapshot matchups are provisional; see `src/minigames/toysquad/README.md`.
+
 **Midnight branch update:** `astra/midnight-hunger` adds the fourth local playable minigame:
 night/day energy rules, N−1 battery targets, shelters, bots, keyboard/touch controls and tournament
 integration. Balance/interpretations are in `src/minigames/midnight/README.md`. It is based on the

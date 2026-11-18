@@ -166,7 +166,7 @@ export const MINIGAMES: MinigameDefinition[] = [
     tieBreak: 'Accuracy',
     controls: [],
   }),
-  planned({
+  {
     id: 'toy-squad',
     title: 'Toy Squad',
     tagline: 'A pocket-sized auto-battler.',
@@ -178,8 +178,13 @@ export const MINIGAMES: MinigameDefinition[] = [
     eligibility: { tournament: false, ranked: false, casual: true },
     scoring: 'score',
     tieBreak: 'Remaining unit health',
-    controls: [],
-  }),
+    controls: [{ keys: 'Click / Tab + Enter', action: 'Buy toys, select a unit and choose a formation square; upgrade, sell or ready' }],
+    inputs: ['keyboard', 'mouse', 'touch'], bots: 'available', recordUnit: 'points',
+    touch: { movement: 'none', look: 'none', orientation: 'any',
+      buttons: [{ id: 'buy', label: 'Buy' }, { id: 'place', label: 'Formation square' }, { id: 'upgrade', label: 'Upgrade' }, { id: 'sell', label: 'Sell' }, { id: 'ready', label: 'Ready' }],
+      notes: 'Tap a shop toy to buy. Select it on the formation board, then tap a square to move or swap. Upgrade costs 3 coins. Ready locks your formation. Three rounds; wins give 3 points, draws 1.' },
+    status: 'playable', load: () => import('./toysquad').then(m => m.default),
+  },
   planned({
     id: 'spellbox-showdown',
     title: 'Spellbox Showdown',

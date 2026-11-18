@@ -4,6 +4,19 @@ Source audit: 18 November 2026, starting commit `59744b7`. Source-inspected, not
 
 ## Implemented client
 
+Toy Squad branch update: fifth local playable module, excluded from tournament/ranked pools by
+its existing metadata. Rules validate shop commands, own formation/currency, simulate independent
+snapshot battles with simultaneous damage, and return shared placements. HUD commands use the
+existing frame-to-fixed-step queue; no host, multiplayer or storage schema changes are required.
+Validation: 71 unit tests and production build pass; Toy Squad desktop/portrait/landscape flows
+and the existing mobile regression suite pass. Format, balance and real-device performance remain
+provisional. Browser-only timing fixes are documented in the module README.
+
+Toy Squad branch update: fifth local playable module, excluded from tournament/ranked pools by
+its existing metadata. Rules validate shop commands, own formation/currency, simulate independent
+snapshot battles with simultaneous damage, and return shared placements. HUD commands use the
+existing frame-to-fixed-step queue; no host, multiplayer or storage schema changes are required.
+
 Midnight branch update: `astra/midnight-hunger` adds a fourth lazy-loaded local game. Its pure rules
 split elapsed time at phase, target-movement and energy-depletion boundaries; seeded target movement
 and collection tie order are repeatable. Scene/HUD are separate; existing input, sound, characters,

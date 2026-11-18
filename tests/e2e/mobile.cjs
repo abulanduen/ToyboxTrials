@@ -114,8 +114,10 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
   // Freeze match time while the (slow, software-rendered) screenshot is taken.
   await page.evaluate(() => window.__toybox.match.timeScale(0));
   await page.screenshot({ path: `${OUT}/mobile-03-copycat-pads.png` });
-  await page.evaluate(() => window.__toybox.match.timeScale(4));
+  // Keep the simulation frozen while CDP sends the ordered touch presses. Under software
+  // rendering, protocol latency can otherwise consume the whole input deadline.
   for (let i = cm.me.progress; i < cm.len; i++) await tapPad(cm.seq[i]);
+  await page.evaluate(() => window.__toybox.match.timeScale(4));
   for (let i = 0; i < 600; i++) {
     const x = await MS();
     if (x.round === 2) break;
@@ -166,7 +168,7 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
   // Jack-in-the-Box in portrait: the answer box sits high (clear of the phone keyboard), tap Crank! to pass.
   await page.evaluate(() => window.__toybox.match.timeScale(2));
   await page.evaluate(() => window.__toybox.teleport(23.2, -16.2, Math.PI - 0.961));
-  await page.waitForTimeout(2500);
+  await page.waitForFunction(() => document.querySelector('.touch-btn--interact')?.getAttribute('aria-label')?.includes('Jack-in-the-Box'));
   const jib = await (await page.$('.touch-btn--interact')).boundingBox();
   await touch('touchStart', [[jib.x + jib.width / 2, jib.y + jib.height / 2, 6]]);
   await page.waitForTimeout(600);
@@ -237,4 +239,4 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
   check('no console/page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
   console.log(res.join('\n'));
   await browser.close();
-})();
+})().catch(e => { console.log(res.join('\n')); console.error(e); process.exitCode = 1; });
