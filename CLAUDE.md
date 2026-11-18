@@ -78,6 +78,7 @@ node tests/e2e/menu.cjs         # main menu, Workshop, unlocks, persistence, dee
 node tests/e2e/minigame.cjs     # Copycat + Jack-in-the-Box practice, full Blitz tournament flow
 node tests/e2e/findoriginal.cjs # Find the Original, desktop + phone portrait
 node tests/e2e/movement.cjs     # Red Light, Green Light + Wind-Up Dash, desktop + phone joystick
+node tests/e2e/dashshots.cjs    # Wind-Up Dash course gallery (screenshots of freshly dealt courses; not pass/fail)
 node tests/e2e/inferno.cjs      # Inferno Escape, desktop + phone portrait
 node tests/e2e/midnight.cjs     # Midnight Hunger, desktop + phone portrait/landscape
 node tests/e2e/toysquad.cjs     # Toy Squad, desktop + phone portrait/landscape
