@@ -101,7 +101,7 @@ export const MINIGAMES: MinigameDefinition[] = [
     title: 'Find the Original',
     tagline: 'Spot Baldwyn among the Not-Baldwyns.',
     description:
-      'Meet Baldwyn, a wind-up gentleman. Then a crowd of look-alikes shuffles in: wrong hat, missing button, key on the other side. Tap the real Baldwyn before anyone else does. Picking a Not-Baldwyn costs points and winds you down for a moment. Five rounds, each with a bigger crowd and sneakier fakes.',
+      'Meet Baldwyn, a wind-up gentleman built from a different set of toy parts every match. Then a crowd of look-alikes shuffles in, each with a part swapped: another hat, a missing button, the key on the other side. Tap the real Baldwyn before anyone else does. Picking a Not-Baldwyn costs points and winds you down for a moment. Five rounds, each with a bigger crowd and sneakier fakes.',
     category: 'observation',
     accent: PALETTE.sage,
     players: { min: 1, max: 8 },

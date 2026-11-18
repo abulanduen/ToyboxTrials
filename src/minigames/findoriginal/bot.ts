@@ -9,7 +9,7 @@
  */
 import type { BotDifficulty, BotPolicy, Contestant } from '../types';
 import { originalIndex, type FindInput, type FindState } from './rules';
-import { traitCount } from './traits';
+import { differences } from './looks';
 
 interface Tuning {
   /** Reaction time before the scan starts (ms). */
@@ -50,12 +50,12 @@ export function createFindBot(): BotPolicy<FindState, FindInput> {
         let findAt = tune.base * (0.7 + rng() * 0.6) + s.toys.length * tune.perToy * (0.3 + rng() * 0.7) * (1 + 1.6 * h);
         const picks: Plan['picks'] = [];
         if (rng() < tune.slip + tune.slipHard * h) {
-          // The most convincing Not-Baldwyn: fewest mistakes (ties broken by the rng).
+          // The most convincing Not-Baldwyn: fewest differences from this match's Baldwyn (ties broken by the rng).
           let best = -1;
           let bestScore = Infinity;
           s.toys.forEach((toy, i) => {
             if (i === target) return;
-            const score = traitCount(toy.traits) + rng() * 0.9;
+            const score = differences(s.baldwyn, toy.look).length + rng() * 0.9;
             if (score < bestScore) {
               bestScore = score;
               best = i;

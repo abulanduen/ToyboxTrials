@@ -2,7 +2,9 @@
  * Find the Original — a wooden tray of look-alike wind-up gentlemen seen from above and in front,
  * and a reference card with the real Baldwyn that stays in the corner of the screen.
  *
- * The crowd is instanced (one InstancedMesh per body part). Picking is done in screen space: every
+ * The crowd is instanced (one InstancedMesh per body part; parts nobody in the round has are
+ * hidden). The reference card is drawn on its own crisp canvas over this one (card.ts), so the
+ * scene's post-processing and resolution tier never blur it. Picking is done in screen space: every
  * frame the toys' on-screen positions are published to `local.ts`, and a tap/click picks the nearest
  * toy within a finger-sized radius, so targets stay usable on a phone however small the toys are.
  */
@@ -15,9 +17,11 @@ import { exposeDebug } from '../../game/debug';
 import { paintMat, woodMat } from '../../scene/props';
 import { matchBus, useMatch } from '../session';
 import type { MinigameSceneProps } from '../types';
-import { originalIndex, toyPose, type FindState } from './rules';
-import { PARTS, TOY_HEIGHT, TOY_MID, createFigure, disposeFigure, instancedMaterial, spinFigureKey } from './figure';
+import { originalIndex, toyPose, type FindState, type Toy } from './rules';
+import { PARTS, TOY_HEIGHT, TOY_MID, instancedMaterial, partsUsed } from './figure';
 import { MAX_TOYS, crowd, cursor, resetLocal, submitPick, toyAt } from './local';
+import { ReferenceCard } from './card';
+import './findoriginal.css';
 
 /** Spot size on the tray (cm): across and front-to-back. */
 const CU = 5.6;
@@ -28,7 +32,6 @@ const RIM = 0.9;
 const ELEV = (44 * Math.PI) / 180;
 /** Narrow lens from far away, so far rows are nearly as big as near ones. */
 const FOV = 16;
-const CARD_DIST = 40;
 /** Never come closer than this (cm): small crowds would otherwise get a wide-angle look and hide each other. */
 const MIN_DIST = 72;
 
@@ -115,11 +118,14 @@ export function FindScene({ getState, localId }: MinigameSceneProps<FindState>) 
       const mesh = new THREE.InstancedMesh(part.geo, mats[part.mat], MAX_TOYS);
       mesh.count = 0;
       mesh.frustumCulled = false; // instances move; the base bounding sphere means nothing
-      mesh.castShadow = part.name !== 'eyeL' && part.name !== 'eyeR' && !part.name.startsWith('button');
+      mesh.castShadow = !part.small;
+      mesh.visible = false;
       mesh.setColorAt(0, GREY); // allocate the colour buffer up front
       return mesh;
     });
   }, []);
+  /** The parts this round's crowd uses (recomputed when a new crowd arrives). */
+  const active = useRef<{ toys: Toy[] | null; parts: number[] }>({ toys: null, parts: [] });
   const shadows = useMemo(() => {
     const mesh = new THREE.InstancedMesh(
       new THREE.CircleGeometry(1.7, 20).rotateX(-Math.PI / 2),
@@ -147,54 +153,16 @@ export function FindScene({ getState, localId }: MinigameSceneProps<FindState>) 
   const foundRing = useRef<THREE.Group>(null!);
   const cursorRing = useRef<THREE.Group>(null!);
 
-  // ---- reference card ----
-  const figure = useMemo(() => createFigure(0), []);
-  useEffect(() => () => disposeFigure(figure), [figure]);
-  const cardGroup = useRef<THREE.Group>(null!);
-  const label = useMemo(() => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 512;
-    canvas.height = 112;
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    const draw = () => {
-      const g = canvas.getContext('2d')!;
-      g.clearRect(0, 0, canvas.width, canvas.height);
-      g.fillStyle = PALETTE.honey;
-      g.strokeStyle = PALETTE.ink;
-      g.lineWidth = 8;
-      g.beginPath();
-      g.roundRect(6, 6, canvas.width - 12, canvas.height - 12, 30);
-      g.fill();
-      g.stroke();
-      g.fillStyle = PALETTE.ink;
-      g.font = '700 70px Fredoka, "Trebuchet MS", sans-serif';
-      g.textAlign = 'center';
-      g.textBaseline = 'middle';
-      g.fillText('BALDWYN', canvas.width / 2, canvas.height / 2 + 5);
-      tex.needsUpdate = true;
+  // ---- reference card (its own canvas over this one) ----
+  const card = useRef<ReferenceCard | null>(null);
+  useEffect(() => {
+    const c = new ReferenceCard(gl.domElement.parentElement!, ELEV);
+    card.current = c;
+    return () => {
+      card.current = null;
+      c.dispose();
     };
-    draw();
-    void document.fonts?.ready.then(draw);
-    return tex;
-  }, []);
-  useEffect(() => () => label.dispose(), [label]);
-  const cardShape = useMemo(() => {
-    const rr = (w: number, h: number, r: number) => {
-      const s = new THREE.Shape();
-      s.moveTo(-w / 2 + r, -h / 2);
-      s.lineTo(w / 2 - r, -h / 2);
-      s.quadraticCurveTo(w / 2, -h / 2, w / 2, -h / 2 + r);
-      s.lineTo(w / 2, h / 2 - r);
-      s.quadraticCurveTo(w / 2, h / 2, w / 2 - r, h / 2);
-      s.lineTo(-w / 2 + r, h / 2);
-      s.quadraticCurveTo(-w / 2, h / 2, -w / 2, h / 2 - r);
-      s.lineTo(-w / 2, -h / 2 + r);
-      s.quadraticCurveTo(-w / 2, -h / 2, -w / 2 + r, -h / 2);
-      return new THREE.ShapeGeometry(s, 5);
-    };
-    return { edge: rr(0.8, 1, 0.09), face: rr(0.74, 0.94, 0.065) };
-  }, []);
+  }, [gl]);
 
   // ---- events: sounds and local reactions ----
   useEffect(() => {
@@ -290,6 +258,9 @@ export function FindScene({ getState, localId }: MinigameSceneProps<FindState>) 
         },
         open: () => crowd.open,
         cursor: () => cursor.index,
+        /** This match's Baldwyn (slot → option index) and the card's on-screen state. */
+        baldwyn: () => getState()?.baldwyn ?? null,
+        card: () => card.current?.info() ?? null,
         layout: () => screenLayout(size.width, size.height, insets),
       },
     });
@@ -364,6 +335,12 @@ export function FindScene({ getState, localId }: MinigameSceneProps<FindState>) 
     const f = fx.current;
     crowd.count = shown ? n : 0;
     crowd.open = phase === 'search' && !!me && !me.found;
+    const act = active.current;
+    if (s && s.toys !== act.toys) {
+      act.toys = s.toys;
+      act.parts = partsUsed(s.toys.map((t) => t.look));
+      meshes.forEach((m, p) => (m.visible = act.parts.includes(p)));
+    }
     let ringX = 0;
     let ringZ = 0;
     let curX = 0;
@@ -402,12 +379,12 @@ export function FindScene({ getState, localId }: MinigameSceneProps<FindState>) 
       }
       mBase.compose(vPos.set(x, y, z), qRot.setFromEuler(eRot.set(0, yaw, 0)), vScale.set(scale, scale * squash, scale));
       const spin = now * 2.2 + toy.ph;
-      for (let p = 0; p < PARTS.length; p++) {
+      for (const p of act.parts) {
         const part = PARTS[p];
-        if (part.place(toy.traits, wrongAge >= 0 ? toy.ph : spin, mPart)) mOut.multiplyMatrices(mBase, mPart);
+        if (part.place(toy.look, wrongAge >= 0 ? toy.ph : spin, mPart)) mOut.multiplyMatrices(mBase, mPart);
         else mOut.makeScale(0, 0, 0);
         meshes[p].setMatrixAt(i, mOut);
-        tmpColor.copy(part.colour(toy.traits));
+        tmpColor.copy(part.colour(toy.look));
         if (grey > 0) tmpColor.lerp(GREY, grey);
         meshes[p].setColorAt(i, tmpColor);
       }
@@ -446,22 +423,8 @@ export function FindScene({ getState, localId }: MinigameSceneProps<FindState>) 
     c.cy += (wantCard.cy - c.cy) * kc;
     c.h += (wantCard.h - c.h) * kc;
     c.show += (show - c.show) * (1 - Math.exp(-smoothDt * 10));
-    const wppC = (2 * CARD_DIST * tanHalf) / H;
-    const g = cardGroup.current;
-    g.visible = c.show > 0.02;
-    g.quaternion.copy(cam.quaternion);
-    // The card sits one card-height behind the figure (scaled up to keep its size on screen).
-    const back = 1 + (c.h * wppC) / CARD_DIST;
-    g.position.set((c.cx - W / 2) * wppC * back, -(c.cy - H / 2) * wppC * back, -CARD_DIST * back).applyMatrix4(cam.matrixWorld);
-    g.scale.setScalar(c.h * wppC * back * c.show);
-    figure.visible = g.visible;
-    const fs = ((c.h * 0.6 * wppC) / TOY_HEIGHT) * c.show;
-    figure.scale.setScalar(fs);
-    // The figure stands upright in the world, so it is seen from exactly the angle the crowd is.
-    figure.position.set((c.cx - W / 2) * wppC, -(c.cy - c.h * 0.07 - H / 2) * wppC, -CARD_DIST).applyMatrix4(cam.matrixWorld);
-    figure.position.y -= TOY_MID * fs;
-    figure.rotation.y = phase === 'study' ? Math.sin(now * 1.6) * 0.3 : 0;
-    spinFigureKey(figure, now * 2.2);
+    if (s) card.current?.setLook(s.baldwyn);
+    card.current?.update(c, wantCard, c.show, phase === 'study' ? Math.sin(now * 1.6) * 0.3 : 0, now * 2.2);
   });
 
   return (
@@ -498,20 +461,6 @@ export function FindScene({ getState, localId }: MinigameSceneProps<FindState>) 
           <meshBasicMaterial color={PALETTE.white} fog={false} />
         </mesh>
       </group>
-      {/* reference card (kept in front of the camera; scale 1 = the card's height) */}
-      <group ref={cardGroup} visible={false}>
-        <mesh geometry={cardShape.edge} position={[0, 0, -0.006]} renderOrder={1}>
-          <meshBasicMaterial color={PALETTE.ink} fog={false} />
-        </mesh>
-        <mesh geometry={cardShape.face} position={[0, 0, -0.003]} renderOrder={2}>
-          <meshBasicMaterial color="#FFF3D6" fog={false} />
-        </mesh>
-        <mesh position={[0, -0.36, 0]} renderOrder={3}>
-          <planeGeometry args={[0.64, 0.14]} />
-          <meshBasicMaterial map={label} transparent fog={false} />
-        </mesh>
-      </group>
-      <primitive object={figure} />
     </group>
   );
 }

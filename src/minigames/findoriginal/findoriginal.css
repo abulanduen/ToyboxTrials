@@ -1,0 +1,38 @@
+/* Find the Original: the reference card. Positioned and scaled per frame by card.ts (it sits over
+   the game canvas, under the HUD); everything inside is sized from --card-h, its height in px. */
+.fo-card {
+  --card-h: 200px;
+  --ink: #2b2433; /* PALETTE.ink */
+  position: absolute;
+  left: 0;
+  top: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform-origin: 50% 50%;
+  border-radius: calc(var(--card-h) * 0.09);
+  background: #fff9ee; /* PALETTE.white */
+  box-shadow:
+    0 0 0 calc(var(--card-h) * 0.022) var(--ink),
+    0 calc(var(--card-h) * 0.04) 0 calc(var(--card-h) * 0.022) rgba(43, 36, 51, 0.25);
+}
+.fo-card__figure {
+  position: absolute;
+  display: block;
+}
+.fo-card__name {
+  position: absolute;
+  left: 11%;
+  right: 11%;
+  bottom: 4.5%;
+  height: 12.5%;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  border: calc(var(--card-h) * 0.012) solid var(--ink);
+  border-radius: calc(var(--card-h) * 0.05);
+  background: #efae45; /* PALETTE.honey */
+  color: var(--ink);
+  font: 700 calc(var(--card-h) * 0.075) / 1 var(--font-display);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}

@@ -27,7 +27,7 @@ export const TUTORIALS: Partial<Record<MinigameId, TutorialStep[]>> = {
     { title: 'Don’t get popped', text: 'A hidden fuse is ticking. When the jack pops, whoever is holding the box is out. Last toy in wins.' },
   ],
   'find-the-original': [
-    { title: 'Meet Baldwyn', text: 'First you see the real Baldwyn, a wind-up gentleman. Remember his hat, buttons and key.' },
+    { title: 'Meet Baldwyn', text: 'First you see the real Baldwyn, a wind-up gentleman built from different toy parts every match. Study him from hat to key: body, buttons, face and whatever he is carrying.' },
     { title: 'Spot him in the crowd', text: 'A crowd of look-alikes shuffles in. Click the real Baldwyn, or move the ring with the arrows and press Enter.', touch: 'A crowd of look-alikes shuffles in. Tap the real Baldwyn. The card in the corner reminds you who to look for.' },
     { title: 'Fast, not reckless', text: 'Finding him first scores the most. Picking a fake costs points and stalls you for a moment. Five rounds, each one sneakier.' },
   ],
