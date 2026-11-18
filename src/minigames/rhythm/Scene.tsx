@@ -45,10 +45,10 @@ const MAX_BEATS = 10;
 const TINE_ANGLE = HIT + 0.2;
 const TINE_R = R + 1.35;
 const TINE_TIP = new THREE.Vector3(0, CY + TINE_R * Math.cos(TINE_ANGLE), TINE_R * Math.sin(TINE_ANGLE));
-const TINE_BASE = new THREE.Vector3(0, TINE_TIP.y - 1.2, TINE_TIP.z + 8);
+const TINE_BASE = new THREE.Vector3(0, TINE_TIP.y - 0.9, TINE_TIP.z + 5.5);
 const TINE_LEN = TINE_TIP.distanceTo(TINE_BASE);
 const SHELF_Y = CY + 3.2;
-const SHELF_Z = -17;
+const SHELF_Z = -14.5;
 /** In portrait the machine is squeezed sideways so the camera can come closer. */
 const PORTRAIT_SQUEEZE = 0.6;
 
@@ -190,7 +190,7 @@ function CameraRig({ machine, band }: { machine: React.RefObject<THREE.Group>; b
     }
     const tanHalf = Math.tan(THREE.MathUtils.degToRad(fov / 2));
     const halfW = (LEN / 2 + 3.5) * squeeze;
-    const d = Math.max(portrait ? 30 : 31, halfW / (tanHalf * aspect));
+    const d = Math.max(portrait ? 32 : 47, halfW / (tanHalf * aspect));
     // Touch pads cover the bottom of the screen and the HUD the top: shift the picture up/down.
     const touch = useGame.getState().touchUI;
     const bottomPx = touch ? (portrait ? 150 : 96) : 74;
@@ -198,8 +198,8 @@ function CameraRig({ machine, band }: { machine: React.RefObject<THREE.Group>; b
     const shift = ((bottomPx - topPx) / size.height) * d * tanHalf; // world units at the target
     const elev = THREE.MathUtils.degToRad(portrait ? 46 : 40);
     const t = s.clock.elapsedTime;
-    const ty = CY + 4.5 - shift * Math.cos(elev);
-    const tz = 3 + shift * Math.sin(elev);
+    const ty = CY + 5.5 - shift * Math.cos(elev);
+    const tz = 2 + shift * Math.sin(elev);
     cam.position.set(Math.sin(t * 0.09) * 0.5, ty + Math.sin(elev) * d, tz + Math.cos(elev) * d);
     cam.lookAt(0, ty, tz);
   });
@@ -431,8 +431,8 @@ function Comb({ fx }: { fx: React.RefObject<Fx> }) {
           <mesh position={[0, 0, -TINE_LEN / 2]} castShadow material={steel}>
             <boxGeometry args={[LANE_W * 0.8, 0.4, TINE_LEN]} />
           </mesh>
-          <mesh position={[0, 0.12, -TINE_LEN + 1.1]} material={tipMats[i]}>
-            <boxGeometry args={[LANE_W * 0.82, 0.62, 2.2]} />
+          <mesh position={[0, 0.12, -TINE_LEN + 1.3]} material={tipMats[i]}>
+            <boxGeometry args={[LANE_W * 0.82, 0.62, 2.6]} />
           </mesh>
         </group>
       ))}

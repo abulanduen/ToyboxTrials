@@ -4,7 +4,7 @@
  * Everyone plays the same chart at once. An input is `{ lane, t }`: `t` is the SONG time (ms) of
  * the physical press, measured by the client from high-resolution press timestamps (and already
  * corrected by the player's latency calibration) — so judging is not quantised to the 60 Hz step.
- * The rules only trust `t` within a small window behind the match clock.
+ * The rules only trust `t` within a small window around the match clock.
  *
  *   |t − note| ≤ 45 ms → Perfect (100)   ≤ 100 ms → Good (50)   otherwise no hit
  *   A note nobody hit by note + 220 ms is a Miss. A press with no note in reach is a stray.
@@ -30,6 +30,12 @@ export interface RhythmConfig {
   missGraceMs: number;
   /** How far behind the match clock a press time may claim to be (must be ≤ missGraceMs). */
   maxInputAgeMs: number;
+  /**
+   * How far ahead of the step clock a press time may be. Inputs are delivered on the first fixed
+   * step of a rendered frame, but the frame itself covers up to 100 ms of match time (the host's
+   * cap), so presses late in a slow frame are legitimately "ahead" of that step.
+   */
+  maxInputLeadMs: number;
 }
 
 export const DEFAULT_CONFIG: RhythmConfig = {
@@ -37,6 +43,7 @@ export const DEFAULT_CONFIG: RhythmConfig = {
   goodMs: 100,
   missGraceMs: 120,
   maxInputAgeMs: 120,
+  maxInputLeadMs: 120,
 };
 
 export const PERFECT_POINTS = 100;
@@ -96,8 +103,8 @@ export function judge(deltaMs: number, cfg: Pick<RhythmConfig, 'perfectMs' | 'go
 function applyPress(s: RhythmState, p: RhythmPlayer, inp: RhythmInput) {
   const cfg = s.config;
   if (!(inp.lane >= 0 && inp.lane <= 3) || !Number.isFinite(inp.t)) return;
-  // A press can't be in the future, and can't claim to be older than the allowed age.
-  const t = Math.min(s.t, Math.max(s.t - cfg.maxInputAgeMs, inp.t));
+  // A press can only claim a time close to the step clock (see RhythmConfig).
+  const t = Math.min(s.t + cfg.maxInputLeadMs, Math.max(s.t - cfg.maxInputAgeMs, inp.t));
   // Earliest pending note in this lane within the Good window.
   for (let i = p.cursor; i < s.chart.length; i++) {
     const n = s.chart[i];

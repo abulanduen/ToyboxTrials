@@ -9,7 +9,7 @@
       "characters": "Production character assets. Empty: the contender is built procedurally (src/character/WindupBot.tsx).",
       "props": "Production prop assets. Empty: all props are code-built primitives (src/scene/*).",
       "ui": "Production UI images. Empty: UI is CSS + inline SVG (src/ui/).",
-      "audio": "Production audio files. Empty: all sound is synthesised at runtime (src/game/audio.ts)."
+      "audio": "Production audio files. Empty: all sound is synthesised at runtime (src/game/audio.ts), including the three Music Box Rhythm tracks, which are composed in code (see the music-* entries)."
     },
     "naming": "<category>-<nn>-<kebab-case-subject>[-<variant>].<ext>",
     "units": "3D world units are centimetres (1 unit = 1 cm); the contender is 3.5 cm tall."
@@ -441,6 +441,33 @@
       "id": "sfx-synth",
       "where": "src/game/audio.ts",
       "what": "Every sound effect incl. Copycat A/S/J/K voices"
+    },
+    {
+      "id": "music-tin-waltz",
+      "type": "music",
+      "title": "Tin Waltz",
+      "where": "src/minigames/rhythm/tracks.ts (score + chart), src/minigames/rhythm/music.ts (scheduler), src/game/audio.ts (music voices)",
+      "what": "Music Box Rhythm track 1 (easy): C major, 3/4, 112 bpm, about 68 s. Melody, bass, chord plucks and count-in, synthesised at runtime",
+      "source": "Composed in code for Toybox Trials (original; not based on any existing song)",
+      "license": "Project-owned"
+    },
+    {
+      "id": "music-clockwork-parade",
+      "type": "music",
+      "title": "Clockwork Parade",
+      "where": "src/minigames/rhythm/tracks.ts, src/minigames/rhythm/music.ts, src/game/audio.ts",
+      "what": "Music Box Rhythm track 2 (medium): G major, 4/4, 124 bpm, about 67 s",
+      "source": "Composed in code for Toybox Trials (original; not based on any existing song)",
+      "license": "Project-owned"
+    },
+    {
+      "id": "music-spring-loaded",
+      "type": "music",
+      "title": "Spring-Loaded",
+      "where": "src/minigames/rhythm/tracks.ts, src/minigames/rhythm/music.ts, src/game/audio.ts",
+      "what": "Music Box Rhythm track 3 (hard): A minor, 4/4, 150 bpm, about 69 s",
+      "source": "Composed in code for Toybox Trials (original; not based on any existing song)",
+      "license": "Project-owned"
     },
     {
       "id": "ui-svg",

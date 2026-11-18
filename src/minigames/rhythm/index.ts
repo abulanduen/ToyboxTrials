@@ -7,7 +7,7 @@ import { getMatchState, useMatch } from '../session';
 import { rhythmRules, type RhythmInput, type RhythmState } from './rules';
 import { createRhythmBot } from './bot';
 import { pressesToInputs, resetSongClock, syncSongClock } from './timing';
-import { songClock, songNow, useRhythmPrefs } from './live';
+import { lastLocalJudge, songClock, songNow, useRhythmPrefs } from './live';
 import { musicStats } from './music';
 import { RhythmScene } from './Scene';
 import { RhythmHud } from './Hud';
@@ -46,6 +46,8 @@ exposeDebug({
     songTime: () => songNow(),
     rate: () => songClock.rate,
     music: () => musicStats(),
+    /** The local player's latest judgement and its timing error in ms (negative = early). */
+    lastJudge: () => ({ ...lastLocalJudge }),
   },
 });
 

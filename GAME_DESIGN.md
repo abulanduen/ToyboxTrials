@@ -266,6 +266,29 @@ the match seed (the same seed gives every client the same course).
 **Tech:** judge input against the **audio clock**, provide latency calibration, and use original or licensed music.
 🔧 **Amended (A6):** music is exempt from the "synthesised only" rule.
 
+✅ **Built (first pass, `src/minigames/rhythm/`):**
+- **Stage:** notes are coloured pins on a turning cylinder. Each pin rides over the top and meets a bright strike
+  line, in front of the steel comb, as its note sounds. Beat and bar lines are drawn on the cylinder. The band
+  (all contestants) stands on a shelf behind and hops on its hits.
+- **Tracks:** three original tunes composed in code (recorded in the asset manifest): *Tin Waltz* (easy, 3/4,
+  112 bpm), *Clockwork Parade* (medium, 124 bpm) and *Spring-Loaded* (hard, 150 bpm), each about 65–70 s. Practice
+  picks the track on the intro card; a tournament draws it from the match seed.
+- **Charts follow the tune:** every pin is a melody note. The lane follows the melody's contour (up = right, a leap
+  = two lanes). Sections get denser: on-beat notes only, then every note, then a second pin on each downbeat.
+- **Judging:** Perfect ±45 ms (100), Good ±100 ms (50), otherwise a Miss. A tap with no pin in reach is a stray.
+  Misses and strays reset the combo. Multiplier ×2 / ×3 / ×4 from combo 10 / 20 / 30. Accuracy = (Perfect + ½ Good)
+  ÷ notes. Ranked by score, then accuracy, then longest combo. No hold notes yet.
+- **Timing:** the host's match clock stays the authority (so pause and the test time-scale work). Presses carry a
+  high-resolution timestamp from the shared input layer and are converted to song time, so judging is not rounded
+  to the 60 Hz step. Music is scheduled ahead on the audio clock, anchored to the match clock and re-anchored if
+  they drift apart by more than 30 ms. With no audio the game plays silently.
+- **Calibration:** a timing offset (−150…+250 ms, saved with the settings) on the intro card, set by ± buttons or
+  a tap-along test.
+- **Bots** play every note with a normally distributed timing error, and skip or fumble some (by difficulty).
+- **Not verified:** the music has never been heard and latency has never been measured on real devices; the
+  windows, the default offset (0 ms) and the bot tuning all need real-player testing. Music has no volume slider
+  of its own yet (it follows the master volume).
+
 ### 09 · Toy Squad (Strategy / Auto-battler · 1–8)
 A short, simple auto-battler. Each round, players:
 1. get some currency

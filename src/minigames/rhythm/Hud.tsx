@@ -14,6 +14,7 @@ import type { MinigameSceneProps } from '../types';
 import { accuracyOf, multiplierFor, type RhythmState } from './rules';
 import { getSong } from './tracks';
 import { LANES } from './lanes';
+import { lastLocalJudge } from './live';
 
 /** Re-render at a modest rate (HUD only — never per frame). */
 function useTicker(hz: number) {
@@ -37,6 +38,11 @@ export function RhythmHud({ getState, contestants, localId }: MinigameSceneProps
     () =>
       matchBus.on('event', (e) => {
         if (e.id !== localId || (e.type !== 'judge' && e.type !== 'stray')) return;
+        if (e.type === 'judge') {
+          lastLocalJudge.judgement = e.judgement as string;
+          lastLocalJudge.delta = (e.delta as number | undefined) ?? 0;
+          lastLocalJudge.count++;
+        }
         const pad = padEls.current[e.lane as number];
         const kind = e.type === 'stray' ? 'stray' : (e.judgement as keyof typeof JUDGE_TEXT);
         if (pad) {

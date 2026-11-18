@@ -26,29 +26,38 @@ export interface SongClock {
   perf: number;
   /** Song ms per wall ms (1 in normal play; 0 when frozen/paused; k under `timeScale(k)`). */
   rate: number;
+  /** Song ms the last frame advanced (bounds how far ahead of a sync the clock is extrapolated). */
+  advance: number;
   started: boolean;
   /** Recent (wall, match) samples for the rate estimate. */
   samples: { perf: number; t: number }[];
 }
 
-export const createSongClock = (): SongClock => ({ est: 0, perf: 0, rate: 1, started: false, samples: [] });
+export const createSongClock = (): SongClock => ({ est: 0, perf: 0, rate: 1, advance: 0, started: false, samples: [] });
 
 export function resetSongClock(c: SongClock) {
   c.est = 0;
   c.perf = 0;
   c.rate = 1;
+  c.advance = 0;
   c.started = false;
   c.samples.length = 0;
 }
 
-/** Call once (or more) per rendered frame with the wall time and the match clock. */
+/**
+ * Call at the start of each rendered frame — before the host steps the match — with the wall time
+ * and the match clock. (That is where both the Scene's frame callback and `readLocalInput` run.)
+ * `matchT` is therefore the clock as the previous frame left it: the frame that is starting adds
+ * its own duration on top, which the estimate includes.
+ */
 export function syncSongClock(c: SongClock, perfNow: number, matchT: number) {
   const last = c.samples[c.samples.length - 1];
   if (!c.started || !last || matchT < last.t || perfNow < c.perf) {
     c.started = true;
-    c.est = matchT + (matchT > 0 ? HALF_STEP : 0);
+    c.est = matchT;
     c.perf = perfNow;
     c.rate = 1;
+    c.advance = 0;
     c.samples.length = 0;
     c.samples.push({ perf: perfNow, t: matchT });
     return;
@@ -70,15 +79,20 @@ export function syncSongClock(c: SongClock, perfNow: number, matchT: number) {
     const r = (matchT - first.t) / span;
     c.rate = Math.abs(r - 1) < 0.08 ? 1 : Math.max(0, r);
   }
-  c.est += c.rate * dPerf;
+  c.advance = c.rate * dPerf;
+  c.est += c.advance;
   c.perf = perfNow;
-  const err = matchT + HALF_STEP * Math.min(1, c.rate) - c.est;
+  const err = matchT + HALF_STEP * Math.min(1, c.rate) + dPerf * c.rate - c.est;
   if (Math.abs(err) > SNAP_MS) c.est += err;
   else c.est += err * 0.08;
 }
 
-/** Song time at wall time `perf` (at or shortly before/after the last sync). */
-export const songTimeAt = (c: SongClock, perf: number) => c.est + (perf - c.perf) * c.rate;
+/**
+ * Song time at wall time `perf`. Presses are converted after the frame's sync, so `perf` is
+ * normally at or before it (interpolation). Looking ahead of the sync is capped at one frame's
+ * advance: the match clock can't move further than that before the next sync corrects it.
+ */
+export const songTimeAt = (c: SongClock, perf: number) => c.est + Math.min((perf - c.perf) * c.rate, Math.max(c.advance, 0));
 
 const SLOTS: Action[] = ['slot1', 'slot2', 'slot3', 'slot4'];
 

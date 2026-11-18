@@ -71,7 +71,9 @@ const pressTimes: number[] = [];
  */
 export function pressStamp(eventTime?: number): number {
   const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-  return eventTime !== undefined && eventTime > 0 && eventTime <= now + 1 && now - eventTime < 500 ? eventTime : now;
+  // (A handler can run seconds after the event on a stalled main thread; a timeStamp on another
+  // timeline — some older browsers use the epoch — is off by far more than that.)
+  return eventTime !== undefined && eventTime > 0 && eventTime <= now + 1 && now - eventTime < 10_000 ? eventTime : now;
 }
 
 function logPress(a: Action, eventTime?: number) {

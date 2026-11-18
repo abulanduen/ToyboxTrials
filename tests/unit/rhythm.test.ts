@@ -337,14 +337,15 @@ describe('Music Box Rhythm timing (press timestamps → song time)', () => {
     let trueT = 0;
     syncSongClock(c, perf, t);
     for (let i = 0; i < frames; i++) {
+      // Like the host: the frame callback sees the clock as the last frame left it, then steps.
       perf += frameMs;
+      syncSongClock(c, perf, t);
       acc += frameMs * scale;
       trueT += frameMs * scale;
       while (acc >= STEP) {
         t += STEP;
         acc -= STEP;
       }
-      syncSongClock(c, perf, t);
     }
     return { c, perf, t, trueT };
   }
@@ -363,7 +364,8 @@ describe('Music Box Rhythm timing (press timestamps → song time)', () => {
     expect(Math.abs(songTimeAt(slow.c, slow.perf) - slow.trueT)).toBeLessThan(12);
     const c = runClock(200, 1000 / 60).c;
     const before = c.est;
-    for (let i = 1; i <= 120; i++) syncSongClock(c, c.perf + 1000 / 60, c.samples[c.samples.length - 1].t); // match clock stopped
+    const stopped = c.samples[c.samples.length - 1].t + STEP; // the last frame's step, then nothing
+    for (let i = 1; i <= 120; i++) syncSongClock(c, c.perf + 1000 / 60, stopped);
     expect(c.rate).toBe(0);
     expect(Math.abs(c.est - before)).toBeLessThan(45);
   });
@@ -414,10 +416,10 @@ describe('Music Box Rhythm timing (press timestamps → song time)', () => {
       // Presses carry the wall time at which the song clock read `song`.
       const acts = presses.map((p) => (['slot1', 'slot2', 'slot3', 'slot4'] as const)[p.lane]);
       const times = presses.map((p) => c.perf + (p.song - c.est) / c.rate);
-      const inputs = pressesToInputs(acts, times, c, 0);
-      rhythmRules.step(s, inputs.length ? { you: inputs } : {}, STEP);
       perf += STEP;
       syncSongClock(c, perf, s.t);
+      const inputs = pressesToInputs(acts, times, c, 0);
+      rhythmRules.step(s, inputs.length ? { you: inputs } : {}, STEP);
     };
     syncSongClock(c, perf, s.t);
     const [n0, n1, n2] = s.chart;
