@@ -175,6 +175,11 @@ function Intro({ touch }: { touch: boolean }) {
                 </div>
               </div>
               {m.opponents > 0 && <DifficultyPicker value={m.difficulty} onChange={(d) => setPracticeOpponents(m.opponents, d)} />}
+              {/* Online lobbies need the authoritative game server (planned): not faked here. */}
+              <div className="setting intro-online" aria-disabled="true" data-testid="online-lobby-note">
+                <span>Online lobby</span>
+                <button disabled>Coming with online play</button>
+              </div>
             </div>
           )}
           {m.module?.IntroExtras && <m.module.IntroExtras practice={!isTournament} />}
@@ -486,7 +491,7 @@ export function unit(plural: string, n: number) {
   return n === 1 && plural.endsWith('s') ? plural.slice(0, -1) : plural;
 }
 
-/** Every playable trial, for solo/bot practice — so new games are reachable before they get a hub gate. */
+/** Every playable trial, for solo/bot practice (each also has its own gate in the hub). */
 function PracticeList({ onClose }: { onClose: () => void }) {
   const records = useGame((s) => s.records);
   const games = MINIGAMES.filter((g) => g.status === 'playable');

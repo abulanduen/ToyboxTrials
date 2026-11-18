@@ -14,7 +14,7 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
   const phone = devices['Pixel 7'];
   const ctx = await browser.newContext({ ...phone, viewport: { width: 915, height: 412 }, screen: { width: 915, height: 412 } });
   const page = await ctx.newPage();
-  page.setDefaultTimeout(120000);
+  page.setDefaultTimeout(+process.env.E2E_TIMEOUT || 120000);
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
@@ -78,8 +78,8 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
 
   // Interact button at the Copycat gate opens the game; play a round with the touch pads.
   await page.evaluate(() => window.__toybox.match.timeScale(4));
-  await page.evaluate(() => window.__toybox.teleport(13.9, -20.4, Math.PI - 0.55));
-  await page.waitForTimeout(2500);
+  await page.evaluate((id) => { const g = window.__toybox.hub.gates().find((x) => x.game === id); window.__toybox.teleport(g.standX, g.standZ, g.yaw); }, 'copycat-conductor');
+  await page.waitForFunction(() => document.querySelector('.touch-btn--interact')?.getAttribute('aria-label')?.includes('Copycat'), null, { timeout: 120000 }).catch(() => null);
   check('Interact button appears with a prompt', await page.isVisible('.touch-btn--interact'), await page.textContent('.touch-btn--interact').catch(() => ''));
   await page.screenshot({ path: `${OUT}/mobile-02-gate-prompt.png` });
   const ib = await (await page.$('.touch-btn--interact')).boundingBox();
@@ -173,7 +173,7 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
 
   // Jack-in-the-Box in portrait: the answer box sits high (clear of the phone keyboard), tap Crank! to pass.
   await page.evaluate(() => window.__toybox.match.timeScale(2));
-  await page.evaluate(() => window.__toybox.teleport(23.2, -16.2, Math.PI - 0.961));
+  await page.evaluate((id) => { const g = window.__toybox.hub.gates().find((x) => x.game === id); window.__toybox.teleport(g.standX, g.standZ, g.yaw); }, 'jack-in-the-box');
   await page.waitForFunction(() => document.querySelector('.touch-btn--interact')?.getAttribute('aria-label')?.includes('Jack-in-the-Box'));
   const jib = await (await page.$('.touch-btn--interact')).boundingBox();
   await touch('touchStart', [[jib.x + jib.width / 2, jib.y + jib.height / 2, 6]]);

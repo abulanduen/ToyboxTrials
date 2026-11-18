@@ -7,11 +7,14 @@ import { Instance, Instances } from '@react-three/drei';
 import { PALETTE } from '../game/palette';
 import { PLAY_BOUNDS } from '../game/collision';
 import { feltTexture } from './textures';
-import { Block, Bunting, Dominoes, FeltTree, woodMat, type DominoSpec } from './props';
-import { Fountain, Gates, Pavilion, Scoreboard, Shop, Workshop } from './Buildings';
-import { DustMotes, Fingerpost, GateBoards } from './Ambience';
+import { Block, Bunting, Dominoes, FeltTree, woodMat } from './props';
+import { Fountain, Pavilion, Scoreboard, Shop, Workshop } from './Buildings';
+import { Gates } from './Gates';
+import { DustMotes, Fingerpost } from './Ambience';
+import { hubFence, hubPathTiles, TILE_SIZE } from './paths';
 import { JackInTheBox, KeyTower, Marble, MusicBox, PencilLog, Train, TrainTrack } from './Interactive';
-import { BLOCKS, BLOCK_SIZE, FOUNTAIN, GATES, PAVILION, SCOREBOARD, SHOP, TREES, WORKSHOP, frontOf, registerHubColliders } from './layout';
+import { BLOCKS, BLOCK_SIZE, GATES, GATE_STAND, PAVILION, TREES, WORKSHOP, frontOf, gateFor, registerHubColliders } from './layout';
+import { exposeDebug } from '../game/debug';
 
 function roundedRectShape(minX: number, minZ: number, maxX: number, maxZ: number, r: number) {
   const s = new THREE.Shape();
@@ -57,106 +60,15 @@ function Playmat() {
   );
 }
 
-/** Height step between overlapping path tiles: big enough to survive a 16-bit depth buffer on phones. */
-export const TILE_STEP = 0.05;
-const TILE_HALF = 0.95;
+// Path-tile maths lives in paths.ts (pure, unit tested); re-exported for the older tile tests.
+export { TILE_STEP, tilesOverlap, withTileHeights } from './paths';
 
-/** True when two 1.9 cm square tiles (rotated about Y) overlap: separating-axis test on their four edge normals. */
-export function tilesOverlap(a: { x: number; z: number; rot: number }, b: { x: number; z: number; rot: number }) {
-  // three.js rotation.y turns +x towards -z, so work in mirrored z to keep the edge axes at angle `rot`.
-  const dx = b.x - a.x, dz = a.z - b.z;
-  if (Math.hypot(dx, dz) >= TILE_HALF * 2 * Math.SQRT2) return false;
-  for (const r of [a.rot, a.rot + Math.PI / 2, b.rot, b.rot + Math.PI / 2]) {
-    const ax = Math.cos(r), az = Math.sin(r);
-    const proj = (q: number) => TILE_HALF * (Math.abs(Math.cos(q) * ax + Math.sin(q) * az) + Math.abs(-Math.sin(q) * ax + Math.cos(q) * az));
-    if (Math.abs(dx * ax + dz * az) >= proj(a.rot) + proj(b.rot) - 1e-6) return false;
-  }
-  return true;
-}
-
-/**
- * Give each tile a height level so that no two overlapping tiles share one (greedy graph colouring).
- * Overlapping tiles with equal tops z-fight, which shows as flicker when the camera turns, worst
- * around the fountain ring where the inner edges and the spokes overlap.
- */
-export function withTileHeights<T extends { x: number; z: number; rot: number }>(tiles: T[]): (T & { y: number; level: number })[] {
-  const levels: number[] = [];
-  tiles.forEach((t, i) => {
-    const used = new Set<number>();
-    for (let j = 0; j < i; j++) if (tilesOverlap(t, tiles[j])) used.add(levels[j]);
-    let l = 0;
-    while (used.has(l)) l++;
-    levels.push(l);
-  });
-  return tiles.map((t, i) => ({ ...t, level: levels[i], y: 0.12 + levels[i] * TILE_STEP }));
-}
-
-/** Wooden tile paths laid along polylines. */
+/** Wooden tile paths: the plaza ring, the streets from it and the Trials Ring road past every gate. */
 function Paths() {
-  const tiles = useMemo(() => {
-    const lines: [number, number][][] = [
-      [
-        [0, 30],
-        [0, FOUNTAIN.z + 8],
-      ],
-      [
-        [0, FOUNTAIN.z - 8],
-        [0, PAVILION.z + PAVILION.d / 2 + 0.5],
-      ],
-    ];
-    const toFront = (x: number, z: number, rot: number, d: number) => {
-      const p = frontOf(x, z, rot, d);
-      return [p.x, p.z] as [number, number];
-    };
-    // Spokes from the fountain ring to each destination
-    const ring = (x: number, z: number): [number, number] => {
-      const a = Math.atan2(z - FOUNTAIN.z, x - FOUNTAIN.x);
-      return [FOUNTAIN.x + Math.cos(a) * 8, FOUNTAIN.z + Math.sin(a) * 8];
-    };
-    const dests: [number, number][] = [
-      toFront(WORKSHOP.x, WORKSHOP.z, WORKSHOP.rot, WORKSHOP.d / 2 + 1.5),
-      toFront(SHOP.x, SHOP.z, SHOP.rot, SHOP.d / 2 + 6),
-      toFront(SCOREBOARD.x, SCOREBOARD.z, SCOREBOARD.rot, 2.5),
-      ...GATES.map((g) => toFront(g.x, g.z, g.rot, 1.5)),
-    ];
-    for (const d of dests) lines.push([ring(d[0], d[1]), d]);
-
-    const out: { x: number; z: number; rot: number; c: string }[] = [];
-    const colors = [PALETTE.woodLight, '#E2BE8E', PALETTE.cardboard];
-    let k = 0;
-    for (const line of lines) {
-      for (let s = 0; s < line.length - 1; s++) {
-        const [ax, az] = line[s];
-        const [bx, bz] = line[s + 1];
-        const len = Math.hypot(bx - ax, bz - az);
-        const n = Math.max(1, Math.round(len / 2.1));
-        const rot = Math.atan2(bx - ax, bz - az);
-        for (let i = 0; i <= n; i++) {
-          const t = i / n;
-          const off = (i % 2 ? 0.55 : -0.55) * 1.0;
-          out.push({ x: ax + (bx - ax) * t + Math.cos(rot) * off, z: az + (bz - az) * t - Math.sin(rot) * off, rot: rot + ((k * 37) % 7) * 0.03 - 0.09, c: colors[k++ % 3] });
-        }
-      }
-    }
-    // Ring of tiles around the fountain. 22 tiles on a 7 cm radius ≈ 2.0 cm apart, so the
-    // 1.9 cm tiles sit edge to edge instead of overlapping (overlaps z-fight and flicker).
-    const ringN = 22;
-    const ringTiles: typeof out = [];
-    for (let i = 0; i < ringN; i++) {
-      const a = (i / ringN) * Math.PI * 2;
-      ringTiles.push({ x: FOUNTAIN.x + Math.cos(a) * 7, z: FOUNTAIN.z + Math.sin(a) * 7, rot: -a, c: colors[i % 3] });
-    }
-    // Drop any path tile that would land on top of one already placed (e.g. where a spoke
-    // meets the ring) — coplanar overlapping tops are what caused the flickering.
-    const kept: typeof out = [];
-    for (const t of [...ringTiles, ...out]) {
-      if (kept.every((k2) => Math.hypot(k2.x - t.x, k2.z - t.z) >= 1.55)) kept.push(t);
-    }
-    return withTileHeights(kept);
-  }, []);
+  const tiles = useMemo(() => hubPathTiles(), []);
   return (
     <Instances limit={tiles.length} receiveShadow castShadow material={woodMat('#ffffff')}>
-      <boxGeometry args={[1.9, 0.22, 1.9]} />
+      <boxGeometry args={[TILE_SIZE, 0.22, TILE_SIZE]} />
       {tiles.map((t, i) => (
         <Instance key={i} position={[t.x, t.y, t.z]} rotation={[0, t.rot, 0]} color={t.c} />
       ))}
@@ -165,35 +77,26 @@ function Paths() {
 }
 
 function DominoFence() {
-  const items = useMemo(() => {
-    const b = PLAY_BOUNDS;
-    const out: DominoSpec[] = [];
-    let k = 0;
-    const jitter = () => ((k++ * 7919) % 11) / 11 - 0.5;
-    // front edge (the precipice side) — a few have toppled
-    for (let x = b.minX - 2; x <= b.maxX + 2; x += 3.1) {
-      const fallen = Math.abs(x - 12) < 4 || Math.abs(x + 30) < 2;
-      out.push({ x, z: b.maxZ + 3.2, rot: jitter() * 0.15, tilt: fallen ? Math.PI / 2 : 0 });
-    }
-    for (let z = b.minZ; z <= b.maxZ; z += 3.1) {
-      out.push({ x: b.minX - 3.2, z, rot: Math.PI / 2 + jitter() * 0.15 });
-      out.push({ x: b.maxX + 3.2, z, rot: Math.PI / 2 + jitter() * 0.15 });
-    }
-    for (let x = b.minX + 4; x <= b.maxX - 4; x += 3.1) {
-      if (Math.abs(x - PAVILION.x) < PAVILION.w / 2) continue;
-      out.push({ x, z: b.minZ - 3.2, rot: jitter() * 0.15 });
-    }
-    return out;
-  }, []);
+  const items = useMemo(() => hubFence(), []);
   return <Dominoes items={items} />;
 }
 
 export function Village() {
   useEffect(() => {
     registerHubColliders();
+    // ?debug only: where each gate is and where to stand to open its lobby (facing the arch)
+    exposeDebug({
+      hub: {
+        gates: () =>
+          GATES.map((g) => {
+            const stand = frontOf(g.x, g.z, g.rot, GATE_STAND + 1.2);
+            return { id: g.id, game: g.game, title: g.title, x: g.x, z: g.z, rot: g.rot, standX: stand.x, standZ: stand.z, yaw: g.rot + Math.PI };
+          }),
+      },
+    });
   }, []);
 
-  const g0 = GATES[0];
+  const copycat = gateFor('copycat-conductor');
   return (
     <group>
       <Playmat />
@@ -205,7 +108,6 @@ export function Village() {
       <Shop />
       <Scoreboard />
       <Gates />
-      <GateBoards />
       <Fingerpost />
       <DustMotes />
       <TrainTrack />
@@ -223,8 +125,7 @@ export function Village() {
       ))}
       {/* bunting strung from the pavilion */}
       <Bunting from={[-PAVILION.w / 2, PAVILION.h + 0.6, PAVILION.z + PAVILION.d / 2]} to={[WORKSHOP.x + 5, WORKSHOP.h + 1, WORKSHOP.z]} sag={2} count={10} />
-      <Bunting from={[PAVILION.w / 2, PAVILION.h + 0.6, PAVILION.z + PAVILION.d / 2]} to={[g0.x - 3, 8.6, g0.z + 1]} sag={1.5} count={8} />
-      <Bunting from={[GATES[1].x, 8.6, GATES[1].z]} to={[GATES[2].x, 8.6, GATES[2].z]} sag={2} count={10} />
+      {copycat && <Bunting from={[PAVILION.w / 2, PAVILION.h + 0.6, PAVILION.z + PAVILION.d / 2]} to={[copycat.x - 3, 8.6, copycat.z + 1]} sag={2.5} count={12} />}
     </group>
   );
 }

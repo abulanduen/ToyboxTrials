@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { Instance, Instances, RoundedBox } from '@react-three/drei';
 import { PALETTE } from '../game/palette';
 import { woodTexture, feltTexture } from './textures';
+import { dominoGeometry, dominoRestY, type DominoSpec } from './domino';
 
 // ---------- shared materials ----------
 const matCache = new Map<string, THREE.Material>();
@@ -29,18 +30,18 @@ export function feltMat(color: string) {
   return m as THREE.MeshStandardMaterial;
 }
 
-// ---------- domino face texture ----------
+// ---------- domino texture: the pip face on the left half, plain ivory on the right (see domino.ts) ----------
 let dominoTex: THREE.Texture | null = null;
 function dominoTexture() {
   if (dominoTex) return dominoTex;
   const c = document.createElement('canvas');
-  c.width = 128;
+  c.width = 256;
   c.height = 256;
   const g = c.getContext('2d')!;
   g.fillStyle = PALETTE.white;
-  g.fillRect(0, 0, 128, 256);
+  g.fillRect(0, 0, 256, 256);
   g.fillStyle = 'rgba(120,100,80,0.10)';
-  for (let i = 0; i < 200; i++) g.fillRect(Math.random() * 128, Math.random() * 256, 2, 2);
+  for (let i = 0; i < 400; i++) g.fillRect(Math.random() * 256, Math.random() * 256, 2, 2);
   g.fillStyle = PALETTE.ink;
   g.fillRect(14, 125, 100, 6);
   const pip = (x: number, y: number) => {
@@ -59,30 +60,28 @@ function dominoTexture() {
   pip(94, 224);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
   dominoTex = t;
   return t;
 }
 
-export interface DominoSpec {
-  x: number;
-  z: number;
-  rot: number;
-  /** 0 = standing, π/2 = lying flat face-up */
-  tilt?: number;
-  y?: number;
-}
+export type { DominoSpec } from './domino';
 
-/** Instanced dominoes (2.4 × 4.8 × 0.75). */
+let dominoMaterial: THREE.MeshStandardMaterial | null = null;
+let dominoGeo: THREE.BufferGeometry | null = null;
+
+/**
+ * Instanced dominoes (2.4 × 4.8 × 0.75, a 1 : 2 face). Pips are on the two big faces only; the
+ * thin edges are plain (see domino.ts). `s` scales a domino uniformly, so it is never stretched.
+ */
 export function Dominoes({ items }: { items: DominoSpec[] }) {
-  const mat = useMemo(() => new THREE.MeshStandardMaterial({ map: dominoTexture(), roughness: 0.35 }), []);
+  const mat = (dominoMaterial ??= new THREE.MeshStandardMaterial({ map: dominoTexture(), roughness: 0.42 }));
+  const geo = (dominoGeo ??= dominoGeometry());
   return (
-    <Instances limit={items.length} castShadow receiveShadow material={mat}>
-      <boxGeometry args={[2.4, 4.8, 0.75]} />
-      {items.map((d, i) => {
-        const tilt = d.tilt ?? 0;
-        const y = d.y ?? (tilt > 1 ? 0.375 : 2.4 * Math.cos(tilt) + 0.375 * Math.sin(tilt));
-        return <Instance key={i} position={[d.x, y, d.z]} rotation={[-tilt, d.rot, 0, 'YXZ']} />;
-      })}
+    <Instances limit={items.length} castShadow receiveShadow material={mat} geometry={geo}>
+      {items.map((d, i) => (
+        <Instance key={i} position={[d.x, d.y ?? dominoRestY(d), d.z]} rotation={[-(d.tilt ?? 0), d.rot, d.roll ?? 0, 'YXZ']} scale={d.s ?? 1} />
+      ))}
     </Instances>
   );
 }

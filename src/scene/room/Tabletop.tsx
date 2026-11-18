@@ -3,15 +3,16 @@
  * mug, pencils, pencil pot, ruler, sticky notes, a little cactus and the lamp's cable.
  *
  * Unlike the rest of the room these are lit in real time (they sit in the sun patch next to the
- * toys and must take and cast the same shadows). None of them has a collider: they all stand on
- * the table margin outside the play bounds (x ±40, z −30…33).
+ * toys and must take and cast the same shadows). Most stand on the table margin outside the play
+ * bounds; the book cliffs and the mug reach into the bigger playmat, so they have colliders
+ * (layout.ts BOOKS / MUG) and stop the camera.
  */
 import { useMemo } from 'react';
 import * as THREE from 'three';
 import { RoundedBox } from '@react-three/drei';
 import { PALETTE, ROOM } from '../../game/palette';
 import { woodTexture } from '../textures';
-import { TABLE } from '../layout';
+import { BOOKS, MUG, TABLE } from '../layout';
 import { camBlock } from '../../game/player';
 
 const mat = (color: string, rough = 0.9, metal = 0) => new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal });
@@ -169,12 +170,12 @@ export function Tabletop({ detail }: { detail: boolean }) {
       </group>
 
       {/* ---------------- book cliffs (back right of the table) ---------------- */}
-      <group position={[56, 0, -36]}>
+      <group position={[BOOKS.x, 0, BOOKS.z]}>
         {books.map((b, i) => {
           const y = books.slice(0, i).reduce((s, o) => s + o.h, 0);
           return (
             <group key={i} position={[0, y + b.h / 2, 0]} rotation={[0, b.rot, 0]}>
-              <RoundedBox args={[b.w, b.h, b.d]} radius={0.5} smoothness={2} castShadow receiveShadow material={b.mat} />
+              <RoundedBox args={[b.w, b.h, b.d]} radius={0.5} smoothness={2} castShadow receiveShadow material={b.mat} ref={camBlock} />
               {/* page block */}
               <mesh position={[0.8, 0, 0]} material={m.pages}>
                 <boxGeometry args={[b.w - 0.6, b.h - 0.9, b.d + 0.05]} />
@@ -185,7 +186,7 @@ export function Tabletop({ detail }: { detail: boolean }) {
       </group>
 
       {/* ---------------- mug building ---------------- */}
-      <group position={[57, 0, 14]}>
+      <group position={[MUG.x, 0, MUG.z]}>
         <mesh position={[0, 5.5, 0]} castShadow receiveShadow material={m.mug} ref={camBlock}>
           <cylinderGeometry args={[4.6, 4.3, 11, 32, 1, true]} />
         </mesh>

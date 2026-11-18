@@ -81,6 +81,15 @@ and review those separately. This branch has not been merged or deployed.
 - **Copycat Conductor:** seeded growing sequences, four ASJK/touch instruments, elimination, solo/bot play and rules tests. Preserve its working functionality.
 - **Historical M5 baseline:** Jack-in-the-Box rules, category bank/matching, bots, scene/HUD and tournament inclusion. At that point nine catalogue entries remained unimplemented.
 
+**Hub gates pass:** the playmat is larger (play bounds x −48…46, z −43…33) and every playable
+trial has its own building-block gate on a Trials Ring road (data in `src/scene/layout.ts`
+`GATES`, accent colour from the registry), with themed, code-built surroundings per game
+(`src/scene/gateDecor.ts`) and a fingerpost board per gate district. Interacting at a gate opens
+that trial's lobby, which is the shared practice intro card (bots, difficulty, tutorial); online
+lobbies are shown as unavailable until the M8 server exists. Dominoes everywhere keep a 1 : 2
+face with pips only on the two big faces; the scoreboard frame is built from whole dominoes.
+Checks: `tests/unit/hub-layout.test.ts`, `tests/e2e/hubgates.cjs`.
+
 ## Current milestone and priorities
 
 **Current milestone: integrate and playtest the seven local games; recover Claude's separate work.**

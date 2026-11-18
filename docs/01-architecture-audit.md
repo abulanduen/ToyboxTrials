@@ -28,7 +28,7 @@ once it is connected.
 | Build tooling | Vite 8 · TypeScript 5.9 (strict) · React 19 | ✅ `npm run build` passes, 0 type errors |
 | 3D | three.js 0.181 · @react-three/fiber 9 · drei 10 · @react-three/postprocessing 3 | ✅ |
 | State | Zustand 5 (+ `persist` → `localStorage`) | ✅ settings & secrets persist across reload |
-| Hub scene | Tabletop village: fountain, pavilion, workshop, shop, scoreboard, 3 gates, train, tower | ✅ |
+| Hub scene | Tabletop village: fountain, pavilion, workshop, shop, scoreboard, one gate per playable trial (11), train, tower | ✅ |
 | Character | Procedural wind-up robot with idle / walk / run / turn-lean / jump / interact / elimination / respawn | ✅ |
 | Controls | WASD/arrows, Shift run, Space jump, E interact, Esc/P pause, mouse look (pointer lock + drag fallback) | ✅ |
 | Collision | Planar footprints + heights (standable surfaces), rounded-rect play bounds | ✅ |

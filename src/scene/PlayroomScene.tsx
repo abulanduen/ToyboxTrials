@@ -201,7 +201,7 @@ export function PlayroomScene() {
 export const frameStats = { fps: 0, frameMs: 0 };
 function FrameStats() {
   const acc = useRef({ t: 0, n: 0 });
-  const { gl, scene } = useThree();
+  const { gl, scene, camera } = useThree();
   // Whole-frame renderer totals (shadow passes + scene + post passes). With a composer the
   // renderer's own counters only describe the last pass, so accumulate manually.
   const totals = useRef({ calls: 0, triangles: 0 });
@@ -209,7 +209,7 @@ function FrameStats() {
     gl.info.autoReset = false;
     exposeDebug({
       /** Raw renderer + scene, for visual tests and debugging only. */
-      three: () => ({ gl, scene }),
+      three: () => ({ gl, scene, camera }),
       renderInfo: () => {
         let meshes = 0;
         scene.traverse((o) => {
@@ -218,7 +218,7 @@ function FrameStats() {
         return { calls: totals.current.calls, triangles: totals.current.triangles, geometries: gl.info.memory.geometries, textures: gl.info.memory.textures, meshes, programs: gl.info.programs?.length };
       },
     });
-  }, [gl, scene]);
+  }, [gl, scene, camera]);
   const frames = useRef(0);
   useFrame((_, dt) => {
     // Runs before this frame renders: bank the previous frame's totals, then reset.

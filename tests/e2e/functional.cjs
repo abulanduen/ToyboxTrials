@@ -7,6 +7,7 @@ const check = (name, ok, detail = '') => { results.push(`${ok ? 'PASS' : 'FAIL'}
 (async () => {
   const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
   const page = await browser.newPage({ viewport: { width: 800, height: 450 }, deviceScaleFactor: 1 });
+  page.setDefaultTimeout(+process.env.E2E_TIMEOUT || 120000); // shared machine, software GL: E2E_TIMEOUT (ms) raises the limit
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
@@ -55,8 +56,9 @@ const check = (name, ok, detail = '') => { results.push(`${ok ? 'PASS' : 'FAIL'}
 
   // Step onto the domino slab (0.75 tall) requires jump; walking onto the book from the domino also needs jump.
   // Interaction prompt + Copycat panel
-  await T(() => window.__toybox.teleport(13.9, -20.4, Math.PI - 0.55));
-  await page.waitForTimeout(2500);
+  // gates are data: stand where the hub says the Copycat gate's lobby opens
+  await page.evaluate((id) => { const g = window.__toybox.hub.gates().find((x) => x.game === id); window.__toybox.teleport(g.standX, g.standZ, g.yaw); }, 'copycat-conductor');
+  await page.waitForFunction((t) => document.querySelector('.prompt')?.textContent.includes(t), 'Copycat', { timeout: 120000 }).catch(() => null);
   const promptTxt = await page.textContent('.prompt').catch(() => null);
   check('prompt shows at Copycat gate', !!promptTxt && promptTxt.includes('Copycat'), JSON.stringify(promptTxt));
   await page.screenshot({ path: `${OUT}/10-gate-prompt.png` });

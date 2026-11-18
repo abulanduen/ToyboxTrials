@@ -1480,6 +1480,17 @@ canvas {
   min-height: 40px;
   min-width: 48px;
 }
+/* online lobbies arrive with the authoritative server: shown, clearly unavailable */
+.intro-online button {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 2px dashed rgba(87, 77, 105, 0.35);
+  border-radius: 10px;
+  background: transparent;
+  color: rgba(43, 36, 51, 0.55);
+  font: 700 0.85rem var(--font-body);
+  cursor: not-allowed;
+}
 .intro-field {
   display: flex;
   flex-wrap: wrap;

@@ -1,17 +1,17 @@
 /**
  * Hub architecture — toy civilisation built from forgotten household objects.
  */
-import { useEffect, useMemo, useRef } from 'react';
+import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { RoundedBox } from '@react-three/drei';
 import * as THREE from 'three';
 import { PALETTE } from '../game/palette';
-import { events } from '../game/events';
 import { useGame } from '../game/store';
 import { camBlock } from '../game/player';
 import { cardboardTexture, cardFaceTexture, stripeTexture } from './textures';
-import { Dominoes, paintMat, feltMat, woodMat, useArchGeometry } from './props';
-import { FOUNTAIN, GATE, GATES, PAVILION, SCOREBOARD, SHOP, WORKSHOP } from './layout';
+import { Dominoes, paintMat, feltMat, woodMat, type DominoSpec } from './props';
+import { DOMINO } from './domino';
+import { FOUNTAIN, PAVILION, SCOREBOARD, SHOP, WORKSHOP } from './layout';
 import { SECRET_IDS } from '../game/interactables';
 
 const cardboardMat = (tint: string = PALETTE.cardboard) =>
@@ -313,132 +313,53 @@ export function Shop() {
   );
 }
 
-// ---------------- Scoreboard: domino wall holding a big painted card ----------------
+// ---------------- Scoreboard: a cream card in a frame of whole dominoes ----------------
+/**
+ * The frame is built from real dominoes at their true 1 : 2 proportions, scaled uniformly
+ * (SCOREBOARD.s): two stacked upright dominoes per post, two lying on their long edge as the sill
+ * under the card, and three on their long edge as the lintel. Pips face the viewer; the thin edges
+ * are plain. Wooden feet and rear braces hold it up.
+ */
 export function Scoreboard() {
   const secrets = useGame((s) => s.secretsFound.length);
-  const face = useMemo(() => cardFaceTexture('SCOREBOARD', `Secrets ${secrets} / ${SECRET_IDS.length}`, PALETTE.coral), [secrets]);
-  const dominos = useMemo(
-    () =>
-      Array.from({ length: 6 }, (_, i) => ({
-        x: -6.25 + i * 2.5,
-        z: 0,
-        rot: 0,
-      })),
-    [],
-  );
+  const face = useMemo(() => cardFaceTexture('SCOREBOARD', `Secrets ${secrets} / ${SECRET_IDS.length}`, PALETTE.coral, 4 / 3), [secrets]);
+  const sb = SCOREBOARD;
+  const s = sb.s;
+  const { w, h, t } = DOMINO;
+  const dominos = useMemo(() => {
+    const out: DominoSpec[] = [];
+    const postX = (3 * h) / 2 - w / 2; // posts sit at the ends of the three-domino lintel
+    for (const sx of [-1, 1]) for (const k of [0, 1]) out.push({ x: sx * postX * s, z: 0, rot: 0, y: (h / 2 + k * h) * s, s });
+    for (const sx of [-1, 1]) out.push({ x: ((sx * h) / 2) * s, z: 0, rot: 0, roll: Math.PI / 2, y: (w / 2) * s, s }); // sill
+    for (const i of [-1, 0, 1]) out.push({ x: i * h * s, z: 0, rot: 0, roll: Math.PI / 2, y: (2 * h + w / 2) * s, s }); // lintel
+    return out;
+  }, [h, s, w]);
+  const cardW = (3 * h - 2 * w) * s;
+  const cardH = (2 * h - w) * s;
   return (
-    <group position={[SCOREBOARD.x, 0, SCOREBOARD.z]} rotation={[0, SCOREBOARD.rot, 0]}>
-      <Dominoes items={dominos.map((d) => ({ ...d, rot: Math.PI / 2 }))} />
-      {/* card frame */}
-      <group position={[0, 8.6, 0.3]} rotation={[-0.08, 0, 0]}>
-        <RoundedBox args={[15.5, 9.8, 0.5]} radius={0.3} smoothness={2} castShadow material={paintMat(PALETTE.coral, 0.6)} ref={camBlock} />
-        <mesh position={[0, 0, 0.27]}>
-          <planeGeometry args={[14.4, 9]} />
+    <group position={[sb.x, 0, sb.z]} rotation={[0, sb.rot, 0]}>
+      <Dominoes items={dominos} />
+      {/* the card, set just behind the dominoes' front faces */}
+      <group position={[0, (w + (2 * h - w) / 2) * s, -t * 0.15 * s]}>
+        <mesh castShadow material={paintMat(PALETTE.coral, 0.6)} ref={camBlock}>
+          <boxGeometry args={[cardW + 0.6, cardH + 0.4, 0.4]} />
+        </mesh>
+        <mesh position={[0, 0, 0.21]}>
+          <planeGeometry args={[cardW - 0.3, cardH - 0.2]} />
           <meshStandardMaterial map={face} roughness={0.8} />
         </mesh>
-        {/* binder clips */}
-        {[-5, 5].map((x) => (
-          <mesh key={x} position={[x, 4.9, 0]} material={paintMat(PALETTE.ink, 0.3, 0.6)}>
-            <boxGeometry args={[1.6, 1.4, 0.9]} />
-          </mesh>
-        ))}
       </group>
-    </group>
-  );
-}
-
-// ---------------- Minigame gates: building-block arches ----------------
-export function Gates() {
-  return (
-    <>
-      {GATES.map((g) => (
-        <Gate key={g.id} gate={g} />
-      ))}
-    </>
-  );
-}
-
-function Gate({ gate }: { gate: (typeof GATES)[number] }) {
-  const arch = useArchGeometry(GATE.width, 3, GATE.depth, GATE.width / 2 - GATE.pillar);
-  const glow = useRef<THREE.Mesh>(null!);
-  const bell = useRef<THREE.Group>(null!);
-  const ring = useRef(0);
-  useEffect(
-    () =>
-      events.on('gate:open', ({ id }) => {
-        if (id === gate.id) ring.current = 1.2;
-      }),
-    [gate.id],
-  );
-  useFrame((s, dt) => {
-    const t = s.clock.elapsedTime;
-    if (glow.current) {
-      const m = glow.current.material as THREE.MeshBasicMaterial;
-      m.opacity = 0.35 + Math.sin(t * 2.5) * 0.15;
-    }
-    if (bell.current) {
-      ring.current = Math.max(0, ring.current - dt);
-      bell.current.rotation.z = Math.sin(t * 2) * 0.08 + Math.sin(t * 22) * 0.5 * ring.current;
-    }
-  });
-  const pillarH = GATE.height - 3;
-  return (
-    <group position={[gate.x, 0, gate.z]} rotation={[0, gate.rot, 0]}>
-      {[-1, 1].map((side) => (
-        <group key={side} position={[side * (GATE.width / 2 - GATE.pillar / 2), 0, 0]}>
-          <RoundedBox args={[GATE.pillar, pillarH / 2, GATE.depth]} radius={0.2} smoothness={2} position={[0, pillarH / 4, 0]} castShadow receiveShadow material={woodMat(gate.color)} ref={camBlock} />
-          <RoundedBox args={[GATE.pillar, pillarH / 2, GATE.depth]} radius={0.2} smoothness={2} position={[0, (pillarH * 3) / 4, 0]} castShadow receiveShadow material={woodMat(PALETTE.cream)} />
+      {/* wooden feet and two rear braces */}
+      {[-1, 1].map((sx) => (
+        <group key={sx} position={[sx * ((3 * h) / 2 - w / 2) * s, 0, 0]}>
+          <mesh position={[0, 0.35, 0]} castShadow receiveShadow material={woodMat(PALETTE.woodMid)}>
+            <boxGeometry args={[w * s + 0.6, 0.7, 2.6]} />
+          </mesh>
+          <mesh position={[0, 4.2, -1.15]} rotation={[0.28, 0, 0]} castShadow material={woodMat(PALETTE.woodDark)}>
+            <boxGeometry args={[0.5, 8.4, 0.5]} />
+          </mesh>
         </group>
       ))}
-      <mesh geometry={arch} position={[0, pillarH, 0]} castShadow receiveShadow material={woodMat(gate.color)} ref={camBlock} />
-      <mesh position={[0, GATE.height + 0.2, 0]} material={woodMat(PALETTE.woodDark)}>
-        <cylinderGeometry args={[0.12, 0.12, 4, 6]} />
-      </mesh>
-      <Flag position={[0, GATE.height + 1.6, 0]} color={gate.color} />
-
-      {gate.active ? (
-        <>
-          {/* golden bell hanging in the arch + glowing welcome mat */}
-          <group ref={bell} position={[0, pillarH + 0.2, 0]}>
-            <mesh position={[0, -0.5, 0]} material={paintMat(PALETTE.ink, 0.6)}>
-              <cylinderGeometry args={[0.05, 0.05, 1, 4]} />
-            </mesh>
-            <mesh position={[0, -1.5, 0]} castShadow material={paintMat(PALETTE.honey, 0.25, 0.85)}>
-              <cylinderGeometry args={[0.35, 1.0, 1.4, 16, 1, true]} />
-            </mesh>
-            <mesh position={[0, -2.25, 0]} material={paintMat(PALETTE.coral, 0.4)}>
-              <sphereGeometry args={[0.28, 10, 8]} />
-            </mesh>
-          </group>
-          <mesh ref={glow} position={[0, 0.14, 1.5]} rotation={[-Math.PI / 2, 0, 0]}>
-            <circleGeometry args={[3, 32]} />
-            <meshBasicMaterial color={PALETTE.honey} transparent opacity={0.4} depthWrite={false} />
-          </mesh>
-          {/* the four instrument colours as a sticker strip on the lintel (Copycat's gate) */}
-          {(gate.id === 'gate-copycat' ? [PALETTE.coral, PALETTE.honey, PALETTE.toyBlue, PALETTE.sage] : []).map((c, i) => (
-            <mesh key={c} position={[-1.8 + i * 1.2, GATE.height - 1.1, GATE.depth / 2 + 0.17]} material={paintMat(c, 0.5)}>
-              <circleGeometry args={[0.45, 16]} />
-            </mesh>
-          ))}
-        </>
-      ) : (
-        <>
-          {/* "under construction": masking tape X + cardboard sign */}
-          {[0.75, -0.75].map((r) => (
-            <mesh key={r} position={[0, pillarH / 2, 0.2]} rotation={[0, 0, r]} material={paintMat('#EBDDB8', 0.9)}>
-              <boxGeometry args={[GATE.width - GATE.pillar * 2 + 1.5, 0.7, 0.08]} />
-            </mesh>
-          ))}
-          <group position={[0, 1.6, GATE.depth / 2 + 0.5]} rotation={[-0.15, 0, 0.06]}>
-            <mesh castShadow material={cardboardMat()}>
-              <boxGeometry args={[3.8, 2.6, 0.2]} />
-            </mesh>
-            <mesh position={[0, 0, 0.11]} material={paintMat(gate.color, 0.7)}>
-              <planeGeometry args={[3.2, 0.5]} />
-            </mesh>
-          </group>
-        </>
-      )}
     </group>
   );
 }

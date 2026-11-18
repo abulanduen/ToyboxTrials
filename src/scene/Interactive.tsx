@@ -12,7 +12,7 @@ import { setDynamic, resolve, type Collider } from '../game/collision';
 import { livePositions, keyAvailable } from '../game/interactables';
 import { camBlock, player } from '../game/player';
 import { sfx } from '../game/audio';
-import { paintMat, woodMat, feltMat } from './props';
+import { Dominoes, paintMat, woodMat, feltMat } from './props';
 import { JACK, MUSICBOX, PENCIL, TOWER, TRACK } from './layout';
 import { Pencil, usePencilMaterials } from './Room';
 
@@ -364,15 +364,8 @@ export function KeyTower() {
   const T = TOWER;
   return (
     <group>
-      {/* lying domino step */}
-      <mesh position={[T.domino.x, T.domino.top / 2, T.domino.z]} castShadow receiveShadow material={paintMat(PALETTE.white, 0.35)}>
-        <boxGeometry args={[T.domino.hx * 2, T.domino.top, T.domino.hz * 2]} />
-      </mesh>
-      {[-1, 1].map((s) => (
-        <mesh key={s} position={[T.domino.x + s * 1.2, T.domino.top + 0.04, T.domino.z]} rotation={[-Math.PI / 2, 0, 0]} material={paintMat(PALETTE.ink, 0.5)}>
-          <circleGeometry args={[0.28, 10]} />
-        </mesh>
-      ))}
+      {/* lying domino step: a real domino, face up (pips on the top face only) */}
+      <Dominoes items={[{ x: T.domino.x, z: T.domino.z, rot: Math.PI / 2, tilt: Math.PI / 2 }]} />
       {/* hardback book */}
       <group position={[T.book.x, T.book.top / 2, T.book.z]}>
         <RoundedBox args={[T.book.hx * 2, T.book.top, T.book.hz * 2]} radius={0.3} smoothness={2} castShadow receiveShadow material={paintMat('#B35A4E', 0.8)} ref={camBlock} />

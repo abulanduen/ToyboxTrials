@@ -14,6 +14,7 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
 (async () => {
   const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
   const page = await browser.newPage({ viewport: { width: 1024, height: 600 } });
+  page.setDefaultTimeout(+process.env.E2E_TIMEOUT || 120000); // shared machine, software GL: E2E_TIMEOUT (ms) raises the limit
   page.setDefaultTimeout(120000);
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -61,8 +62,8 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   await page.evaluate(() => window.__toybox.match.timeScale(4));
 
   // --- Solo practice via the Copycat gate
-  await page.evaluate(() => window.__toybox.teleport(13.9, -20.4, Math.PI - 0.55));
-  await page.waitForTimeout(2500);
+  await page.evaluate((id) => { const g = window.__toybox.hub.gates().find((x) => x.game === id); window.__toybox.teleport(g.standX, g.standZ, g.yaw); }, 'copycat-conductor');
+  await page.waitForFunction((t) => document.querySelector('.prompt')?.textContent.includes(t), 'Copycat', { timeout: 120000 }).catch(() => null);
   check('gate prompt says Play Copycat Conductor', (await page.textContent('.prompt'))?.includes('Play'));
   await page.keyboard.press('KeyE');
   await page.waitForSelector('.match-intro', { timeout: 60000 });
@@ -132,7 +133,8 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   await page.waitForSelector('.hud-sign', { timeout: 60000 });
   await page.waitForTimeout(1500);
   const pos = await page.evaluate(() => window.__toybox.state());
-  check('quitting returns to the hub where you left it', Math.hypot(pos.x - 13.9, pos.z + 20.4) < 1.5, `x=${pos.x.toFixed(1)} z=${pos.z.toFixed(1)}`);
+  const cc = await page.evaluate(() => window.__toybox.hub.gates().find((g) => g.game === 'copycat-conductor'));
+  check('quitting returns to the hub where you left it', Math.hypot(pos.x - cc.standX, pos.z - cc.standZ) < 1.5, `x=${pos.x.toFixed(1)} z=${pos.z.toFixed(1)} (gate stand ${cc.standX.toFixed(1)}, ${cc.standZ.toFixed(1)})`);
 
   // --- Jack-in-the-Box practice via the coral gate: type real answers into the answer box
   const J = () => page.evaluate(() => {
@@ -150,7 +152,7 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   };
   /** A valid answer from the category's common tier that hasn't been said yet. */
   const freshAnswer = (j) => j.tiers[0].split(',').map((e) => e.split('|')[0].trim()).find((a) => !j.said.includes(a));
-  await page.evaluate(() => window.__toybox.teleport(23.2, -16.2, Math.PI - 0.961));
+  await page.evaluate((id) => { const g = window.__toybox.hub.gates().find((x) => x.game === id); window.__toybox.teleport(g.standX, g.standZ, g.yaw); }, 'jack-in-the-box');
   // The prompt updates on the next rendered frames: wait for it rather than a fixed delay (slow software GL).
   await page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Jack-in-the-Box'), null, { timeout: 60000 }).catch(() => null);
   check('coral gate prompt says Play Jack-in-the-Box', (await page.textContent('.prompt'))?.includes('Jack-in-the-Box'), await page.textContent('.prompt'));
@@ -204,8 +206,8 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   await page.waitForTimeout(1200);
 
   // --- The blue gate opens Wind-Up Dash (the race itself is covered by tests/e2e/movement.cjs)
-  await page.evaluate(() => window.__toybox.teleport(30.6, -7.1, Math.PI - 1.3428));
-  await page.waitForTimeout(2500);
+  await page.evaluate((id) => { const g = window.__toybox.hub.gates().find((x) => x.game === id); window.__toybox.teleport(g.standX, g.standZ, g.yaw); }, 'wind-up-dash');
+  await page.waitForFunction((t) => document.querySelector('.prompt')?.textContent.includes(t), 'Wind-Up Dash', { timeout: 120000 }).catch(() => null);
   check('blue gate prompt says Play Wind-Up Dash', (await page.textContent('.prompt'))?.includes('Wind-Up Dash'), await page.textContent('.prompt'));
   await page.keyboard.press('KeyE');
   await page.waitForSelector('.match-intro', { timeout: 60000 });
