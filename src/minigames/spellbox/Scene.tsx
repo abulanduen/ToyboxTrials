@@ -1,3 +1,4 @@
+import { CAMERA_DIR, fitDistance, fovFor, framing } from './camera';
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -87,10 +88,18 @@ export function SpellboxScene({getState,localId,contestants}:MinigameSceneProps<
   },[camera,gl,getState,localId,pointerRay,floorPlane]);
   useEffect(()=>matchBus.on('event',createSpellboxAudio(localId,getState)),[localId,getState]);
   useEffect(()=>{exposeDebug({spellbox:{point:(x:number,z:number,height=.1)=>{const p=new THREE.Vector3(x,height,z).project(camera),r=gl.domElement.getBoundingClientRect();return{x:r.left+(p.x+1)*r.width/2,y:r.top+(1-p.y)*r.height/2};}}});},[camera,gl]);
-  useFrame(()=>{
-    const cam=camera as THREE.PerspectiveCamera,aspect=cam.aspect,fov=aspect<1?50+(1-aspect)*40:50;if(cam.fov!==fov){cam.fov=fov;cam.updateProjectionMatrix();}
+  const fit=useRef({key:'',d:60}),view=useRef({x:0,z:0,d:60,ready:false}),lookAt=useMemo(()=>new THREE.Vector3(),[]);
+  useFrame((_,dt)=>{
+    const cam=camera as THREE.PerspectiveCamera,aspect=cam.aspect,fov=fovFor(aspect);if(cam.fov!==fov){cam.fov=fov;cam.updateProjectionMatrix();}
     const s=getState(),radius=s?.kind==='spellbox-showdown'?s.radius:15;
-    const scale=radius/15,distance=Math.max(56,31/aspect)*scale;camera.position.set(0,distance,distance*.52);camera.lookAt(0,0,scale);
+    const scale=radius/15;
+    // Frame the ring between the HUD bands; on big rings follow the local toy (see camera.ts).
+    const me=s?.kind==='spellbox-showdown'&&s.phase==='arena'?s.players.find(p=>p.id===localId&&p.alive)??null:null;
+    const f=framing(radius,me),key=`${f.half.toFixed(2)}:${aspect.toFixed(3)}`;
+    if(fit.current.key!==key)fit.current={key,d:fitDistance(f.half,aspect)};
+    const k=view.current.ready?1-Math.exp(-6*Math.min(dt,.1)):1;view.current.ready=true;
+    view.current.x+=(f.x-view.current.x)*k;view.current.z+=(f.z-view.current.z)*k;view.current.d+=(fit.current.d-view.current.d)*k;
+    camera.position.copy(CAMERA_DIR).multiplyScalar(view.current.d).add(lookAt.set(view.current.x,0,view.current.z));camera.lookAt(lookAt);
     stage.current.scale.set(scale,1,scale);target.current.visible=s?.kind==='spellbox-showdown'&&!!s.shrink;
     if(s?.kind==='spellbox-showdown'&&s.shrink)target.current.scale.set(s.shrink.to,1,s.shrink.to);
     if(s?.kind==='spellbox-showdown'&&pointer.current&&!useMatch.getState().paused){
