@@ -5,6 +5,17 @@ const fs = require('node:fs');
 const path = require('node:path');
 const out = path.join(__dirname, 'output');
 fs.mkdirSync(out, { recursive: true });
+/** Push the touch joystick (CDP touch events) in a direction until `until(arg)` holds in the page, then let go. */
+async function stickUntil(page, [dx, dy], until, arg) {
+  const cdp = await page.context().newCDPSession(page);
+  const zone = await page.locator('.touch-stick-zone').boundingBox();
+  const x = zone.x + zone.width * 0.4, y = zone.y + zone.height * 0.55;
+  const send = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts.map(([px, py]) => ({ x: px, y: py, id: 1 })) });
+  await send('touchStart', [[x, y]]);
+  await send('touchMove', [[x + dx * 20, y + dy * 20]]);
+  await send('touchMove', [[x + dx * 60, y + dy * 60]]);
+  try { await page.waitForFunction(until, arg); } finally { await send('touchEnd', []); await cdp.detach(); }
+}
 (async () => {
   const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   try {
@@ -29,14 +40,18 @@ fs.mkdirSync(out, { recursive: true });
       await page.waitForFunction(() => window.__toybox.match.phase() === 'playing');
       // Freeze time for a readable visual checkpoint, then resume for real input.
       await page.evaluate(() => window.__toybox.match.timeScale(0));
-      await page.screenshot({ path: path.join(out, `inferno-${mobile ? 'phone' : 'desktop'}.png`) });
+      await page.screenshot({ path: path.join(out, `inferno-${mobile ? 'phone' : 'desktop'}.png`), timeout: 240000 }); // software GL under load is slow
       const start = await page.evaluate(() => ({ ...window.__toybox.match.state().players[0] }));
       await page.evaluate(() => window.__toybox.match.timeScale(1));
-      if (mobile) await page.getByRole('button', { name: 'Right', exact: true }).tap();
+      if (mobile) {
+        assert.equal(await page.locator('.touch-stick-zone').count(), 1, 'touch joystick shown');
+        assert.equal(await page.getByRole('button', { name: 'Up', exact: true }).count(), 0, 'no direction pads');
+      }
+      if (mobile) await stickUntil(page, [1, 0], x => window.__toybox.match.state().players[0].x > x, start.x);
       else { await page.keyboard.down('KeyD'); await page.waitForTimeout(100); await page.keyboard.up('KeyD'); }
       await page.waitForFunction(x => window.__toybox.match.state().players[0].x > x, start.x);
       // Face the boundary without moving; then face back to a guaranteed vacant spawn tile.
-      if (mobile) await page.getByRole('button', { name: 'Left', exact: true }).tap(); else await page.keyboard.press('KeyA');
+      if (mobile) await stickUntil(page, [-1, 0], () => window.__toybox.match.state().players[0].facing === 3); else await page.keyboard.press('KeyA');
       // Let that queued press land first; with slow frames it could otherwise turn the toy after the setup below.
       await page.waitForFunction(() => window.__toybox.match.state().players[0].facing === 3);
       await page.evaluate(() => {
