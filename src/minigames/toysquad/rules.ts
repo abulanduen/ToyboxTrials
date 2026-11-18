@@ -10,7 +10,7 @@ export { tickBattle } from './combat';
 export const BOARD_SIZE = 8, DEPLOY_CELLS = 32, MAX_UNITS = 10, BENCH_SIZE = 8, SHOP_SIZE = 5;
 export const boardLimit = (level: number) => Math.min(MAX_UNITS, level + 2);
 export const deploymentPosition = (cell: number, side: 0 | 1) => ({ x: cell % 8, z: side === 0 ? 4 + Math.floor(cell / 8) : 3 - Math.floor(cell / 8) });
-export interface SquadUnit { id: number; kind: UnitKind; tier: number; cell: number }
+export interface SquadUnit { id: number; kind: UnitKind; tier: number; cell: number; upgradedAt?: number }
 export interface SquadPlayer {
   id: string; level: number; coins: number; units: SquadUnit[]; ready: boolean; points: number; health: number; wins: number;
   shop: (UnitKind | null)[]; roll: number; passives: PassiveId[]; passiveOffers: PassiveId[];
@@ -60,7 +60,28 @@ const freeBench = (p: SquadPlayer) => Array.from({ length: BENCH_SIZE }, (_, i) 
 export const canMerge = (a: SquadUnit, b: SquadUnit) => a.id !== b.id && a.kind === b.kind && a.tier === b.tier && a.tier < 3;
 function merge(s: SquadState, p: SquadPlayer, source: SquadUnit, target: SquadUnit) {
   if (!canMerge(source, target)) return;
-  target.tier++; p.units = p.units.filter(u => u !== source); s.events.push({ type: 'squad-upgrade', id: p.id });
+  target.tier++; target.upgradedAt = s.t; p.units = p.units.filter(u => u !== source); s.events.push({ type: 'squad-upgrade', id: p.id });
+}
+const mergeOrder = (a: SquadUnit, b: SquadUnit) => Number(a.cell < 0) - Number(b.cell < 0) || a.id - b.id;
+/** Preview all existing recipients in a purchase's automatic chain, preferring deployed toys. */
+export function purchaseUpgradeTargets(p: SquadPlayer, kind: UnitKind): SquadUnit[] {
+  const targets: SquadUnit[] = [];
+  for (let tier = 1; tier < 3; tier++) {
+    const target = p.units.filter(u => u.kind === kind && u.tier === tier).sort(mergeOrder)[0];
+    if (!target) break; targets.push(target);
+  }
+  return targets;
+}
+export function canBuy(p: SquadPlayer, kind: UnitKind) {
+  return p.coins >= ROSTER[kind].cost && (purchaseUpgradeTargets(p, kind).length > 0 || p.units.filter(u => u.cell >= 0).length < boardLimit(p.level) || freeBench(p) !== undefined);
+}
+function autoMergePairs(s: SquadState, p: SquadPlayer) {
+  for (;;) {
+    const ordered = [...p.units].sort(mergeOrder);
+    const target = ordered.find(u => ordered.some(other => canMerge(u, other)));
+    if (!target) return;
+    merge(s, p, ordered.find(u => canMerge(u, target))!, target);
+  }
 }
 function shop(s: SquadState, p: SquadPlayer, input: SquadInput) {
   if (p.ready) return;
@@ -72,11 +93,15 @@ function shop(s: SquadState, p: SquadPlayer, input: SquadInput) {
   if (input.type === 'reroll') { const cost = rerollPrice(s, p); if (p.coins >= cost) { p.coins -= cost; refresh(s, p); } return; }
   if (input.type === 'buy') {
     if (!Number.isInteger(input.slot) || input.slot < 0 || input.slot >= SHOP_SIZE) return;
-    const kind = p.shop[input.slot]; if (!kind || p.coins < ROSTER[kind].cost) return;
+    const kind = p.shop[input.slot]; if (!kind || !canBuy(p, kind)) return;
+    const recipient = purchaseUpgradeTargets(p, kind)[0];
     const board = p.units.filter(u => u.cell >= 0);
     const cell = board.length < boardLimit(p.level) ? Array.from({ length: DEPLOY_CELLS }, (_, i) => i).find(c => !board.some(u => u.cell === c)) : freeBench(p);
-    if (cell === undefined) return;
-    p.units.push({ id: s.nextId++, kind, tier: 1, cell }); p.coins -= ROSTER[kind].cost; p.shop[input.slot] = null;
+    if (cell === undefined && !recipient) return;
+    const bought = { id: s.nextId++, kind, tier: 1, cell: cell ?? recipient.cell };
+    if (recipient) { p.units.push(bought); merge(s, p, bought, recipient); }
+    else p.units.push(bought);
+    autoMergePairs(s, p); p.coins -= ROSTER[kind].cost; p.shop[input.slot] = null;
     s.events.push({ type: 'squad-buy', id: p.id }); return;
   }
   if (!('unit' in input)) return;
@@ -129,7 +154,10 @@ export const squadRules: RulesCore<SquadState, SquadInput, SquadConfig> = {
   step(s, inputs, dtMs) {
     if (s.phase === 'over' || !Number.isFinite(dtMs) || dtMs <= 0) return s;
     if (s.phase === 'build') {
-      for (const p of s.players) for (const input of inputs[p.id] ?? []) shop(s, p, input);
+      for (const p of s.players) {
+        if (!p.ready) autoMergePairs(s, p);
+        for (const input of inputs[p.id] ?? []) shop(s, p, input);
+      }
       if (s.players.every(p => p.ready)) startBattle(s);
     }
     let remaining = dtMs;

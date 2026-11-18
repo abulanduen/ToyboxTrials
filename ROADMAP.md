@@ -31,6 +31,8 @@ All 62 units now also have individually named passives and automatic mana spells
 damage, buffs/debuffs, healing, shields and 11 formation traits. Unit kits and run-wide passive
 choices remain separate. Next: human playtesting of kit combinations, readability and balance;
 online/ranked integration remains future work.
+Owner UX revision: pairs merge automatically; reserves sit below the player board; hover shows
+details; Q sells hovered/selected toys, R rerolls, E readies. Gold rings preview shop recipients.
 See `src/minigames/toysquad/README.md` and `CATALOGUE.md` for mechanics and provisional balance.
 This branch includes Midnight/Inferno; six other local catalogue entries lack modules, including
 work the owner reports Claude is handling separately.

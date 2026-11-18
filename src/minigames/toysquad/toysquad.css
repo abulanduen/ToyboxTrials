@@ -35,7 +35,11 @@
 .squad-scoreboard small { display:block; font-size:11px; }
 .squad-combat-kits { pointer-events:auto; max-height:24vh; overflow:auto; font-size:12px; }
 .squad-combat-kits summary { cursor:pointer; min-height:56px; display:flex; align-items:center; font-family:Fredoka,sans-serif; }
-.squad-kit-guide article { border-top:1px solid #C9A57A; padding:6px; font-size:13px; }
-.squad-traits p,.squad-selection p { margin:6px 0; }
+.squad-traits p { margin:6px 0; }
+.squad-tooltip { position:absolute; top:100px; right:12px; width:min(330px,calc(100% - 24px)); max-height:calc(100% - 112px); overflow:auto; pointer-events:none; background:#FFF9EE; border:2px solid #EFAE45; border-radius:10px; padding:10px; font-size:12px; box-shadow:0 3px 0 #574D69; }
+.squad-tooltip small { display:block; font-size:11px; }
+.squad-tooltip p { margin:6px 0; }
+.squad-upgrade-label { color:#574D69; background:#EFAE45; border-radius:3px; }
+@media(max-height:500px) { .squad-tooltip { top:78px; max-height:calc(100% - 90px); width:245px; font-size:11px; } }
 @media(max-width:600px) { .squad-banner { font-size:12px; } .squad-workbench button { font-size:12px; } .squad-workbench { max-height:35%; } }
-@media(max-height:500px) { .squad-workbench { max-height:32%; padding:5px; } .squad-workbench:has(details[open]),.squad-workbench:has(.squad-passive-pick) { max-height:65%; } .squad-workbench>small { display:none; } .squad-banner { padding:4px 8px; font-size:12px; } }
+@media(max-height:500px) { .squad-workbench { max-height:33%; padding:2px; border-width:2px; } .squad-workbench:has(details[open]),.squad-workbench:has(.squad-passive-pick) { max-height:65%; } .squad-workbench>small,.squad-shop small { display:none; } .squad-shop small.squad-upgrade-label { display:block; font-size:10px; } .squad-banner { padding:4px 8px; font-size:12px; } }

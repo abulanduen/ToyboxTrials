@@ -14,11 +14,15 @@ The 8×8 drag board reuses the host queue; bounded particle/damage-number pools 
 handles pure target selection, capped support effects and distinct-kind trait bonuses. Combat
 tracks mana, cooldowns, temporary buffs/statuses and one bounded reaction batch; spells emit named
 render events. Mana bars and spell particles read simulation state without per-frame React updates.
-Unit-kit validation: 97 unit tests and production build pass; ten-round desktop/portrait/landscape checks pass kit
-descriptions, distinct-kind traits, spells/mana, merges, passive choices, records and restart.
+Toy Squad purchases now auto-merge pairs and chain to three stars, preferring deployed recipients.
+Merge previews and capacity checks share pure rules helpers. Reserves render in a physical row
+below the board and use the same validated move/drop command as deployment. Q/R/E use shared
+action bindings; an ephemeral UI store coordinates hover/selection, details and upgrade rings.
+Current validation: 98 unit tests and production build pass; ten-round desktop/portrait/landscape
+checks pass automatic merges, hover kits, Q/R/E, reserve drags/swaps, spells, records and restart.
 No host, storage-key/schema, multiplayer or ranked-system changes are needed. Exact design and
 provisional economy/balance are in the module README and CATALOGUE.md.
-The existing mobile regression suite passes without console/page errors. Strategic balance,
+The existing mobile regression suite passed with the prior unit-kit update. Strategic balance,
 audio quality and real-device performance remain unverified.
 
 Midnight branch update: `astra/midnight-hunger` adds a fourth lazy-loaded local game. Its pure rules

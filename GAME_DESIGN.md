@@ -249,7 +249,7 @@ Each contender's energy drains continuously, and play alternates between two pha
 
 ### 09 · Toy Squad (Strategy / Auto-battler · 1–8)
 **Implemented on `astra/toy-squad`, revised by the owner:** ten rounds, an 8×8 battlefield,
-two-copy merges up to three stars, a five-slot weighted shop with paid rerolls, reserves,
+automatic two-copy merges up to three stars, a five-slot weighted shop with paid rerolls, reserves,
 level-based deployment caps, and passive choices on rounds 3/6/9. The roster has 62 units:
 16 Common, 14 Uncommon, 13 Rare, 12 Epic, 7 Legendary. Level 1 starts with three deployed slots;
 each round increases level and cap by one, up to level 10 and ten deployed toys. Exact shop odds,
@@ -261,6 +261,9 @@ shields, buffs, marks, poison, stun, silence and cleansing enable mixed formatio
 deployed kinds activate matching-trait bonuses; duplicates and reserves do not count. These kits
 are separate from the run-wide choices on rounds 3/6/9. Exact kits, 11 traits and provisional
 balance rules are recorded in the module catalogue and README.
+Reserves occupy eight slots below the player board. Hover reveals kits; gold highlights show
+shop upgrade recipients. Q sells the hovered/selected toy, R rerolls and E readies, with touch
+buttons and tap selection retained. Matching purchases merge immediately and can chain upgrades.
 
 A short, simple auto-battler. Each round, players:
 1. get some currency

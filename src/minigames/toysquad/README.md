@@ -8,9 +8,18 @@ pools. Online play is not implemented. Full unit/passive designs: [CATALOGUE.md]
 
 - 8×8 battlefield; deploy in the near four rows. Drag toys to place them. Nonmatching occupied
   squares swap; enemy-side/off-board drops cancel. Mouse, touch and keyboard/tap placement work.
-- Combine **two identical toys at the same stars** for the next star: two 1-stars → one 2-star;
-  two 2-stars → one 3-star. Three stars is the maximum. Drag duplicates together or use the Merge
-  button in **Formation, reserves & merges**. Paid upgrades have been removed.
+- **Pairs merge automatically**, across board and reserves: two identical 1-stars → one 2-star;
+  two identical 2-stars → one 3-star. Three stars is the maximum. Deployed recipients take priority,
+  then oldest ID; their ID and square stay fixed. Purchases chain immediately, even at full capacity
+  when they can merge. Gold rings show deployed recipients for shop upgrades and briefly flash
+  after upgrading. Hovering a shop offer narrows highlights to that offer's upgrade chain.
+- Eight physical reserve slots sit directly below the near edge of the board. Drag between board
+  and reserves; occupied nonmatching squares swap, and the deployment cap still applies. The
+  Formation & traits panel retains keyboard/tap squares, with reserves below the formation grid.
+- **Q** sells the hovered toy, or the selected toy if none is hovered; **R** rerolls; **E** readies.
+  Shortcuts use the shared input queue, ignore held-key repeats, and respect pause/phase/Ready locks.
+  Hover shop cards or toys for kit details; tap an owned toy to keep its details on touch devices.
+  Sell, reroll and Ready buttons remain available for touch. There is no separate Inspect section.
 - Start at Level 1 with three board slots. Level increases each round through Level 10; capacity
   is `min(10, level + 2)`, giving 3/4/5/6/7/8/9/10/10/10 slots over the ten rounds.
 - Five shop offers roll independently using the exact odds below. A bought offer stays sold until
@@ -57,8 +66,8 @@ are first-pass designs for playtesting, not claims of a finished competitive met
 ## Unit kits and synergies
 
 All 62 toys have a distinct named **passive** and **spell**, in addition to their basic attack
-style. Unit passives are independent of the three run-wide passive choices. Inspect shop kits
-inside Formation before buying, or select an owned toy for its full kit. Compact names appear
+style. Unit passives are independent of the three run-wide passive choices. Hover a shop card
+before buying, or hover/select an owned toy for its full kit. Compact names appear
 on shop cards. Battle mana bars and **Unit spells & mana** show charging and cast counts.
 
 - Basic attacks grant 20 mana. Losing health grants 8 once per tick; fully absorbed hits do
@@ -105,13 +114,14 @@ dragging cancels on pause, focus loss and phase change. Storage keys/schemas are
 games and room pass when merging; runtime edits outside this module are only its registry entry.
 
 Checks: `npm test`, `npm run build`, `node tests/e2e/toysquad.cjs` against a preview server with
-Playwright/Chromium. The test uses controlled duplicates to exercise real purchases, reserve limits
-and merges, then plays all ten rounds and chooses the three passives. Real-device performance,
+Playwright/Chromium. The test uses controlled stock to exercise automatic merges, Q/R/E shortcuts,
+hover details and physical reserve dragging/swaps, then plays all ten rounds and chooses the three
+passives. Real-device performance,
 audio quality and strategic balance still need human playtesting.
 
-Unit-kit verification, 18 November 2026: 97 unit tests and production build pass. Desktop, portrait-touch and landscape-touch
-ten-round checks pass kit descriptions, distinct-kind trait counts, mana-driven spells and particles,
-alongside purchases, merges, passive picks, records and restart, without console/page errors.
+Verification, 18 November 2026: 98 unit tests and production build pass. Desktop, portrait-touch and
+landscape-touch ten-round checks pass automatic chain merges, hover details, Q/R/E shortcuts,
+physical reserve dragging/swaps, spells, passive picks, records and restart, without console/page errors.
 
-The existing mobile hub/Copycat/Jack/Workshop regression suite passes too. Headless software
+The existing mobile hub/Copycat/Jack/Workshop regression suite passed with the prior unit-kit update. Headless software
 rendering is not a real-device FPS measurement.

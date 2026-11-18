@@ -6,9 +6,9 @@ import { sfx, unlockAudio } from '../../game/audio';
 import { exposeDebug } from '../../game/debug';
 import { matchBus, useMatch } from '../session';
 import type { MinigameSceneProps } from '../types';
-import { MAX_UNITS, ROSTER, deploymentPosition, type AttackEffect, type SquadState } from './rules';
-import { boardToWorld, CELL_SIZE, worldToDeployment } from './board';
-import { submitSquadInput } from './local';
+import { BENCH_SIZE, MAX_UNITS, ROSTER, purchaseUpgradeTargets, type AttackEffect, type SquadState } from './rules';
+import { boardToWorld, CELL_SIZE, placementPosition, reservePosition, worldToDeployment } from './board';
+import { submitSquadInput, useSquadUI } from './local';
 import { RARITY_COLOURS } from './catalogue';
 
 interface Drag { unit: number; pointer: number; x: number; z: number; cell: number | null; release: () => void }
@@ -30,17 +30,19 @@ function Piece({ slot, side, getState, localId, drag, down, move, up, cancel }: 
   const currentId = useRef<number | null>(null); const yaw = useRef(0);
   const stars = useRef<THREE.Group>(null!);
   const mana = useRef<THREE.Mesh>(null!);
+  const upgrade = useRef<THREE.Mesh>(null!);
   useFrame((_, dt) => {
     const s = getState(); root.current.visible = false; currentId.current = null;
     if (s?.kind !== 'toy-squad') return;
     const p = s.players.find(p => p.id === localId);
     const battle = s.battles.find(b => b.owner === localId);
     const fighter = battle?.fighters.filter(u => u.side === side)[slot];
-    const buildUnit = s.phase === 'build' && side === 0 ? p?.units.filter(u => u.cell >= 0)[slot] : undefined;
-    const unit = s.phase === 'build' ? buildUnit : fighter;
+    const reserve = side === 0 && slot >= MAX_UNITS ? p?.units.filter(u => u.cell < 0)[slot - MAX_UNITS] : undefined;
+    const buildUnit = reserve ?? (s.phase === 'build' && side === 0 && slot < MAX_UNITS ? p?.units.filter(u => u.cell >= 0)[slot] : undefined);
+    const unit = s.phase === 'build' ? buildUnit : buildUnit ?? fighter;
     if (!unit) return;
     currentId.current = buildUnit?.id ?? null; root.current.visible = true;
-    const pos = buildUnit ? deploymentPosition(buildUnit.cell, side) : fighter!;
+    const pos = buildUnit ? placementPosition(buildUnit.cell) : fighter!;
     const dragging = buildUnit && drag.current?.unit === buildUnit.id ? drag.current : null;
     const alive = !!buildUnit || fighter!.hp > 0;
     if (!alive) { root.current.visible = false; currentId.current = null; return; }
@@ -57,9 +59,20 @@ function Piece({ slot, side, getState, localId, drag, down, move, up, cancel }: 
     mana.current.visible = !buildUnit;
     mana.current.scale.x = buildUnit ? 0.01 : Math.max(0.01, fighter!.magic.mana / fighter!.magic.maxMana);
     stars.current.children.forEach((mesh, i) => { mesh.visible = i < unit.tier; });
+    const ui = useSquadUI.getState();
+    const hoveredOffer = ui.shopSlot !== null ? p?.shop[ui.shopSlot] : null;
+    const offers = ui.shopSlot !== null ? hoveredOffer ? [hoveredOffer] : [] : p?.shop.filter((k): k is string => !!k) ?? [];
+    const receivesUpgrade = !!buildUnit && buildUnit.cell >= 0 && !!p && offers.some(k => purchaseUpgradeTargets(p, k).some(u => u.id === unit.id));
+    const justUpgraded = !!buildUnit && buildUnit.upgradedAt !== undefined && s.t - buildUnit.upgradedAt < 1400;
+    upgrade.current.visible = receivesUpgrade || justUpgraded;
+    (body.current.material as THREE.MeshStandardMaterial).emissive.set(receivesUpgrade || justUpgraded ? PALETTE.honey : '#000000');
+    (body.current.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.3;
   });
   return <group ref={root} onPointerDown={e => { if (currentId.current !== null) down(e, currentId.current); }}
+    onPointerOver={e => { if (currentId.current !== null && !drag.current) { e.stopPropagation(); useSquadUI.setState({ hovered: currentId.current, shopSlot: null }); } }}
+    onPointerOut={() => { if (useSquadUI.getState().hovered === currentId.current) useSquadUI.setState({ hovered: null }); }}
     onPointerMove={move} onPointerUp={up} onPointerCancel={cancel} onLostPointerCapture={cancel}>
+    <mesh ref={upgrade} position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => {}}><ringGeometry args={[1.35, 1.6, 24]} /><meshBasicMaterial color={PALETTE.honey} side={THREE.DoubleSide} /></mesh>
     <mesh position={[0, 0.1, 0]}><boxGeometry args={[2.8, 0.3, 2.8]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} /></mesh>
     <group ref={model}>
       <mesh ref={body} position={[0, 1.1, 0]} castShadow><boxGeometry args={[1.5, 1.6, 1.4]} /><meshStandardMaterial roughness={0.45} /></mesh>
@@ -153,6 +166,7 @@ export function SquadScene({ getState, localId }: MinigameSceneProps<SquadState>
   const down: PointerHandler = (e, id) => {
     if (id === undefined || drag.current || !editable(getState(), localId)) return;
     e.stopPropagation(); unlockAudio();
+    useSquadUI.setState({ selected: id, hovered: null, shopSlot: null });
     const target = e.target as unknown as { setPointerCapture(id: number): void; releasePointerCapture(id: number): void };
     target.setPointerCapture(e.pointerId); e.ray.intersectPlane(floorPlane, point.current);
     drag.current = { unit: id, pointer: e.pointerId, x: point.current.x, z: point.current.z, cell: worldToDeployment(point.current.x, point.current.z),
@@ -182,14 +196,17 @@ export function SquadScene({ getState, localId }: MinigameSceneProps<SquadState>
       return { x: rect.left + (projected.x + 1) * rect.width / 2, y: rect.top + (1 - projected.y) * rect.height / 2 };
     } } });
   }, [camera, gl]);
-  useFrame(() => {
-    const aspect = (camera as THREE.PerspectiveCamera).aspect; const distance = Math.max(42, 31 / aspect);
+  useFrame(({ size }) => {
+    const building = getState()?.phase === 'build';
+    const aspect = (camera as THREE.PerspectiveCamera).aspect;
+    const distance = Math.max(building ? size.height < 500 ? 66 : 53 : 42, 31 / aspect);
     camera.position.set(0, distance, distance * 0.58);
-    camera.lookAt(0, 0, getState()?.phase === 'build' ? 10 : 2.5);
+    camera.lookAt(0, 0, building ? 11 : 2.5);
     if (drag.current && !editable(getState(), localId)) cancel();
     const d = drag.current; highlight.current.visible = !!d;
     if (d) {
-      highlight.current.position.set(d.cell === null ? d.x : boardToWorld(d.cell % 8), 0.15, d.cell === null ? d.z : boardToWorld(4 + Math.floor(d.cell / 8)));
+      const pos = d.cell !== null ? placementPosition(d.cell) : null;
+      highlight.current.position.set(pos ? boardToWorld(pos.x) : d.x, 0.15, pos ? boardToWorld(pos.z) : d.z);
       (highlight.current.material as THREE.MeshBasicMaterial).color.set(d.cell === null ? PALETTE.coral : PALETTE.honey);
     }
   });
@@ -199,8 +216,12 @@ export function SquadScene({ getState, localId }: MinigameSceneProps<SquadState>
       <planeGeometry args={[CELL_SIZE - 0.12, CELL_SIZE - 0.12]} /><meshStandardMaterial color={(i % 8 + Math.floor(i / 8)) % 2 ? PALETTE.cardboard : PALETTE.cream} />
     </mesh>)}
     <mesh position={[0, 0.1, 0]}><boxGeometry args={[28, 0.07, 0.14]} /><meshBasicMaterial color={PALETTE.coral} /></mesh>
+    {Array.from({ length: BENCH_SIZE }, (_, i) => {
+      const pos = reservePosition(-i - 1);
+      return <mesh key={`bench-${i}`} position={[boardToWorld(pos.x), -0.04, boardToWorld(pos.z)]} receiveShadow><boxGeometry args={[3.25, 0.35, 3.25]} /><meshStandardMaterial color={PALETTE.woodMid} /></mesh>;
+    })}
     <mesh ref={highlight} rotation={[-Math.PI / 2, 0, 0]} raycast={() => {}}><planeGeometry args={[3.3, 3.3]} /><meshBasicMaterial transparent opacity={0.5} depthWrite={false} /></mesh>
-    {([0, 1] as const).flatMap(side => Array.from({ length: MAX_UNITS }, (_, slot) => <Piece key={`${side}:${slot}`} slot={slot} side={side} getState={getState} localId={localId} drag={drag} down={down} move={move} up={up} cancel={cancel} />))}
+    {([0, 1] as const).flatMap(side => Array.from({ length: MAX_UNITS + (side === 0 ? BENCH_SIZE : 0) }, (_, slot) => <Piece key={`${side}:${slot}`} slot={slot} side={side} getState={getState} localId={localId} drag={drag} down={down} move={move} up={up} cancel={cancel} />))}
     <AttackParticles getState={getState} localId={localId} />
     <DamageNumbers getState={getState} localId={localId} />
   </group>;

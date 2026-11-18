@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { PAINT_JOBS } from '../../src/game/palette';
 import type { Contestant } from '../../src/minigames/types';
 import { seededRng } from '../../src/minigames/rng';
-import { squadRules, rollShop, boardLimit, deploymentPosition, type Battle, type SquadInput, type SquadState } from '../../src/minigames/toysquad/rules';
+import { squadRules, rollShop, boardLimit, deploymentPosition, purchaseUpgradeTargets, type Battle, type SquadInput, type SquadState } from '../../src/minigames/toysquad/rules';
 import { ROSTER, RARITIES, SHOP_ODDS, UNIT_POOLS, PASSIVES } from '../../src/minigames/toysquad/catalogue';
 import { makeFighters, pathStep, tickBattle } from '../../src/minigames/toysquad/combat';
-import { boardToWorld, worldToDeployment } from '../../src/minigames/toysquad/board';
+import { boardToWorld, placementPosition, worldToDeployment } from '../../src/minigames/toysquad/board';
 import { createSquadBot } from '../../src/minigames/toysquad/bot';
 const people: Contestant[] = Array.from({ length: 3 }, (_, i) => ({ id: `p${i}`, name: `Toy ${i}`, paint: PAINT_JOBS[0], hat: 'none', keySkin: 'classic', isLocal: i === 0, bot: 'normal' }));
 const fresh = () => squadRules.init(people, 123);
@@ -46,29 +46,37 @@ describe('Toy Squad catalogue and shop', () => {
     s.players[0].coins = 1; const before = [...s.players[0].shop]; send(s, { type: 'reroll' }); expect(s.players[0].shop).toEqual(before);
   });
   it('starts at level 1 with 3 board slots; reserves hold purchases beyond the board cap', () => {
-    const s = fresh(); for (let i = 0; i < 5; i++) buy(s);
+    const s = fresh(); for (const kind of Object.keys(ROSTER).slice(0,5)) buy(s,kind);
     expect(s.players[0].level).toBe(1); expect(s.players[0].units.filter(u => u.cell >= 0)).toHaveLength(3);
     expect(s.players[0].units.filter(u => u.cell < 0)).toHaveLength(2);
     const reserve = s.players[0].units[3]; send(s, { type: 'move', unit: reserve.id, cell: 31 }); expect(reserve.cell).toBe(-1);
-    send(s, { type: 'move', unit: reserve.id, cell: 0 }); // identical stars merge instead of exceeding the cap
-    expect(s.players[0].units.find(u => u.cell === 0)!.tier).toBe(2);
+    send(s, { type: 'move', unit: reserve.id, cell: 0 }); // swap into the full board
+    expect(reserve.cell).toBe(0); expect(s.players[0].units[0].cell).toBe(-1);
     expect(Array.from({ length: 10 }, (_, i) => boardLimit(i + 1))).toEqual([3,4,5,6,7,8,9,10,10,10]);
   });
   it('rejects purchases beyond a full board and eight reserves without charging', () => {
     const s = fresh(); s.players[0].coins = 100;
-    for (let i = 0; i < 11; i++) buy(s, i % 2 ? 'robot' : 'soldier');
-    const before = s.players[0].coins; buy(s);
-    expect(s.players[0].units).toHaveLength(11); expect(s.players[0].coins).toBe(before); expect(s.players[0].shop[0]).toBe('soldier');
+    const kinds=Object.keys(ROSTER); for (const kind of kinds.slice(0,11)) buy(s,kind);
+    const before = s.players[0].coins; buy(s,kinds[11]);
+    expect(s.players[0].units).toHaveLength(11); expect(s.players[0].coins).toBe(before); expect(s.players[0].shop[0]).toBe(kinds[11]);
+    buy(s,kinds[0]); expect(s.players[0].units).toHaveLength(11); expect(s.players[0].units[0].tier).toBe(2); expect(s.players[0].coins).toBe(before-1);
   });
 });
 describe('Toy Squad merges, placement and passives', () => {
   it('combines two copies at equal stars, including reserves, up to exactly 3 stars', () => {
-    const s = fresh(); const a = buy(s), b = buy(s), c = buy(s), d = buy(s);
-    send(s, { type: 'move', unit: b.id, cell: a.cell }); expect(a.tier).toBe(2);
-    send(s, { type: 'merge', unit: d.id, other: c.id }); expect(c.tier).toBe(2);
-    send(s, { type: 'merge', unit: c.id, other: a.id }); expect(a.tier).toBe(3); expect(s.players[0].units).toHaveLength(1);
+    const s = fresh(); const a = buy(s); buy(s); expect(a.tier).toBe(2); expect(s.players[0].units).toHaveLength(1);
+    buy(s); expect(s.players[0].units).toHaveLength(2); buy(s);
+    expect(a.tier).toBe(3); expect(s.players[0].units).toHaveLength(1); expect(a.id).toBe(1); expect(a.cell).toBe(0);
     const extra = buy(s); extra.tier = 3; send(s, { type: 'merge', unit: extra.id, other: a.id });
     expect(a.tier).toBe(3); expect(s.players[0].units).toHaveLength(2);
+  });
+  it('previews chained recipients and automatically favours board toys over reserves', () => {
+    const s=fresh(), p=s.players[0];
+    p.units=[{id:10,kind:'soldier',tier:1,cell:-1},{id:20,kind:'soldier',tier:2,cell:7}]; s.nextId=21;
+    expect(purchaseUpgradeTargets(p,'soldier').map(u=>u.id)).toEqual([10,20]);
+    buy(s); expect(p.units).toEqual([{id:20,kind:'soldier',tier:3,cell:7,upgradedAt:0}]);
+    p.units=[{id:30,kind:'hare',tier:1,cell:-1},{id:31,kind:'hare',tier:1,cell:2}];
+    send(s,{type:'reroll'}); expect(p.units).toHaveLength(1); expect(p.units[0]).toMatchObject({id:31,tier:2,cell:2});
   });
   it('does not merge different kinds/stars or other owners; legal nonmatches swap', () => {
     const s = fresh(); const a = buy(s), b = buy(s, 'robot');
@@ -81,6 +89,8 @@ describe('Toy Squad merges, placement and passives', () => {
     for (let c = 0; c < 32; c++) { const p = deploymentPosition(c, 0); expect(worldToDeployment(boardToWorld(p.x), boardToWorld(p.z))).toBe(c); }
     expect(worldToDeployment(boardToWorld(2), boardToWorld(3))).toBeNull();
     expect(worldToDeployment(boardToWorld(8), boardToWorld(5))).toBeNull();
+    for(let c=-1;c>=-8;c--) { const p=placementPosition(c); expect(p.z).toBeGreaterThan(7); expect(worldToDeployment(boardToWorld(p.x),boardToWorld(p.z))).toBe(c); }
+    expect(worldToDeployment(boardToWorld(2),boardToWorld(10))).toBeNull();
     const s = fresh(), u = buy(s); send(s, { type: 'move', unit: u.id, cell: 31 }); expect(u.cell).toBe(31);
     send(s, { type: 'move', unit: u.id, cell: 32 }); expect(u.cell).toBe(31);
   });
