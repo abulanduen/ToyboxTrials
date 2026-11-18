@@ -1,6 +1,6 @@
 /**
  * The hub's streets, as data: wooden tile paths (spokes from the fountain, the Trials Ring road
- * past every gate) and the domino fence around the playmat. Pure maths, no rendering, so the
+ * past the outer gates) and the domino fence around the playmat. Pure maths, no rendering, so the
  * layout can be unit tested.
  */
 import { PLAY_BOUNDS, overlaps, type Collider } from '../game/collision';
@@ -68,7 +68,8 @@ const gate = (id: string) => GATES.find((g) => g.game === id)!;
  *  - spokes from the plaza to the Workshop, Shop, Scoreboard and to the gates that have a clear
  *    line of sight from the fountain;
  *  - the Trials Ring: a road around the west, north and east of the village passing in front of
- *    every gate, with a short stub up to each arch.
+ *    every outer gate (Blink Duel stands inside the ring at the end of its own street), with a
+ *    short stub up to each arch.
  */
 export function hubPathLines(): PathLine[] {
   const lines: PathLine[] = [
@@ -107,7 +108,7 @@ export function hubPathLines(): PathLine[] {
     roadPoint(gate('copycat-conductor')),
     roadPoint(gate('music-box-rhythm')),
     roadPoint(gate('wind-up-dash')),
-    roadPoint(gate('blink-duel')),
+    [38.5, 7], // behind the Scoreboard's braces
     roadPoint(gate('red-light-green-light')),
   ];
   lines.push({ id: 'ring', pts: ring });

@@ -27,6 +27,7 @@ async function frames(page, n) {
 async function open(browser, opts, quality = QUALITY) {
   const ctx = await browser.newContext(opts);
   const page = await ctx.newPage();
+  page.setDefaultTimeout(180000); // shared machine, software GL: be patient
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
@@ -64,7 +65,7 @@ const leave = async (page) => {
       if (g.game === 'copycat-conductor') {
         const note = await page.$('[data-testid=online-lobby-note] button');
         check('online lobby shown as not available (disabled)', !!note && (await note.isDisabled()), note ? await note.textContent() : 'missing');
-        await page.screenshot({ path: `${OUT}/hubgates-lobby-desktop.png` });
+        await page.screenshot({ path: `${OUT}/hubgates-lobby-desktop.png`, timeout: 180000, animations: 'disabled' });
       }
       await leave(page);
     }
@@ -76,27 +77,24 @@ const leave = async (page) => {
     const phone = { ...devices['iPhone 13'], deviceScaleFactor: 1 };
     const { ctx, page, errors } = await open(browser, phone);
     const gates = await page.evaluate(() => window.__toybox.hub.gates());
-    const touch = (type, pts) => page.evaluate(([t, p]) => {
-      const el = document.elementFromPoint(p[0]?.[0] ?? 1, p[0]?.[1] ?? 1) || document.body;
-      const mk = (q) => new Touch({ identifier: q[2], target: el, clientX: q[0], clientY: q[1] });
-      const list = p.map(mk);
-      el.dispatchEvent(new TouchEvent(t, { bubbles: true, cancelable: true, touches: t === 'touchend' ? [] : list, changedTouches: list, targetTouches: list }));
-    }, [type, pts]);
+    // real touch input through the DevTools protocol (as tests/e2e/mobile.cjs does)
+    const cdp = await ctx.newCDPSession(page);
+    const touch = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts.map(([x, y, id = 0]) => ({ x, y, id })) });
     for (const id of ['toy-squad', 'spellbox-showdown', 'red-light-green-light']) {
       const g = gates.find((x) => x.game === id);
       await page.evaluate((v) => window.__toybox.teleport(v.standX, v.standZ, v.yaw), g);
       await page.waitForFunction((t) => document.querySelector('.touch-btn--interact')?.getAttribute('aria-label')?.includes(t), g.title, { timeout: 120000 }).catch(() => null);
       const btn = await page.$('.touch-btn--interact');
       check(`phone ${id}: Interact button names the trial`, !!btn && ((await btn.getAttribute('aria-label')) || '').includes(g.title));
-      if (id === 'toy-squad') await page.screenshot({ path: `${OUT}/hubgates-phone-prompt.png` });
+      if (id === 'toy-squad') await page.screenshot({ path: `${OUT}/hubgates-phone-prompt.png`, timeout: 180000 });
       const b = await btn.boundingBox();
       check(`phone ${id}: Interact button ≥ 56 px`, b.width >= 56 && b.height >= 56, `${b.width}x${b.height}`);
-      await touch('touchstart', [[b.x + b.width / 2, b.y + b.height / 2, 7]]);
+      await touch('touchStart', [[b.x + b.width / 2, b.y + b.height / 2, 7]]);
       await page.waitForTimeout(300);
-      await touch('touchend', [[b.x + b.width / 2, b.y + b.height / 2, 7]]);
+      await touch('touchEnd', []);
       const h2 = await page.waitForSelector('.match-intro h2', { timeout: 120000 }).then((e) => e.textContent()).catch(() => '');
       check(`phone ${id}: Interact opens its lobby`, h2.includes(g.title), h2);
-      if (id === 'toy-squad') await page.screenshot({ path: `${OUT}/hubgates-lobby-phone.png` });
+      if (id === 'toy-squad') await page.screenshot({ path: `${OUT}/hubgates-lobby-phone.png`, timeout: 180000, animations: 'disabled' });
       await page.waitForTimeout(800);
       await page.tap('[data-testid=match-leave]');
       await page.waitForSelector('.match-intro', { state: 'detached', timeout: 120000 });
@@ -106,38 +104,41 @@ const leave = async (page) => {
     await ctx.close();
   }
 
-  if (want('shots')) {
+  if (want('shots') || want('gateshots')) {
     const q = process.env.SHOT_QUALITY || 'balanced';
     const { ctx, page } = await open(browser, desktop, q);
     await page.addStyleTag({ content: '.hud-hint,.ticket-stack,.prompt{display:none!important}' }).catch(() => {});
     const gates = await page.evaluate(() => window.__toybox.hub.gates());
     for (const g of gates) {
-      // stand on the road in front of the gate, camera behind and a little to the side
-      await page.evaluate((v) => { const d = 7.5; window.__toybox.teleport(v.x + Math.sin(v.rot) * d, v.z + Math.cos(v.rot) * d, v.yaw); window.__toybox.aim(v.rot + 0.25, 0.2); }, g);
+      // stand in front of the gate, camera swung out to the side so the arch and both of its
+      // themed spots are in frame (straight behind, a building can shorten the camera boom)
+      await page.evaluate((v) => { const d = 5; window.__toybox.teleport(v.x + Math.sin(v.rot) * d, v.z + Math.cos(v.rot) * d, v.yaw); window.__toybox.aim(v.rot + 0.85, 0.32); }, g);
       await frames(page, 10);
       await page.screenshot({ path: `${OUT}/hubgates-gate-${g.game}.png`, timeout: 180000 });
     }
-    // scoreboard close-up (front) and from the side
-    await page.evaluate(() => { window.__toybox.teleport(24.5, 5.6, -1.79 + Math.PI); window.__toybox.aim(-1.79 - 0.15, 0.12); });
-    await frames(page, 10);
-    await page.screenshot({ path: `${OUT}/hubgates-scoreboard.png`, timeout: 180000 });
-    await page.evaluate(() => { window.__toybox.teleport(27, 15, -2.4); window.__toybox.aim(-0.9, 0.15); });
-    await frames(page, 10);
-    await page.screenshot({ path: `${OUT}/hubgates-scoreboard-side.png`, timeout: 180000 });
-    // opposing gameplay views from the plaza
-    const views = [
-      ['north', 0, 8, Math.PI, 0, 0.2],
-      ['south', 0, -10, 0, Math.PI, 0.2],
-      ['east', -10, -1, Math.PI / 2, -Math.PI / 2, 0.2],
-      ['west', 10, -1, -Math.PI / 2, Math.PI / 2, 0.2],
-    ];
-    info.views = {};
-    for (const [name, x, z, yaw, cy, cp] of views) {
-      await page.evaluate((v) => { window.__toybox.teleport(v[1], v[2], v[3]); window.__toybox.aim(v[4], v[5]); }, [name, x, z, yaw, cy, cp]);
+    if (want('shots')) {
+      // scoreboard close-up (front) and from the side
+      await page.evaluate(() => { window.__toybox.teleport(24.5, 5.6, -1.79 + Math.PI); window.__toybox.aim(-1.79 - 0.15, 0.12); });
       await frames(page, 10);
-      await page.screenshot({ path: `${OUT}/hubgates-view-${name}.png`, timeout: 180000 });
-      info.views[name] = await page.evaluate(() => window.__toybox.renderInfo());
-      console.log(q, name, JSON.stringify(info.views[name]));
+      await page.screenshot({ path: `${OUT}/hubgates-scoreboard.png`, timeout: 180000 });
+      await page.evaluate(() => { window.__toybox.teleport(27, 15, -2.4); window.__toybox.aim(-0.9, 0.15); });
+      await frames(page, 10);
+      await page.screenshot({ path: `${OUT}/hubgates-scoreboard-side.png`, timeout: 180000 });
+      // opposing gameplay views from the plaza
+      const views = [
+        ['north', 0, 8, Math.PI, 0, 0.2],
+        ['south', 0, -10, 0, Math.PI, 0.2],
+        ['east', -10, -1, Math.PI / 2, -Math.PI / 2, 0.2],
+        ['west', 10, -1, -Math.PI / 2, Math.PI / 2, 0.2],
+      ];
+      info.views = {};
+      for (const [name, x, z, yaw, cy, cp] of views) {
+        await page.evaluate((v) => { window.__toybox.teleport(v[1], v[2], v[3]); window.__toybox.aim(v[4], v[5]); }, [name, x, z, yaw, cy, cp]);
+        await frames(page, 10);
+        await page.screenshot({ path: `${OUT}/hubgates-view-${name}.png`, timeout: 180000 });
+        info.views[name] = await page.evaluate(() => window.__toybox.renderInfo());
+        console.log(q, name, JSON.stringify(info.views[name]));
+      }
     }
     await ctx.close();
   }

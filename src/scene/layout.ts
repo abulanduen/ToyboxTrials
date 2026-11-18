@@ -36,8 +36,8 @@ export const JACK = { x: -35, z: -22 };
 export const FINGERPOST = { x: -5.5, z: 14, h: 14.6 };
 
 /**
- * Minigame gates: one building-block arch per playable trial, standing on the Trials Ring around
- * the village and facing the fountain. The ring road passes a few centimetres in front of each;
+ * Minigame gates: one building-block arch per playable trial, facing the fountain. Most stand on
+ * the Trials Ring around the village and the ring road passes a few centimetres in front of each;
  * interacting at a gate opens that trial's lobby (the shared practice intro card).
  * Positions are data: add a playable game to the registry and give it a spot here.
  */
@@ -51,7 +51,7 @@ const GATE_SPOTS: Record<MinigameId, { x: number; z: number; spoke: boolean; dis
   'music-box-rhythm': { x: 35, z: -25.5, spoke: true, district: 'north-east', short: 'Music Box' },
   // east side
   'wind-up-dash': { x: 41.5, z: -9, spoke: true, district: 'east', short: 'Dash' },
-  'blink-duel': { x: 42, z: 8.5, spoke: false, district: 'east', short: 'Blink Duel' }, // behind the Scoreboard
+  'blink-duel': { x: 22, z: -16, spoke: true, district: 'north-east', short: 'Blink Duel' }, // inside the ring, in plain sight of the plaza
   'red-light-green-light': { x: 39, z: 25, spoke: false, district: 'east', short: 'Red Light' }, // beside the toy railway
   // west side
   'inferno-escape': { x: -43.5, z: -13, spoke: false, district: 'west', short: 'Inferno' }, // behind the Workshop
@@ -148,9 +148,10 @@ export const TREES: [number, number, number][] = [
 ];
 
 export const BLOCKS: { x: number; z: number; y: number; rot: number; color: string; s?: number }[] = [
-  { x: 20, z: -9.2, y: 0, rot: 0.2, color: PALETTE.toyBlue },
-  { x: 23.2, z: -9.7, y: 0, rot: -0.1, color: PALETTE.coral },
-  { x: 21.6, z: -9.5, y: 3, rot: 0.5, color: PALETTE.honey },
+  // a little block stack in the middle of the train loop
+  { x: 17.4, z: 21.2, y: 0, rot: 0.2, color: PALETTE.toyBlue },
+  { x: 20.6, z: 21.7, y: 0, rot: -0.1, color: PALETTE.coral },
+  { x: 19, z: 21.5, y: 3, rot: 0.5, color: PALETTE.honey },
   { x: 31, z: 31, y: 0, rot: 0.4, color: PALETTE.sage },
   { x: -18.4, z: 30.8, y: 0, rot: 0.1, color: PALETTE.honey },
   { x: 8.5, z: 10.5, y: 0, rot: 0.7, color: PALETTE.inkPurple, s: 0.8 },
