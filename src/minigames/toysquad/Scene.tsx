@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { PALETTE } from '../../game/palette';
-import { sfx, unlockAudio } from '../../game/audio';
+import { playToyCue, sfx, unlockAudio } from '../../game/audio';
 import { exposeDebug } from '../../game/debug';
 import { matchBus, useMatch } from '../session';
 import type { MinigameSceneProps } from '../types';
@@ -10,6 +10,7 @@ import { BENCH_SIZE, MAX_UNITS, ROSTER, purchaseUpgradeTargets, type Battle, typ
 import { boardToWorld, CELL_SIZE, placementPosition, reservePosition, worldToDeployment } from './board';
 import { setLocalPlayer, submitSquadInput, useSquadUI } from './local';
 import { drawQueuedPortrait } from './portraits';
+import { audibleBattle, combatVoices, eventCue, type CombatVoice } from './sounds';
 import { RARITY_COLOURS } from './catalogue';
 import { TOY_SPECS, type Motion } from './models';
 import { TIER_GEOMETRY, TOY_GLOW_MATERIAL, TOY_MATERIAL, UNLIT_VERTEX_MATERIAL, standGeometry, toyGeometry } from './toys';
@@ -158,6 +159,8 @@ function Piece({ slot, side, getState, localId, drag, down, move, up, cancel }: 
   </group>;
 }
 
+const playVoice = (voice: CombatVoice) => playToyCue(voice === 'spell' ? 'stitch' : voice === 'heavy' ? 'button' : 'hit', voice === 'hit' ? 0.45 : 0.6);
+
 /** `?debug` only: every roster toy on the board at once, for contact-sheet screenshots. */
 function ToyGallery({ yaw }: { yaw: number }) {
   return <group>{Object.keys(ROSTER).map((kind, i) => <group key={kind} position={[boardToWorld(i % 8), 0.3, boardToWorld(Math.floor(i / 8))]}>
@@ -200,14 +203,13 @@ export function SquadScene({ getState, localId }: MinigameSceneProps<SquadState>
   const { camera, gl } = useThree(); const drag = useRef<Drag | null>(null); const highlight = useRef<THREE.Mesh>(null!);
   const [gallery, setGallery] = useState<{ yaw: number; x: number; z: number; distance: number } | null>(null);
   const point = useRef(new THREE.Vector3());
-  const selection = useRef<THREE.Mesh>(null!); const why = useRef('');
+  const selection = useRef<THREE.Mesh>(null!);
+  const heard = useRef<{ battle: Battle | null; tick: number }>({ battle: null, tick: 0 });
   const cancel = () => {
-    if (drag.current) console.log('DBG cancel', why.current, editable(getState(), localId), JSON.stringify(useMatch.getState().paused), useMatch.getState().phase, getState()?.phase);
     const previous = drag.current; drag.current = null; gl.domElement.style.cursor = ''; previous?.release();
     if (useSquadUI.getState().dragging !== null) useSquadUI.setState({ dragging: null, overShop: false });
   };
   const move: PointerHandler = e => {
-    why.current = 'move:' + e.type;
     const d = drag.current; if (!d || e.pointerId !== d.pointer) return;
     e.stopPropagation(); if (!editable(getState(), localId)) { cancel(); return; }
     if (e.ray.intersectPlane(floorPlane, point.current)) { d.x = point.current.x; d.z = point.current.z; d.cell = worldToDeployment(d.x, d.z); }
@@ -218,7 +220,6 @@ export function SquadScene({ getState, localId }: MinigameSceneProps<SquadState>
     if (d.sell !== useSquadUI.getState().overShop) useSquadUI.setState({ overShop: d.sell });
   };
   const down: PointerHandler = (e, id) => {
-    console.log('DBG down', id, !!drag.current, editable(getState(), localId));
     if (id === undefined || drag.current || !editable(getState(), localId)) return;
     e.stopPropagation(); unlockAudio();
     useSquadUI.setState({ selected: id, hovered: null, shopSlot: null });
@@ -231,7 +232,7 @@ export function SquadScene({ getState, localId }: MinigameSceneProps<SquadState>
   };
   const up: PointerHandler = e => {
     if (!drag.current || e.pointerId !== drag.current.pointer) return;
-    move(e); const d = drag.current; why.current = 'up:' + e.type + ':' + e.nativeEvent.type + ':' + e.nativeEvent.buttons;
+    move(e); const d = drag.current;
     if (d && editable(getState(), localId)) {
       if (d.sell) { submitSquadInput({ type: 'sell', unit: d.unit }); useSquadUI.setState({ selected: null }); }
       else if (d.cell !== null) submitSquadInput({ type: 'move', unit: d.unit, cell: d.cell });
@@ -244,10 +245,12 @@ export function SquadScene({ getState, localId }: MinigameSceneProps<SquadState>
     const blur = () => cancel(); window.addEventListener('blur', blur);
     return () => { off(); window.removeEventListener('blur', blur); cancel(); setLocalPlayer(null); gl.domElement.style.touchAction = previousTouch; };
   }, [gl]);
+  // Only your own purchases and upgrades make a sound; the other contenders' boards stay silent.
   useEffect(() => matchBus.on('event', e => {
-    if (e.type === 'squad-buy') sfx.click(); if (e.type === 'squad-upgrade') sfx.reward();
-    if (e.type === 'squad-battle') sfx.bell(); if (e.type === 'squad-recap') sfx.musicBox();
-  }), []);
+    const cue = eventCue(e, localId);
+    if (cue === 'buy') sfx.click(); if (cue === 'upgrade') sfx.reward();
+    if (cue === 'battle') sfx.bell(); if (cue === 'recap') sfx.musicBox();
+  }), [localId]);
   useEffect(() => {
     exposeDebug({ squad: { point: (x: number, z: number, height = 0.1) => {
       const projected = new THREE.Vector3(boardToWorld(x), height, boardToWorld(z)).project(camera);
@@ -257,6 +260,12 @@ export function SquadScene({ getState, localId }: MinigameSceneProps<SquadState>
   }, [camera, gl]);
   useFrame(({ size, gl: renderer }) => {
     drawQueuedPortrait(renderer);
+    // Combat sounds come from your own battle only, a few voices per tick at most.
+    const now = getState(), watched = now?.kind === 'toy-squad' && now.phase === 'battle' ? audibleBattle(now.battles, localId) : undefined;
+    if (watched && (watched !== heard.current.battle || watched.tick !== heard.current.tick)) {
+      heard.current.battle = watched; heard.current.tick = watched.tick;
+      if (!useMatch.getState().paused) for (const voice of combatVoices(watched.attacks)) playVoice(voice);
+    }
     const building = getState()?.phase === 'build';
     const aspect = (camera as THREE.PerspectiveCamera).aspect;
     // Battles have no shop dock, so narrow (portrait) screens can frame the board tighter than the build view.

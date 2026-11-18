@@ -153,6 +153,16 @@ holds them with stun. These are strategic options, not established optimal build
 - **Toy Handbook:** the Toys button (top left) lists all 62 toys with picture, rarity, cost, trait
   symbols, stats, passive and spell, filterable by rarity and trait. Each has a star toggle;
   favourites are saved in the shared settings (`squadFavourites`) and marked on shop cards.
+- **Damage overview:** during the battle and the recap, a panel at the right edge (opposite the
+  traits) lists your toys with picture and name, damage dealt high to low with a bar each (the blue
+  part is spells and passives), and a Taken toggle for health lost. A row flashes when that toy
+  lands or takes a hit (a static outline with reduced motion). It starts folded into a Damage tab on
+  phones and can be folded anywhere. The numbers are a read-only `stats` tally on each fighter that
+  the rules never read; it adds up to exactly the hit numbers shown over the board.
+- **Sound:** only your own purchases and upgrades click, and only your own battle makes combat
+  sounds; the other contenders' boards are silent. Each battle tick plays at most three voices
+  (one spell chime, light hits, one heavier thump when four or more attacks land). `sounds.ts`
+  holds this filter as pure, unit-tested logic.
 - Pure helpers for these panels are in `info.ts`; `local.ts` holds drag/selection UI state.
 
 ## Implementation / handoff

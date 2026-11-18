@@ -9,7 +9,7 @@ const out = path.join(__dirname,'output'); fs.mkdirSync(out,{recursive:true});
     for (const layout of (process.env.SQUAD_LAYOUTS || 'desktop,portrait,landscape').split(',')) {
       const mobile = layout !== 'desktop', viewport = layout === 'portrait' ? {width:390,height:844} : layout === 'landscape' ? {width:844,height:390} : {width:1280,height:800};
       const page = await browser.newPage({viewport,hasTouch:mobile,isMobile:mobile}); page.setDefaultTimeout(120000);
-      const errors = []; page.on('pageerror',e=>errors.push(e.message)); page.on('console',m=>{if(m.text().startsWith('DBG')) console.log(m.text().slice(0,900)); if(m.type()==='error') errors.push(m.text());});
+      const errors = []; page.on('pageerror',e=>errors.push(e.message)); page.on('console',m=>{if(m.type()==='error') errors.push(m.text());});
       await page.addInitScript(()=>localStorage.setItem('toybox-trials:prototype:v1',JSON.stringify({state:{quality:'low',tutorials:false},version:0})));
       const state = () => page.evaluate(()=>window.__toybox.match.state());
       const click = async id => {const b=page.getByTestId(id); if(mobile) await b.tap(); else await b.click();};
@@ -215,11 +215,26 @@ const out = path.join(__dirname,'output'); fs.mkdirSync(out,{recursive:true});
       await page.keyboard.press('KeyE'); await page.waitForFunction(()=>window.__toybox.match.state().phase==='battle');
       // Give the controlled battle durability and full mana to observe a real cast on all viewports.
       await page.evaluate(()=>{window.__toybox.match.timeScale(0); for(const u of window.__toybox.match.state().battles[0].fighters){u.hp=u.maxHp=500;u.shield=0;u.magic.mana=u.magic.maxMana;} window.__toybox.match.timeScale(1);});
+      // Damage overview, on the right: open on desktop, folded into a tab on phones so it never covers the board.
+      if(mobile) { await page.getByTestId('squad-damage-open').waitFor({state:'visible'}); assert.equal(await page.getByTestId('squad-damage').count(),0); await size56('squad-damage-open'); await click('squad-damage-open'); }
+      await page.getByTestId('squad-damage').waitFor({state:'visible'});
       await page.waitForFunction(()=>window.__toybox.match.state().battles[0].attacks.some(a=>a.spell));
       await page.waitForFunction(()=>window.__toybox.match.state().battles[0].damages.length>0);
+      // A row flashes when that toy lands a hit.
+      await page.waitForSelector('[data-testid="squad-damage"] li.is-hit');
       await page.evaluate(()=>window.__toybox.match.timeScale(0));
       assert.ok((await state()).battles[0].fighters[0].magic.casts>0);
+      const damageRowsShown = () => page.evaluate(()=>[...document.querySelectorAll('[data-testid="squad-damage"] li')].map(li=>Number(li.dataset.value)));
+      const tally = mode => page.evaluate(m=>window.__toybox.match.state().battles[0].fighters.filter(u=>u.side===0).map(u=>u.stats[m]).sort((a,b)=>b-a),mode);
+      await page.waitForFunction(()=>{const s=window.__toybox.match.state().battles[0].fighters.filter(u=>u.side===0).map(u=>u.stats.dealt).sort((a,b)=>b-a).join(); return [...document.querySelectorAll('[data-testid="squad-damage"] li')].map(li=>li.dataset.value).join()===s;});
+      const dealt=await damageRowsShown(); assert.deepEqual(dealt,await tally('dealt')); assert.ok(dealt[0]>0,'the overview lists real damage, highest first');
+      const panel=await page.getByTestId('squad-damage').boundingBox(); assert.ok(panel.x+panel.width>=viewport.width-20,'damage overview sits at the right edge');
       await page.screenshot({path:path.join(out,`toysquad-${layout}-damage.png`)});
+      await click('squad-damage-taken'); await page.waitForFunction(()=>document.querySelector('[data-testid="squad-damage"]').dataset.mode==='taken');
+      await page.waitForFunction(()=>{const s=window.__toybox.match.state().battles[0].fighters.filter(u=>u.side===0).map(u=>u.stats.taken).sort((a,b)=>b-a).join(); return [...document.querySelectorAll('[data-testid="squad-damage"] li')].map(li=>li.dataset.value).join()===s;});
+      await page.screenshot({path:path.join(out,`toysquad-${layout}-damage-taken.png`)});
+      await click('squad-damage-dealt'); await size56('squad-damage-close');
+      if(mobile) { await click('squad-damage-close'); await page.getByTestId('squad-damage-open').waitFor({state:'visible'}); }
       if(process.env.SQUAD_SMOKE) {
         assert.deepEqual(errors,[]); console.log(`PASS Toy Squad ${layout} final interaction smoke: automatic merges, hover details, Q/R/E, reserve drags/swaps, upgrade highlights and spells; no console/page errors`);
         await page.close(); continue;
