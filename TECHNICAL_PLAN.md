@@ -4,6 +4,37 @@ Source audit: 18 November 2026, starting commit `59744b7`. Source-inspected, not
 
 ## Implemented client
 
+Spellbox Showdown: seventh local playable module on `astra/spellbox-showdown`. Pure fixed-10 ms
+rules own a three-slot/eight-spell draft, cooldowns, swept projectiles, mines, exact fan geometry,
+damage-scaled impulses, momentum/solid bodies and simultaneous ring-outs. Damage batches share
+one post-hit multiplier per target. Seeded bots choose builds and respond to public threats/edges.
+Scene/HUD provide keyboard/mouse and touch; instanced effects cap at 64 projectiles/64 bursts and
+16 mines. Shared host, scoring and storage schemas remain unchanged. This is local simulation;
+server authority and online latency handling remain future work. Balance details are in the module README.
+Spellbox population revision: live `state.radius` derives from the initial field and contracts
+to surviving-player bands after a 10-second warning. Pure fixed-step rules drive contraction,
+ring-outs, unsupported mines and cues; the scene scales only the stage and camera, leaving toys
+and spell ranges unchanged. Camera zoom reprojects mouse aim, while touch keeps a world target.
+`SLOT_OPTIONS` validates exactly three offers per button for both humans and bots; Mine moves
+between E/R with a legal fallback, preserving unique builds.
+Validation: 136 unit tests and production build pass; desktop/portrait/landscape Spellbox checks
+cover three-option drafts, eight-player sizing, countdown/contraction, mouse/touch aim through
+zoom, casting and ring-outs. Copycat/Jack practice and seeded Spellbox/Copycat/Blink Blitz pass
+without console/page errors.
+Combat balance, real-device performance and online behaviour remain unverified.
+
+Blink Duel: sixth playable local module on `astra/blink-duel`. Pure rules use a 10 ms internal
+quantum, validated blink endpoints, solid living bodies and exact circle/sector hit tests.
+Telegraphed swings commit origin/facing, allow blink cancellation, and resolve simultaneous hits
+from one living snapshot. Seeded delayed bots react to visible attacks. Shared actions plus a
+bounded pointer queue drive keyboard/mouse/touch; R3F reads mutable simulation state for cones,
+toy swords and bounded blink/strike effects. Existing host, records and tournament scoring remain
+unchanged. This is local simulation, not an authoritative online server. Details and provisional
+balance are in `src/minigames/blink/README.md`.
+Validation: 112 unit tests and production build pass; desktop/portrait/landscape Blink browser
+flows and the existing Copycat/Jack plus seeded Blink/Jack/Copycat Blitz regressions pass without
+console/page errors. Real-device performance, combat balance and online latency remain unverified.
+
 Toy Squad: fifth local playable module, casual-only. The owner’s ten-round format uses a
 62-unit weighted shop, reserves, two-copy star merges, level-based deployment limits and
 passive offers on rounds 3/6/9. `catalogue.ts` stores exact odds/unit/passive data; `rules.ts`
@@ -18,7 +49,7 @@ Toy Squad purchases now auto-merge pairs and chain to three stars, preferring de
 Merge previews and capacity checks share pure rules helpers. Reserves render in a physical row
 below the board and use the same validated move/drop command as deployment. Q/R/E use shared
 action bindings; an ephemeral UI store coordinates hover/selection, details and upgrade rings.
-Current validation: 98 unit tests and production build pass; ten-round desktop/portrait/landscape
+Prior Toy Squad revision validation: 98 unit tests and production build passed; ten-round desktop/portrait/landscape
 checks pass automatic merges, hover kits, Q/R/E, reserve drags/swaps, spells, records and restart.
 No host, storage-key/schema, multiplayer or ranked-system changes are needed. Exact design and
 provisional economy/balance are in the module README and CATALOGUE.md.
@@ -42,7 +73,7 @@ in this clone; Claude's separate cloud work is recorded in `ROADMAP.md`.
 | --- | --- |
 | Build | React 19, strict TypeScript, Vite; `npm run build` typechecks and emits static `dist/` with relative asset paths |
 | Rendering | three.js via React Three Fiber/drei; browser WebGL canvas, procedural geometry/textures, DOM/CSS overlays |
-| Quality | Low: no shadows/post FX, DPR up to 1.25; Balanced: tilt-shift/1024 shadows, DPR up to 1.5; High: depth of field/2048 shadows, DPR up to 2 |
+| Quality | Low: no shadows/post FX, DPR up to 1.25; Balanced: 1024 shadows, DPR up to 1.5; High: 2048 shadows, DPR up to 2. Hub uses tilt-shift/DOF respectively; minigames disable focus blur at both tiers |
 | State | Zustand; localStorage settings, cosmetics, secrets, records and limited tournament history; no secure online persistence |
 | World | Tabletop hub and oversized room; third-person movement, simple planar/height collision, camera blockers, interactive props |
 | Input/audio | Shared keyboard/touch action layer; Web Audio synthesis |

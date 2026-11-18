@@ -8,7 +8,8 @@ import type { MinigameDefinition, MinigameId, TouchLayout } from './types';
 /** Placeholder for planned games: must be replaced with a real layout before a game ships. */
 const TOUCH_TBD: TouchLayout = { movement: 'none', look: 'none', buttons: [], orientation: 'any', notes: 'To be designed with the minigame.' };
 
-const planned = (d: Omit<MinigameDefinition, 'status' | 'touch' | 'inputs' | 'bots' | 'recordUnit'> & { touch?: TouchLayout }): MinigameDefinition => ({
+/** For catalogue entries that are announced but not built yet (none at the moment: all eleven are playable). */
+export const planned = (d: Omit<MinigameDefinition, 'status' | 'touch' | 'inputs' | 'bots' | 'recordUnit'> & { touch?: TouchLayout }): MinigameDefinition => ({
   touch: TOUCH_TBD,
   recordUnit: 'points',
   inputs: ['keyboard', 'mouse', 'touch'],
@@ -23,7 +24,7 @@ export const MINIGAMES: MinigameDefinition[] = [
     title: 'Copycat Conductor',
     tagline: 'Watch the bandleader. Repeat the tune. One note longer every round.',
     description:
-      'The wind-up conductor plays a sequence on four toy instruments. Repeat it in order. A wrong note or running out of time knocks you out. Each round adds a note and the demonstrations speed up. Last toy standing wins.',
+      'The wind-up conductor plays a sequence on four toy instruments. Repeat it in order. A wrong note or running out of time knocks you out. Every round is a brand-new tune, one note longer and a little faster. Last toy standing wins.',
     category: 'memory',
     accent: PALETTE.honey,
     players: { min: 1, max: 8 },
@@ -71,9 +72,9 @@ export const MINIGAMES: MinigameDefinition[] = [
     inputs: ['keyboard', 'mouse', 'touch'],
     bots: 'available',
     recordUnit: 'seconds',
-    touch: { movement: 'none', look: 'none', orientation: 'any',
-      buttons: [{ id: 'forward', label: 'Up' }, { id: 'left', label: 'Left' }, { id: 'back', label: 'Down' }, { id: 'right', label: 'Right' }, { id: 'slot1', label: 'Break' }, { id: 'slot2', label: 'Build wall' }],
-      notes: 'Hold directional pads to move; Break clears the tile ahead. Build wall places one wall during the 15-second preparation. Unused walls expire. Survivors tie at the time limit.' },
+    touch: { movement: 'joystick', look: 'none', orientation: 'any',
+      buttons: [{ id: 'slot1', label: 'Break' }, { id: 'slot2', label: 'Build wall' }],
+      notes: 'Push the joystick (left thumb, anywhere on the left) up, down, left or right to move and turn; Break clears the tile ahead. Build wall places one wall during the 15-second preparation. Unused walls expire. Survivors tie at the time limit.' },
     status: 'playable',
     load: () => import('./inferno').then(m => m.default),
   },
@@ -91,9 +92,9 @@ export const MINIGAMES: MinigameDefinition[] = [
     tieBreak: 'Out later ranks higher',
     controls: [{ keys: 'WASD / arrows', action: 'Move; hold against a push to resist' }, { keys: 'Space', action: 'Hit the battery bot ahead (3 hits to claim)' }],
     inputs: ['keyboard', 'mouse', 'touch'], bots: 'available', recordUnit: 'seconds',
-    touch: { movement: 'none', look: 'none', orientation: 'any',
-      buttons: [{ id: 'forward', label: 'Up', hold: true }, { id: 'left', label: 'Left', hold: true }, { id: 'back', label: 'Down', hold: true }, { id: 'right', label: 'Right', hold: true }, { id: 'slot1', label: 'Hit', hold: true }],
-      notes: 'Hold directional pads to move or resist a push. Face a battery bot and tap/hold Hit: three hits recharge you (one battery per night). Corner shelters slow daytime drain.' },
+    touch: { movement: 'joystick', look: 'none', orientation: 'any',
+      buttons: [{ id: 'slot1', label: 'Hit', hold: true }],
+      notes: 'Push the joystick (left thumb) up, down, left or right to move; hold it against a push to resist. Face a battery bot and tap/hold Hit: three hits recharge you (one battery per night). Corner shelters slow daytime drain.' },
     status: 'playable', load: () => import('./midnight').then(m => m.default),
   },
   {
@@ -158,7 +159,7 @@ export const MINIGAMES: MinigameDefinition[] = [
     status: 'playable',
     load: () => import('./redlight').then((m) => m.default),
   },
-  planned({
+  {
     id: 'blink-duel',
     title: 'Blink Duel',
     tagline: 'Teleport, bait, strike.',
@@ -170,8 +171,12 @@ export const MINIGAMES: MinigameDefinition[] = [
     eligibility: { tournament: true, ranked: true, casual: true },
     scoring: 'elimination-order',
     tieBreak: 'Out later ranks higher',
-    controls: [],
-  }),
+    controls: [{ keys: 'WASD / arrows', action: 'Move and face; mouse / tap arena aims' }, { keys: 'Space', action: 'Blink forward instantly; no cooldown. Cancels your wind-up.' }, { keys: 'J / left click', action: 'Commit a telegraphed sword swing; one hit eliminates' }],
+    inputs: ['keyboard','mouse','touch'], bots: 'available', recordUnit: 'seconds',
+    touch: { movement: 'none', look: 'none', orientation: 'any', buttons: [{id:'forward',label:'Up',hold:true},{id:'left',label:'Left',hold:true},{id:'back',label:'Down',hold:true},{id:'right',label:'Right',hold:true},{id:'slot1',label:'Blink'},{id:'slot2',label:'Swing'}],
+      notes: 'Hold direction pads to move/face, or tap the arena to aim. Tap Blink repeatedly with no cooldown; Swing has a visible 0.95-second wind-up. Blinking cancels it. Last toy standing wins; simultaneous eliminations and timeout survivors tie.' },
+    status: 'playable', load: () => import('./blink').then(m => m.default),
+  },
   {
     id: 'wind-up-dash',
     title: 'Wind-Up Dash',
@@ -258,7 +263,7 @@ export const MINIGAMES: MinigameDefinition[] = [
       notes: 'Tap an offer to buy; reroll costs coins. Drag equal-star matching toys together to merge (maximum 3 stars); nonmatching toys swap. Formation drawer manages your reserves. Choose a passive on rounds 3, 6 and 9 before Ready.' },
     status: 'playable', load: () => import('./toysquad').then(m => m.default),
   },
-  planned({
+  {
     id: 'spellbox-showdown',
     title: 'Spellbox Showdown',
     tagline: 'Knock rivals out of the ring with toy spells.',
@@ -270,8 +275,11 @@ export const MINIGAMES: MinigameDefinition[] = [
     eligibility: { tournament: true, ranked: true, casual: true },
     scoring: 'elimination-order',
     tieBreak: 'Out later ranks higher',
-    controls: [],
-  }),
+    controls: [{keys:'WASD / arrows',action:'Move and face; mouse / tap arena aims'},{keys:'Q / E / R',action:'Cast your equipped spells; click also casts Q'},{keys:'Build cards',action:'Choose one of three options for each button, then lock your build'}],
+    inputs:['keyboard','mouse','touch'],bots:'available',recordUnit:'seconds',
+    touch:{movement:'none',look:'none',orientation:'any',buttons:[{id:'forward',label:'Up',hold:true},{id:'left',label:'Left',hold:true},{id:'back',label:'Down',hold:true},{id:'right',label:'Right',hold:true},{id:'slot1',label:'Spell Q'},{id:'slot2',label:'Spell E'},{id:'slot3',label:'Spell R'}],notes:'Each spell button has three draft choices. Hold pads to move, tap arena to aim, then tap spells to cast. Larger fields start on larger rings. After eliminations, a 10s warning marks the next smaller edge. Stay inside; last toy wins.'},
+    status:'playable',load:()=>import('./spellbox').then(m=>m.default),
+  },
   {
     id: 'jack-in-the-box',
     title: 'Jack-in-the-Box',
