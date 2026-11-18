@@ -22,6 +22,31 @@ them. The completed/next sections below describe only the older local clone.
 
 ## Completed first passes
 
+**Toy Squad branch update:** `astra/toy-squad` adds the fifth local playable game, casual-only.
+It now has ten rounds, a 62-unit five-rarity shop using the owner’s exact level odds, paid rerolls,
+two-copy merges up to three stars, eight reserves, level-based 3–10 board slots, and passive
+choices on rounds 3/6/9. The 8×8 drag board retains turning/attack particles and adds hit numbers.
+Pathfinding now routes around living toys and resolves contested moves; dead toys never block.
+All 62 units now also have individually named passives and automatic mana spells, with AoE/line
+damage, buffs/debuffs, healing, shields and 11 formation traits. Unit kits and run-wide passive
+choices remain separate. Next: human playtesting of kit combinations, readability and balance;
+online/ranked integration remains future work.
+Owner UX revision: pairs merge automatically; reserves sit below the player board; hover shows
+details; Q sells hovered/selected toys, R rerolls, E readies. Gold rings preview shop recipients.
+See `src/minigames/toysquad/README.md` and `CATALOGUE.md` for mechanics and provisional balance.
+This branch includes Midnight/Inferno; six other local catalogue entries lack modules, including
+work the owner reports Claude is handling separately.
+
+**Midnight branch update:** `astra/midnight-hunger` adds the fourth local playable minigame:
+night/day energy rules, N−1 battery targets, shelters, bots, keyboard/touch controls and tournament
+integration. Balance/interpretations are in `src/minigames/midnight/README.md`. It is based on the
+Inferno branch; merge that work first. Seven catalogue entries remain planned in this clone;
+Claude's separate work is still described in the handoff section above.
+
+Owner revision: Midnight now has solid player/target collision, pushes with opposite-input
+resistance, and three-hit battery claims via Spacebar/Hit. Inferno uses Spacebar to break and R
+to build. Details and provisional cooldown/chain rules are in the respective module READMEs.
+
 **Astra branch update:** `astra/inferno-escape` adds a local Inferno Escape module, Pavilion practice
 entry via the registry, bots and tournament eligibility. See `src/minigames/inferno/README.md` for
 provisional rules and integration notes. Claude retains the three worktrees listed above; recover

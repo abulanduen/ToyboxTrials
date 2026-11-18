@@ -191,9 +191,18 @@ mechanical hazard. **Tech:** top-down destructible tile grid, no 3D destruction 
 updates as tiles change.
 
 ### 03 · Midnight Hunger (Survival / Scarcity · 2–8)
+**Local first pass on `astra/midnight-hunger`:** rules, bots, scene, energy HUD and keyboard/touch
+controls now exist (four local playable games on this branch, seven remaining planned entries).
+See `src/minigames/midnight/README.md` for provisional phase/drain balance, one-catch-per-night policy,
+shelter layout and time-limit ties. These choices await playtesting and are not final design.
+
 Each contender's energy drains continuously, and play alternates between two phases until one player remains.
 - **Night:** about 10 s to catch a target. Only **N−1** targets spawn for N survivors, so at least one player goes without.
   Catching one restores energy.
+- **Owner revision:** players collide and can push unresisting toys; holding against the push
+  resists it. Battery bots require three hits with Spacebar (touch: Hit), rather than contact
+  collection. Damage is shared; the third attacker claims the recharge. See the module README
+  for provisional range/cooldown and push-chain details.
 - **Day:** "sunlight" drains energy much faster. Players retreat to shelters, which slow the drain but don't stop it.
 
 **Toybox:** nocturnal clockwork toys whose targets are battery-carrying bots, and sunlight overheats them.
@@ -290,6 +299,23 @@ the match seed (the same seed gives every client the same course).
 🔧 **Amended (A6):** music is exempt from the "synthesised only" rule.
 
 ### 09 · Toy Squad (Strategy / Auto-battler · 1–8)
+**Implemented on `astra/toy-squad`, revised by the owner:** ten rounds, an 8×8 battlefield,
+automatic two-copy merges up to three stars, a five-slot weighted shop with paid rerolls, reserves,
+level-based deployment caps, and passive choices on rounds 3/6/9. The roster has 62 units:
+16 Common, 14 Uncommon, 13 Rare, 12 Epic, 7 Legendary. Level 1 starts with three deployed slots;
+each round increases level and cap by one, up to level 10 and ten deployed toys. Exact shop odds,
+the roster, passives and provisional balance are in `src/minigames/toysquad/README.md` and
+`src/minigames/toysquad/CATALOGUE.md`. Auto-combat, bots, dragging, particles and damage numbers
+are local; online play and ranked eligibility remain future work. Casual-only for now.
+Every unit also has its own named passive and automatic mana spell. Area/line damage, healing,
+shields, buffs, marks, poison, stun, silence and cleansing enable mixed formations. Two/four distinct
+deployed kinds activate matching-trait bonuses; duplicates and reserves do not count. These kits
+are separate from the run-wide choices on rounds 3/6/9. Exact kits, 11 traits and provisional
+balance rules are recorded in the module catalogue and README.
+Reserves occupy eight slots below the player board. Hover reveals kits; gold highlights show
+shop upgrade recipients. Q sells the hovered/selected toy, R rerolls and E readies, with touch
+buttons and tap selection retained. Matching purchases merge immediately and can chain upgrades.
+
 A short, simple auto-battler. Each round, players:
 1. get some currency
 2. buy units from a small shop
@@ -298,7 +324,9 @@ A short, simple auto-battler. Each round, players:
 5. watch the auto-battle and get results
 
 **Toybox:** soldiers, wind-up animals, robots and plastic creatures on a tabletop strategy board.
-**Tech:** small roster, deterministic combat, balanced to avoid dominant combos. Round count and victory condition are open.
+**Tech:** deterministic combat with pathfinding around living units; dead units never block. Ten
+rounds are confirmed. Current scoring (wins 3, draws 1; surviving health breaks ties) and unit
+balance remain provisional pending playtesting.
 
 ### 10 · Spellbox Showdown (Arena / Builds / Knockback · 2–8)
 - Players pick spells to form a build, each with its own effects and cooldowns.

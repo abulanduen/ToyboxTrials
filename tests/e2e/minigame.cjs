@@ -221,9 +221,14 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
     // The races (Red Light Green Light, Wind-Up Dash): never leave the start line.
     // Find the Original: never pick, and the bot outscores us.
     // Inferno Escape: put our toy on the furnace and let the real rules/host resolve the loss.
+    // Midnight Hunger: drain our energy and let the night knock us out first.
     if (game.includes('Copycat')) await failRound();
     if (game.includes('Inferno')) {
       await page.evaluate(() => { const s = window.__toybox.match.state(); s.players[0].x = s.furnace.x; s.players[0].z = s.furnace.z; });
+    }
+    if (game.includes('Midnight')) {
+      // Leave our toy exposed with almost no energy and let the real rules knock it out first.
+      await page.evaluate(() => { const s = window.__toybox.match.state(); s.players[0].energy = 0.01; });
     }
     await page.waitForSelector('.results', { timeout: 300000 });
     await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing

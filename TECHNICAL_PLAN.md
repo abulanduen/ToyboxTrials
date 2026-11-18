@@ -4,6 +4,35 @@ Source audit: 18 November 2026, starting commit `59744b7`. Source-inspected, not
 
 ## Implemented client
 
+Toy Squad: fifth local playable module, casual-only. The owner’s ten-round format uses a
+62-unit weighted shop, reserves, two-copy star merges, level-based deployment limits and
+passive offers on rounds 3/6/9. `catalogue.ts` stores exact odds/unit/passive data; `rules.ts`
+validates purchases, rerolls, merges and rounds; `combat.ts` runs living-unit pathfinding,
+contested movement and simultaneous ability damage. Dead units never block or render.
+The 8×8 drag board reuses the host queue; bounded particle/damage-number pools use match time.
+`kits.ts` supplies 62 individual passive/spell pairs and 11 formation traits. `spellcraft.ts`
+handles pure target selection, capped support effects and distinct-kind trait bonuses. Combat
+tracks mana, cooldowns, temporary buffs/statuses and one bounded reaction batch; spells emit named
+render events. Mana bars and spell particles read simulation state without per-frame React updates.
+Toy Squad purchases now auto-merge pairs and chain to three stars, preferring deployed recipients.
+Merge previews and capacity checks share pure rules helpers. Reserves render in a physical row
+below the board and use the same validated move/drop command as deployment. Q/R/E use shared
+action bindings; an ephemeral UI store coordinates hover/selection, details and upgrade rings.
+Current validation: 98 unit tests and production build pass; ten-round desktop/portrait/landscape
+checks pass automatic merges, hover kits, Q/R/E, reserve drags/swaps, spells, records and restart.
+No host, storage-key/schema, multiplayer or ranked-system changes are needed. Exact design and
+provisional economy/balance are in the module README and CATALOGUE.md.
+The existing mobile regression suite passed with the prior unit-kit update. Strategic balance,
+audio quality and real-device performance remain unverified.
+
+Midnight branch update: `astra/midnight-hunger` adds a fourth lazy-loaded local game. Its pure rules
+split elapsed time at phase, target-movement and energy-depletion boundaries; seeded target movement
+and collection tie order are repeatable. Scene/HUD are separate; existing input, sound, characters,
+host lifecycle and local record storage are reused. No online/ranked functionality is added.
+Validation: 55 unit tests and production build pass; Midnight desktop/portrait/landscape flows,
+Copycat/Jack and mixed Blitz regressions, and the existing mobile suite pass without reported
+console/page errors. Balance and real-device performance remain unverified.
+
 Branch update: `astra/inferno-escape` adds a third playable local module, Inferno Escape, with
 independent deterministic tile rules, bots, scene/HUD and lazy registry integration. Earlier
 two-module counts below describe the starting audit. Eight catalogue entries remain planned
