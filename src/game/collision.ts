@@ -36,7 +36,7 @@ export type Collider = CircleCollider | BoxCollider;
 export const STEP_HEIGHT = 0.45;
 
 /** Playable area on the table top: an axis-aligned rounded rectangle. */
-export const PLAY_BOUNDS = { minX: -40, maxX: 40, minZ: -30, maxZ: 33, corner: 8 };
+export const PLAY_BOUNDS = { minX: -48, maxX: 46, minZ: -43, maxZ: 33, corner: 8 };
 
 const staticColliders: Collider[] = [];
 const dynamicColliders: Collider[] = [];
