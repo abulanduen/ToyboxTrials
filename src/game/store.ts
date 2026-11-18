@@ -48,6 +48,11 @@ interface SettingsSlice {
   records: Partial<Record<MinigameId, { best: number; plays: number; wins: number }>>;
   tournamentWins: Partial<Record<TournamentFormat, number>>;
   tournamentHistory: { format: TournamentFormat; place: number; of: number; games: MinigameId[]; at: number }[];
+  /**
+   * Music Box Rhythm latency calibration: how many ms late this device's taps arrive relative to
+   * the music the player hears (subtracted from every press time before judging). Negative = early.
+   */
+  rhythmOffsetMs: number;
 }
 
 interface SessionSlice {
@@ -107,6 +112,7 @@ export const useGame = create<GameState>()(
       records: {},
       tournamentWins: {},
       tournamentHistory: [],
+      rhythmOffsetMs: 0,
 
       // session
       screen: 'menu',
@@ -166,6 +172,7 @@ export const useGame = create<GameState>()(
         records: s.records,
         tournamentWins: s.tournamentWins,
         tournamentHistory: s.tournamentHistory,
+        rhythmOffsetMs: s.rhythmOffsetMs,
       }),
     },
   ),

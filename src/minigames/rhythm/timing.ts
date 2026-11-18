@@ -15,7 +15,7 @@ import type { Lane } from './tracks';
 const STEP_MS = 1000 / 60;
 /** The match clock is on average half a step behind the true accumulated time. */
 const HALF_STEP = STEP_MS / 2;
-const RATE_WINDOW_MS = 250;
+const RATE_WINDOW_MS = 400;
 /** Larger disagreements than this are a jump (pause, hitch, time-scale change): snap. */
 const SNAP_MS = 40;
 
@@ -55,6 +55,13 @@ export function syncSongClock(c: SongClock, perfNow: number, matchT: number) {
   }
   const dPerf = perfNow - c.perf;
   if (dPerf < 0.5) return; // second call in the same frame
+  if (c.rate === 0 && matchT > last.t) {
+    // Starting again after a full stop (countdown → play, resume from pause): assume normal speed
+    // until there is enough motion to measure, instead of averaging in the standstill.
+    c.samples.length = 0;
+    c.samples.push(last);
+    c.rate = 1;
+  }
   c.samples.push({ perf: perfNow, t: matchT });
   while (c.samples.length > 2 && perfNow - c.samples[1].perf >= RATE_WINDOW_MS) c.samples.shift();
   const first = c.samples[0];

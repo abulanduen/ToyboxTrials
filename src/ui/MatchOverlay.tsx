@@ -159,6 +159,7 @@ function Intro({ touch }: { touch: boolean }) {
               {m.opponents > 0 && <DifficultyPicker value={m.difficulty} onChange={(d) => setPracticeOpponents(m.opponents, d)} />}
             </div>
           )}
+          {m.module?.IntroExtras && <m.module.IntroExtras practice={!isTournament} />}
           {isTournament && (
             <div className="intro-field">
               {m.contestants.map((c) => (

@@ -69,7 +69,7 @@ const pressTimes: number[] = [];
  * timeline and recent (it is taken when the OS delivered the input, before any main-thread
  * queueing); otherwise the time the handler ran.
  */
-function pressStamp(eventTime?: number): number {
+export function pressStamp(eventTime?: number): number {
   const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
   return eventTime !== undefined && eventTime > 0 && eventTime <= now + 1 && now - eventTime < 500 ? eventTime : now;
 }
