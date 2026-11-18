@@ -2206,3 +2206,194 @@ canvas {
     top: calc(74px + env(safe-area-inset-top));
   }
 }
+
+/* ======================================================================
+   Milestone 6 — movement minigames (Red Light Green Light, Wind-Up Dash)
+   Shared race HUD (.mv-*) + Red Light signal (.rl-*) + Dash bits (.wd-*)
+   ====================================================================== */
+.mv-hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.mv-top {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  width: min(560px, calc(100vw - 150px));
+}
+.mv-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  max-width: 100%;
+}
+.rl-signal {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 22px 6px 12px;
+  border-radius: 999px;
+  border: 3px solid var(--ink-deep);
+  background: var(--cream);
+  box-shadow: 0 5px 0 rgba(43, 36, 51, 0.4);
+  font: 700 clamp(1.25rem, 4.2vw, 1.9rem) var(--font-display);
+  white-space: nowrap;
+  animation: prompt-pop 0.22s cubic-bezier(0.2, 1.8, 0.4, 1) both;
+}
+.rl-signal__lamp {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 50%;
+  border: 3px solid var(--ink-deep);
+  background: var(--paper);
+  box-shadow: inset 0 0 0 3px rgba(255, 249, 238, 0.55);
+}
+.rl-signal--go {
+  background: var(--sage);
+}
+.rl-signal--go .rl-signal__lamp {
+  background: #4fae5a;
+}
+.rl-signal--warn {
+  background: var(--honey);
+  animation: prompt-pop 0.22s cubic-bezier(0.2, 1.8, 0.4, 1) both, rl-shake 0.12s linear infinite;
+}
+.rl-signal--warn .rl-signal__lamp {
+  background: #f7d27a;
+  border-radius: 6px; /* shape changes too, not just colour */
+}
+.rl-signal--stop {
+  background: var(--coral);
+  color: var(--paper);
+  text-shadow: 0 2px 0 rgba(43, 36, 51, 0.55);
+}
+.rl-signal--stop .rl-signal__lamp {
+  background: #c9372e;
+  border-radius: 4px;
+  transform: rotate(45deg) scale(0.85);
+}
+.rl-signal--done {
+  background: #d7ecd7;
+}
+.rl-signal--done .rl-signal__lamp {
+  background: var(--honey);
+}
+@keyframes rl-shake {
+  0%,
+  100% {
+    translate: -1.5px 0;
+  }
+  50% {
+    translate: 1.5px 0;
+  }
+}
+.mv-clock {
+  font: 700 1rem var(--font-display);
+  min-width: 3.4em;
+  text-align: center;
+}
+.mv-clock.urgent {
+  background: var(--honey);
+}
+.mv-track {
+  position: relative;
+  width: calc(100% - 28px);
+  height: 26px;
+  margin: 0 14px;
+}
+.mv-track__line {
+  position: absolute;
+  left: -12px;
+  right: -12px;
+  top: 7px;
+  height: 12px;
+  border-radius: 8px;
+  border: 2.5px solid var(--ink-deep);
+  background: rgba(255, 249, 238, 0.85);
+}
+.mv-track__mark {
+  position: absolute;
+  top: 9px;
+  width: 2.5px;
+  height: 8px;
+  background: rgba(43, 36, 51, 0.45);
+  transform: translateX(-50%);
+}
+.mv-track__flag {
+  position: absolute;
+  right: -12px;
+  top: 2px;
+  width: 9px;
+  height: 22px;
+  border: 2.5px solid var(--ink-deep);
+  border-radius: 3px;
+  background: repeating-conic-gradient(var(--ink-deep) 0 25%, var(--paper) 0 50%) 0 0 / 6px 6px;
+}
+.mv-dot {
+  position: absolute;
+  top: 6px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2.5px solid var(--ink-deep);
+  transform: translateX(-50%);
+  transition: left 0.12s linear;
+}
+.mv-dot.me {
+  top: 1px;
+  width: 24px;
+  height: 24px;
+  border-width: 3px;
+  box-shadow: 0 0 0 3px var(--paper), 0 3px 0 3px rgba(43, 36, 51, 0.35);
+  z-index: 1;
+}
+.mv-dot.hurt {
+  filter: grayscale(0.8);
+  opacity: 0.75;
+}
+.mv-note {
+  white-space: nowrap;
+}
+.mv-note--hurry {
+  padding: 3px 12px;
+  border-radius: 12px;
+  border: 2.5px solid var(--ink-deep);
+  background: var(--honey);
+  font: 700 0.9rem var(--font-body);
+}
+/* The joystick zone and Jump button reuse the hub's toy-part styles (.touch-*). */
+.mv-touch .touch-stick-zone,
+.mv-touch .touch-btn {
+  pointer-events: auto;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+@media (orientation: portrait) {
+  .mv-top {
+    width: calc(100vw - 96px);
+    left: calc(50% - 22px);
+  }
+  .mv-touch .touch-stick-zone {
+    width: 60%;
+    height: 42%;
+  }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  .mv-top {
+    gap: 4px;
+    top: calc(8px + env(safe-area-inset-top));
+  }
+  .rl-signal {
+    padding: 3px 18px 3px 10px;
+    font-size: 1.3rem;
+  }
+}

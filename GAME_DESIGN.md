@@ -209,6 +209,22 @@ match state: a toy is Baldwyn only because its look has no mistakes.
 
 **Tech:** clear transition cues and fair latency handling.
 
+**Built (first pass, M6):** a 106 cm felt runway along the long side of the table, with the **Signalman** (an
+original clockwork referee on a turntable) at the far end.
+- Cycle: **go** (1.3–2.7 s, with an occasional 0.75–1.15 s "snap" go, never twice running and never first) →
+  **tell** (0.6–0.9 s: its key ratchets, the lamps flicker amber and it swings round) → **stop** (1.7–2.9 s).
+  The whole schedule is rolled from the match seed, so timing never depends on inputs.
+- 140 ms after the lamps turn red, any toy moving faster than 1 cm/s is caught. **Decision: a knock-back, not
+  elimination.** The toy is flicked back to the start line and held until the next green, so everyone keeps
+  playing. A partial knock-back (24 cm) was tried first, but then never stopping still finished the race.
+- The signal is shown four ways: the Signalman's facing and paddles, its beacon, lamps along both kerbs, and the
+  HUD word (GO! / It's turning… / STOP!), plus a different sound for each. It never relies on colour alone.
+- First across the line wins. Once somebody finishes, the rest have 15 s. The clock is 90 s. Placement is finish
+  time, then distance. Score: finishers get 100 + seconds left on the clock, others get the percentage covered.
+- Toys don't collide with each other, so nobody can be shoved into a penalty.
+- **Bots:** start delay, reaction time to the tell and an over-run chance per stop (easy 14%, normal 6%, hard 2%).
+- **Untuned:** all the timings above, the grace, and how harsh a full reset feels. They need real players.
+
 ### 06 · Blink Duel (PvP / Precision / Mind games · 2–8)
 - Teleport (blink) with **no cooldown**. One successful hit eliminates.
 - Attacks have a **long, clearly telegraphed** wind-up, so players bait and blink out.
@@ -223,6 +239,24 @@ match state: a toy is Baldwyn only because its look has no mistakes.
 
 **Toybox:** a course built from train track, dominoes, ramps, springs and mechanical traps.
 **Tech:** simple collision, deterministic obstacle patterns, a clear camera and readable boundaries.
+
+**Built (first pass, M6):** one straight 106 cm sprint down a felt track, four obstacles, layout rolled from
+the match seed (the same seed gives every client the same course).
+1. **Domino rows:** three rows block the track except for two gaps each. Walking into a domino topples it
+   (about 0.3 s lost), and it stays down, so the leaders clear a path for the pack.
+2. **Spring pad and block wall:** the wall has one narrow gate. The spring pad on the other side throws a toy
+   17 cm, clean over the wall.
+3. **Ruler bridge:** a spill of jam cuts top speed to 38%. A ruler lies across it on a diagonal at full speed.
+4. **Snap jaws:** three rows of two jaws. Each rattles for 0.55 s, then snaps shut for 0.75 s. A toy inside is
+   stunned for 1.1 s and spat back out; a shut jaw blocks. The two jaws in a row are half a cycle apart, so one
+   side is always open.
+- First across the line wins. Once somebody finishes, the rest have 15 s. The clock is 75 s. Placement is finish
+  time, then distance. Score: finishers get 100 + seconds left on the clock, others get the percentage covered.
+- Toys don't collide with each other. Train track, ramps, laps and moving hazards are not built yet.
+- **Bots** aim at a line through each obstacle with sideways noise and time the jaws. Easy bots barge through
+  dominoes, wobble off the ruler and misjudge jaws. Hard bots hold a clean line.
+- **Untuned:** obstacle spacing, jam slow-down, stun length and jaw timing. A clean run is short (about 12–20 s),
+  so the course probably wants a second half or laps.
 
 ### 08 · Music Box Rhythm (Rhythm / Timing · 1–8)
 - A four-lane rhythm game on **A S J K**, with Perfect, Good and Miss judgements.
@@ -292,6 +326,12 @@ hot-potato word games. Content and theme are original.
 - ranked and casual eligibility
 - scoring method and tie-break method
 - scene configuration and rules configuration
+
+**Movement games** (Red Light Green Light, Wind-Up Dash, and later ones) share `src/minigames/shared/`:
+a pure, deterministic movement core with the hub toy's tuning (`movement.ts`: position/velocity per contestant,
+circle and box collision, jump, input sanitising and latching), the local input sampler (`moveInput.ts`),
+and the render pieces (`Racer`, `ChaseCam`, `MoveTouch` joystick + Jump, `RaceHud`). Inputs reach the rules
+core as data (`{ ax, ay, run, jump }`), so the same core can run on the game server.
 
 The tournament controller needs **no game-specific logic** to know a round has finished. Minigames
 are independently testable. Implementation: `src/minigames/types.ts` (`MinigameDefinition`, a pure

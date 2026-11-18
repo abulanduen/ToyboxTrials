@@ -200,14 +200,13 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
     await page.click('[data-testid=reveal-go]');
     await page.waitForSelector('[data-testid=match-start]', { timeout: 60000 });
     await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
-    await page.click('[data-testid=match-start]');
-    const game = await page.evaluate(() => {
-      const s = window.__toybox.match.state();
-      return s?.category ? 'jack' : s?.toys ? 'find' : 'copycat';
-    });
+    const game = (await page.textContent('.match-intro h2')).trim();
     games.push(game);
-    // Jack: just never answer, and the jack pops on us. Find the Original: never pick, the bot outscores us.
-    if (game === 'copycat') await failRound();
+    await page.click('[data-testid=match-start]');
+    // Lose on purpose. Copycat: play a wrong note. Jack: never answer, and the jack pops on us.
+    // The races (Red Light Green Light, Wind-Up Dash): never leave the start line.
+    // Find the Original: never pick, and the bot outscores us.
+    if (game.includes('Copycat')) await failRound();
     await page.waitForSelector('.results', { timeout: 300000 });
     await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
     const rows = await page.$$eval('.results-list li', (els) => els.map((e) => e.textContent));
@@ -225,7 +224,7 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
   const title = await page.textContent('.final h2');
   check('final standings: placed 2nd of 2 after losing every trial', title.includes('2nd of 2'), title);
-  check('tournament mixes the three playable games', games.includes('jack') && games.includes('copycat') && games.includes('find'), games.join(','));
+  check('tournament plays three different trials', new Set(games).size === 3, games.join(', '));
   await page.waitForTimeout(2500);
   await page.screenshot({ path: `${OUT}/m4-09-final.png` });
   const hist = await page.evaluate(() => JSON.parse(localStorage.getItem('toybox-trials:prototype:v1')).state.tournamentHistory);

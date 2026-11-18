@@ -16,7 +16,7 @@ import { GearIcon } from './icons';
 
 const STICK_RADIUS = 52; // px the knob can travel
 
-function Joystick() {
+export function Joystick() {
   const zone = useRef<HTMLDivElement>(null);
   const base = useRef<HTMLDivElement>(null);
   const knob = useRef<HTMLDivElement>(null);
