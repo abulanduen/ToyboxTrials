@@ -1,6 +1,6 @@
 /**
  * Wind-Up Dash HUD: a banner for what just happened to you, the clock, the progress strip (with
- * the four obstacles marked), and on touch devices the joystick and Jump button.
+ * this course's traps marked), and on touch devices the joystick and Jump button.
  */
 import { useEffect, useState } from 'react';
 import { matchBus } from '../session';
@@ -8,7 +8,8 @@ import { useTicker } from '../copycat/Hud';
 import type { MinigameSceneProps } from '../types';
 import { MoveTouch } from '../shared/MoveTouch';
 import { RaceClock, RaceTrack, ordinal } from '../shared/RaceHud';
-import { inJam, onRuler, progressOf, type DashState } from './rules';
+import { beltAt, sectionAt } from './course';
+import { progressOf, stuckInJam, type DashState } from './rules';
 
 export function DashHud({ getState, contestants, localId }: MinigameSceneProps<DashState>) {
   useTicker(15);
@@ -23,6 +24,7 @@ export function DashHud({ getState, contestants, localId }: MinigameSceneProps<D
       if (e.id !== localId) return;
       if (e.type === 'snap') setFlash({ text: 'Snapped!', v: ++v });
       if (e.type === 'spring') setFlash({ text: 'Boing!', v: ++v });
+      if (e.type === 'bonk') setFlash({ text: 'Bonk!', v: ++v });
       if (e.type === 'finish') setPlace(e.order as number);
     });
   }, [localId]);
@@ -35,8 +37,11 @@ export function DashHud({ getState, contestants, localId }: MinigameSceneProps<D
   if (!s) return <MoveTouch />;
   const me = s.players.find((p) => p.id === localId);
   const closing = s.endAt < s.config.limitMs;
-  const stuck = !!me && !me.finished && me.m.grounded && inJam(s.course, me.m.z) && !onRuler(s.course, me.m.x, me.m.z);
-  const c = s.config;
+  const racing = !!me && !me.finished && me.m.grounded;
+  const stuck = racing && stuckInJam(s.course, me.m.x, me.m.z);
+  const here = racing ? sectionAt(s.course, me.m.z) : null;
+  const backwards = !!here && here.kind === 'conveyor' && beltAt(here, me!.m.x, me!.m.z) < 0;
+  const c = s.course;
   const at = (z: number) => (c.startZ - z) / (c.startZ - c.finishZ);
 
   let banner = 'Dash!';
@@ -50,12 +55,18 @@ export function DashHud({ getState, contestants, localId }: MinigameSceneProps<D
   } else if (s.phase === 'over') {
     banner = 'Race over!';
     tone = 'watch';
+  } else if (me && me.toss && me.toss.stun > 0) {
+    banner = 'Bonk!';
+    tone = 'out';
   } else if (me && me.stunMs > 0) {
-    banner = 'Snapped!';
+    banner = flash?.text === 'Bonk!' ? 'Bonk!' : 'Snapped!';
     tone = 'out';
   } else if (flash) banner = flash.text;
   else if (stuck) {
     banner = 'Sticky! Find the ruler';
+    tone = 'out';
+  } else if (backwards) {
+    banner = 'Wrong belt! Switch lanes';
     tone = 'out';
   } else if (closing) banner = 'Someone’s home! Hurry!';
 
@@ -69,7 +80,7 @@ export function DashHud({ getState, contestants, localId }: MinigameSceneProps<D
           <RaceClock ms={s.endAt - s.t} urgent={closing} />
         </div>
         <RaceTrack
-          marks={[at(s.course.rows[1].z), at(s.course.wall.z), at((s.course.jam.z0 + s.course.jam.z1) / 2), at(s.course.jaws[2].z)]}
+          marks={c.sections.map((q) => at((q.z0 + q.z1) / 2))}
           entries={s.players.map((p) => {
             const con = contestants.find((x) => x.id === p.id);
             return {

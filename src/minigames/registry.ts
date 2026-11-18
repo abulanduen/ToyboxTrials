@@ -175,9 +175,9 @@ export const MINIGAMES: MinigameDefinition[] = [
   {
     id: 'wind-up-dash',
     title: 'Wind-Up Dash',
-    tagline: 'Dominoes, a spring, a ruler and snapping jaws. First home wins.',
+    tagline: 'A new road and new traps every race. First home wins.',
     description:
-      'A sprint down a strip of tabletop props. Dominoes block the way until somebody knocks them over, so barge through or slip through the gaps. Hop on the spring pad to fly over the block wall, or squeeze through its gate. Stay on the ruler to cross the sticky jam. Then time your run through the snap jaws: they rattle before they bite. First toy across the line wins.',
+      'A sprint down a strip of tabletop props, and no two races are the same: every match deals a new road and four or five traps out of ten. You might meet dominoes, a spring pad, sticky jam, snap jaws, crayon gates, rolling marbles, a pendulum, spinning tops, tape-measure belts or a stack of books. Pick your line, hop what you can and time what moves. First toy across the line wins.',
     category: 'racing',
     accent: PALETTE.toyBlue,
     players: { min: 2, max: 8 },
@@ -197,7 +197,7 @@ export const MINIGAMES: MinigameDefinition[] = [
       look: 'none',
       buttons: [{ id: 'jump', label: 'Jump', colour: PALETTE.honey }],
       orientation: 'any',
-      notes: 'Steer with the joystick: push it up to run. Use the spring pad, stay on the ruler, and wait for the snap jaws to open.',
+      notes: 'Steer with the joystick: push it up to run. Tap Jump to hop marbles and book steps. Wait for moving traps to open.',
     },
     status: 'playable',
     load: () => import('./winddash').then((m) => m.default),
