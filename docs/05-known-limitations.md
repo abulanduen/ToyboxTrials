@@ -39,14 +39,34 @@ _What is not done, not verified, or risky. Updated at Milestone 2._
 2. **Post-processing at high DPR.** Depth of field (High) and tilt-shift (Balanced) run full-screen
    passes. On 4K or Retina screens with integrated GPUs this can dominate. *Mitigation:* DPR is capped at 1.5 on
    Balanced, `AdaptiveDpr` is enabled, and Low disables all post-processing.
-3. **Soft shadow maps (PCFSoft) at 2048 on High.** *Mitigation:* the shadow frustum follows the player
-   (±55 cm). Drop to 1024 or bake a static shadow texture for the village.
+3. **Soft shadow maps (PCFSoft): 2048 × 1024 on Balanced, 4096 × 2048 on High.** The frustum is now
+   fixed and covers the whole table (so shadows don't swim and the window wall can shape the sun
+   patch), which doubled the texel count of each tier's map. Not measured on a real GPU.
+   *Mitigation:* halve the sizes in `QUALITY` (`src/scene/PlayroomScene.tsx`), or bake a static
+   shadow texture for the village.
 4. **Transparent overdraw** (fountain droplets, marble, glass). Small today. Watch it as VFX are added.
 5. **Canvas texture regeneration** (scoreboard face) happens on secret count changes only. This is fine now,
    but avoid per-frame text textures.
 6. **Bundle size:** about 400 kB of gzipped JS, mostly three.js and postprocessing. Minigames must be
    lazy-loaded to keep the hub start fast.
 7. **Memory on mobile:** about 22–50 textures and 380 geometries depending on tier. Not yet profiled on phones.
+
+## Room visual pass (window light, baked room, props): what is and isn't verified
+
+- **Measured (SwiftShader, `tests/e2e/visual.cjs`, 960 × 540, hub looking at the window):** Low went
+  from 296 to 287 draw calls and from 48k to 64k triangles; Balanced from 488 to 512 draw calls and
+  from 95k to 116k triangles (shadow and post passes included). The room itself is about 10 draw
+  calls now; the extra triangles are furniture and the subdivided walls that carry the baked light.
+- **Not measured: frame rate on any real device.** In particular, on phones: the additive light
+  shafts and window halo are large transparent quads (fill-rate cost), and the furniture is built
+  and baked on the main thread right after the hub becomes interactive (a possible one-off hitch).
+- **Low has no sun shadows for the village** (only the toy's blob shadow), as before. The room's
+  baked light does not react to anything: furniture does not shade other furniture.
+- **Depth precision:** wall art and the rug sit about 1 cm off their surface with polygon offset.
+  Fine with a 24-bit depth buffer; a 16-bit one could shimmer at room distance. Not seen in testing,
+  not tested on real phones.
+- **The sun now rakes in low from behind the village** (toward the usual camera), so toys are
+  back-lit with long shadows. If faces read too dark on a real screen, raise the fill light in `Lights`.
 
 ## Design and process risks
 

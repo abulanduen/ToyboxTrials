@@ -5,28 +5,63 @@
 import { Suspense, useEffect, useMemo, useRef } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { AdaptiveDpr, Environment, Lightformer } from '@react-three/drei';
-import { Bloom, DepthOfField, EffectComposer, TiltShift2, Vignette } from '@react-three/postprocessing';
+import { Bloom, DepthOfField, EffectComposer, TiltShift2, ToneMapping, Vignette } from '@react-three/postprocessing';
+import { ToneMappingMode } from 'postprocessing';
 import * as THREE from 'three';
 import { useGame, type Quality } from '../game/store';
 import { PALETTE } from '../game/palette';
 import { player } from '../game/player';
 import { PlayerController } from '../character/PlayerController';
 import { Room, LAMP_HEAD, LAMP_AIM } from './Room';
+import { SUN_DIR } from './room/bake';
+import { TABLE } from './layout';
 import { exposeDebug } from '../game/debug';
 import { MatchStage } from '../minigames/MatchStage';
 import { Village } from './Village';
 
-const QUALITY: Record<Quality, { dpr: [number, number]; shadowMap: number; post: 'none' | 'tilt' | 'dof'; aa: boolean }> = {
-  low: { dpr: [1, 1.25], shadowMap: 0, post: 'none', aa: false },
-  balanced: { dpr: [1, 1.5], shadowMap: 1024, post: 'tilt', aa: true },
-  high: { dpr: [1, 2], shadowMap: 2048, post: 'dof', aa: true },
+/**
+ * Quality tiers. `shadow` is the sun's shadow-map size (null = no shadow maps): the map is wider
+ * than tall because the fixed shadow frustum that covers the whole table is ~1.8:1 in light space.
+ * Low (the default on touch devices) has no shadow maps and no post-processing: the toys keep
+ * their blob shadows and the room's lighting is baked, so it still reads as a sunlit room.
+ */
+const QUALITY: Record<Quality, { dpr: [number, number]; shadow: [number, number] | null; post: 'none' | 'tilt' | 'dof'; aa: boolean }> = {
+  low: { dpr: [1, 1.25], shadow: null, post: 'none', aa: false },
+  balanced: { dpr: [1, 1.5], shadow: [2048, 1024], post: 'tilt', aa: true },
+  high: { dpr: [1, 2], shadow: [4096, 2048], post: 'dof', aa: true },
 };
+
+/**
+ * Fixed sun + shadow frustum. The light shines along SUN_DIR (through the window in the back
+ * wall); its orthographic shadow camera is fitted once to the table top and everything standing
+ * on it, so shadow texels never move and nothing swims as the player walks. The window wall
+ * lies inside the same frustum (further up the rays), so it shapes the sun patch for real.
+ */
+function sunRig() {
+  const target = new THREE.Vector3((TABLE.minX + TABLE.maxX) / 2, 0, (TABLE.minZ + TABLE.maxZ) / 2);
+  const position = target.clone().addScaledVector(SUN_DIR, -330);
+  const view = new THREE.Matrix4().lookAt(position, target, new THREE.Vector3(0, 1, 0)).setPosition(position).invert();
+  const box = { l: Infinity, r: -Infinity, b: Infinity, t: -Infinity, far: 0 };
+  const p = new THREE.Vector3();
+  for (const x of [TABLE.minX - 2, TABLE.maxX + 2])
+    for (const z of [TABLE.minZ - 2, TABLE.maxZ + 2])
+      for (const y of [-TABLE.thickness, 50]) {
+        p.set(x, y, z).applyMatrix4(view);
+        box.l = Math.min(box.l, p.x);
+        box.r = Math.max(box.r, p.x);
+        box.b = Math.min(box.b, p.y);
+        box.t = Math.max(box.t, p.y);
+        box.far = Math.max(box.far, -p.z);
+      }
+  return { target, position, ...box, near: 40, far: box.far + 4 };
+}
 
 function Lights({ quality }: { quality: Quality }) {
   const q = QUALITY[quality];
   const sun = useRef<THREE.DirectionalLight>(null!);
   const spot = useRef<THREE.SpotLight>(null!);
   const { scene } = useThree();
+  const rig = useMemo(sunRig, []);
 
   useEffect(() => {
     // Lights' targets must be in the scene graph to update. Capture them now: the refs are
@@ -35,47 +70,44 @@ function Lights({ quality }: { quality: Quality }) {
     const spotTarget = spot.current.target;
     scene.add(sunTarget);
     scene.add(spotTarget);
+    sunTarget.position.copy(rig.target);
+    // The frustum props above only set fields: three never rebuilds a shadow camera's projection
+    // by itself, so without this the map would cover the default 10 × 10 cm around the target.
+    sun.current.shadow.camera.updateProjectionMatrix();
     spotTarget.position.copy(LAMP_AIM);
     return () => {
       scene.remove(sunTarget);
       scene.remove(spotTarget);
     };
-  }, [scene]);
-
-  // Keep the shadow frustum centred on the player so the map resolution goes where it matters.
-  useFrame(() => {
-    const s = sun.current;
-    if (!s) return;
-    const cx = THREE.MathUtils.clamp(player.pos.x, -20, 20);
-    const cz = THREE.MathUtils.clamp(player.pos.z, -15, 15);
-    s.position.set(cx + 70, 110, cz - 60);
-    s.target.position.set(cx, 0, cz);
-  });
+  }, [scene, rig]);
 
   return (
     <>
-      <hemisphereLight args={['#FFF1DA', '#7A5A44', 1.15]} />
-      {/* afternoon sun through the window (key light, casts shadows) */}
+      {/* sky + room bounce: warm from above, wood/felt from below */}
+      <hemisphereLight args={['#FFF1DA', '#8A6A50', 1.05]} />
+      {/* afternoon sun through the window (key light, casts shadows on Balanced/High) */}
       <directionalLight
         ref={sun}
-        color="#FFE3B8"
-        intensity={2.3}
-        castShadow={q.shadowMap > 0}
-        shadow-mapSize-width={q.shadowMap || 512}
-        shadow-mapSize-height={q.shadowMap || 512}
-        shadow-camera-left={-55}
-        shadow-camera-right={55}
-        shadow-camera-top={55}
-        shadow-camera-bottom={-55}
-        shadow-camera-near={10}
-        shadow-camera-far={320}
-        shadow-bias={-0.0004}
-        shadow-normalBias={0.04}
+        position={rig.position}
+        color="#FFDDAE"
+        intensity={2.5}
+        castShadow={!!q.shadow}
+        shadow-mapSize-width={q.shadow?.[0] ?? 512}
+        shadow-mapSize-height={q.shadow?.[1] ?? 512}
+        shadow-camera-left={rig.l}
+        shadow-camera-right={rig.r}
+        shadow-camera-top={rig.t}
+        shadow-camera-bottom={rig.b}
+        shadow-camera-near={rig.near}
+        shadow-camera-far={rig.far}
+        shadow-bias={-0.0005}
+        shadow-normalBias={0.05}
+        shadow-radius={2.5}
       />
       {/* the desk lamp: a warm honey pool over the square */}
-      <spotLight ref={spot} position={LAMP_HEAD} color={PALETTE.honey} intensity={2.4} angle={0.85} penumbra={0.9} decay={0} distance={0} />
-      {/* cool bounce from the window side to separate silhouettes */}
-      <directionalLight position={[-80, 40, 90]} color="#BFD6EA" intensity={0.45} />
+      <spotLight ref={spot} position={LAMP_HEAD} color={PALETTE.honey} intensity={2.0} angle={0.85} penumbra={0.9} decay={0} distance={0} />
+      {/* soft fill from the room side (the camera's usual side) so sun-backlit toys keep readable faces */}
+      <directionalLight position={[-70, 60, 110]} color="#E6DCEA" intensity={0.75} />
     </>
   );
 }
@@ -96,8 +128,11 @@ function Effects({ quality }: { quality: Quality }) {
       ) : (
         <TiltShift2 blur={0.22} taper={0.42} start={[0, 0.42]} end={[1, 0.42]} samples={8} direction={[1, 1]} />
       )}
-      <Bloom intensity={0.35} luminanceThreshold={0.92} luminanceSmoothing={0.15} mipmapBlur />
-      <Vignette offset={0.28} darkness={0.55} eskil={false} />
+      <Bloom intensity={0.5} luminanceThreshold={1.0} luminanceSmoothing={0.25} mipmapBlur />
+      <Vignette offset={0.28} darkness={0.5} eskil={false} />
+      {/* The composer renders the scene in linear HDR and switches the renderer's own tone
+          mapping off, so apply the same ACES curve here: every tier then shares one grade. */}
+      <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
     </EffectComposer>
   );
 }
@@ -138,7 +173,7 @@ export function PlayroomScene() {
   return (
     <Canvas
       key={quality /* remount on tier change: shadow maps & composer are created up front */}
-      shadows={q.shadowMap > 0 ? 'soft' : false}
+      shadows={q.shadow ? 'soft' : false}
       dpr={q.dpr}
       gl={{ antialias: q.post === 'none' && quality !== 'low', powerPreference: 'high-performance', stencil: false }}
       // near/far tuned for depth precision: nothing gets closer than ~0.6 cm to the camera, and
@@ -163,19 +198,29 @@ export const frameStats = { fps: 0, frameMs: 0 };
 function FrameStats() {
   const acc = useRef({ t: 0, n: 0 });
   const { gl, scene } = useThree();
+  // Whole-frame renderer totals (shadow passes + scene + post passes). With a composer the
+  // renderer's own counters only describe the last pass, so accumulate manually.
+  const totals = useRef({ calls: 0, triangles: 0 });
   useEffect(() => {
+    gl.info.autoReset = false;
     exposeDebug({
+      /** Raw renderer + scene, for visual tests and debugging only. */
+      three: () => ({ gl, scene }),
       renderInfo: () => {
         let meshes = 0;
         scene.traverse((o) => {
           if ((o as THREE.Mesh).isMesh) meshes++;
         });
-        return { calls: gl.info.render.calls, triangles: gl.info.render.triangles, geometries: gl.info.memory.geometries, textures: gl.info.memory.textures, meshes, programs: gl.info.programs?.length };
+        return { calls: totals.current.calls, triangles: totals.current.triangles, geometries: gl.info.memory.geometries, textures: gl.info.memory.textures, meshes, programs: gl.info.programs?.length };
       },
     });
   }, [gl, scene]);
   const frames = useRef(0);
   useFrame((_, dt) => {
+    // Runs before this frame renders: bank the previous frame's totals, then reset.
+    totals.current.calls = gl.info.render.calls;
+    totals.current.triangles = gl.info.render.triangles;
+    gl.info.reset();
     // A few frames in, textures exist and shaders have compiled: hide the loading card.
     if (++frames.current === 4) useGame.getState().set({ ready: true });
     acc.current.t += dt;
