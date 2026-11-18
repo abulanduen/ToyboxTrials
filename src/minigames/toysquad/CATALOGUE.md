@@ -457,3 +457,76 @@ Count distinct deployed unit kinds, including only living team members at battle
 | Medic | 2/4 distinct: +1/+3 healing power. |
 | Trickster | 2/4 distinct: +1/+3 bonus damage against marked enemies. |
 | Artificer | 2/4 distinct: +3/+6 mana per basic attack. |
+
+## Toy models and effects
+
+Presentation only; none of this changes rules or balance. Every unit has its own code-built toy
+(`models.ts`) and its own basic-attack and spell look (`effects.ts`). The attack column gives the
+projectile shape and flight path. Spell shapes are laid out on the board from the unit's kit: a line
+to the board edge, a blast ring at the kit radius, a drop on every enemy, one heavy shot, and motes
+to affected allies. Heal, shield, stun, poison, mark, silence and buff feedback is shared by all toys.
+
+| Toy | Model | Basic attack | Spell effect |
+| --- | --- | --- | --- |
+| Tin Soldier | Blue tin body, coral shako with plume, crossed belts, shouldered rifle | Bayonet jab (beam, jab) | Musket-ball volley (orb) |
+| Wind-up Robot | Boxy blue robot, visor eyes, chest gauge, antenna, big brass key | Piston punch (cube, jab) | Overclock cogs (gear) |
+| Spring Hare | Lilac felt hare with long ears on a coiled tin spring | Bouncing spring (coil, bounce) | Springburst coils (coil) |
+| Button Brawler | Giant coral four-hole button for a head, honey boxing gloves | One-two buttons (disc, jab) | Button barrage (disc) |
+| Peg Pikeman | Wooden clothes peg with tin spring, helmet and long pike | Pike thrust (beam, jab) | Peg skewer (beam) |
+| Marble Slinger | Hooded slinger with Y catapult and a satchel of glass marbles | Bouncing marble (orb, bounce) | Ricochet marbles (orb) |
+| Felt Fox | Orange felt fox, cream muzzle, bushy cream-tipped tail | Felt-claw swipe (slash, sweep) | Foxfire wisps (flame) |
+| Thimble Guard | Dimpled silver thimble with eye slot, round shield and needle | Thimble bash (disc, jab) | Thimble shelter (disc) |
+| Spool Spinner | Wooden spool wound with coral thread, needle arms, brass key | Rolling spool (disc, roll) | Unravelling thread (slash) |
+| Paper Medic | White paper cone with folded wings, cross cap and first-aid bag | Paper plane (dart, arc) | Folded first-aid crosses (plus) |
+| Crayon Cannon | Wheeled wooden carriage with a giant coral crayon barrel and spares | Crayon shell (bolt, arc) | Waxwork blast (bolt) |
+| Rubber Frog | Squat lime frog, bulging eyes, honey spots | Sticky glob (drop, arc) | Puddle-pop bubbles (orb) |
+| Domino Drummer | Black domino tile carrying a coral drum and sticks | Drumstick thump (cube, smash) | Toppling dominoes (cube) |
+| Clockwork Mouse | Grey tin mouse, pink ears and tail, wheels, upright key | Wire nibble (shard, jab) | Stolen sparks (gear) |
+| Cork Knight | Champagne cork with gold cap and wire cage, toothpick sword, card shield | Toothpick slash (slash, sweep) | Popping corks (orb) |
+| Ribbon Rookie | Pink skirted rookie with a big coral bow and ribbon wand | Ribbon streamer (beam, zigzag) | Rally ribbons (star) |
+| Bottle-cap Captain | Navy officer under a crimped bottle-cap hat with a gold star, sabre | Sabre cut (slash, sweep) | Bottle-cap salute (disc) |
+| Yo-yo Yak | Shaggy brown yak, cream horns, blue yo-yo on a string | Yo-yo throw (disc, boomerang) | Round-trip slam (disc) |
+| Kite Archer | Green archer with a coral diamond kite on the back and a bow | Kite-string arrow (bolt, line) | Crosswind kites (dart) |
+| Bead Bomber | Three stacked beads with a fuse and bead-string arms | Lobbed beads (orb, arc) | Scatterbead salvo (orb) |
+| Stitch Serpent | Coiled green felt snake with cream stitches and a button rattle | Stitching fang (shard, zigzag) | Binding seam (beam) |
+| Pencil Lancer | Helmeted rider shouldering a full yellow pencil as a lance, lined-paper shield | Pencil lance (beam, jab) | Ruled line (beam) |
+| Spring Ram | Woolly cream ram, curled honey horns, four spring legs, key | Sprung headbutt (coil, jab) | Battering spring (coil) |
+| Patchwork Nurse | Wide patchwork skirt, blue cross cap, hair buns, needle | Thrown patch (chip, arc) | Patchwork picnic (chip) |
+| Cog Crab | Flat brass gear shell with copper dome, eye stalks and coral claws | Claw pinch (gear, jab) | Clamping cogs (gear) |
+| Paper Panther | Angular purple origami cat with cream creases | Paper-cut claws (slash, sweep) | Midnight cut (slash) |
+| Windmill Imp | Coral horned imp with a four-colour windmill on its back | Spinning blade (star, spiral) | Gust of gears (slash) |
+| Copper Bat | Copper ball bat with plum wings on a wire stand | Echo rings (ring, line) | Echo drain (ring) |
+| Domino Duellist | White domino tile in a plumed hat with a fencing foil | Foil lunge (beam, jab) | Double-six tiles (cube) |
+| Magnet Mole | Brown mole with pink claws and a red horseshoe magnet on its back | Magnetic zap (bolt, zigzag) | Polarised burst (shard) |
+| Clockwork Bear | Seated teddy with brass belly cog and key | Paw smash (orb, smash) | Bear-hug barrier (gear) |
+| Music-box Mage | Wooden music box with brass cylinder and crank, wizard popping out | Chiming notes (note, spiral) | Arpeggio storm (note) |
+| Jackhammer Jack | Coral overalls, yellow hard hat, steel jackhammer | Jackhammer pound (bolt, smash) | Jackhammer quake (cube) |
+| Ribbon Ronin | Plum robe under a wide straw hat, trailing ribbons, long blade | Ribbon crescent (slash, sweep) | Crescent ribbons (slash) |
+| Paint-pot Pyro | Tin paint pot overflowing with coral and honey paint flames, brush torch | Paint flare (flame, arc) | Paint-pot inferno (flame) |
+| Porcelain Panda | White and ink panda with blue china flower, teacup, gold crack | Flying saucer (disc, arc) | Soothing tea (drop) |
+| Tin Toxin | Tin can with popped lid, hazard label and bubbling lime goo | Toxic spit (drop, arc) | Toxic toybox fumes (orb) |
+| Quill Quarreller | Navy ink bottle with cork head, crossbow and giant quill | Quill bolt (feather, line) | Thousand quills (feather) |
+| Velvet Vampire | Plum cape with high coral-lined collar, pale face, fangs | Velvet fang (shard, spiral) | Velvet feast (drop) |
+| Ratchet Rhino | Tin rhino with brass horn, side ratchet gears and wrench tail | Horn charge (bolt, jab) | Riveting stampede (gear) |
+| Glass Griffin | Faceted pale-blue crystal griffin with shard wings | Glass talons (shard, arc) | Prismatic dive (shard) |
+| Chess Chevalier | Wooden chess knight on its base with lance and chequered shield | Knight's move (cube, ell) | Checkmate squares (chip) |
+| Lantern Lynx | Spotted sandy lynx with ear tufts, lantern hung from its tail | Lantern spark (flame, line) | Lantern lock (star) |
+| Brass Behemoth | Huge brass boiler with furnace door, smokestacks and steel fists | Boiler fist (cube, smash) | Brass bastion (disc) |
+| Carousel Chimera | Striped carousel canopy over lion, goat and serpent heads | Three-headed snap (slash, sweep) | Carousel cataclysm (star) |
+| Prism Princess | Lilac gown with rainbow hoops, crystal crown, floating prisms | Refracted beams (shard, line) | Royal refraction (shard) |
+| Rivet Raccoon | Masked grey raccoon with striped tail, goggles and shoulder rivet launcher | Rivet rocket (bolt, arc) | Rivet rocketfall (bolt) |
+| Suture Sphinx | Reclining sand sphinx with blue-and-gold headdress and stitched spine | Riddle glyph (shard, spiral) | Sphinx's shelter (plus) |
+| Obsidian Origami | Black origami crane with gold-edged wings on a wire | Paper shuriken (dart, line) | Obsidian eclipse (dart) |
+| Venom Violinist | Green tailcoat and top hat, violin and bow, lime snake coiled round | Sour notes (note, zigzag) | Viper concerto (note) |
+| Pendulum Paladin | Tin great-helm knight with clock-face shield and pendulum mace | Pendulum swing (disc, sweep) | Stolen second (gear) |
+| Silver Spider | Silver eight-legged spider with coral hourglass and eyes | Web strand (orb, line) | Web of weakness (beam) |
+| Turbine Tiger | Striped orange tiger with twin jet turbines | Afterburner claws (slash, sweep) | Overdrive roar (flame) |
+| Needle Navigator | Navy captain in a bicorne with a giant threaded needle and back compass | Threaded needle (bolt, line) | Needle north (beam) |
+| Royal Rocking Horse | Wooden horse on rockers with coral saddle cloth and crown | Royal hoof stomp (orb, smash) | Rocking coronation (star) |
+| Grandfather Gear | Tall wooden clock with face, pendulum window and a brass gear halo | Rolling great gear (gear, roll) | Stop the clock (gear) |
+| Aurora Automaton | White hovering automaton with glass dome and rainbow aurora arcs | Aurora rings (ring, line) | Spectrum cascade (beam) |
+| Phoenix Pinwheel | Coral firebird with fan wings, flame crest and pinwheel tail | Pinwheel embers (flame, spiral) | Rekindling feathers (feather) |
+| Velvet Dragon | Violet plush dragon with honey spines, horns and patchwork wings | Patchwork breath (flame, line) | Dragon's patchwork breath (flame) |
+| Celestial Seamstress | Navy star-spangled gown, silver hair, crescent halo, giant needle | Threaded star (star, arc) | Stitched constellation (star) |
+| Crownless King | Ermine-caped king, bare head, crown hung on his greatsword | Greatsword cleave (slash, smash) | Final decree (shard) |
+| Infinity Jack | Harlequin jack-in-the-box, spring neck, jester hat, brass infinity on the lid | Boxing spring (coil, boomerang) | Out of the box (coil) |
