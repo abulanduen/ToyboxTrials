@@ -36,5 +36,8 @@ Keep scenery lower in contrast and saturation than characters. Prefer restrained
 - Blink Duel uses a felt practice mat, cardboard rails, oversized original toy swords and blue/brass
   spring-pop rings. Striped sector warnings and a filling charge bar communicate timing without
   relying on colour alone; reduced-motion suppresses the decorative sweep and ring expansion.
+- Spellbox uses a circular wooden/plastic stage, toy wands and spell-coloured projectiles, button
+  mines, ward bubbles and burst rings. Mark the open edge clearly: it is a ring-out boundary, not
+  a solid wall. Ground cones/circles/lines warn of spells; damage and cooldowns also have text cues.
 - Concepts in `public/assets/concepts/` are references and excluded from production output. Older cream-mascot concepts do not override the current contender design.
 - Proposed generated room assets, including the dog, remain future work. Use compressed GLB, lazy loading, a Low-tier fallback and source/licence records. Keep the toy layer code-built; never copy reference-game characters, levels or audio.

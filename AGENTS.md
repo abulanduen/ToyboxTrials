@@ -27,6 +27,9 @@ Applies to Codex, Claude Code and other contributors. Read this file before edit
   Blink Duel is authorized on `astra/blink-duel`, based on Toy Squad. Preserve no-cooldown
   blinking, one-hit eliminations and clear wind-up cues. Balance/cancel/tie choices are provisional
   in its module README. Claude's assigned games remain separate.
+  Spellbox Showdown is authorized on `astra/spellbox-showdown`, based on Blink. Preserve
+  three-slot build selection, per-spell cooldowns, damage-scaled knockback and ring-out victory.
+  Its eight-spell roster and numerical balance are provisional; see the module README.
 
 ## Coding conventions
 

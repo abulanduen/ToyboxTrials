@@ -189,8 +189,8 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   await page.click('[data-testid=format-blitz]');
   await page.click('.intro-options .segmented >> nth=0 >> button >> nth=0'); // 1 bot
   await page.click('.intro-options .segmented >> nth=1 >> button >> nth=0'); // easy
-  // A repeatable draw covers the new combat module plus Jack and Copycat in one host flow.
-  await page.evaluate(() => { Math.random = () => 13 / 4294967296; });
+  // A repeatable draw covers both combat modules and Copycat; Jack practice is checked above.
+  await page.evaluate(() => { Math.random = () => 15 / 4294967296; });
   await page.click('[data-testid=tournament-start]');
   const games = [];
   for (let round = 1; round <= 3; round++) {
@@ -202,7 +202,7 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
     await page.waitForSelector('[data-testid=match-start]', { timeout: 60000 });
     await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
     await page.click('[data-testid=match-start]');
-    const game = await page.evaluate(() => { const s = window.__toybox.match.state(); return s?.kind === 'blink-duel' ? 'blink' : s?.kind === 'midnight-hunger' ? 'midnight' : s?.category ? 'jack' : s?.furnace ? 'inferno' : 'copycat'; });
+    const game = await page.evaluate(() => { const s = window.__toybox.match.state(); return s?.kind === 'spellbox-showdown' ? 'spellbox' : s?.kind === 'blink-duel' ? 'blink' : s?.kind === 'midnight-hunger' ? 'midnight' : s?.category ? 'jack' : s?.furnace ? 'inferno' : 'copycat'; });
     games.push(game);
     if (game === 'copycat') await failRound(); // Jack: just never answer, and the jack pops on us
     if (game === 'inferno') {
@@ -215,6 +215,9 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
     }
     if (game === 'blink') {
       await page.evaluate(() => { const s = window.__toybox.match.state(); s.players[0].alive = false; s.players[0].outAt = s.t; });
+    }
+    if (game === 'spellbox') {
+      await page.evaluate(() => { const s = window.__toybox.match.state(); s.players.forEach(p => { p.ready = true; }); s.players[0].alive = false; s.players[0].outAt = s.t; });
     }
     await page.waitForSelector('.results', { timeout: 180000 });
     await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
@@ -233,8 +236,8 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
   const title = await page.textContent('.final h2');
   check('final standings: placed 2nd of 2 after losing every trial', title.includes('2nd of 2'), title);
-  check('tournament uses three distinct playable games', new Set(games).size === 3 && games.every(g => ['jack', 'copycat', 'inferno', 'midnight', 'blink'].includes(g)), games.join(','));
-  check('tournament exercises Blink, Jack and Copycat together', ['blink','jack','copycat'].every(g => games.includes(g)), games.join(','));
+  check('tournament uses three distinct playable games', new Set(games).size === 3 && games.every(g => ['jack', 'copycat', 'inferno', 'midnight', 'blink','spellbox'].includes(g)), games.join(','));
+  check('tournament exercises Spellbox, Blink and Copycat together', ['spellbox','blink','copycat'].every(g => games.includes(g)), games.join(','));
   await page.waitForTimeout(2500);
   await page.screenshot({ path: `${OUT}/m4-09-final.png` });
   const hist = await page.evaluate(() => JSON.parse(localStorage.getItem('toybox-trials:prototype:v1')).state.tournamentHistory);

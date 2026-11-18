@@ -9,7 +9,7 @@ inline and summarised first. Everything marked _proposal_ is not final.
 
 ---
 
-## Current status and source authority (18 November 2026)
+## Current status and source authority (19 November 2026)
 
 This existing specification is preserved pending the owner's separately supplied authoritative
 game-design conversation, which has not yet been provided in this chat. Do not invent missing mechanics.
@@ -17,9 +17,9 @@ Current owner instructions take precedence over historical amendments: preserve 
 Conductor implementation. Amendment A1 records the earlier Base44 decision, not permission to rewrite it now.
 
 **Implemented in this branch:** explorable 3D hub, menu, Workshop, local persistence, Copycat
-Conductor, Jack-in-the-Box, Inferno Escape, Midnight Hunger, Toy Squad and Blink Duel, with local
+Conductor, Jack-in-the-Box, Inferno Escape, Midnight Hunger, Toy Squad, Blink Duel and Spellbox Showdown, with local
 practice/bots. Local unranked Blitz/Normal/Treasure tournaments include all except Toy Squad.
-**Not implemented here:** the other five games (including Claude's separate work), online
+**Not implemented here:** the other four games (Claude's separate work), online
 multiplayer, matchmaking, ranked ratings or online leaderboards.
 Registry eligibility flags describe intended use, not available online/ranked modes.
 
@@ -292,6 +292,12 @@ balance remain provisional pending playtesting.
 
 **Toybox:** toy mages in a plastic-and-wood ring, with spells as toy explosions, springs, bubbles and fireworks.
 **Tech:** planar arena physics, authoritative damage and knockback, and a small spell roster to start.
+**Implemented local first pass on `astra/spellbox-showdown`:** a timed three-slot draft from eight
+spells, seeded bots, projectiles, AoE/cone blasts, pull, mines, ward and damage repair. Q/E/R cast;
+mouse/tap aims; WASD/arrows or touch pads move. Damage increases knockback, and crossing the
+circular edge eliminates. Records, local tournaments and both mobile orientations use the shared
+host. Spell values, draft length, momentum, hitstun and tie policies are provisional; exact data
+is in `src/minigames/spellbox/README.md`. Online authority and real PvP are not implemented.
 
 ### 11 · Jack-in-the-Box (Knowledge / Nerve · 2–8) — 🔧 Amended (A8), replaces Toybox Trivia
 A hot-potato category game. The contenders sit in a ring around a cranking jack-in-the-box.

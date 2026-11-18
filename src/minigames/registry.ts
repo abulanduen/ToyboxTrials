@@ -189,7 +189,7 @@ export const MINIGAMES: MinigameDefinition[] = [
       notes: 'Tap an offer to buy; reroll costs coins. Drag equal-star matching toys together to merge (maximum 3 stars); nonmatching toys swap. Formation drawer manages your reserves. Choose a passive on rounds 3, 6 and 9 before Ready.' },
     status: 'playable', load: () => import('./toysquad').then(m => m.default),
   },
-  planned({
+  {
     id: 'spellbox-showdown',
     title: 'Spellbox Showdown',
     tagline: 'Knock rivals out of the ring with toy spells.',
@@ -201,8 +201,11 @@ export const MINIGAMES: MinigameDefinition[] = [
     eligibility: { tournament: true, ranked: true, casual: true },
     scoring: 'elimination-order',
     tieBreak: 'Out later ranks higher',
-    controls: [],
-  }),
+    controls: [{keys:'WASD / arrows',action:'Move and face; mouse / tap arena aims'},{keys:'Q / E / R',action:'Cast your three equipped spells; click also casts slot Q'},{keys:'Build cards',action:'Choose three distinct spells, then lock your build'}],
+    inputs:['keyboard','mouse','touch'],bots:'available',recordUnit:'seconds',
+    touch:{movement:'none',look:'none',orientation:'any',buttons:[{id:'forward',label:'Up',hold:true},{id:'left',label:'Left',hold:true},{id:'back',label:'Down',hold:true},{id:'right',label:'Right',hold:true},{id:'slot1',label:'Spell Q'},{id:'slot2',label:'Spell E'},{id:'slot3',label:'Spell R'}],notes:'Choose three spells in the draft. Hold pads to move, tap arena to aim, and tap spell cards to cast. Damage increases knockback; cross the circular edge and you are out. Last toy in wins.'},
+    status:'playable',load:()=>import('./spellbox').then(m=>m.default),
+  },
   {
     id: 'jack-in-the-box',
     title: 'Jack-in-the-Box',

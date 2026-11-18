@@ -4,6 +4,17 @@ Source audit: 18 November 2026, starting commit `59744b7`. Source-inspected, not
 
 ## Implemented client
 
+Spellbox Showdown: seventh local playable module on `astra/spellbox-showdown`. Pure fixed-10 ms
+rules own a three-slot/eight-spell draft, cooldowns, swept projectiles, mines, exact fan geometry,
+damage-scaled impulses, momentum/solid bodies and simultaneous ring-outs. Damage batches share
+one post-hit multiplier per target. Seeded bots choose builds and respond to public threats/edges.
+Scene/HUD provide keyboard/mouse and touch; instanced effects cap at 64 projectiles/64 bursts and
+16 mines. Shared host, scoring and storage schemas remain unchanged. This is local simulation;
+server authority and online latency handling remain future work. Balance details are in the module README.
+Validation: 130 unit tests and production build pass; desktop/portrait/landscape Spellbox flows,
+Copycat/Jack practice and a seeded Spellbox/Copycat/Blink Blitz pass without console/page errors.
+Combat balance, real-device performance and online behaviour remain unverified.
+
 Blink Duel: sixth playable local module on `astra/blink-duel`. Pure rules use a 10 ms internal
 quantum, validated blink endpoints, solid living bodies and exact circle/sector hit tests.
 Telegraphed swings commit origin/facing, allow blink cancellation, and resolve simultaneous hits

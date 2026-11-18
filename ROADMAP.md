@@ -22,10 +22,17 @@ them. The completed/next sections below describe only the older local clone.
 
 ## Completed first passes
 
+**Spellbox Showdown branch update:** `astra/spellbox-showdown` adds the seventh local playable
+game: three-slot drafts, eight distinct spells, projectiles/AoE/pull/mines/shield/repair,
+damage-scaled knockback, ring-outs, bots and keyboard/mouse/touch. It uses existing records,
+results and local tournaments. Values and tie rules remain provisional in its module README.
+Four games remain absent here: Claude's Find the Original, Red Light/Green Light, Wind-Up Dash
+and Music Box Rhythm. Recover/review that work before integration; do not recreate it.
+
 **Blink Duel branch update:** `astra/blink-duel` adds the sixth local playable game: no-cooldown
 blinks, one-hit sword eliminations, striped wind-up cones, simultaneous hits, solid living bodies,
 bots, keyboard/mouse/touch and local tournament/record integration. See its module README for
-provisional range/timing, cancellation and tie rules. Five catalogue games still lack local modules:
+provisional range/timing, cancellation and tie rules. At that revision five catalogue games lacked local modules:
 Claude's Find the Original, Red Light/Green Light, Wind-Up Dash and Music Box Rhythm work, plus
 Spellbox Showdown. Recover/review Claude's work before integration; do not recreate it.
 
@@ -66,14 +73,14 @@ and review those separately. This branch has not been merged or deployed.
 
 ## Current milestone and priorities
 
-**Current milestone: integrate and playtest the six local games; recover Claude's separate work.**
-Spellbox Showdown is the remaining unassigned game; implement it only when the owner requests it.
+**Current milestone: integrate and playtest the seven local games; recover Claude's separate work.**
+All games previously assigned to Astra now have local modules. Online multiplayer remains future work.
 
 1. Recover and review Claude's games and room pass, including uncommitted/untracked cloud work.
 2. Integrate reviewed Astra/Claude branches into main with regression checks for the existing games,
    tournament flow, mobile controls and saved data.
 3. Reconcile the separately supplied authoritative specification when available; do not invent it.
-4. Human playtesting for Blink combat feel and Toy Squad balance, followed by measured fixes.
+4. Human playtesting for Blink/Spellbox combat feel and Toy Squad balance, followed by measured fixes.
 5. Real-device performance, mobile usability, audio mix and accessibility; then the online proof of concept.
 
 ## Future stages
@@ -84,7 +91,7 @@ Spellbox Showdown is the remaining unassigned game; implement it only when the o
 | M9 | Friends rooms/codes, public casual, configurable Custom Party, guest nicknames and bot fill |
 | M10 | Ranked ratings, history and leaderboards. Blitz/Normal/Treasure must have independent ratings; older plan stages launch one ladder first as population allows |
 | M11 | Emotes, inspection, parties, lobby instancing and interest management; grow toward the unverified 500-player lobby-server goal |
-| Remaining local games | Find the Original, Red Light/Green Light, Wind-Up Dash, Music Box Rhythm (Claude's separate work, unverified here), and Spellbox Showdown |
+| Remaining local games | Find the Original, Red Light/Green Light, Wind-Up Dash, Music Box Rhythm (Claude's separate work, unverified here) |
 | Optional room polish | Room dog pending asset/delivery; denser village, evening lighting and other visual ideas remain proposals |
 
 ## Decisions and information still missing
