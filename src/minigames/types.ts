@@ -101,6 +101,8 @@ export interface MinigameModule<State = unknown, Input = unknown> {
   readLocalInput(presses: readonly Action[]): Input[];
   Scene: ComponentType<MinigameSceneProps<State>>;
   Hud: ComponentType<MinigameSceneProps<State>>;
+  /** Optional game-specific options on the intro card (e.g. Music Box Rhythm's track + timing offset). */
+  IntroExtras?: ComponentType<{ practice: boolean }>;
 }
 
 /**

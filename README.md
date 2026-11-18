@@ -117,6 +117,10 @@ node tests/e2e/menu.cjs
 node tests/e2e/minigame.cjs
 ```
 
+```bash
+node tests/e2e/rhythm.cjs   # Music Box Rhythm (uses a preview server on port 4178)
+```
+
 Unit tests for the game logic (no browser needed):
 
 ```bash

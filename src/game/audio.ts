@@ -10,6 +10,10 @@ import { useGame } from './store';
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
+/** Music bus (Music Box Rhythm, amendment A6): follows the master volume, not the sfx volume. */
+let musicOut: GainNode | null = null;
+let musicActive = false;
+const MUSIC_LEVEL = 0.8;
 let noiseBuf: AudioBuffer | null = null;
 
 function ensure(): AudioContext | null {
@@ -22,6 +26,9 @@ function ensure(): AudioContext | null {
   comp.ratio.value = 4;
   master = ctx.createGain();
   master.connect(comp).connect(ctx.destination);
+  musicOut = ctx.createGain();
+  musicOut.gain.value = 0;
+  musicOut.connect(comp);
   applyVolume();
   // White noise buffer reused by percussive sounds.
   noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 0.5, ctx.sampleRate);
@@ -34,6 +41,7 @@ function applyVolume() {
   if (!master || !ctx) return;
   const s = useGame.getState();
   master.gain.setTargetAtTime(s.masterVolume * s.sfxVolume * 0.9, ctx.currentTime, 0.02);
+  musicOut?.gain.setTargetAtTime(musicActive ? s.masterVolume * MUSIC_LEVEL : 0, ctx.currentTime, 0.03);
 }
 useGame.subscribe((s, p) => {
   if (s.masterVolume !== p.masterVolume || s.sfxVolume !== p.sfxVolume) applyVolume();
@@ -58,7 +66,7 @@ function env(g: GainNode, t: number, peak: number, attack: number, decay: number
   g.gain.exponentialRampToValueAtTime(0.0001, t + attack + decay);
 }
 
-function tone(freq: number, t: number, peak: number, decay: number, type: OscillatorType = 'sine', attack = 0.003, glideTo?: number) {
+function tone(freq: number, t: number, peak: number, decay: number, type: OscillatorType = 'sine', attack = 0.003, glideTo?: number, dest: AudioNode | null = master) {
   const c = live();
   if (!c) return;
   const o = c.createOscillator();
@@ -67,12 +75,12 @@ function tone(freq: number, t: number, peak: number, decay: number, type: Oscill
   o.frequency.setValueAtTime(freq, t);
   if (glideTo) o.frequency.exponentialRampToValueAtTime(glideTo, t + attack + decay);
   env(g, t, peak, attack, decay);
-  o.connect(g).connect(master!);
+  o.connect(g).connect(dest ?? master!);
   o.start(t);
   o.stop(t + attack + decay + 0.05);
 }
 
-function noise(t: number, peak: number, decay: number, filterFreq: number, q = 1, type: BiquadFilterType = 'bandpass') {
+function noise(t: number, peak: number, decay: number, filterFreq: number, q = 1, type: BiquadFilterType = 'bandpass', dest: AudioNode | null = master) {
   const c = live();
   if (!c || !noiseBuf) return;
   const src = c.createBufferSource();
@@ -84,7 +92,7 @@ function noise(t: number, peak: number, decay: number, filterFreq: number, q = 1
   f.Q.value = q;
   const g = c.createGain();
   env(g, t, peak, 0.002, decay);
-  src.connect(f).connect(g).connect(master!);
+  src.connect(f).connect(g).connect(dest ?? master!);
   src.start(t, Math.random() * 0.3);
   src.stop(t + decay + 0.05);
 }
@@ -391,3 +399,55 @@ export const sfx = {
 };
 
 export type SfxName = keyof typeof sfx;
+
+// ---------- music (Music Box Rhythm) ----------
+
+/**
+ * Voices for the in-code compositions of Music Box Rhythm (GAME_DESIGN.md amendment A6: music is
+ * the one exception to "sound effects only"). Everything is still synthesised here; the tunes
+ * themselves live in src/minigames/rhythm/tracks.ts and are scheduled by rhythm/music.ts.
+ *
+ * All voices take an absolute AudioContext time so a scheduler can place notes ahead of time on
+ * the audio clock. They go to the music bus (master volume × a fixed level), which is silent
+ * unless `music.setActive(true)`.
+ */
+export const music = {
+  /** AudioContext time in seconds, or null when audio isn't running (locked, unsupported, headless). */
+  now(): number | null {
+    const c = live();
+    return c ? c.currentTime : null;
+  },
+  /** Open or close the music bus (short fade). Notes already scheduled are silenced by closing it. */
+  setActive(on: boolean) {
+    if (musicActive === on) return;
+    musicActive = on;
+    applyVolume();
+  },
+  /** Melody: a bright plucked music-box tine. `dur` (s) lengthens the ring a little for long notes. */
+  tine(freq: number, t: number, dur = 0.4, gain = 0.2) {
+    const decay = Math.min(1.6, 0.55 + dur * 0.9);
+    tone(freq, t, gain, decay, 'sine', 0.002, undefined, musicOut);
+    tone(freq * 4.02, t, gain * 0.28, decay * 0.18, 'sine', 0.001, undefined, musicOut);
+    tone(freq * 1.004, t, gain * 0.3, decay * 0.8, 'sine', 0.003, undefined, musicOut);
+    noise(t, gain * 0.2, 0.01, 6200, 5, 'bandpass', musicOut);
+  },
+  /** Accompaniment chord tone: a softer, shorter tine. */
+  pluck(freq: number, t: number, dur = 0.3, gain = 0.07) {
+    tone(freq, t, gain, Math.min(0.7, 0.25 + dur), 'sine', 0.003, undefined, musicOut);
+    tone(freq * 3, t, gain * 0.2, 0.08, 'sine', 0.001, undefined, musicOut);
+  },
+  /** Bass: a round, felted low bar. */
+  bass(freq: number, t: number, dur = 0.5, gain = 0.2) {
+    tone(freq, t, gain, Math.min(1.2, 0.3 + dur), 'sine', 0.012, undefined, musicOut);
+    tone(freq * 2, t, gain * 0.3, 0.22, 'triangle', 0.008, undefined, musicOut);
+  },
+  /** Wooden tick (count-in and calibration metronome). */
+  tick(t: number, accent = false) {
+    noise(t, accent ? 0.34 : 0.22, 0.028, accent ? 2100 : 2700, 3.5, 'bandpass', musicOut);
+    tone(accent ? 1480 : 1110, t, accent ? 0.13 : 0.08, 0.045, 'triangle', 0.001, undefined, musicOut);
+  },
+  /** Light shaker / ratchet tick for the rhythm bed. */
+  shake(t: number, accent = false) {
+    noise(t, accent ? 0.075 : 0.04, accent ? 0.05 : 0.03, 6500, 2.2, 'bandpass', musicOut);
+  },
+};

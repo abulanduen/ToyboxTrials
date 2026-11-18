@@ -135,7 +135,7 @@ _Depends on:_ M8.
 
 | Game | Why this position |
 | --- | --- |
-| Music Box Rhythm | Reuses the ASJK instruments and audio. Needs a music source (A6) and audio-clock judging |
+| Music Box Rhythm ✅ (first pass) | Built: three in-code tunes with melody-derived charts, timestamped presses, music scheduled on the audio clock, latency calibration, bots, `tests/e2e/rhythm.cjs`. To do: a hub entrance, real-device listening and latency tests, hold notes, a music volume slider |
 | Inferno Escape | Tile grid + pathfinding. Bots can use the same pathfinding |
 | Midnight Hunger | Phase timing + scarcity. Bots need simple target and shelter logic |
 | Toy Squad | Deterministic auto-battle. Bots pick from a heuristic shop |
@@ -153,5 +153,6 @@ _Depends on:_ M8.
 | 17 Nov 2026 | Adopted the master brief (GAME_DESIGN.md) with amendments A1–A7 |
 | 17 Nov 2026 | Start with casual and bots. One ranked ladder first, the other two later |
 | 17 Nov 2026 | Toybox Trivia replaced by Jack-in-the-Box (hot-potato categories, Puffer Party-style) |
+| 18 Nov 2026 | Music Box Rhythm music is composed in code (A6): no audio files. Presses are timestamped in the shared input layer (`getPressTimes()`) |
 | _pending_ | Game-server host for multiplayer (M8) |
 | _pending_ | Rating algorithm, ranked guest access, Base44 competition eligibility |

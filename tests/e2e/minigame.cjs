@@ -222,6 +222,7 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
     // Find the Original: never pick, and the bot outscores us.
     // Inferno Escape: put our toy on the furnace and let the real rules/host resolve the loss.
     // Midnight Hunger: drain our energy and let the night knock us out first.
+    // Music Box Rhythm: never tap, and the bot outscores us.
     if (game.includes('Copycat')) await failRound();
     if (game.includes('Inferno')) {
       await page.evaluate(() => { const s = window.__toybox.match.state(); s.players[0].x = s.furnace.x; s.players[0].z = s.furnace.z; });
@@ -229,6 +230,11 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
     if (game.includes('Midnight')) {
       // Leave our toy exposed with almost no energy and let the real rules knock it out first.
       await page.evaluate(() => { const s = window.__toybox.match.state(); s.players[0].energy = 0.01; });
+    }
+    if (game.includes('Music Box')) {
+      // Never tap: every pin is a miss. Fast-forward the ~68 s song (music is muted off 1x).
+      await page.waitForFunction(() => window.__toybox.match.phase() === 'playing', null, { timeout: 120000 });
+      await page.evaluate(() => window.__toybox.match.timeScale(8));
     }
     await page.waitForSelector('.results', { timeout: 300000 });
     await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
