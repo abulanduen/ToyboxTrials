@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { PALETTE } from '../../game/palette';
@@ -6,122 +6,156 @@ import { sfx, unlockAudio } from '../../game/audio';
 import { exposeDebug } from '../../game/debug';
 import { matchBus, useMatch } from '../session';
 import type { MinigameSceneProps } from '../types';
-import { BENCH_SIZE, MAX_UNITS, ROSTER, purchaseUpgradeTargets, type AttackEffect, type SquadState } from './rules';
+import { BENCH_SIZE, MAX_UNITS, ROSTER, purchaseUpgradeTargets, type Battle, type Fighter, type SquadPlayer, type SquadState, type SquadUnit } from './rules';
 import { boardToWorld, CELL_SIZE, placementPosition, reservePosition, worldToDeployment } from './board';
 import { submitSquadInput, useSquadUI } from './local';
 import { RARITY_COLOURS } from './catalogue';
+import { TOY_SPECS, type Motion } from './models';
+import { STAND_GEOMETRY, TIER_GEOMETRY, TOY_GLOW_MATERIAL, TOY_MATERIAL, UNLIT_VERTEX_MATERIAL, toyGeometry } from './toys';
+import { SquadFx, cueKey, unitCues } from './Fx';
 
 interface Drag { unit: number; pointer: number; x: number; z: number; cell: number | null; release: () => void }
 type PointerHandler = (e: ThreeEvent<PointerEvent>, id?: number) => void;
 const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.1);
-const starShape = new THREE.Shape();
-for (let i = 0; i < 10; i++) { const angle = i * Math.PI / 5, r = i % 2 ? 0.12 : 0.28; if (i) starShape.lineTo(Math.sin(angle) * r, Math.cos(angle) * r); else starShape.moveTo(0, r); }
-starShape.closePath();
-const starGeometry = new THREE.ShapeGeometry(starShape);
 const editable = (s: SquadState | null, id: string) => s?.kind === 'toy-squad' && s.phase === 'build'
   && !s.players.find(p => p.id === id)?.ready && !useMatch.getState().paused && useMatch.getState().phase === 'playing';
+// Shared by every piece: one pick volume (never drawn), bars and the upgrade ring.
+const PICK_GEOMETRY = new THREE.BoxGeometry(2.7, 2.5, 2.7);
+const PICK_MATERIAL = new THREE.MeshBasicMaterial({ visible: false });
+const BAR_GEOMETRY = new THREE.BoxGeometry(1.6, 0.2, 0.2), MANA_GEOMETRY = new THREE.BoxGeometry(1.6, 0.12, 0.2);
+const UPGRADE_GEOMETRY = new THREE.RingGeometry(1.42, 1.68, 24);
+const UPGRADE_MATERIAL = new THREE.MeshBasicMaterial({ color: PALETTE.honey, side: THREE.DoubleSide });
+const MANA_MATERIAL = new THREE.MeshBasicMaterial({ color: PALETTE.toyBlue });
+const reducedMotion = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const easeInOut = (t: number) => t * t * (3 - 2 * t);
+
+/** The local player's units and battle, split once per frame so 28 pieces do not each re-filter them. */
+interface View { state: SquadState | null; t: number; phase: string; player: SquadPlayer | undefined; battle: Battle | undefined; sides: [Fighter[], Fighter[]]; board: SquadUnit[]; reserve: SquadUnit[] }
+const view: View = { state: null, t: -1, phase: '', player: undefined, battle: undefined, sides: [[], []], board: [], reserve: [] };
+let viewStamp = -1;
+function readView(s: SquadState, localId: string, stamp: number): View {
+  if (stamp === viewStamp && view.state === s && view.t === s.t && view.phase === s.phase) return view;
+  viewStamp = stamp; view.state = s; view.t = s.t; view.phase = s.phase;
+  view.player = s.players.find(p => p.id === localId); view.battle = s.battles.find(b => b.owner === localId);
+  view.sides[0].length = 0; view.sides[1].length = 0; view.board.length = 0; view.reserve.length = 0;
+  for (const u of view.battle?.fighters ?? []) view.sides[u.side].push(u);
+  for (const u of view.player?.units ?? []) (u.cell < 0 ? view.reserve : view.board).push(u);
+  return view;
+}
+
+/** Whole-toy idle motion. `t` is simulation seconds, so it pauses with the match. */
+function idle(model: THREE.Group, motion: Motion, t: number, lively: number) {
+  const k = 0.45 + lively * 0.55; let y = 0, rx = 0, rz = 0, yaw = 0, squash = 1;
+  switch (motion) {
+    case 'march': y = Math.abs(Math.sin(t * 6)) * 0.1 * k; rz = Math.sin(t * 6) * 0.06 * k; break;
+    case 'hop': y = Math.abs(Math.sin(t * 4.2)) * 0.34 * k; squash = 1 - Math.cos(t * 8.4) * 0.07 * k; break;
+    case 'float': y = 0.3 + Math.sin(t * 2.3) * 0.14; rz = Math.sin(t * 1.7) * 0.05; break;
+    case 'wobble': rz = Math.sin(t * 3.4) * 0.1 * k; break;
+    case 'jitter': y = Math.abs(Math.sin(t * 34)) * 0.05 * k; rx = Math.sin(t * 17) * 0.02; break;
+    case 'rock': rx = Math.sin(t * 3.1) * 0.17 * k; break;
+    case 'slither': yaw = Math.sin(t * 3) * 0.22 * k; rz = Math.sin(t * 3 + 1.2) * 0.05; break;
+    case 'tick': rz = Math.tanh(Math.sin(t * Math.PI) * 5) * 0.06; break;
+    case 'prowl': y = Math.abs(Math.sin(t * 5)) * 0.05 * k; rx = Math.sin(t * 2.5) * 0.05 * k; break;
+    case 'stomp': y = Math.max(0, Math.sin(t * 4)) ** 2 * 0.16 * k; rz = Math.sin(t * 2) * 0.04 * k; break;
+    case 'twirl': yaw = Math.sin(t * 1.9) * 0.45 * k; y = Math.abs(Math.sin(t * 3.8)) * 0.06; break;
+  }
+  const wide = 1 / Math.sqrt(squash);
+  model.position.y = y; model.rotation.set(rx, yaw, rz); model.scale.set(wide, squash, wide);
+}
 
 function Piece({ slot, side, getState, localId, drag, down, move, up, cancel }: {
   slot: number; side: 0 | 1; getState: () => SquadState | null; localId: string;
   drag: RefObject<Drag | null>; down: PointerHandler; move: PointerHandler; up: PointerHandler; cancel: () => void;
 }) {
-  const root = useRef<THREE.Group>(null!); const model = useRef<THREE.Group>(null!); const body = useRef<THREE.Mesh>(null!);
-  const barrel = useRef<THREE.Mesh>(null!); const ears = useRef<THREE.Group>(null!); const hp = useRef<THREE.Mesh>(null!);
+  const root = useRef<THREE.Group>(null!); const model = useRef<THREE.Group>(null!); const toy = useRef<THREE.Mesh>(null!);
+  const hp = useRef<THREE.Mesh>(null!); const mana = useRef<THREE.Mesh>(null!); const stars = useRef<THREE.Mesh>(null!); const upgrade = useRef<THREE.Mesh>(null!);
+  const hpMaterial = useMemo(() => new THREE.MeshBasicMaterial({ color: PALETTE.sage }), []);
+  useEffect(() => () => hpMaterial.dispose(), [hpMaterial]);
   const currentId = useRef<number | null>(null); const yaw = useRef(0);
-  const stars = useRef<THREE.Group>(null!);
-  const mana = useRef<THREE.Mesh>(null!);
-  const upgrade = useRef<THREE.Mesh>(null!);
-  useFrame((_, dt) => {
+  const shown = useRef({ kind: '', rarity: '', tier: 0, key: NaN, x: 0, z: 0 });
+  const reduced = useRef(reducedMotion());
+  useFrame(({ clock }, dt) => {
     const s = getState(); root.current.visible = false; currentId.current = null;
     if (s?.kind !== 'toy-squad') return;
-    const p = s.players.find(p => p.id === localId);
-    const battle = s.battles.find(b => b.owner === localId);
-    const fighter = battle?.fighters.filter(u => u.side === side)[slot];
-    const reserve = side === 0 && slot >= MAX_UNITS ? p?.units.filter(u => u.cell < 0)[slot - MAX_UNITS] : undefined;
-    const buildUnit = reserve ?? (s.phase === 'build' && side === 0 && slot < MAX_UNITS ? p?.units.filter(u => u.cell >= 0)[slot] : undefined);
+    const v = readView(s, localId, clock.elapsedTime), p = v.player;
+    const fighter = v.battle ? v.sides[side][slot] : undefined;
+    const reserve = side === 0 && slot >= MAX_UNITS ? v.reserve[slot - MAX_UNITS] : undefined;
+    const buildUnit = reserve ?? (s.phase === 'build' && side === 0 && slot < MAX_UNITS ? v.board[slot] : undefined);
     const unit = s.phase === 'build' ? buildUnit : buildUnit ?? fighter;
-    if (!unit) return;
+    const look = shown.current;
+    if (!unit) { look.key = NaN; return; }
+    const now = s.t / 1000, still = reduced.current;
+    const cues = buildUnit ? undefined : unitCues.get(cueKey(side, fighter!.id));
+    // A defeated toy topples for a moment, then leaves the board. Dead toys are never pickable.
+    const dying = !buildUnit && fighter!.hp <= 0 ? (now - (cues?.diedAt ?? -9)) / 0.4 : -1;
+    if (dying >= 1 || (dying >= 0 && still)) { look.key = NaN; return; }
     currentId.current = buildUnit?.id ?? null; root.current.visible = true;
+    const def = ROSTER[unit.kind];
+    if (look.kind !== unit.kind) { look.kind = unit.kind; toy.current.geometry = toyGeometry(unit.kind); }
+    if (look.rarity !== def.rarity) { look.rarity = def.rarity; hpMaterial.color.set(RARITY_COLOURS[def.rarity]); }
+    if (look.tier !== unit.tier) { look.tier = unit.tier; stars.current.geometry = TIER_GEOMETRY[Math.min(3, Math.max(1, unit.tier)) - 1]; }
     const pos = buildUnit ? placementPosition(buildUnit.cell) : fighter!;
     const dragging = buildUnit && drag.current?.unit === buildUnit.id ? drag.current : null;
-    const alive = !!buildUnit || fighter!.hp > 0;
-    if (!alive) { root.current.visible = false; currentId.current = null; return; }
-    root.current.position.set(dragging?.x ?? boardToWorld(pos.x), dragging ? 1.1 : alive ? 0.3 : 0.05, dragging?.z ?? boardToWorld(pos.z));
-    root.current.scale.setScalar(alive ? 1 + (unit.tier - 1) * 0.12 : 0.3);
+    // Fighters glide between squares; build pieces and reduced motion snap exactly as before.
+    const tx = boardToWorld(pos.x), tz = boardToWorld(pos.z), key = buildUnit ? -1 : cueKey(side, fighter!.id);
+    const glide = !buildUnit && !still && look.key === key ? 1 - Math.exp(-dt * 11) : 1;
+    look.x += (tx - look.x) * glide; look.z += (tz - look.z) * glide; look.key = key;
+    const stride = Math.min(1, (Math.abs(tx - look.x) + Math.abs(tz - look.z)) / 1.5);
+    root.current.position.set(dragging?.x ?? look.x, dragging ? 1.1 : 0.3, dragging?.z ?? look.z);
+    root.current.scale.setScalar(1 + (unit.tier - 1) * 0.12);
     const targetYaw = buildUnit ? Math.PI : fighter!.facing ?? (side === 0 ? Math.PI : 0);
     const delta = Math.atan2(Math.sin(targetYaw - yaw.current), Math.cos(targetYaw - yaw.current));
-    yaw.current += delta * (1 - Math.exp(-dt * 14)); model.current.rotation.y = yaw.current;
-    (body.current.material as THREE.MeshStandardMaterial).color.set(ROSTER[unit.kind].colour);
-    barrel.current.visible = ROSTER[unit.kind].range > 1; ears.current.visible = ROSTER[unit.kind].shape === 'beast';
-    body.current.scale.set(ROSTER[unit.kind].shape === 'robot' ? 1.2 : 1, 1, ROSTER[unit.kind].shape === 'beast' ? 1.2 : 1);
-    (hp.current.material as THREE.MeshBasicMaterial).color.set(RARITY_COLOURS[ROSTER[unit.kind].rarity]);
+    yaw.current += delta * (1 - Math.exp(-dt * 14));
+    const m = model.current;
+    if (still) { m.position.set(0, 0, 0); m.rotation.set(0, yaw.current, 0); m.scale.setScalar(1); }
+    else {
+      idle(m, TOY_SPECS[unit.kind]?.motion ?? 'march', now + slot * 1.37 + side * 0.6, dragging ? 1 : stride);
+      let lunge = 0, spin = 0;
+      if (cues) {
+        const attack = (now - cues.attackAt) / 0.3, cast = (now - cues.castAt) / 0.5, hurt = (now - cues.hurtAt) / 0.24;
+        if (attack >= 0 && attack < 1) lunge = Math.sin(attack * Math.PI) * (cues.ranged ? -0.35 : 0.8);
+        if (cast >= 0 && cast < 1) { const k = Math.sin(cast * Math.PI); m.position.y += k * 0.8; spin = easeInOut(cast) * Math.PI * 2; m.scale.multiplyScalar(1 + k * 0.14); }
+        if (hurt >= 0 && hurt < 1) { const k = Math.sin(hurt * Math.PI); m.scale.y *= 1 - k * 0.14; m.scale.x *= 1 + k * 0.08; m.scale.z *= 1 + k * 0.08; }
+        if (dying >= 0) { m.rotation.x += dying * 1.4; m.scale.multiplyScalar(1 - dying * 0.85); m.position.y += Math.sin(dying * Math.PI) * 0.6; }
+      }
+      m.position.x = Math.sin(yaw.current) * lunge; m.position.z = Math.cos(yaw.current) * lunge; m.rotation.y += yaw.current + spin;
+    }
+    const alive = !!buildUnit || fighter!.hp > 0;
+    hp.current.visible = alive; stars.current.visible = alive;
     hp.current.scale.x = buildUnit ? 1 : Math.max(0.01, fighter!.hp / fighter!.maxHp);
-    mana.current.visible = !buildUnit;
+    mana.current.visible = !buildUnit && alive;
     mana.current.scale.x = buildUnit ? 0.01 : Math.max(0.01, fighter!.magic.mana / fighter!.magic.maxMana);
-    stars.current.children.forEach((mesh, i) => { mesh.visible = i < unit.tier; });
     const ui = useSquadUI.getState();
-    const hoveredOffer = ui.shopSlot !== null ? p?.shop[ui.shopSlot] : null;
-    const offers = ui.shopSlot !== null ? hoveredOffer ? [hoveredOffer] : [] : p?.shop.filter((k): k is string => !!k) ?? [];
-    const receivesUpgrade = !!buildUnit && buildUnit.cell >= 0 && !!p && offers.some(k => purchaseUpgradeTargets(p, k).some(u => u.id === unit.id));
+    let receivesUpgrade = false;
+    if (buildUnit && buildUnit.cell >= 0 && p) {
+      // Only an offer of this toy's own kind can upgrade it; a hovered shop card narrows the check to that card.
+      const offered = ui.shopSlot !== null ? p.shop[ui.shopSlot] === unit.kind : p.shop.includes(unit.kind);
+      receivesUpgrade = offered && purchaseUpgradeTargets(p, unit.kind).some(u => u.id === unit.id);
+    }
     const justUpgraded = !!buildUnit && buildUnit.upgradedAt !== undefined && s.t - buildUnit.upgradedAt < 1400;
     upgrade.current.visible = receivesUpgrade || justUpgraded;
-    (body.current.material as THREE.MeshStandardMaterial).emissive.set(receivesUpgrade || justUpgraded ? PALETTE.honey : '#000000');
-    (body.current.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.3;
+    toy.current.material = receivesUpgrade || justUpgraded ? TOY_GLOW_MATERIAL : TOY_MATERIAL;
   });
   return <group ref={root} onPointerDown={e => { if (currentId.current !== null) down(e, currentId.current); }}
     onPointerOver={e => { if (currentId.current !== null && !drag.current) { e.stopPropagation(); useSquadUI.setState({ hovered: currentId.current, shopSlot: null }); } }}
     onPointerOut={() => { if (useSquadUI.getState().hovered === currentId.current) useSquadUI.setState({ hovered: null }); }}
     onPointerMove={move} onPointerUp={up} onPointerCancel={cancel} onLostPointerCapture={cancel}>
-    <mesh ref={upgrade} position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => {}}><ringGeometry args={[1.35, 1.6, 24]} /><meshBasicMaterial color={PALETTE.honey} side={THREE.DoubleSide} /></mesh>
-    <mesh position={[0, 0.1, 0]}><boxGeometry args={[2.8, 0.3, 2.8]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} /></mesh>
-    <group ref={model}>
-      <mesh ref={body} position={[0, 1.1, 0]} castShadow><boxGeometry args={[1.5, 1.6, 1.4]} /><meshStandardMaterial roughness={0.45} /></mesh>
-      <mesh position={[0, 2.15, 0]}><sphereGeometry args={[0.65, 12, 10]} /><meshStandardMaterial color={side === 0 ? PALETTE.cream : PALETTE.coral} /></mesh>
-      <mesh position={[0, 2.2, 0.6]}><circleGeometry args={[0.21, 12]} /><meshBasicMaterial color={PALETTE.ink} side={THREE.DoubleSide} /></mesh>
-      <mesh ref={barrel} position={[0, 1.2, 1]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[0.15, 0.15, 1.2, 8]} /><meshStandardMaterial color={PALETTE.brass} /></mesh>
-      <group ref={ears}>{[-0.3, 0.3].map(x => <mesh key={x} position={[x, 2.9, 0]}><boxGeometry args={[0.25, 1, 0.25]} /><meshStandardMaterial color={PALETTE.honey} /></mesh>)}</group>
-      {[-0.5, 0.5].map(x => <mesh key={x} position={[x, 0.2, 0]}><boxGeometry args={[0.45, 0.35, 1.7]} /><meshStandardMaterial color={PALETTE.inkPurple} /></mesh>)}
-    </group>
-    <mesh ref={hp} position={[0, 3.7, 0]}><boxGeometry args={[1.6, 0.2, 0.2]} /><meshBasicMaterial color={PALETTE.sage} /></mesh>
-    <mesh ref={mana} position={[0, 3.4, 0]}><boxGeometry args={[1.6, 0.12, 0.2]} /><meshBasicMaterial color={PALETTE.toyBlue} /></mesh>
-    <group ref={stars} position={[0, 4.15, 0]}>{[-0.5,0,0.5].map(x => <mesh key={x} position={[x,0,0]} rotation={[-Math.PI / 2,0,0]} geometry={starGeometry} dispose={null}><meshBasicMaterial color={PALETTE.honey} side={THREE.DoubleSide} /></mesh>)}</group>
+    <mesh ref={upgrade} position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => {}} geometry={UPGRADE_GEOMETRY} material={UPGRADE_MATERIAL} dispose={null} />
+    <mesh position={[0, 1.1, 0]} geometry={PICK_GEOMETRY} material={PICK_MATERIAL} dispose={null} />
+    <mesh geometry={STAND_GEOMETRY[side]} material={TOY_MATERIAL} raycast={() => {}} receiveShadow dispose={null} />
+    <group ref={model}><mesh ref={toy} geometry={toyGeometry('soldier')} material={TOY_MATERIAL} raycast={() => {}} castShadow dispose={null} /></group>
+    <mesh ref={hp} position={[0, 3.9, 0]} geometry={BAR_GEOMETRY} material={hpMaterial} raycast={() => {}} dispose={null} />
+    <mesh ref={mana} position={[0, 3.62, 0]} geometry={MANA_GEOMETRY} material={MANA_MATERIAL} raycast={() => {}} dispose={null} />
+    <mesh ref={stars} position={[0, 4.35, 0]} geometry={TIER_GEOMETRY[0]} material={UNLIT_VERTEX_MATERIAL} raycast={() => {}} dispose={null} />
   </group>;
 }
 
-interface Spark { effect: AttackEffect; born: number; bit: number }
-function AttackParticles({ getState, localId }: { getState: () => SquadState | null; localId: string }) {
-  const mesh = useRef<THREE.InstancedMesh>(null!); const particles = useRef<Spark[]>([]);
-  const seen = useRef(''); const marker = useRef(new THREE.Object3D()); const colour = useRef(new THREE.Color());
-  const reduced = useRef(typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-  useFrame(() => {
-    const s = getState(); const b = s?.kind === 'toy-squad' && s.phase !== 'build' ? s.battles.find(b => b.owner === localId) : undefined;
-    const now = s?.kind === 'toy-squad' ? s.t / 1000 : 0;
-    const key = b && s ? `${s.seed}:${s.round}:${b.tick}` : '';
-    if (key !== seen.current) {
-      seen.current = key;
-      for (const effect of b?.attacks ?? []) for (let bit = 0; bit < (reduced.current ? 1 : effect.spell ? 12 : 5); bit++) particles.current.push({ effect, born: now, bit });
-    }
-    particles.current = particles.current.filter(p => now - p.born < 0.4).slice(-96);
-    if (!b) particles.current = [];
-    mesh.current.count = particles.current.length;
-    particles.current.forEach((p, i) => {
-      const age = (now - p.born) / 0.4; const e = p.effect;
-      const travel = reduced.current ? 1 : Math.min(1, age * 2);
-      const spread = reduced.current ? 0 : Math.sin(age * Math.PI) * p.bit * 0.13;
-      const obj = marker.current;
-      obj.position.set(boardToWorld(e.x + (e.tx - e.x) * travel) + Math.cos(p.bit * 2.4) * spread,
-        1.7 + (reduced.current ? 0 : Math.sin(age * Math.PI) * 0.8), boardToWorld(e.z + (e.tz - e.z) * travel) + Math.sin(p.bit * 2.4) * spread);
-      obj.scale.setScalar((1 - age) * (p.bit === 0 ? 0.32 : 0.17)); obj.updateMatrix();
-      if (e.spell) {
-        const radius = reduced.current ? 0 : (e.radius ?? 1) * CELL_SIZE * age;
-        obj.position.set(boardToWorld(e.tx) + Math.cos(p.bit * Math.PI / 6) * radius, 0.6 + Math.sin(age * Math.PI), boardToWorld(e.tz) + Math.sin(p.bit * Math.PI / 6) * radius);
-        obj.scale.setScalar((1 - age) * 0.45); obj.updateMatrix();
-      }
-      mesh.current.setMatrixAt(i, obj.matrix); colour.current.set(ROSTER[e.kind].colour); mesh.current.setColorAt(i, colour.current);
-    });
-    mesh.current.instanceMatrix.needsUpdate = true; if (mesh.current.instanceColor) mesh.current.instanceColor.needsUpdate = true;
-  });
-  return <instancedMesh ref={mesh} args={[undefined, undefined, 96]} frustumCulled={false} raycast={() => {}}><sphereGeometry args={[1, 6, 6]} /><meshBasicMaterial toneMapped={false} /></instancedMesh>;
+/** `?debug` only: every roster toy on the board at once, for contact-sheet screenshots. */
+function ToyGallery({ yaw }: { yaw: number }) {
+  return <group>{Object.keys(ROSTER).map((kind, i) => <group key={kind} position={[boardToWorld(i % 8), 0.3, boardToWorld(Math.floor(i / 8))]}>
+    <mesh geometry={STAND_GEOMETRY[0]} material={TOY_MATERIAL} dispose={null} />
+    <mesh geometry={toyGeometry(kind)} material={TOY_MATERIAL} rotation={[0, yaw, 0]} castShadow dispose={null} />
+  </group>)}</group>;
 }
 
 function DamageNumbers({ getState, localId }: { getState: () => SquadState | null; localId: string }) {
@@ -156,6 +190,7 @@ function DamageNumbers({ getState, localId }: { getState: () => SquadState | nul
 
 export function SquadScene({ getState, localId }: MinigameSceneProps<SquadState>) {
   const { camera, gl } = useThree(); const drag = useRef<Drag | null>(null); const highlight = useRef<THREE.Mesh>(null!);
+  const [gallery, setGallery] = useState<{ yaw: number; x: number; z: number; distance: number } | null>(null);
   const point = useRef(new THREE.Vector3());
   const cancel = () => { const previous = drag.current; drag.current = null; gl.domElement.style.cursor = ''; previous?.release(); };
   const move: PointerHandler = e => {
@@ -194,7 +229,7 @@ export function SquadScene({ getState, localId }: MinigameSceneProps<SquadState>
       const projected = new THREE.Vector3(boardToWorld(x), height, boardToWorld(z)).project(camera);
       const rect = gl.domElement.getBoundingClientRect();
       return { x: rect.left + (projected.x + 1) * rect.width / 2, y: rect.top + (1 - projected.y) * rect.height / 2 };
-    } } });
+    }, gallery: (yaw: number | null, x = 3.5, z = 3.8, distance = 36) => setGallery(yaw === null ? null : { yaw, x, z, distance }), names: () => Object.values(ROSTER).map(d => d.name) } });
   }, [camera, gl]);
   useFrame(({ size }) => {
     const building = getState()?.phase === 'build';
@@ -202,6 +237,7 @@ export function SquadScene({ getState, localId }: MinigameSceneProps<SquadState>
     const distance = Math.max(building ? size.height < 500 ? 66 : 53 : 42, 31 / aspect);
     camera.position.set(0, distance, distance * 0.58);
     camera.lookAt(0, 0, building ? 11 : 2.5);
+    if (gallery) { const x = boardToWorld(gallery.x), z = boardToWorld(gallery.z); camera.position.set(x, gallery.distance, z + gallery.distance * 0.58); camera.lookAt(x, 0, z); }
     if (drag.current && !editable(getState(), localId)) cancel();
     const d = drag.current; highlight.current.visible = !!d;
     if (d) {
@@ -221,8 +257,9 @@ export function SquadScene({ getState, localId }: MinigameSceneProps<SquadState>
       return <mesh key={`bench-${i}`} position={[boardToWorld(pos.x), -0.04, boardToWorld(pos.z)]} receiveShadow><boxGeometry args={[3.25, 0.35, 3.25]} /><meshStandardMaterial color={PALETTE.woodMid} /></mesh>;
     })}
     <mesh ref={highlight} rotation={[-Math.PI / 2, 0, 0]} raycast={() => {}}><planeGeometry args={[3.3, 3.3]} /><meshBasicMaterial transparent opacity={0.5} depthWrite={false} /></mesh>
-    {([0, 1] as const).flatMap(side => Array.from({ length: MAX_UNITS + (side === 0 ? BENCH_SIZE : 0) }, (_, slot) => <Piece key={`${side}:${slot}`} slot={slot} side={side} getState={getState} localId={localId} drag={drag} down={down} move={move} up={up} cancel={cancel} />))}
-    <AttackParticles getState={getState} localId={localId} />
+    {/* Effects subscribe to the frame loop first, so pieces read this frame's animation cues. */}
+    <SquadFx getState={getState} localId={localId} />
+    {gallery ? <ToyGallery yaw={gallery.yaw} /> : ([0, 1] as const).flatMap(side => Array.from({ length: MAX_UNITS + (side === 0 ? BENCH_SIZE : 0) }, (_, slot) => <Piece key={`${side}:${slot}`} slot={slot} side={side} getState={getState} localId={localId} drag={drag} down={down} move={move} up={up} cancel={cancel} />))}
     <DamageNumbers getState={getState} localId={localId} />
   </group>;
 }
