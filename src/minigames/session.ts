@@ -351,5 +351,7 @@ exposeDebug({
     state: () => runtime.state,
     phase: () => useMatch.getState().phase,
     timeScale: setMatchTimeScale,
+    /** Open a game's practice card directly (for games without a hub entrance yet). */
+    practice: (id: MinigameId) => openPractice(id),
   },
 });

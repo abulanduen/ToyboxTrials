@@ -1,4 +1,5 @@
 /* Milestones 4–5: minigame host, Copycat Conductor, Jack-in-the-Box and the tournament flow (desktop).
+   Find the Original has its own suite (tests/e2e/findoriginal.cjs); here it only appears in the tournament.
    Run: BASE_URL=http://localhost:4173/ node tests/e2e/minigame.cjs */
 const { chromium } = require('playwright');
 const path = require('path');
@@ -200,10 +201,14 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
     await page.waitForSelector('[data-testid=match-start]', { timeout: 60000 });
     await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
     await page.click('[data-testid=match-start]');
-    const game = await page.evaluate(() => window.__toybox.match.state()?.category ? 'jack' : 'copycat');
+    const game = await page.evaluate(() => {
+      const s = window.__toybox.match.state();
+      return s?.category ? 'jack' : s?.toys ? 'find' : 'copycat';
+    });
     games.push(game);
-    if (game === 'copycat') await failRound(); // Jack: just never answer, and the jack pops on us
-    await page.waitForSelector('.results', { timeout: 180000 });
+    // Jack: just never answer, and the jack pops on us. Find the Original: never pick, the bot outscores us.
+    if (game === 'copycat') await failRound();
+    await page.waitForSelector('.results', { timeout: 300000 });
     await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
     const rows = await page.$$eval('.results-list li', (els) => els.map((e) => e.textContent));
     check(`trial ${round}: results list both contestants with points`, rows.length === 2 && rows.some((r) => r.includes('+10')) && rows.some((r) => r.includes('+8')), rows.join(' | '));
@@ -220,7 +225,7 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
   const title = await page.textContent('.final h2');
   check('final standings: placed 2nd of 2 after losing every trial', title.includes('2nd of 2'), title);
-  check('tournament mixes the playable games', games.includes('jack') && games.includes('copycat'), games.join(','));
+  check('tournament mixes the three playable games', games.includes('jack') && games.includes('copycat') && games.includes('find'), games.join(','));
   await page.waitForTimeout(2500);
   await page.screenshot({ path: `${OUT}/m4-09-final.png` });
   const hist = await page.evaluate(() => JSON.parse(localStorage.getItem('toybox-trials:prototype:v1')).state.tournamentHistory);

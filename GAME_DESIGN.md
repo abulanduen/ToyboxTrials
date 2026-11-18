@@ -176,14 +176,31 @@ Each contender's energy drains continuously, and play alternates between two pha
 **Toybox:** nocturnal clockwork toys whose targets are battery-carrying bots, and sunlight overheats them.
 **Tech:** deterministic drain maths and server-controlled phase timing, with rates balanced in playtests.
 
-### 04 · Find the Original (Observation / Speed · 1–8)
-- A crowd of similar characters fills a shared arena. One is the target, **Baldwyn**, an original wind-up toy
-  with distinctive details. The rest are Not-Baldwyn decoys.
-- Players click or tap the one they think is Baldwyn. The first correct pick scores most, and later correct picks
-  score by order. The last player scores nothing.
+### 04 · Find the Original (Observation / Speed · 1–8) — ✅ built (M5)
+- **Baldwyn** is an original wind-up tin gentleman: sage barrel body, honey belt, two cream buttons, cream head,
+  round ink eyes, coral nose, handlebar moustache, an ink-purple top hat with a coral band tipped over one ear,
+  and a brass key in his side. **Not-Baldwyns** get one to three details wrong, from obvious (blue body, coral
+  hat, no hat) through medium (belt, nose, moustache, key side, hat band) to subtle (a missing button, hat tipped
+  the other way, one eye shut).
+- **Five rounds.** Each opens with a reference card ("This is Baldwyn"), which then stays in the corner of the
+  screen. Crowds grow 6 → 12 → 15 → 20 → 24. Mistakes go from two or three obvious ones to a single subtle one,
+  and from round 3 the crowd shuffles and turns on the spot.
+- Players tap or click the toy they think is Baldwyn (keyboard: move a ring with the arrows, pick with Enter).
+- **Scoring:** a correct pick scores by finishing order (100 / 70 / 50 / 40 / 30 / 20 / 10) plus a speed bonus
+  of up to 50. Picks in the same server step tie. A **wrong pick costs 15 points** (never below zero) and winds
+  you down for 1.5 s, longer for each further mistake that round. A decoy can't be picked twice.
+- Once the first toy finds him, the rest have 7 s ("hurry"). The round ends when all but one have found him,
+  so the last player scores nothing, or after 20 s. Nobody is shown where he was until the round ends.
+- Placement is by total points. Ties go to the faster total correct-pick time, then share the place.
+- **Bots** scan the crowd: time grows with crowd size and how subtle the round is, and weaker bots sometimes
+  pick the most convincing fake first or run out of time on the last rounds.
 
-**Tech:** identical positions and target on every client, with details readable at the target resolution.
-🔧 **Amended (A5):** client-side anti-cheat is "impractical, not impossible".
+**Tech:** the rules core generates each round's crowd from the match seed, and every toy's position is a pure
+function of the state, so all clients agree without sending positions. Portrait screens show the same grid
+turned on its side. The crowd is instanced (one draw call per body part). Picking is in screen space with
+finger-sized targets. All values above are first-pass and untuned with real players.
+🔧 **Amended (A5):** client-side anti-cheat is "impractical, not impossible". There is no target flag in the
+match state: a toy is Baldwyn only because its look has no mistakes.
 
 ### 05 · Red Light, Green Light (Reflexes / Movement · 2–8)
 - A giant mechanical referee alternates green (move) and red (stop) on a toy-soldier runway.

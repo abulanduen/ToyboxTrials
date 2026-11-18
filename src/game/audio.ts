@@ -287,6 +287,35 @@ export const sfx = {
     lfo.stop(t + 1.05);
     for (let i = 0; i < 6; i++) noise(t + 0.05 + i * 0.03, 0.08, 0.05, 5000 + i * 400, 3);
   },
+
+  // ---- Find the Original ----
+
+  /** Spotted the real one: a quick "ta-da" on music-box tines with a tin sparkle. */
+  spotted() {
+    const t = now();
+    tine(1174.7, t, 0.13, 0.35, 4.1);
+    tine(1568, t + 0.09, 0.14, 0.6, 4.1);
+    tine(2349.3, t + 0.18, 0.1, 0.8, 3.0);
+    for (let i = 0; i < 4; i++) noise(t + 0.2 + i * 0.04, 0.05, 0.03, 6200 + i * 500, 4);
+  },
+  /** Picked a Not-Baldwyn: your spring unwinds (clicks slowing down, a sagging tone). */
+  windDown() {
+    const t = now();
+    let dt = 0.04;
+    let at = t + 0.12;
+    for (let i = 0; i < 7; i++) {
+      noise(at, 0.14, 0.02, 3000 - i * 220, 5);
+      at += dt;
+      dt *= 1.28;
+    }
+    tone(330, t + 0.1, 0.09, 0.5, 'triangle', 0.004, 150);
+  },
+  /** Someone else found him: two quick wooden knocks ("hurry up"). */
+  knock() {
+    const t = now();
+    noise(t, 0.2, 0.03, 900, 2);
+    noise(t + 0.11, 0.24, 0.035, 1100, 2);
+  },
 };
 
 export type SfxName = keyof typeof sfx;
