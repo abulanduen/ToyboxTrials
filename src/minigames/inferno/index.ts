@@ -7,7 +7,7 @@ import { InfernoHud } from './Hud';
 
 const game: MinigameModule<InfernoState, InfernoInput> = {
   rules: infernoRules, createBot: createInfernoBot,
-  bindings: { ...HUB_BINDINGS, jump: [], slot1: ['Space'], slot2: ['KeyE', 'Enter'], interact: [] },
+  bindings: { ...HUB_BINDINGS, jump: [], slot1: ['Space'], slot2: ['KeyR'], interact: [] },
   readLocalInput(presses) {
     const inputs: InfernoInput[] = [];
     if (isDown('forward') || presses.includes('forward')) inputs.push({ direction: 0 });

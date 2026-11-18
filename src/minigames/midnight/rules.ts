@@ -9,19 +9,22 @@ export type Direction = 0 | 1 | 2 | 3;
 export interface Cell { x: number; z: number }
 export const SHELTERS: readonly Cell[] = [{ x: 1, z: 1 }, { x: 9, z: 1 }, { x: 1, z: 9 }, { x: 9, z: 9 }];
 export const sheltered = (p: Cell) => SHELTERS.some(c => Math.abs(c.x - p.x) <= 1 && Math.abs(c.z - p.z) <= 1);
-export interface HungerInput { direction: Direction }
+export interface HungerInput { direction?: Direction | null; hit?: boolean }
 export interface HungerPlayer extends Cell {
   id: string; energy: number; alive: boolean; fed: boolean; batteries: number;
   facing: Direction; nextMove: number; outAt: number;
+  intent: Direction | null; intentUntil: number; nextHit: number;
 }
-export interface Battery extends Cell { id: number; caughtBy: string | null }
+export interface Battery extends Cell { id: number; caughtBy: string | null; hits: number }
 export interface HungerConfig {
   nightMs: number; dayMs: number; maxMs: number; moveMs: number; targetMoveMs: number;
   maxEnergy: number; batteryEnergy: number; nightDrain: number; dayDrain: number; shelterDrain: number;
+  hitMs: number;
 }
 export const DEFAULT_CONFIG: HungerConfig = {
   nightMs: 10000, dayMs: 8000, maxMs: 180000, moveMs: 190, targetMoveMs: 750,
   maxEnergy: 100, batteryEnergy: 40, nightDrain: 2, dayDrain: 9, shelterDrain: 3,
+  hitMs: 400,
 };
 export interface HungerState {
   kind: 'midnight-hunger'; seed: number; config: HungerConfig; t: number;
@@ -39,24 +42,46 @@ function spawnNight(s: HungerState) {
     if (!sheltered(c) && !s.players.some(p => p.alive && same(p, c))) cells.push(c);
   }
   const count = Math.max(0, s.players.filter(p => p.alive).length - 1);
-  s.batteries = shuffle(rng, cells).slice(0, count).map((c, id) => ({ ...c, id, caughtBy: null }));
+  s.batteries = shuffle(rng, cells).slice(0, count).map((c, id) => ({ ...c, id, caughtBy: null, hits: 0 }));
   for (const p of s.players) p.fed = false;
   s.targetStep = 0; s.nextTarget = s.t + s.config.targetMoveMs;
   s.events.push({ type: 'night', night: s.night, targets: count });
 }
 
-function collect(s: HungerState) {
+function attack(s: HungerState, inputs: Record<string, HungerInput[]>) {
   if (s.phase !== 'night') return;
-  // Rotate equal-arrival priority each night rather than permanently favouring contestant order.
+  // Rotate simultaneous-attack priority each night rather than permanently favouring contestant order.
   const order = shuffle(seededRng(subSeed(s.seed, `catch:${s.night}`)), s.players);
   for (const p of order) {
-    if (!p.alive || p.fed) continue;
-    const battery = s.batteries.find(b => b.caughtBy === null && same(b, p));
+    if (!p.alive || p.fed || s.t < p.nextHit || !(inputs[p.id] ?? []).some(i => i.hit)) continue;
+    p.nextHit = s.t + s.config.hitMs;
+    const [dx, dz] = DIRECTIONS[p.facing];
+    const cell = { x: p.x + dx, z: p.z + dz };
+    const battery = s.batteries.find(b => b.caughtBy === null && same(b, cell));
     if (!battery) continue;
+    battery.hits++;
+    s.events.push({ type: 'battery-hit', id: p.id, target: battery.id, hits: battery.hits });
+    if (battery.hits < 3) continue;
     battery.caughtBy = p.id; p.fed = true; p.batteries++;
     p.energy = Math.min(s.config.maxEnergy, p.energy + s.config.batteryEnergy);
     s.events.push({ type: 'battery', id: p.id });
   }
+}
+
+/** Plan the entire push chain before mutating it; a blocked or resisting toy cancels the push. */
+function movePlayer(s: HungerState, p: HungerPlayer, direction: Direction) {
+  const [dx, dz] = DIRECTIONS[direction];
+  const chain = [p]; let cursor = p;
+  while (true) {
+    const dest = { x: cursor.x + dx, z: cursor.z + dz };
+    if (!inside(dest) || (s.phase === 'night' && s.batteries.some(b => b.caughtBy === null && same(b, dest)))) return;
+    const other = s.players.find(q => q.alive && same(q, dest));
+    if (!other) break;
+    if (other.intentUntil > s.t && other.intent === (direction + 2) % 4) return;
+    chain.push(other); cursor = other;
+  }
+  for (const toy of chain) { toy.x += dx; toy.z += dz; toy.nextMove = s.t + s.config.moveMs; }
+  if (chain.length > 1) s.events.push({ type: 'push', id: p.id, count: chain.length - 1 });
 }
 
 function moveTargets(s: HungerState) {
@@ -64,10 +89,9 @@ function moveTargets(s: HungerState) {
   for (const b of s.batteries) {
     if (b.caughtBy !== null) continue;
     const choices = shuffle(rng, DIRECTIONS).map(([dx, dz]) => ({ x: b.x + dx, z: b.z + dz }))
-      .filter(c => inside(c) && !sheltered(c) && !s.batteries.some(other => other !== b && other.caughtBy === null && same(c, other)));
+      .filter(c => inside(c) && !sheltered(c) && !s.players.some(p => p.alive && same(p, c)) && !s.batteries.some(other => other !== b && other.caughtBy === null && same(c, other)));
     if (choices[0]) Object.assign(b, choices[0]);
   }
-  collect(s);
 }
 
 export const hungerRules: RulesCore<HungerState, HungerInput, HungerConfig> = {
@@ -79,21 +103,28 @@ export const hungerRules: RulesCore<HungerState, HungerInput, HungerConfig> = {
     const s: HungerState = { kind: 'midnight-hunger', seed, config: cfg, t: 0, phase: 'night',
       phaseEnds: cfg.nightMs, night: 1, batteries: [], nextTarget: 0, targetStep: 0, events: [],
       players: contestants.map((c, i) => ({ id: c.id, x: spawns[i][0], z: spawns[i][1],
-        energy: cfg.maxEnergy, alive: true, fed: false, batteries: 0, facing: 2, nextMove: 0, outAt: 0 })) };
+        energy: cfg.maxEnergy, alive: true, fed: false, batteries: 0, facing: 2, nextMove: 0, outAt: 0,
+        intent: null, intentUntil: 0, nextHit: 0 })) };
     spawnNight(s); return s;
   },
   step(s, inputs, dtMs) {
     if (s.phase === 'over' || !Number.isFinite(dtMs) || dtMs <= 0) return s;
-    for (const p of s.players) {
-      if (!p.alive || s.t < p.nextMove) continue;
-      const input = (inputs[p.id] ?? []).find(i => Number.isInteger(i.direction) && i.direction >= 0 && i.direction < 4);
-      if (!input) continue;
-      p.facing = input.direction; p.nextMove = s.t + s.config.moveMs;
-      const [dx, dz] = DIRECTIONS[input.direction]; const c = { x: p.x + dx, z: p.z + dz };
-      // Players may pass through one another; shelters never become body-blocked.
-      if (inside(c)) Object.assign(p, c);
+    // Register everyone's intent first so opposing inputs resist regardless of iteration order.
+    for (const p of s.players) for (const input of inputs[p.id] ?? []) {
+      if (!p.alive) continue;
+      if (input.direction === null) p.intent = null;
+      else if (input.direction !== undefined && Number.isInteger(input.direction) && input.direction >= 0 && input.direction < 4) {
+        p.intent = input.direction; p.facing = input.direction;
+        p.intentUntil = s.t + s.config.moveMs * 3;
+      }
     }
-    collect(s);
+    for (const p of s.players) {
+      if (!p.alive || s.t < p.nextMove || p.intent === null || p.intentUntil <= s.t) continue;
+      if (!(inputs[p.id] ?? []).some(i => i.direction === p.intent)) continue;
+      p.nextMove = s.t + s.config.moveMs;
+      movePlayer(s, p, p.intent);
+    }
+    attack(s, inputs);
     let remaining = dtMs;
     while (remaining > 0) {
       const alive = s.players.filter(p => p.alive);

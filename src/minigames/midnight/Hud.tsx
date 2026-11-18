@@ -27,7 +27,7 @@ export function HungerHud({ getState, localId }: MinigameSceneProps<HungerState>
   const night = s.phase === 'night';
   return <div className={`hunger-hud ${night ? 'hunger-night' : 'hunger-day'}`}>
     <div className="hunger-banner">
-      <strong>{night ? 'NIGHT · Catch a battery' : 'DAY · Find shelter'} · {Math.ceil(Math.max(0, s.phaseEnds - s.t) / 1000)}s</strong>
+      <strong>{night ? 'NIGHT · Hit a battery bot 3 times' : 'DAY · Find shelter'} · {Math.ceil(Math.max(0, s.phaseEnds - s.t) / 1000)}s</strong>
       <span>{!me.alive ? 'Out of energy — watching the survivors' : night ? me.fed ? 'Recharged! Head to a corner shelter.' : `${s.batteries.filter(b => b.caughtBy === null).length} batteries left · one each` : sheltered(me) ? 'Sheltered: energy still drains slowly' : 'Exposed: sunlight drains energy fast!'}</span>
       <div className="hunger-energy" role="progressbar" aria-label="Energy" aria-valuemin={0} aria-valuemax={s.config.maxEnergy} aria-valuenow={Math.round(me.energy)}>
         <div style={{ width: `${me.energy / s.config.maxEnergy * 100}%` }} />
@@ -40,6 +40,7 @@ export function HungerHud({ getState, localId }: MinigameSceneProps<HungerState>
     {!paused && me.alive && <div className="hunger-controls"><DirectionPad action="forward" label="Up" /><div>
       <DirectionPad action="left" label="Left" /><DirectionPad action="back" label="Down" /><DirectionPad action="right" label="Right" />
     </div></div>}
-    <div className="hunger-hint">{night ? 'Touch a battery bot to catch it' : 'Roofed corners are shelters'}</div>
+    {!paused && me.alive && <div className="hunger-attack"><DirectionPad action="slot1" label="Hit" /></div>}
+    <div className="hunger-hint">{night ? 'Face a bot · Space / Hit · 3 hits' : 'Hold against a push to resist'}</div>
   </div>;
 }

@@ -38,12 +38,15 @@ function Toy({ c, getState }: { c: Contestant; getState: () => HungerState | nul
 
 function BatteryToy({ id, getState }: { id: number; getState: () => HungerState | null }) {
   const root = useRef<THREE.Group>(null!);
+  const pips = useRef<THREE.Group>(null!);
   useFrame(({ clock }) => {
     const s = getState(); const b = s?.kind === 'midnight-hunger' && s.phase === 'night' ? s.batteries.find(b => b.id === id && b.caughtBy === null) : undefined;
     root.current.visible = !!b;
     if (b) root.current.position.set(coord(b.x), 0.8 + Math.sin(clock.elapsedTime * 5 + id) * 0.12, coord(b.z));
+    pips.current.children.forEach((pip, i) => { pip.visible = !!b && i < 3 - b.hits; });
   });
   return <group ref={root}>
+    <group ref={pips} position={[0, 1.6, 0]}>{[-0.6, 0, 0.6].map(x => <mesh key={x} position={[x, 0, 0]}><sphereGeometry args={[0.2, 8, 8]} /><meshBasicMaterial color={PALETTE.cream} /></mesh>)}</group>
     <mesh castShadow><boxGeometry args={[1.4, 1.1, 1.2]} /><meshStandardMaterial color={PALETTE.honey} emissive={PALETTE.honey} emissiveIntensity={0.4} /></mesh>
     <mesh position={[0, 0.8, 0]}><cylinderGeometry args={[0.45, 0.45, 0.45, 10]} /><meshStandardMaterial color={PALETTE.brass} /></mesh>
     <mesh position={[0, 0, 0.62]}><boxGeometry args={[0.65, 0.18, 0.08]} /><meshBasicMaterial color={PALETTE.ink} /></mesh>
@@ -57,6 +60,7 @@ export function HungerScene({ getState, contestants }: MinigameSceneProps<Hunger
   const { camera } = useThree();
   useEffect(() => matchBus.on('event', e => {
     if (e.type === 'battery') sfx.reward();
+    if (e.type === 'battery-hit') sfx.bump();
     if (e.type === 'night') sfx.musicBox();
     if (e.type === 'day') sfx.bell();
     if (e.type === 'eliminated') sfx.eliminate();

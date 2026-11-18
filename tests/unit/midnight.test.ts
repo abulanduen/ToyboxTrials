@@ -26,10 +26,16 @@ describe('Midnight Hunger', () => {
   });
   it('restores capped energy exactly once per player per night', () => {
     const s = fresh(); const p = s.players[0]; p.energy = 80;
-    s.batteries = [{ id: 0, x: p.x, z: p.z, caughtBy: null }, { id: 1, x: p.x, z: p.z, caughtBy: null }];
-    hungerRules.step(s, {}, 1);
+    p.facing = 1; s.nextTarget = 99999;
+    s.batteries = [{ id: 0, x: p.x + 1, z: p.z, caughtBy: null, hits: 0 }, { id: 1, x: p.x, z: p.z + 1, caughtBy: null, hits: 0 }];
+    hungerRules.step(s, { p0: [{ hit: true }] }, 400);
+    hungerRules.step(s, { p0: [{ hit: true }] }, 400);
+    expect(p.batteries).toBe(0); expect(s.batteries[0].hits).toBe(2);
+    hungerRules.step(s, { p0: [{ hit: true }] }, 1);
     expect(p.energy).toBeCloseTo(99.998); expect(p.batteries).toBe(1); expect(p.fed).toBe(true);
-    hungerRules.step(s, {}, 1); expect(p.batteries).toBe(1);
+    p.facing = 2;
+    for (let i = 0; i < 4; i++) hungerRules.step(s, { p0: [{ hit: true }] }, 400);
+    expect(p.batteries).toBe(1);
     expect(s.batteries.filter(b => b.caughtBy !== null)).toHaveLength(1);
   });
   it('clears targets by day and respawns N−1 for current survivors at night', () => {
@@ -41,11 +47,54 @@ describe('Midnight Hunger', () => {
     expect(s.batteries).toHaveLength(2); expect(s.players.every(p => !p.fed)).toBe(true);
   });
   it('a shared target has one seeded winner regardless of input object order', () => {
-    const s = fresh(); for (const p of s.players) { p.x = 5; p.z = 5; }
-    s.batteries = [{ id: 0, x: 5, z: 5, caughtBy: null }];
-    hungerRules.step(s, {}, 1);
+    const s = fresh(); s.players[0].x = 4; s.players[0].z = 5; s.players[0].facing = 1;
+    s.players[1].x = 6; s.players[1].z = 5; s.players[1].facing = 3;
+    s.batteries = [{ id: 0, x: 5, z: 5, caughtBy: null, hits: 2 }];
+    hungerRules.step(s, { p0: [{ hit: true }], p1: [{ hit: true }] }, 1);
     expect(s.players.filter(p => p.fed)).toHaveLength(1);
     expect(s.events.filter(e => e.type === 'battery')).toHaveLength(1);
+  });
+  it('requires three in-range hits, enforces attack cooldown, and never collects by contact', () => {
+    const s = fresh(); const p = s.players[0]; p.facing = 1; s.nextTarget = 99999;
+    s.batteries = [{ id: 0, x: p.x + 1, z: p.z, hits: 0, caughtBy: null }];
+    hungerRules.step(s, { p0: [{ direction: 1 }] }, 16);
+    expect(p.x).toBe(4); expect(p.fed).toBe(false);
+    hungerRules.step(s, { p0: [{ hit: true }, { hit: true }, { hit: true }] }, 16);
+    expect(s.batteries[0].hits).toBe(1);
+    hungerRules.step(s, { p0: [{ hit: true }] }, 16); expect(s.batteries[0].hits).toBe(1);
+    hungerRules.step(s, {}, 400); p.facing = 0;
+    hungerRules.step(s, { p0: [{ hit: true }] }, 16); expect(s.batteries[0].hits).toBe(1);
+    s.phase = 'day'; p.facing = 1;
+    hungerRules.step(s, { p0: [{ hit: true }] }, 16); expect(s.batteries[0].hits).toBe(1);
+  });
+  it('pushes idle players as a chain without overlap, but cancels at the edge', () => {
+    const s = fresh(); s.batteries = [];
+    s.players.forEach((p, i) => { p.x = i + 4; p.z = 5; });
+    hungerRules.step(s, { p0: [{ direction: 1 }] }, 200);
+    expect(s.players.map(p => p.x)).toEqual([5, 6, 7, 8]);
+    s.players.forEach((p, i) => { p.x = i + 7; });
+    hungerRules.step(s, { p0: [{ direction: 1 }] }, 200);
+    expect(s.players.map(p => p.x)).toEqual([7, 8, 9, 10]);
+  });
+  it('resists opposing input regardless of contestant order; releases resistance on stop', () => {
+    for (const reverse of [false, true]) {
+      const s = fresh(); s.batteries = [];
+      Object.assign(s.players[0], { x: 4, z: 5 }); Object.assign(s.players[1], { x: 5, z: 5 });
+      const a = s.players[0], b = s.players[1]; if (reverse) s.players.reverse();
+      hungerRules.step(s, { p0: [{ direction: 1 }], p1: [{ direction: 3 }] }, 200);
+      expect([a.x, b.x]).toEqual([4, 5]);
+      hungerRules.step(s, { p0: [{ direction: 1 }], p1: [{ direction: null }] }, 200);
+      expect([a.x, b.x]).toEqual([5, 6]);
+    }
+  });
+  it('allows a push with movement and expires stale resistance', () => {
+    const s = fresh(); s.batteries = [];
+    Object.assign(s.players[0], { x: 4, z: 5 }); Object.assign(s.players[1], { x: 5, z: 5 });
+    hungerRules.step(s, { p0: [{ direction: 1 }], p1: [{ direction: 1 }] }, 200);
+    expect(s.players.slice(0, 2).map(p => p.x)).toEqual([5, 6]);
+    s.players[1].intent = 3; s.players[1].intentUntil = s.t - 1;
+    hungerRules.step(s, { p0: [{ direction: 1 }] }, 200);
+    expect(s.players.slice(0, 2).map(p => p.x)).toEqual([6, 7]);
   });
   it('resolves simultaneous energy depletion as a tie and does not revive eliminated toys', () => {
     const s = fresh(); s.batteries = []; for (const p of s.players) p.energy = 1;
@@ -69,6 +118,7 @@ describe('Midnight Hunger', () => {
     hungerRules.step(s, {}, 200);
     hungerRules.step(s, { p0: [{ direction: 1 }] }, 16); expect(p.x).toBe(1);
     hungerRules.step(s, { p0: [{ direction: 99 as 0 }] }, 200); expect(p.x).toBe(1);
+    hungerRules.step(s, { p0: [{ direction: 99 as 0 }] }, 16); expect(p.x).toBe(1);
     p.alive = false; hungerRules.step(s, { p0: [{ direction: 1 }] }, 16); expect(p.x).toBe(1);
   });
   it('splits large steps at exact phase, target and elimination boundaries', () => {
@@ -90,6 +140,7 @@ describe('Midnight Hunger', () => {
       for (let i = 0; i < 2000 && s.phase !== 'over'; i++) {
         hungerRules.step(s, Object.fromEntries(people.map(c => [c.id, bot.decide(s, c, 16, rng)])), 16);
         hungerRules.drainEvents(s);
+        expect(new Set(s.players.filter(p => p.alive).map(p => `${p.x},${p.z}`)).size).toBe(s.players.filter(p => p.alive).length);
         for (const p of s.players) { expect(p.x).toBeGreaterThanOrEqual(0); expect(p.x).toBeLessThan(11); expect(p.energy).toBeGreaterThanOrEqual(0); expect(p.energy).toBeLessThanOrEqual(100); }
       }
       expect(s.phase).toBe('over'); return hungerRules.result(s);

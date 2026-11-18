@@ -34,9 +34,17 @@ const out = path.join(__dirname, 'output'); fs.mkdirSync(out, { recursive: true 
       });
       await page.evaluate(() => window.__toybox.match.timeScale(1));
       if (mobile) await page.getByRole('button', { name: 'Right', exact: true }).tap(); else await page.keyboard.press('KeyD');
-      await page.waitForFunction(x => { const p = window.__toybox.match.state().players[0]; return p.x > x && p.fed; }, startX).catch(async e => {
-        console.error('Movement/collection state:', await page.evaluate(() => window.__toybox.match.state())); throw e;
-      });
+      await page.waitForFunction(() => window.__toybox.match.state().players[0].facing === 1);
+      assert.equal(await page.evaluate(() => window.__toybox.match.state().players[0].x), startX, 'battery bot blocks movement');
+      assert.equal(await page.evaluate(() => window.__toybox.match.state().players[0].fed), false, 'contact does not collect');
+      for (let hit = 1; hit <= 3; hit++) {
+        await page.waitForFunction(() => { const s = window.__toybox.match.state(); return s.t >= s.players[0].nextHit; });
+        if (mobile) await page.getByRole('button', { name: 'Hit', exact: true }).tap(); else await page.keyboard.press('Space');
+        await page.waitForFunction(n => window.__toybox.match.state().batteries[0].hits === n, hit);
+        assert.equal(await page.evaluate(() => window.__toybox.match.state().players[0].fed), hit === 3);
+      }
+      if (mobile) await page.getByRole('button', { name: 'Right', exact: true }).tap(); else await page.keyboard.press('KeyD');
+      await page.waitForFunction(x => window.__toybox.match.state().players[0].x > x, startX);
       assert.ok(await page.evaluate(() => window.__toybox.match.state().players[0].energy > 60));
       await page.getByRole('button', { name: 'Pause', exact: true }).click(); await page.waitForSelector('.pause');
       const pausedAt = await page.evaluate(() => window.__toybox.match.state().t); await page.waitForTimeout(250);

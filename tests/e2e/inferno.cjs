@@ -32,6 +32,16 @@ fs.mkdirSync(out, { recursive: true });
       await page.waitForFunction(x => window.__toybox.match.state().players[0].x > x, start.x);
       // Face the boundary without moving; then face back to a guaranteed vacant spawn tile.
       if (mobile) await page.getByRole('button', { name: 'Left', exact: true }).tap(); else await page.keyboard.press('KeyA');
+      await page.evaluate(() => {
+        const s = window.__toybox.match.state(); const p = s.players[0];
+        p.x = 4; p.z = 4; p.facing = 0;
+        s.tiles[3 * 11 + 4] = 'rock'; p.nextBreak = 0;
+      });
+      if (mobile) await page.getByRole('button', { name: 'Break', exact: true }).tap(); else await page.keyboard.press('Space');
+      await page.waitForFunction(() => window.__toybox.match.state().tiles[3 * 11 + 4] === 'floor');
+      if (mobile) await page.getByRole('button', { name: 'Build wall', exact: true }).tap(); else await page.keyboard.press('KeyR');
+      await page.waitForFunction(() => window.__toybox.match.state().players[0].wallUsed);
+      assert.equal(await page.evaluate(() => window.__toybox.match.state().tiles[3 * 11 + 4]), 'wall');
       await page.getByRole('button', { name: 'Pause', exact: true }).click();
       await page.waitForSelector('.pause');
       const pausedAt = await page.evaluate(() => window.__toybox.match.state().t);

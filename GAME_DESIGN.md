@@ -199,6 +199,10 @@ shelter layout and time-limit ties. These choices await playtesting and are not 
 Each contender's energy drains continuously, and play alternates between two phases until one player remains.
 - **Night:** about 10 s to catch a target. Only **N−1** targets spawn for N survivors, so at least one player goes without.
   Catching one restores energy.
+- **Owner revision:** players collide and can push unresisting toys; holding against the push
+  resists it. Battery bots require three hits with Spacebar (touch: Hit), rather than contact
+  collection. Damage is shared; the third attacker claims the recharge. See the module README
+  for provisional range/cooldown and push-chain details.
 - **Day:** "sunlight" drains energy much faster. Players retreat to shelters, which slow the drain but don't stop it.
 
 **Toybox:** nocturnal clockwork toys whose targets are battery-carrying bots, and sunlight overheats them.

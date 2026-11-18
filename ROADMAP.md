@@ -28,6 +28,10 @@ integration. Balance/interpretations are in `src/minigames/midnight/README.md`. 
 Inferno branch; merge that work first. Seven catalogue entries remain planned in this clone;
 Claude's separate work is still described in the handoff section above.
 
+Owner revision: Midnight now has solid player/target collision, pushes with opposite-input
+resistance, and three-hit battery claims via Spacebar/Hit. Inferno uses Spacebar to break and R
+to build. Details and provisional cooldown/chain rules are in the respective module READMEs.
+
 **Astra branch update:** `astra/inferno-escape` adds a local Inferno Escape module, Pavilion practice
 entry via the registry, bots and tournament eligibility. See `src/minigames/inferno/README.md` for
 provisional rules and integration notes. Claude retains the three worktrees listed above; recover

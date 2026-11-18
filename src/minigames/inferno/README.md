@@ -3,7 +3,7 @@
 Entry: Tournament Pavilion → **Or practise one trial → Inferno Escape**. Also eligible for local bot tournaments. Supports 2–8 contenders through the shared host; online play remains future work.
 
 - WASD/arrows or held directional pads move on the board and turn the facing marker.
-- Space/Break removes the rock or wall ahead. E/Build wall places one blue wall on an empty, unoccupied tile ahead during the 15-second preparation.
+- Space/Break removes the rock or your own wall ahead. R/Build wall places one blue wall on an empty, unoccupied tile ahead during the 15-second preparation.
 - Everyone starts in a shared 3×3 centre clearing. All other interior tiles are rocks; the outside border is impassable.
 - After preparation, the furnace appears in the centre and pursues survivors along routes weighted by travel and destruction time. It breaks rocks in 0.9 seconds and walls in 1.8 seconds; the block under attack glows coral. Shelters buy time rather than stopping it permanently.
 - Players can break rocks and their own wall, but never another player's wall. Removing your own wall does not restore your build allowance.
