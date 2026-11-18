@@ -106,26 +106,48 @@ function tine(freq: number, t: number, peak: number, decay: number, partial = 3.
 const now = () => (ctx ? ctx.currentTime + 0.005 : 0);
 const jitter = (v: number, amt: number) => v * (1 + (Math.random() * 2 - 1) * amt);
 
+/** Short material sounds for busy action games; never changes Copycat's instrument voices. */
+export type ToyCue = 'puff' | 'fan' | 'marble' | 'bubble' | 'ribbon' | 'storm' | 'stitch' | 'button' | 'charge' | 'hit' | 'out' | 'warning' | 'count';
+export function playToyCue(cue: ToyCue, volume = 1) {
+  if (!live()) return;
+  const t = now(), k = Math.max(0, Math.min(1, volume));
+  if (!k) return;
+  switch (cue) {
+    case 'puff': noise(t, .11*k, .075, 650, .6, 'lowpass'); tone(240,t,.07*k,.08,'sine',.008,130); break;
+    case 'fan': noise(t,.1*k,.15,950,.5,'lowpass'); break;
+    case 'marble': tone(520,t,.09*k,.11,'sine',.006,390); noise(t,.035*k,.025,1100,.6,'lowpass'); break;
+    case 'bubble': tone(380,t,.08*k,.12,'sine',.012,680); break;
+    case 'ribbon': noise(t,.09*k,.13,1450,.5,'lowpass'); tone(300,t,.025*k,.1,'sine',.012,240); break;
+    case 'storm': noise(t,.1*k,.21,700,.5,'lowpass'); noise(t+.06,.04*k,.12,1100,.5,'lowpass'); break;
+    case 'stitch': tone(440,t,.065*k,.11,'sine',.012); tone(550,t+.07,.045*k,.12,'sine',.012); break;
+    case 'button': tone(290,t,.08*k,.055,'sine',.006,190); noise(t,.04*k,.025,800,.5,'lowpass'); break;
+    case 'charge': noise(t,.035*k,.045,850,.5,'lowpass'); break;
+    case 'hit': tone(jitter(180,.05),t,.1*k,.07,'sine',.006,110); noise(t,.04*k,.035,650,.5,'lowpass'); break;
+    case 'out': tone(350,t,.09*k,.23,'sine',.012,130); noise(t+.08,.035*k,.065,700,.5,'lowpass'); break;
+    case 'warning': tone(660,t,.09*k,.14,'sine',.01); tone(440,t+.17,.07*k,.14,'sine',.01); break;
+    case 'count': tone(400,t,.06*k,.055,'sine',.008,300); break;
+  }
+}
+
 // ---------- the sound palette ----------
 
 export const sfx = {
   /** Wooden UI click. */
   click() {
     const t = now();
-    noise(t, 0.35, 0.03, 2400, 3);
-    tone(jitter(1100, 0.03), t, 0.15, 0.04, 'triangle');
+    noise(t, 0.12, 0.025, 1200, 0.7, 'lowpass');
+    tone(jitter(700, 0.03), t, 0.06, 0.035, 'sine', 0.006);
   },
   /** Softer hover tick for menu focus. */
   tick() {
     const t = now();
     noise(t, 0.12, 0.02, 3800, 4);
   },
-  /** Tiny plastic foot tap with a clockwork tick on top. */
+  /** Muted wooden/plastic foot tap without a sharp clockwork overtone. */
   footstep(left: boolean) {
     const t = now();
-    noise(t, 0.16, 0.035, left ? 1500 : 1750, 2.5);
-    tone(jitter(left ? 420 : 470, 0.05), t, 0.05, 0.03, 'triangle');
-    noise(t + 0.045, 0.05, 0.015, 5200, 6);
+    noise(t, 0.07, 0.03, left ? 850 : 950, 0.6, 'lowpass');
+    tone(jitter(left ? 280 : 310, 0.05), t, 0.025, 0.03, 'sine', 0.006);
   },
   /** Clockwork ratchet: a run of accelerating clicks. */
   windUp(clicks = 9) {

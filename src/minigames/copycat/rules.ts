@@ -2,7 +2,8 @@
  * Copycat Conductor — rules core (GAME_DESIGN.md §4 · 01). Deterministic; no DOM/three/timers.
  *
  * Round loop:  intro → demo (conductor plays the sequence) → turn ("your turn") → input → judge → …
- * - The sequence starts at `startLength` notes and grows by one each round.
+ * - Every round plays a brand-new sequence (not the last one plus a note). It starts at
+ *   `startLength` notes and each round's sequence is one note longer than the last.
  * - Demonstrations speed up every round (interval × `speedUp`, floored at `minIntervalMs`).
  * - In the input phase each player repeats the sequence. A wrong note or running out of time
  *   eliminates them. Finishing early is fine — they wait for the others.
@@ -70,7 +71,9 @@ export interface CopycatState {
   phase: Phase;
   phaseT: number;
   round: number;
-  /** Full pre-generated note sequence; round r uses the first `lengthFor(r)` notes. */
+  /** Match seed: each round's sequence is derived from it and the round number. */
+  seed: number;
+  /** This round's note sequence (`lengthFor(round)` notes), freshly generated every round. */
   sequence: Slot[];
   demoIndex: number;
   players: CopycatPlayer[];
@@ -99,6 +102,15 @@ function makeSequence(seed: number, length: number): Slot[] {
   return seq;
 }
 
+/** A fresh sequence for `round`, never just the previous round's tune with a note added. */
+export function sequenceForRound(seed: number, round: number, length: number): Slot[] {
+  const prev = round > 1 ? sequenceForRound(seed, round - 1, length - 1) : null;
+  for (let attempt = 0; ; attempt++) {
+    const seq = makeSequence((seed ^ Math.imul(round * 7919 + attempt * 104729, 2654435761)) >>> 0, length);
+    if (!prev || attempt >= 8 || prev.some((n, i) => seq[i] !== n)) return seq;
+  }
+}
+
 function setPhase(s: CopycatState, phase: Phase) {
   s.phase = phase;
   s.phaseT = 0;
@@ -120,6 +132,7 @@ function startRound(s: CopycatState) {
     p.finished = false;
   }
   s.demoIndex = 0;
+  s.sequence = sequenceForRound(s.seed, s.round, lengthFor(s));
   setPhase(s, 'demo');
   s.events.push({ type: 'round-start', round: s.round, length: lengthFor(s), interval: intervalFor(s) });
 }
@@ -137,7 +150,8 @@ export const copycatRules: RulesCore<CopycatState, CopycatInput, CopycatConfig> 
       phase: 'intro',
       phaseT: 0,
       round: 1,
-      sequence: makeSequence(seed, cfg.startLength + cfg.maxRounds),
+      seed,
+      sequence: sequenceForRound(seed, 1, cfg.startLength),
       demoIndex: 0,
       players: contestants.map((c) => ({
         id: c.id,

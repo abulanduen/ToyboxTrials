@@ -19,7 +19,7 @@ export const TUTORIALS: Partial<Record<MinigameId, TutorialStep[]>> = {
   'copycat-conductor': [
     { title: 'Watch the conductor', text: 'The conductor plays a tune on four instruments: drum, bell, xylophone and music box. Watch and listen.' },
     { title: 'Play it back', text: 'Repeat the tune in the same order with A, S, J and K.', touch: 'Repeat the tune in the same order by tapping the four instrument pads.' },
-    { title: 'Longer and faster', text: 'Every round adds a note and speeds up. A wrong note or running out of time knocks you out. Last toy playing wins.' },
+    { title: 'A new tune every round', text: 'Every round plays a brand-new tune, one note longer and a little faster. A wrong note or running out of time knocks you out. Last toy playing wins.' },
   ],
   'jack-in-the-box': [
     { title: 'Read the category', text: 'Each round has a category, like “Name a fruit”. The wind-up box is passed around the circle.' },
@@ -42,19 +42,29 @@ export const TUTORIALS: Partial<Record<MinigameId, TutorialStep[]>> = {
     { title: 'Watch what moves', text: 'Anything that rattles, rolls, swings or lifts runs on a rhythm. Wait for your gap, then go. First toy across the line wins.' },
   ],
   'inferno-escape': [
-    { title: 'Dig in', text: 'You start in the middle of a field of blocks. Move with W A S D and press Space to break the block you are facing.', touch: 'You start in the middle of a field of blocks. Hold the direction pads to move and tap Break to clear the block you are facing.' },
+    { title: 'Dig in', text: 'You start in the middle of a field of blocks. Move with W A S D and press Space to break the block you are facing.', touch: 'You start in the middle of a field of blocks. Push the joystick to move and turn, and tap Break to clear the block you are facing.' },
     { title: 'One wall each', text: 'During the 15-second preparation you may place exactly one wall with R. Use it wisely: unused walls expire.', touch: 'During the 15-second preparation you may place exactly one wall with Build wall. Use it wisely: unused walls expire.' },
     { title: 'Outrun the furnace', text: 'Then the wind-up furnace rolls out and hunts the nearest toy, chewing through blocks and walls. If it touches you, you are out. Last survivor wins.' },
   ],
   'midnight-hunger': [
     { title: 'Energy always drains', text: 'Your energy bar runs down all the time. Reach zero and you are out. Last toy with energy wins.' },
     { title: 'Hunt batteries by night', text: 'At night, face a battery bot and press Space three times to claim its charge. There is always one battery too few to go round.', touch: 'At night, face a battery bot and tap Hit three times to claim its charge. There is always one battery too few to go round.' },
-    { title: 'Shelter by day', text: 'Daylight overheats you. Get under a green roofed shelter in a corner to slow the drain. Push rivals out of your way, or hold against a push to resist.' },
+    { title: 'Shelter by day', text: 'Daylight overheats you. Get under a green roofed shelter in a corner to slow the drain. Push rivals out of your way, or hold against a push to resist.', touch: 'Daylight overheats you. Steer with the joystick to a green roofed shelter in a corner. Push rivals out of your way, or hold the stick against a push to resist.' },
   ],
   'music-box-rhythm': [
     { title: 'Pins meet the line', text: 'Coloured pins ride the turning music box towards a bright line. Each colour is one lane.' },
     { title: 'Play on the beat', text: 'Press A, S, J or K as a pin crosses the line in its lane.', touch: 'Tap the matching pad as a pin crosses the line in its lane. Use both thumbs.' },
     { title: 'Build a combo', text: 'Perfect and Good hits build your combo up to ×4. A miss or a stray tap breaks it. Highest score wins. Taps feel late? Adjust the timing offset on this card.' },
+  ],
+  'blink-duel': [
+    { title: 'One hit and you are out', text: 'Swords knock a toy out in a single hit. Last toy standing wins.' },
+    { title: 'Blink to dodge', text: 'Space blinks you forward instantly, with no cooldown. Aim with W A S D or the mouse.', touch: 'Tap Blink to teleport forward instantly, with no cooldown. Steer to aim, or tap the arena.' },
+    { title: 'Read the wind-up', text: 'A swing (J or click) charges for almost a second, and a striped cone shows where it will land. Blink out of cones, and blinking cancels your own swing.', touch: 'Swing charges for almost a second, and a striped cone shows where it will land. Blink out of cones, and blinking cancels your own swing.' },
+  ],
+  'spellbox-showdown': [
+    { title: 'Pick your build', text: 'Before the fight, choose one spell for each of your three buttons, then press Ready.' },
+    { title: 'Push them out', text: 'Hits add damage, and the more damage a toy has, the further it flies. Cast with Q, E and R; aim with the mouse.', touch: 'Hits add damage, and the more damage a toy has, the further it flies. Tap your three spell buttons; tap the arena to aim.' },
+    { title: 'Stay in the ring', text: 'Cross the edge and you are out. The ring shrinks as toys fall, with a warning first. Last toy inside wins.' },
   ],
   'toy-squad': [
     { title: 'Buy toys', text: 'Spend coins on toys from the shop. Rerolling shows new offers for a few coins. Your level decides which rarities appear.' },
