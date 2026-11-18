@@ -530,3 +530,27 @@ to affected allies. Heal, shield, stun, poison, mark, silence and buff feedback 
 | Celestial Seamstress | Navy star-spangled gown, silver hair, crescent halo, giant needle | Threaded star (star, arc) | Stitched constellation (star) |
 | Crownless King | Ermine-caped king, bare head, crown hung on his greatsword | Greatsword cleave (slash, smash) | Final decree (shard) |
 | Infinity Jack | Harlequin jack-in-the-box, spring neck, jester hat, brass infinity on the lid | Boxing spring (coil, boomerang) | Out of the box (coil) |
+
+## Rarity colours and trait symbols
+
+| Rarity | Colour | Token |
+| --- | --- | --- |
+| Common | Grey | `RARITY.common` `#A9A6AE` |
+| Uncommon | Green | `RARITY.uncommon` (sage) |
+| Rare | Blue | `RARITY.rare` (toy blue) |
+| Epic | Purple | `RARITY.epic` `#9A78C9` |
+| Legendary | Yellow | `RARITY.legendary` (honey) |
+
+| Trait | Symbol |
+| --- | --- |
+| Tin | Tin can |
+| Clockwork | Wind-up key |
+| Felt | Stitched patch |
+| Paper | Folded sheet |
+| Wood | Log rings |
+| Prism | Prism splitting light |
+| Vanguard | Shield |
+| Ranger | Arrow on a target |
+| Medic | Cross |
+| Trickster | Jester hat |
+| Artificer | Spanner |

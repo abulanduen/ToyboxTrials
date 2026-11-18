@@ -9,7 +9,7 @@ export function makeFighters(units: SquadUnit[], side: 0 | 1, passives: readonly
     return { ...u, side, x: u.cell % 8, z: side === 0 ? 4 + Math.floor(u.cell / 8) : 3 - Math.floor(u.cell / 8), hp, maxHp: hp,
       facing: side === 0 ? Math.PI : 0, armour: d.armour + (passives.includes('polish') ? 1 : 0), shield: passives.includes('bubble') ? 5 : 0,
       poison: 0, stunnedUntil: 0, attacks: 0, bonusDamage: (passives.includes('springs') ? 1 : 0) + (!front && passives.includes('backline') ? 1 : 0),
-      range: d.range + (d.range > 1 && passives.includes('sights') ? 1 : 0),
+      range: d.range + (d.range > 1 && passives.includes('sights') ? 1 : 0), stats: { dealt: 0, spell: 0, taken: 0 },
       magic: { mana: 0, maxMana: d.spell.mana, nextCast: 0, casts: 0, lastSpell: '', baseRange: 0, spellPower: 0, healPower: 0, attackMana: 0, markBonus: 0, poisonPower: 1, markedUntil: 0, markPower: 0, silencedUntil: 0, hurtCount: 0, wounded: false, buffs: [] } };
   });
   initMagic(fighters); return fighters;
@@ -48,11 +48,11 @@ export function tickBattle(b: Battle) {
   }
   for (const u of b.fighters) if (u.hp > 0 && u.poison > 0) {
     const amount = u.magic.poisonPower;
-    u.hp = Math.max(0, u.hp - amount); u.poison--; hurt.add(u); b.damages.push({ serial: b.tick * 1024 + b.damages.length, unit: u.id, x: u.x, z: u.z, amount });
+    u.hp = Math.max(0, u.hp - amount); u.stats.taken += amount; u.poison--; hurt.add(u); b.damages.push({ serial: b.tick * 1024 + b.damages.length, unit: u.id, x: u.x, z: u.z, amount });
   }
   finish(b); if (b.done) return;
   const live = b.fighters.filter(u => u.hp > 0);
-  const hits: { source: Fighter; target: Fighter; amount: number; pierce: boolean; primary: boolean }[] = [];
+  const hits: { source: Fighter; target: Fighter; amount: number; pierce: boolean; primary: boolean; spell?: boolean }[] = [];
   const heals = new Map<Fighter, number>(); const poison = new Set<Fighter>(), stuns = new Set<Fighter>();
   const moves: { unit: Fighter; x: number; z: number }[] = [];
   const requests: EffectRequest[] = [];
@@ -115,12 +115,14 @@ export function tickBattle(b: Battle) {
       const amount = Math.max(1, h.amount + marked - (h.pierce ? 0 : Math.max(0, h.target.armour + buffValue(h.target, 'armour', b.tick))));
       const absorbed = Math.min(h.target.shield, amount); h.target.shield -= absorbed;
       if (amount > absorbed) hurt.add(h.target);
+      // Tally for the damage overview only; nothing in the rules reads it.
+      h.source.stats.dealt += amount - absorbed; if (h.spell) h.source.stats.spell += amount - absorbed;
       totals.set(h.target, (totals.get(h.target) ?? 0) + amount - absorbed);
     }
-    for (const [u, amount] of totals) { u.hp = Math.max(0, u.hp - amount); if (amount) b.damages.push({ serial: b.tick * 1024 + b.damages.length, unit: u.id, x: u.x, z: u.z, amount }); }
+    for (const [u, amount] of totals) { u.hp = Math.max(0, u.hp - amount); u.stats.taken += amount; if (amount) b.damages.push({ serial: b.tick * 1024 + b.damages.length, unit: u.id, x: u.x, z: u.z, amount }); }
   };
   const spellHits = (effects: EffectRequest[]) => effects.filter(r => r.effect.type === 'damage').map(r => ({ source: r.source, target: r.target,
-    amount: Math.max(1, r.effect.amount * 2 ** (r.source.tier - 1) + r.source.magic.spellPower + buffValue(r.source, 'spellPower', b.tick)), pierce: r.effect.pierce ?? false, primary: false }));
+    amount: Math.max(1, r.effect.amount * 2 ** (r.source.tier - 1) + r.source.magic.spellPower + buffValue(r.source, 'spellPower', b.tick)), pierce: r.effect.pierce ?? false, primary: false, spell: true }));
   resolve([...hits, ...spellHits(requests)]);
   for (const u of poison) if (u.hp > 0) u.poison = Math.max(u.poison, 3);
   for (const u of stuns) if (u.hp > 0) u.stunnedUntil = b.tick + 1;

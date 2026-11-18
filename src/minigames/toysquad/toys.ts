@@ -8,6 +8,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { PALETTE } from '../../game/palette';
+import { RARITY_COLOURS, type Rarity } from './catalogue';
 import { TOY_SPECS, type Prim, type ToyPart } from './models';
 
 const extrude = (points: [number, number][]) => {
@@ -95,14 +96,24 @@ export const toyTriangles = (kind: string) => TOY_SPECS[kind].parts.reduce((n, p
 export const TOY_MATERIAL = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0.05 });
 export const TOY_GLOW_MATERIAL = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0.05, emissive: PALETTE.honey, emissiveIntensity: 0.38 });
 
-const stand = (top: string, rim: string) => bakeParts([
-  { g: 'cyl', c: rim, p: [0, 0.05, 0], s: [2.56, 0.1, 2.56], r: [0, 0, 0], o: 'XYZ' },
-  { g: 'cyl', c: top, p: [0, 0.11, 0], s: [2.24, 0.06, 2.24], r: [0, 0, 0], o: 'XYZ' },
+const stand = (top: string, rim: string, rarity: string) => bakeParts([
+  // Outer band and front notch carry the rarity colour; the inner rim and top carry the team.
+  { g: 'cyl', c: rarity, p: [0, 0.05, 0], s: [2.66, 0.1, 2.66], r: [0, 0, 0], o: 'XYZ' },
+  { g: 'cyl', c: rim, p: [0, 0.09, 0], s: [2.3, 0.1, 2.3], r: [0, 0, 0], o: 'XYZ' },
+  { g: 'cyl', c: top, p: [0, 0.13, 0], s: [2.02, 0.06, 2.02], r: [0, 0, 0], o: 'XYZ' },
   // A notch at the toy's front so facing reads even from directly above.
-  { g: 'prism', c: rim, p: [0, 0.1, 1.3], s: [0.6, 0.4, 0.08], r: [Math.PI / 2, 0, 0], o: 'XYZ' },
+  { g: 'prism', c: rarity, p: [0, 0.1, 1.36], s: [0.6, 0.4, 0.08], r: [Math.PI / 2, 0, 0], o: 'XYZ' },
 ]);
-/** Team stands: the local squad is cream on toy blue, the opposing squad coral on ink. */
-export const STAND_GEOMETRY = [stand(PALETTE.cream, PALETTE.toyBlue), stand(PALETTE.coral, PALETTE.ink)] as const;
+const stands = new Map<string, THREE.BufferGeometry>();
+/**
+ * Team stands: the local squad is cream on toy blue, the opposing squad coral on ink. The outer
+ * band is the unit's rarity colour. One cached geometry per team and rarity (ten at most).
+ */
+export function standGeometry(side: 0 | 1, rarity: Rarity): THREE.BufferGeometry {
+  const key = `${side}:${rarity}`; let geometry = stands.get(key);
+  if (!geometry) { geometry = side === 0 ? stand(PALETTE.cream, PALETTE.toyBlue, RARITY_COLOURS[rarity]) : stand(PALETTE.coral, PALETTE.ink, RARITY_COLOURS[rarity]); stands.set(key, geometry); }
+  return geometry;
+}
 
 const starShape = (x: number): ToyPart => ({ g: 'star', c: PALETTE.honey, p: [x, 0, 0], s: [0.56, 0.56, 0.08], r: [-Math.PI / 2, 0, 0], o: 'XYZ' });
 /** One geometry per star tier (1–3), so the tier marker is a single draw call. */
