@@ -167,7 +167,7 @@ A mechanical wind-up bandleader demonstrates a sequence on four instruments, eac
 colour, sound and animation: **A coral drum · S golden bell · J blue xylophone · K green music box**.
 - The sequence starts short. Players watch, then reproduce it in order.
 - Correct players progress and incorrect players are eliminated.
-- Each round adds one action, and demonstrations get faster.
+- Each round plays a brand-new sequence, one action longer than the last (owner decision, 18 Nov 2026: not the previous tune plus a note), and demonstrations get faster.
 - The last player standing wins.
 
 **Practice:** solo, scored by rounds survived. **Multiplayer:** every player gets the same sequence and
