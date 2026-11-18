@@ -61,7 +61,7 @@ function useInstanced(geo: THREE.BufferGeometry, mat: THREE.Material, items: { m
 // ------------------------------------------------------------------ gate structures
 
 function GateStructures() {
-  const pillarGeo = useMemo(() => new RoundedBoxGeometry(GATE.pillar, PILLAR_H / 2, GATE.depth, 2, 0.2), []);
+  const pillarGeo = useMemo(() => new RoundedBoxGeometry(GATE.pillar, PILLAR_H / 2, GATE.depth, 1, 0.2), []);
   const archGeo = useArchGeometry(GATE.width, 3, GATE.depth, GATE.width / 2 - GATE.pillar);
   const white = woodMat('#ffffff');
   const pillars = useMemo(
