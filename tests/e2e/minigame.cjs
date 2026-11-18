@@ -151,7 +151,8 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   /** A valid answer from the category's common tier that hasn't been said yet. */
   const freshAnswer = (j) => j.tiers[0].split(',').map((e) => e.split('|')[0].trim()).find((a) => !j.said.includes(a));
   await page.evaluate(() => window.__toybox.teleport(23.2, -16.2, Math.PI - 0.961));
-  await page.waitForTimeout(2500);
+  // The prompt updates on the next rendered frames: wait for it rather than a fixed delay (slow software GL).
+  await page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Jack-in-the-Box'), null, { timeout: 60000 }).catch(() => null);
   check('coral gate prompt says Play Jack-in-the-Box', (await page.textContent('.prompt'))?.includes('Jack-in-the-Box'), await page.textContent('.prompt'));
   await page.keyboard.press('KeyE');
   await page.waitForSelector('.match-intro', { timeout: 60000 });
