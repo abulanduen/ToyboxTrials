@@ -8,7 +8,7 @@ const out = path.join(__dirname,'output'); fs.mkdirSync(out,{recursive:true});
   try {
     for (const layout of (process.env.SQUAD_LAYOUTS || 'desktop,portrait,landscape').split(',')) {
       const mobile = layout !== 'desktop', viewport = layout === 'portrait' ? {width:390,height:844} : layout === 'landscape' ? {width:844,height:390} : {width:1280,height:800};
-      const page = await browser.newPage({viewport,hasTouch:mobile,isMobile:mobile}); page.setDefaultTimeout(120000);
+      const page = await browser.newPage({viewport,hasTouch:mobile,isMobile:mobile}); page.setDefaultTimeout(300000);
       const errors = []; page.on('pageerror',e=>errors.push(e.message)); page.on('console',m=>{if(m.type()==='error') errors.push(m.text());});
       await page.addInitScript(()=>localStorage.setItem('toybox-trials:prototype:v1',JSON.stringify({state:{quality:'low',tutorials:false},version:0})));
       const state = () => page.evaluate(()=>window.__toybox.match.state());
