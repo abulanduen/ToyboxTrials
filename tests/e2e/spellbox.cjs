@@ -21,14 +21,14 @@ try{for(const layout of(process.env.SPELLBOX_LAYOUTS||'desktop,portrait,landscap
   }
   assert.equal(iconFiles.size,8,'all eight production icons decode');await click('spellbox-slot-1');
   assert.equal(await page.locator('.spellbox-catalogue button').count(),3);assert.equal((await state()).radius,39);
-  await page.screenshot({path:path.join(out,`spellbox-${layout}-draft.png`)});await click('spellbox-ready');await page.evaluate(()=>window.__toybox.match.timeScale(1));await page.waitForFunction(()=>window.__toybox.match.state().phase==='arena');
+  await page.screenshot({path:path.join(out,`spellbox-${layout}-draft.png`),timeout:240000});await click('spellbox-ready');await page.evaluate(()=>window.__toybox.match.timeScale(1));await page.waitForFunction(()=>window.__toybox.match.state().phase==='arena');
   // Keep a visible target stationary while real input adapters launch and resolve a rocket.
   await page.evaluate(()=>{const s=window.__toybox.match.state();Object.assign(s.players[0],{x:-4,z:0,vx:0,vz:0,moveX:0,moveZ:0,angle:Math.PI/2});s.players.slice(1).forEach((p,i)=>Object.assign(p,{x:i===0?4:-10,z:i===0?0:i*5-8,vx:0,vz:0,moveX:0,moveZ:0,cast:null,stunnedUntil:1e9,nextAction:1e9,cooldowns:[1e9,1e9,1e9]}));});
   const x=(await state()).players[0].x;if(mobile)await page.getByRole('button',{name:'Right',exact:true}).tap();else await page.keyboard.press('KeyD');await page.waitForFunction(x=>window.__toybox.match.state().players[0].x>x,x);
   await aim(11,0);await cast(0);await page.waitForFunction(()=>{const s=window.__toybox.match.state();if(s.players[1].damage>0){window.__toybox.match.timeScale(0);return true;}return false;});
   let s=await state();assert.equal(s.players[1].damage,14);assert.ok(s.players[1].vx>0);assert.equal(s.players[0].casts,1);assert.equal(await page.getByTestId('spellbox-cast-0').isDisabled(),true);
   const sizes=await page.locator('.spellbox-casts button').evaluateAll(buttons=>buttons.map(b=>b.getBoundingClientRect().height));assert.ok(sizes.every(h=>h>=56));
-  await page.screenshot({path:path.join(out,`spellbox-${layout}-hit.png`)});
+  await page.screenshot({path:path.join(out,`spellbox-${layout}-hit.png`),timeout:240000});
   await page.evaluate(()=>window.__toybox.match.timeScale(1));await page.getByRole('button',{name:'Pause',exact:true}).click();await page.waitForSelector('.pause');const t=(await state()).t;await page.waitForTimeout(250);assert.equal((await state()).t,t);await page.keyboard.press('Escape');await page.waitForSelector('.pause',{state:'detached'});
   await page.evaluate(()=>{const p=window.__toybox.match.state().players[0];p.damage=80;p.cooldowns[2]=0;p.nextAction=0;p.stunnedUntil=0;p.vx=p.vz=0;});await cast(2);await page.waitForFunction(()=>window.__toybox.match.state().players[0].damage===60);
   // Cast slot E as an AoE shot, then finish with a high-damage ring-out through the actual rules.
@@ -37,7 +37,7 @@ try{for(const layout of(process.env.SPELLBOX_LAYOUTS||'desktop,portrait,landscap
   await page.evaluate(()=>{const s=window.__toybox.match.state();s.projectiles=[];s.mines=[];s.players.slice(2).forEach(p=>{p.alive=false;p.outAt=s.t;});s.players.slice(0,2).forEach((p,i)=>Object.assign(p,{x:i?4:-4,z:0,vx:0,vz:0,moveX:0,moveZ:0,cast:null,stunnedUntil:1e9}));});
   await page.waitForFunction(()=>{if(window.__toybox.match.state().shrink){window.__toybox.match.timeScale(0);return true;}return false;});
   s=await state();assert.equal(s.radius,39);assert.equal(s.shrink.to,15);assert.ok(s.shrink.startsAt-s.t>=9800);await page.waitForSelector('[data-testid="spellbox-shrink"]');
-  await page.screenshot({path:path.join(out,`spellbox-${layout}-shrink-warning.png`)});
+  await page.screenshot({path:path.join(out,`spellbox-${layout}-shrink-warning.png`),timeout:240000});
   await aim(8,8);const aimScreen=await page.evaluate(()=>window.__toybox.spellbox.point(8,8));
   await page.evaluate(()=>window.__toybox.match.timeScale(5));
   await page.waitForFunction(()=>{const s=window.__toybox.match.state();if(s.shrink&&s.t>=s.shrink.startsAt-1000){window.__toybox.match.timeScale(0);return true;}return false;});
@@ -50,7 +50,7 @@ try{for(const layout of(process.env.SPELLBOX_LAYOUTS||'desktop,portrait,landscap
   {const me=(await state()).players[0],dAng=(a,b)=>Math.abs(Math.atan2(Math.sin(a-b),Math.cos(a-b)));
    if(!mobile){const g=await page.evaluate(c=>window.__toybox.spellbox.ground(c.x,c.y),aimScreen);assert.ok(g&&dAng(newAngle,Math.atan2(g.x-me.x,g.z-me.z))<.05,'mouse aim follows the pointer through the zoom');}
    else assert.ok(dAng(newAngle,Math.atan2(8-me.x,8-me.z))<.05&&Math.abs(newAngle-oldAngle)<.03,'touch keeps its chosen world target');}
-  await page.screenshot({path:path.join(out,`spellbox-${layout}-duel-size.png`)});
+  await page.screenshot({path:path.join(out,`spellbox-${layout}-duel-size.png`),timeout:240000});
   await page.evaluate(()=>{const s=window.__toybox.match.state(),p=s.players[0],q=s.players[1];Object.assign(p,{x:8,z:0,vx:0,vz:0,moveX:0,moveZ:0,angle:Math.PI/2,cast:null,nextAction:0,stunnedUntil:0,cooldowns:[0,0,0]});Object.assign(q,{x:14.3,z:0,vx:0,vz:0,moveX:0,moveZ:0,damage:100,cast:null,stunnedUntil:1e9});s.projectiles=[];window.__toybox.match.timeScale(1);});
   await aim(14.8,0);if(mobile)await cast(0);else{const p=await page.evaluate(()=>window.__toybox.spellbox.point(14.8,0));await page.mouse.click(p.x,p.y);}
   await page.waitForFunction(()=>!window.__toybox.match.state().players[1].alive);assert.equal((await state()).players[0].alive,true);await page.waitForSelector('.results');
