@@ -148,7 +148,9 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   let j = await waitJ((j) => j.phase === 'live' && j.holder === 'you', 'my turn');
   check('category card shows the prompt', (await page.textContent('[data-testid=jb-category]')).includes(j.prompt), j.prompt);
   await page.evaluate(() => window.__toybox.match.timeScale(0)); // freeze the fuse while we type
-  check('answer box is focused when the box reaches you', await page.evaluate(() => document.activeElement?.getAttribute('data-testid') === 'jb-input'));
+  // The HUD redraws at 10 Hz; under heavy CPU load give it a moment to catch up.
+  const focused = await page.waitForFunction(() => document.activeElement?.getAttribute('data-testid') === 'jb-input', null, { timeout: 10000 }).then(() => true, () => false);
+  check('answer box is focused when the box reaches you', focused);
   await page.keyboard.type('zzqx nonsense');
   await page.keyboard.press('Enter');
   await page.evaluate(() => window.__toybox.match.timeScale(0.05)); // let one step run

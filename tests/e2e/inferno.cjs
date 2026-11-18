@@ -19,7 +19,9 @@ fs.mkdirSync(out, { recursive: true });
       await page.waitForSelector('.prompt');
       if (mobile) await page.locator('.prompt').tap(); else await page.keyboard.press('KeyE');
       await page.getByTestId('practice-inferno-escape').click();
-      await page.waitForTimeout(800);
+      // Match buttons ignore taps for 0.7 s after they appear, and the module loads lazily.
+      await page.getByTestId('match-start').waitFor({ state: 'visible' });
+      await page.waitForTimeout(900);
       await page.getByTestId('match-start').click();
       await page.waitForFunction(() => window.__toybox.match.phase() === 'playing');
       // Freeze time for a readable visual checkpoint, then resume for real input.
@@ -44,7 +46,7 @@ fs.mkdirSync(out, { recursive: true });
       await page.waitForSelector('.results');
       const record = await page.evaluate(() => JSON.parse(localStorage.getItem('toybox-trials:prototype:v1')).state.records['inferno-escape']);
       assert.equal(record.plays, 1);
-      await page.waitForTimeout(800);
+      await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
       await page.getByTestId('results-leave').click();
       await page.waitForSelector('.hud-sign');
       assert.deepEqual(errors, []);
