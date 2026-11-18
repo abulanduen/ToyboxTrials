@@ -434,6 +434,15 @@
       "source": "OpenAI built-in image_gen; Pop Rocket project-generated style reference",
       "license": "AI-generated project artwork; no third-party reference artwork supplied",
       "prompt": "docs/assets/spellbox-icon-prompts.md#button-mine"
+    },
+    {
+      "id": "concept-parallax-playroom-v1",
+      "file": "concepts/concept-parallax-playroom-v1.png",
+      "status": "reference-only",
+      "source": "OpenAI built-in image_gen; original project prompt, no reference artwork",
+      "license": "AI-generated project concept artwork",
+      "prompt": "docs/assets/parallax-playroom-concept.md",
+      "intendedUse": "Proposed layered playroom backdrop direction; excluded from production output"
     }
   ],
   "codeGenerated": [

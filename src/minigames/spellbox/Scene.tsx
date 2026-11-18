@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { PALETTE } from '../../game/palette';
-import { sfx, unlockAudio } from '../../game/audio';
+import { unlockAudio } from '../../game/audio';
+import { createSpellboxAudio } from './audio';
 import { exposeDebug } from '../../game/debug';
 import { WindupBot } from '../../character/WindupBot';
 import { createToyAnim } from '../../character/anim';
@@ -84,7 +85,7 @@ export function SpellboxScene({getState,localId,contestants}:MinigameSceneProps<
     gl.domElement.addEventListener('pointermove',aim);gl.domElement.addEventListener('pointerdown',down);gl.domElement.addEventListener('pointerleave',leave);window.addEventListener('blur',clear);
     return()=>{off();clear();gl.domElement.style.touchAction=old;gl.domElement.removeEventListener('pointermove',aim);gl.domElement.removeEventListener('pointerdown',down);gl.domElement.removeEventListener('pointerleave',leave);window.removeEventListener('blur',clear);};
   },[camera,gl,getState,localId,pointerRay,floorPlane]);
-  useEffect(()=>matchBus.on('event',e=>{if(e.type==='spellbox-windup')sfx.crank(1);if(e.type==='spellbox-cast')sfx.bell();if(e.type==='spellbox-hit')sfx.bump();if(e.type==='eliminated')sfx.eliminate();if(e.type==='spellbox-shrink-warning')sfx.bell();if(e.type==='spellbox-shrink-tick')sfx.tick();}),[]);
+  useEffect(()=>matchBus.on('event',createSpellboxAudio(localId,getState)),[localId,getState]);
   useEffect(()=>{exposeDebug({spellbox:{point:(x:number,z:number,height=.1)=>{const p=new THREE.Vector3(x,height,z).project(camera),r=gl.domElement.getBoundingClientRect();return{x:r.left+(p.x+1)*r.width/2,y:r.top+(1-p.y)*r.height/2};}}});},[camera,gl]);
   useFrame(()=>{
     const cam=camera as THREE.PerspectiveCamera,aspect=cam.aspect,fov=aspect<1?50+(1-aspect)*40:50;if(cam.fov!==fov){cam.fov=fov;cam.updateProjectionMatrix();}

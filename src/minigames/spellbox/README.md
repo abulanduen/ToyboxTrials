@@ -105,6 +105,11 @@ input. Scene/HUD reuse the existing host for loading/countdown, pause, results, 
 tournaments. Animation/effect timing follows simulation time. Queues and virtual movement release
 on pause/unmount; aim also clears on blur. Nothing here is an online multiplayer server.
 
+Audio uses short, distinct synthetic material cues instead of the shared long bell/crank on
+every cast. `audio.ts` limits opponent bursts, reserves local/warning cues and reduces distant
+opponent volume. Only local wind-ups sound; shrink ticks play for the final three seconds.
+These are presentation limits, independent of simulation timing and gameplay events.
+
 Run `npm test`, `npm run build`, `node tests/e2e/spellbox.cjs` and the existing
 `node tests/e2e/minigame.cjs` against a preview with Playwright/Chromium. Unit tests cover every
 spell, collision, simultaneous impulses, draft locks, limits and natural seeded bot ring-outs.
