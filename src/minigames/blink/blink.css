@@ -21,3 +21,11 @@
 .blink-hint { position:absolute; left:50%; transform:translateX(-50%); bottom:18px; max-width:390px; text-align:center; font-size:12px; padding:6px 10px; background:#F4E8CE; border-radius:8px; }
 @media(max-width:650px) { .blink-banner strong { font-size:12px; } .blink-banner { padding:6px; } .blink-banner span { font-size:11px; } .blink-roster { top:155px; } .blink-hint { bottom:155px; width:calc(100% - 30px); font-size:11px; } }
 @media(max-height:500px) { .blink-banner { padding:4px 8px; } .blink-banner small { display:none; } .blink-roster { top:88px; } .blink-hint { max-width:360px; bottom:14px; font-size:10px; } }
+/* Danger: the local toy stands inside an enemy wind-up cone. */
+.blink-banner--danger { border-color:#E76B62 !important; background:#FBE1DB !important; }
+.blink-banner--danger strong { color:#B53F36; }
+/* Knockout toasts */
+.blink-toast { position:absolute; left:50%; top:38%; transform:translate(-50%,-50%); padding:10px 18px; border-radius:12px; background:#EFAE45; color:#2B2433; border:3px solid #574D69; box-shadow:0 4px 0 #574D69; font:700 22px Fredoka,sans-serif; pointer-events:none; animation:blink-toast-pop .25s ease-out; }
+.blink-toast--out { background:#E76B62; color:#FFF9EE; }
+@keyframes blink-toast-pop { from { transform:translate(-50%,-50%) scale(.6); opacity:0; } to { transform:translate(-50%,-50%) scale(1); opacity:1; } }
+@media (prefers-reduced-motion: reduce) { .blink-toast { animation:none; } }

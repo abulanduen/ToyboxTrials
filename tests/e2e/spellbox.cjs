@@ -5,12 +5,12 @@ const out=path.join(__dirname,'output');fs.mkdirSync(out,{recursive:true});
 try{for(const layout of(process.env.SPELLBOX_LAYOUTS||'desktop,portrait,landscape').split(',')){
   const mobile=layout!=='desktop',viewport=layout==='portrait'?{width:390,height:844}:layout==='landscape'?{width:844,height:390}:{width:1280,height:800};
   const page=await browser.newPage({viewport,hasTouch:mobile,isMobile:mobile});page.setDefaultTimeout(90000);const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
-  await page.addInitScript(()=>localStorage.setItem('toybox-trials:prototype:v1',JSON.stringify({state:{quality:'low'},version:0})));
+  await page.addInitScript(()=>localStorage.setItem('toybox-trials:prototype:v1',JSON.stringify({state:{quality:'low',tutorials:false},version:0})));
   const state=()=>page.evaluate(()=>window.__toybox.match.state());const click=async id=>mobile?page.getByTestId(id).tap():page.getByTestId(id).click();
   const aim=async(x,z)=>{const p=await page.evaluate(v=>window.__toybox.spellbox.point(v.x,v.z),{x,z});if(mobile)await page.touchscreen.tap(p.x,p.y);else await page.mouse.move(p.x,p.y);};
   const cast=async slot=>{if(mobile)await click(`spellbox-cast-${slot}`);else await page.keyboard.press(['KeyQ','KeyE','KeyR'][slot]);};
-  await page.goto((process.env.BASE_URL||'http://127.0.0.1:4174/')+'?debug#play');await page.waitForSelector('.loading',{state:'detached'});await page.evaluate(()=>window.__toybox.teleport(0,-12.6,Math.PI));await page.waitForSelector('.prompt');if(mobile)await page.locator('.prompt').tap();else await page.keyboard.press('KeyE');
-  await click('practice-spellbox-showdown');await page.waitForTimeout(800);await page.getByRole('button',{name:'7 bots',exact:true}).click();await click('match-start');await page.waitForFunction(()=>window.__toybox.match.phase()==='playing');
+  await page.goto((process.env.BASE_URL||'http://localhost:4173/')+'?debug#play');await page.waitForSelector('.loading',{state:'detached'});await page.evaluate(()=>window.__toybox.teleport(0,-12.6,Math.PI));await page.waitForSelector('.prompt');if(mobile)await page.locator('.prompt').tap();else await page.keyboard.press('KeyE');
+  await click('practice-spellbox-showdown');await page.getByTestId('match-start').waitFor({state:'visible'});await page.waitForTimeout(900);await page.getByRole('button',{name:'7 bots',exact:true}).click();await click('match-start');await page.waitForFunction(()=>window.__toybox.match.phase()==='countdown');await page.evaluate(()=>window.__toybox.match.timeScale(10));await page.waitForFunction(()=>window.__toybox.match.phase()==='playing');await page.evaluate(()=>window.__toybox.match.timeScale(1));
   await page.evaluate(()=>window.__toybox.match.timeScale(.25));await click('spellbox-slot-2');await click('spellbox-equip-repair-stitches');await click('spellbox-slot-1');await click('spellbox-equip-pinwheel-storm');
   await page.waitForFunction(()=>window.__toybox.match.state().players[0].build.join(',')==='pop-rocket,pinwheel-storm,repair-stitches');
   const iconFiles=new Set();

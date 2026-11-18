@@ -11,6 +11,11 @@ import type { Contestant, MinigameSceneProps } from '../types';
 import { matchBus, useMatch } from '../session';
 import { clearBlinkInput, queueBlinkInput, setBlinkAim } from './local';
 import { DEFAULT_CONFIG, type BlinkState } from './rules';
+import { BlinkFeedback } from './Feedback';
+import { ARENA_CAMERA_DIR, arenaFov, fitArenaDistance, squarePoints } from '../shared/arenaCamera';
+
+/** Ground half-extent the camera frames: the 32 cm arena plus its cardboard rails. */
+const ARENA_FRAME = 17.1;
 
 /** Shape is on local X/Y; rotate onto the tabletop with zero pointing forwards (+Z). */
 function sectorGeometry(radius:number,halfAngle:number) {
@@ -40,7 +45,8 @@ function Toy({c,getState}:{c:Contestant;getState:()=>BlinkState|null}) {
     if(p.attack){
       warning.current.visible=true;warning.current.position.set(p.attack.x,.09,p.attack.z);warning.current.rotation.y=p.attack.angle;
       fill.current.scale.setScalar(Math.max(.01,charge));
-      (fill.current.material as THREE.MeshBasicMaterial).opacity=.18+charge*.35;
+      // The last 30% of the wind-up flashes so "about to land" reads at a glance.
+      (fill.current.material as THREE.MeshBasicMaterial).opacity=.18+charge*.35+(charge>.7&&!reduced.current?.18*(.5+.5*Math.sin(s.t/38)):0);
     }
     if(p.lastStrike&&s.t-p.lastStrike.at<250){flash.current.visible=true;flash.current.position.set(p.lastStrike.x,.12,p.lastStrike.z);flash.current.rotation.y=p.lastStrike.angle;}
     if(p.lastBlink&&s.t-p.lastBlink.at<400){
@@ -100,11 +106,21 @@ export function BlinkScene({getState,localId,contestants}:MinigameSceneProps<Bli
     if(e.type==='blink')sfx.jump();if(e.type==='duel-windup')sfx.crank(1);if(e.type==='duel-strike')sfx.bump();if(e.type==='eliminated')sfx.eliminate();
   }),[]);
   useEffect(()=>{exposeDebug({blink:{point:(x:number,z:number,height=.1)=>{const p=new THREE.Vector3(x,height,z).project(camera),r=gl.domElement.getBoundingClientRect();return{x:r.left+(p.x+1)*r.width/2,y:r.top+(1-p.y)*r.height/2};}}});},[camera,gl]);
+  // Frame the square arena (rails included) between the HUD bands, cached per aspect.
+  const fit=useRef({aspect:0,d:60}),shake=useRef({at:-1e9,kills:0,alive:true});
+  const reducedMotion=useRef(typeof window!=='undefined'&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   useFrame(()=>{
     const cam=camera as THREE.PerspectiveCamera,aspect=cam.aspect;
-    const fov=aspect<1?50+(1-aspect)*40:50;if(cam.fov!==fov){cam.fov=fov;cam.updateProjectionMatrix();}
-    const distance=Math.max(56,31/aspect);camera.position.set(0,distance,distance*.52);camera.lookAt(0,0,1);
-    const s=getState();if(s?.kind==='blink-duel'&&pointer.current&&!useMatch.getState().paused){const p=s.players.find(p=>p.id===localId);if(p)setBlinkAim({x:pointer.current.x-p.x,z:pointer.current.z-p.z});}
+    const fov=arenaFov(aspect);if(cam.fov!==fov){cam.fov=fov;cam.updateProjectionMatrix();}
+    if(fit.current.aspect!==aspect)fit.current={aspect,d:fitArenaDistance(squarePoints(ARENA_FRAME),aspect)};
+    camera.position.copy(ARENA_CAMERA_DIR).multiplyScalar(fit.current.d);
+    const s=getState();
+    // A short shake when you knock someone out or get knocked out (off with reduced motion).
+    const me=s?.kind==='blink-duel'?s.players.find(p=>p.id===localId):undefined;
+    if(me){if(me.kills>shake.current.kills||(!me.alive&&shake.current.alive))shake.current.at=performance.now();shake.current.kills=me.kills;shake.current.alive=me.alive;}
+    const age=(performance.now()-shake.current.at)/260;
+    if(age<1&&!reducedMotion.current){const a=(1-age)*.45;camera.position.x+=Math.sin(age*55)*a;camera.position.z+=Math.cos(age*47)*a*.6;}
+    camera.lookAt(0,0,0);if(s?.kind==='blink-duel'&&pointer.current&&!useMatch.getState().paused){const p=s.players.find(p=>p.id===localId);if(p)setBlinkAim({x:pointer.current.x-p.x,z:pointer.current.z-p.z});}
   });
   return <group>
     <mesh position={[0,-.5,0]} receiveShadow><boxGeometry args={[35,1,35]}/><meshStandardMaterial color={PALETTE.woodMid}/></mesh>
@@ -113,5 +129,6 @@ export function BlinkScene({getState,localId,contestants}:MinigameSceneProps<Bli
     {[-12,-6,0,6,12].flatMap(n=>[<mesh key={`v${n}`} position={[n,.04,0]} rotation={[-Math.PI/2,0,0]}><planeGeometry args={[.045,32]}/><meshBasicMaterial color={PALETTE.felt}/></mesh>,<mesh key={`h${n}`} position={[0,.04,n]} rotation={[-Math.PI/2,0,0]}><planeGeometry args={[32,.045]}/><meshBasicMaterial color={PALETTE.felt}/></mesh>])}
     <mesh position={[0,.05,0]} rotation={[-Math.PI/2,0,0]}><ringGeometry args={[2.8,2.9,32]}/><meshBasicMaterial color={PALETTE.cream}/></mesh>
     {contestants.map(c=><Toy key={c.id} c={c} getState={getState}/>)}
+    <BlinkFeedback getState={getState} localId={localId}/>
   </group>;
 }
