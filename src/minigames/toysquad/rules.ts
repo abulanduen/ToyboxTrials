@@ -4,6 +4,7 @@ import { rankByKey } from '../scoring';
 import type { MatchEvent, RulesCore } from '../types';
 import { PASSIVES, ROSTER, SHOP_ODDS, UNIT_POOLS, type PassiveId, type UnitKind } from './catalogue';
 import { makeFighters, tickBattle } from './combat';
+import type { BuffStat } from './kits';
 export { ROSTER, type UnitKind } from './catalogue';
 export { tickBattle } from './combat';
 export const BOARD_SIZE = 8, DEPLOY_CELLS = 32, MAX_UNITS = 10, BENCH_SIZE = 8, SHOP_SIZE = 5;
@@ -21,8 +22,14 @@ export interface Fighter {
   id: number; kind: UnitKind; tier: number; side: 0 | 1; x: number; z: number; hp: number; maxHp: number;
   facing: number; armour: number; shield: number; poison: number; stunnedUntil: number; attacks: number;
   bonusDamage: number; range: number;
+  magic: {
+    mana: number; maxMana: number; nextCast: number; casts: number; lastSpell: string; baseRange: number;
+    spellPower: number; healPower: number; attackMana: number; markBonus: number;
+    poisonPower: number; markedUntil: number; markPower: number; silencedUntil: number; hurtCount: number; wounded: boolean;
+    buffs: { key: string; stat: BuffStat; amount: number; until: number }[];
+  };
 }
-export interface AttackEffect { serial: number; from: number; to: number; kind: UnitKind; x: number; z: number; tx: number; tz: number }
+export interface AttackEffect { serial: number; from: number; to: number; kind: UnitKind; x: number; z: number; tx: number; tz: number; spell?: string; radius?: number }
 export interface DamageEffect { serial: number; unit: number; x: number; z: number; amount: number }
 export interface Battle {
   owner: string; opponent: string; fighters: Fighter[]; done: boolean; outcome: 'win' | 'loss' | 'draw' | null;

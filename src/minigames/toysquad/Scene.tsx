@@ -29,6 +29,7 @@ function Piece({ slot, side, getState, localId, drag, down, move, up, cancel }: 
   const barrel = useRef<THREE.Mesh>(null!); const ears = useRef<THREE.Group>(null!); const hp = useRef<THREE.Mesh>(null!);
   const currentId = useRef<number | null>(null); const yaw = useRef(0);
   const stars = useRef<THREE.Group>(null!);
+  const mana = useRef<THREE.Mesh>(null!);
   useFrame((_, dt) => {
     const s = getState(); root.current.visible = false; currentId.current = null;
     if (s?.kind !== 'toy-squad') return;
@@ -53,6 +54,8 @@ function Piece({ slot, side, getState, localId, drag, down, move, up, cancel }: 
     body.current.scale.set(ROSTER[unit.kind].shape === 'robot' ? 1.2 : 1, 1, ROSTER[unit.kind].shape === 'beast' ? 1.2 : 1);
     (hp.current.material as THREE.MeshBasicMaterial).color.set(RARITY_COLOURS[ROSTER[unit.kind].rarity]);
     hp.current.scale.x = buildUnit ? 1 : Math.max(0.01, fighter!.hp / fighter!.maxHp);
+    mana.current.visible = !buildUnit;
+    mana.current.scale.x = buildUnit ? 0.01 : Math.max(0.01, fighter!.magic.mana / fighter!.magic.maxMana);
     stars.current.children.forEach((mesh, i) => { mesh.visible = i < unit.tier; });
   });
   return <group ref={root} onPointerDown={e => { if (currentId.current !== null) down(e, currentId.current); }}
@@ -67,6 +70,7 @@ function Piece({ slot, side, getState, localId, drag, down, move, up, cancel }: 
       {[-0.5, 0.5].map(x => <mesh key={x} position={[x, 0.2, 0]}><boxGeometry args={[0.45, 0.35, 1.7]} /><meshStandardMaterial color={PALETTE.inkPurple} /></mesh>)}
     </group>
     <mesh ref={hp} position={[0, 3.7, 0]}><boxGeometry args={[1.6, 0.2, 0.2]} /><meshBasicMaterial color={PALETTE.sage} /></mesh>
+    <mesh ref={mana} position={[0, 3.4, 0]}><boxGeometry args={[1.6, 0.12, 0.2]} /><meshBasicMaterial color={PALETTE.toyBlue} /></mesh>
     <group ref={stars} position={[0, 4.15, 0]}>{[-0.5,0,0.5].map(x => <mesh key={x} position={[x,0,0]} rotation={[-Math.PI / 2,0,0]} geometry={starGeometry} dispose={null}><meshBasicMaterial color={PALETTE.honey} side={THREE.DoubleSide} /></mesh>)}</group>
   </group>;
 }
@@ -82,7 +86,7 @@ function AttackParticles({ getState, localId }: { getState: () => SquadState | n
     const key = b && s ? `${s.seed}:${s.round}:${b.tick}` : '';
     if (key !== seen.current) {
       seen.current = key;
-      for (const effect of b?.attacks ?? []) for (let bit = 0; bit < (reduced.current ? 1 : 5); bit++) particles.current.push({ effect, born: now, bit });
+      for (const effect of b?.attacks ?? []) for (let bit = 0; bit < (reduced.current ? 1 : effect.spell ? 12 : 5); bit++) particles.current.push({ effect, born: now, bit });
     }
     particles.current = particles.current.filter(p => now - p.born < 0.4).slice(-96);
     if (!b) particles.current = [];
@@ -95,6 +99,11 @@ function AttackParticles({ getState, localId }: { getState: () => SquadState | n
       obj.position.set(boardToWorld(e.x + (e.tx - e.x) * travel) + Math.cos(p.bit * 2.4) * spread,
         1.7 + (reduced.current ? 0 : Math.sin(age * Math.PI) * 0.8), boardToWorld(e.z + (e.tz - e.z) * travel) + Math.sin(p.bit * 2.4) * spread);
       obj.scale.setScalar((1 - age) * (p.bit === 0 ? 0.32 : 0.17)); obj.updateMatrix();
+      if (e.spell) {
+        const radius = reduced.current ? 0 : (e.radius ?? 1) * CELL_SIZE * age;
+        obj.position.set(boardToWorld(e.tx) + Math.cos(p.bit * Math.PI / 6) * radius, 0.6 + Math.sin(age * Math.PI), boardToWorld(e.tz) + Math.sin(p.bit * Math.PI / 6) * radius);
+        obj.scale.setScalar((1 - age) * 0.45); obj.updateMatrix();
+      }
       mesh.current.setMatrixAt(i, obj.matrix); colour.current.set(ROSTER[e.kind].colour); mesh.current.setColorAt(i, colour.current);
     });
     mesh.current.instanceMatrix.needsUpdate = true; if (mesh.current.instanceColor) mesh.current.instanceColor.needsUpdate = true;

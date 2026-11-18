@@ -35,12 +35,16 @@ const out = path.join(__dirname,'output'); fs.mkdirSync(out,{recursive:true});
       assert.equal((await state()).players[0].shop.length,5);
       // Controlled duplicates still go through real stock slots, payment and reserve limits.
       await page.evaluate(()=>{window.__toybox.match.state().players[0].shop=['soldier','soldier','soldier','soldier','robot'];});
+      await page.waitForFunction(()=>document.querySelector('[data-testid="squad-buy-0"]').textContent.includes('Tin Volley'));
       for(let slot=0;slot<4;slot++) {await click(`squad-buy-${slot}`); await page.waitForFunction(n=>window.__toybox.match.state().players[0].units.length===n,slot+1);}
       assert.equal((await state()).players[0].units.filter(u=>u.cell>=0).length,3);
       assert.equal((await state()).players[0].units.filter(u=>u.cell<0).length,1);
       await drag(1,0,4); await page.waitForFunction(()=>window.__toybox.match.state().players[0].units[0].tier===2);
       await click('squad-formation-toggle'); await click('squad-bench-0'); await click('squad-cell-2');
       await page.waitForFunction(()=>window.__toybox.match.state().players[0].units.filter(u=>u.tier===2).length===2);
+      await click('squad-cell-0'); await page.waitForSelector('[data-testid="squad-kit"]');
+      assert.match(await page.getByTestId('squad-kit').textContent(),/Parade Discipline/);
+      assert.match(await page.getByTestId('squad-traits').textContent(),/Tin 1\/2/); // Duplicates do not activate traits.
       await click('squad-formation-toggle'); await drag(2,0,4);
       await page.waitForFunction(()=>window.__toybox.match.state().players[0].units[0].tier===3);
       assert.equal((await state()).players[0].units.length,1);
@@ -54,8 +58,12 @@ const out = path.join(__dirname,'output'); fs.mkdirSync(out,{recursive:true});
       await page.waitForSelector('.pause',{state:'detached'}); await page.evaluate(()=>window.__toybox.match.timeScale(0));
       await page.screenshot({path:path.join(out,`toysquad-${layout}-build.png`)}); await page.evaluate(()=>window.__toybox.match.timeScale(1));
       await click('squad-ready'); await page.waitForFunction(()=>window.__toybox.match.state().phase==='battle');
+      // Give the controlled battle durability and full mana to observe a real cast on all viewports.
+      await page.evaluate(()=>{window.__toybox.match.timeScale(0); for(const u of window.__toybox.match.state().battles[0].fighters){u.hp=u.maxHp=500;u.shield=0;u.magic.mana=u.magic.maxMana;} window.__toybox.match.timeScale(1);});
+      await page.waitForFunction(()=>window.__toybox.match.state().battles[0].attacks.some(a=>a.spell));
       await page.waitForFunction(()=>window.__toybox.match.state().battles[0].damages.length>0);
       await page.evaluate(()=>window.__toybox.match.timeScale(0));
+      assert.ok((await state()).battles[0].fighters[0].magic.casts>0);
       await page.screenshot({path:path.join(out,`toysquad-${layout}-damage.png`)});
       await page.evaluate(()=>window.__toybox.match.timeScale(30));
       for(let round=2;round<=10;round++) {
@@ -77,7 +85,7 @@ const out = path.join(__dirname,'output'); fs.mkdirSync(out,{recursive:true});
       await page.waitForTimeout(800); await click('results-again'); await page.waitForFunction(()=>window.__toybox.match.phase()==='playing');
       assert.equal((await state()).round,1); assert.equal((await state()).players[0].units.length,0);
       await page.getByRole('button',{name:'Pause',exact:true}).click(); await page.waitForTimeout(800); await page.locator('.pause__actions .toy-btn').nth(1).click(); await page.waitForSelector('.hud-sign');
-      assert.deepEqual(errors,[]); console.log(`PASS Toy Squad ${layout}: five-slot shop, board/reserves, 2→3-star drag merges, reroll, damage numbers, ten levels/rounds, passive choices 3/6/9, records, restart and hub return; no console/page errors`);
+      assert.deepEqual(errors,[]); console.log(`PASS Toy Squad ${layout}: unit kit explanations, distinct-kind traits, auto-cast mana/spell particles, five-slot shop, board/reserves, 2→3-star drag merges, reroll, damage numbers, ten levels/rounds, passive choices 3/6/9, records, restart and hub return; no console/page errors`);
       await page.close();
     }
   } finally {await browser.close();}

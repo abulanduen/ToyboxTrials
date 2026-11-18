@@ -10,10 +10,15 @@ passive offers on rounds 3/6/9. `catalogue.ts` stores exact odds/unit/passive da
 validates purchases, rerolls, merges and rounds; `combat.ts` runs living-unit pathfinding,
 contested movement and simultaneous ability damage. Dead units never block or render.
 The 8×8 drag board reuses the host queue; bounded particle/damage-number pools use match time.
+`kits.ts` supplies 62 individual passive/spell pairs and 11 formation traits. `spellcraft.ts`
+handles pure target selection, capped support effects and distinct-kind trait bonuses. Combat
+tracks mana, cooldowns, temporary buffs/statuses and one bounded reaction batch; spells emit named
+render events. Mana bars and spell particles read simulation state without per-frame React updates.
+Unit-kit validation: 97 unit tests and production build pass; ten-round desktop/portrait/landscape checks pass kit
+descriptions, distinct-kind traits, spells/mana, merges, passive choices, records and restart.
 No host, storage-key/schema, multiplayer or ranked-system changes are needed. Exact design and
 provisional economy/balance are in the module README and CATALOGUE.md.
-Validation: 82 unit tests and production build pass; ten-round desktop/portrait/landscape checks
-and the existing mobile regression suite pass without console/page errors. Strategic balance,
+The existing mobile regression suite passes without console/page errors. Strategic balance,
 audio quality and real-device performance remain unverified.
 
 Midnight branch update: `astra/midnight-hunger` adds a fourth lazy-loaded local game. Its pure rules

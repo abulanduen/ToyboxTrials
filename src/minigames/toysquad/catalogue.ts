@@ -1,4 +1,5 @@
 import { PALETTE } from '../../game/palette';
+import { UNIT_KITS, type UnitKit } from './kits';
 
 export const RARITIES = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary'] as const;
 export type Rarity = typeof RARITIES[number];
@@ -17,7 +18,7 @@ export const ABILITIES: Record<Ability, string> = {
   chain: 'Bounces half damage to one additional nearby enemy.', pierce: 'Ignores armour, and hits one enemy directly behind the target.',
   fury: 'Every third attack deals double damage.',
 };
-export interface UnitDefinition { name: string; rarity: Rarity; cost: number; hp: number; damage: number; range: number; armour: number; ability: Ability; colour: string; role: string; shape: 'soldier' | 'robot' | 'beast' }
+export interface UnitDefinition extends UnitKit { name: string; rarity: Rarity; cost: number; hp: number; damage: number; range: number; armour: number; ability: Ability; colour: string; role: string; shape: 'soldier' | 'robot' | 'beast' }
 type Entry = [id: string, name: string, hp: number, damage: number, range: number, ability: Ability, shape?: UnitDefinition['shape']];
 const groups: Record<Rarity, Entry[]> = {
   Common: [
@@ -67,7 +68,7 @@ export const RARITY_COLOURS: Record<Rarity, string> = { Common: PALETTE.cream, U
 export const ROSTER: Record<string, UnitDefinition> = Object.fromEntries(RARITIES.flatMap((rarity, i) => groups[rarity].map(([id, name, hp, damage, range, ability, shape]) => [id, {
   name, rarity, cost: i + 1, hp, damage, range, ability, armour: ability === 'guard' ? i + 1 : 0,
   colour: [PALETTE.toyBlue, PALETTE.sage, PALETTE.honey, PALETTE.coral, PALETTE.inkPurple][i],
-  role: ABILITIES[ability], shape: shape ?? 'soldier',
+  role: ABILITIES[ability], shape: shape ?? 'soldier', ...UNIT_KITS[id],
 }])));
 export type UnitKind = string;
 export const UNIT_POOLS = RARITIES.map(r => Object.keys(ROSTER).filter(k => ROSTER[k].rarity === r));

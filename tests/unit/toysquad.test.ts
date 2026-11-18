@@ -12,9 +12,11 @@ const fresh = () => squadRules.init(people, 123);
 const send = (s: SquadState, ...inputs: SquadInput[]) => squadRules.step(s, { p0: inputs }, 1);
 function buy(s: SquadState, kind = 'soldier') { s.players[0].shop[0] = kind; send(s, { type: 'buy', slot: 0 }); return s.players[0].units.at(-1)!; }
 function battle(home = 'soldier', away = 'robot'): Battle {
-  return { owner: 'p0', opponent: 'p1', fighters: [
+  const b: Battle = { owner: 'p0', opponent: 'p1', fighters: [
     ...makeFighters([{ id: 1, kind: home, tier: 1, cell: 0 }], 0, []), ...makeFighters([{ id: 2, kind: away, tier: 1, cell: 0 }], 1, []),
   ], done: false, outcome: null, health: 0, attacks: [], damages: [], tick: 0, homePassives: [], awayPassives: [] };
+  // These legacy attack tests isolate base attacks from the newly added start passives.
+  b.fighters.forEach(u => { u.shield = 0; u.magic.buffs = []; }); return b;
 }
 describe('Toy Squad catalogue and shop', () => {
   it('ships exactly 62 distinct named options in the requested rarity counts', () => {
@@ -92,7 +94,7 @@ describe('Toy Squad merges, placement and passives', () => {
   });
   it('passive stats, shields and discounted rerolls have real effects', () => {
     const [u] = makeFighters([{ id: 1, kind: 'soldier', tier: 2, cell: 0 }], 0, ['padding','springs','polish','bubble','vanguard']);
-    expect(u.maxHp).toBe(ROSTER.soldier.hp * 2 + 10); expect(u.bonusDamage).toBe(1); expect(u.armour).toBe(1); expect(u.shield).toBe(5);
+    expect(u.maxHp).toBe(ROSTER.soldier.hp * 2 + 10); expect(u.bonusDamage).toBe(1); expect(u.armour).toBe(1); expect(u.shield).toBe(9); // Bubble + two-star Parade Discipline
     const s = fresh(); s.players[0].passives = ['bargain']; send(s, { type: 'reroll' }); expect(s.players[0].coins).toBe(9);
   });
   it('runs ten rounds, levels once per round and offers passives only on rounds 3/6/9', () => {

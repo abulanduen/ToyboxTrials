@@ -27,6 +27,10 @@ It now has ten rounds, a 62-unit five-rarity shop using the owner’s exact leve
 two-copy merges up to three stars, eight reserves, level-based 3–10 board slots, and passive
 choices on rounds 3/6/9. The 8×8 drag board retains turning/attack particles and adds hit numbers.
 Pathfinding now routes around living toys and resolves contested moves; dead toys never block.
+All 62 units now also have individually named passives and automatic mana spells, with AoE/line
+damage, buffs/debuffs, healing, shields and 11 formation traits. Unit kits and run-wide passive
+choices remain separate. Next: human playtesting of kit combinations, readability and balance;
+online/ranked integration remains future work.
 See `src/minigames/toysquad/README.md` and `CATALOGUE.md` for mechanics and provisional balance.
 This branch includes Midnight/Inferno; six other local catalogue entries lack modules, including
 work the owner reports Claude is handling separately.

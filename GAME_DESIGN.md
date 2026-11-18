@@ -256,6 +256,11 @@ each round increases level and cap by one, up to level 10 and ten deployed toys.
 the roster, passives and provisional balance are in `src/minigames/toysquad/README.md` and
 `src/minigames/toysquad/CATALOGUE.md`. Auto-combat, bots, dragging, particles and damage numbers
 are local; online play and ranked eligibility remain future work. Casual-only for now.
+Every unit also has its own named passive and automatic mana spell. Area/line damage, healing,
+shields, buffs, marks, poison, stun, silence and cleansing enable mixed formations. Two/four distinct
+deployed kinds activate matching-trait bonuses; duplicates and reserves do not count. These kits
+are separate from the run-wide choices on rounds 3/6/9. Exact kits, 11 traits and provisional
+balance rules are recorded in the module catalogue and README.
 
 A short, simple auto-battler. Each round, players:
 1. get some currency

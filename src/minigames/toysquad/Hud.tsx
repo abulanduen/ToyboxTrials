@@ -5,6 +5,8 @@ import type { MinigameSceneProps } from '../types';
 import { clearSquadInput, submitSquadInput } from './local';
 import { DEPLOY_CELLS, BENCH_SIZE, boardLimit, canMerge, rerollPrice, type SquadInput, type SquadState } from './rules';
 import { ABILITIES, PASSIVES, RARITY_COLOURS, ROSTER, SHOP_ODDS } from './catalogue';
+import { TRAIT_BONUSES, type Trait } from './kits';
+import { traitCounts } from './spellcraft';
 import './toysquad.css';
 
 export function SquadHud({ getState, localId, contestants }: MinigameSceneProps<SquadState>) {
@@ -17,6 +19,7 @@ export function SquadHud({ getState, localId, contestants }: MinigameSceneProps<
   const building = s.phase === 'build', editable = building && !me.ready && !paused && hostPhase === 'playing';
   const unit = me.units.find(u => u.id === selected), partner = unit && me.units.find(other => canMerge(unit, other));
   const boardCount = me.units.filter(u => u.cell >= 0).length, benchCount = me.units.length - boardCount;
+  const traits = traitCounts(me.units), fight = s.battles.find(b => b.owner === localId);
   const send = (input: SquadInput) => { if (editable) { unlockAudio(); submitSquadInput(input); } };
   const name = (id: string) => contestants.find(c => c.id === id)?.name || 'Clockwork Squad';
   const place = (cell: number) => {
@@ -37,10 +40,10 @@ export function SquadHud({ getState, localId, contestants }: MinigameSceneProps<
       <div className="squad-shop" aria-label="Unit shop">
         {me.shop.map((kind, slot) => {
           const def = kind ? ROSTER[kind] : null;
-          return <button key={slot} data-testid={`squad-buy-${slot}`} title={def ? `${def.name} · ${def.rarity}\nHP ${def.hp}, damage ${def.damage}, range ${def.range}\n${ABILITIES[def.ability]}` : 'Purchased — reroll or wait for next round'}
+          return <button key={slot} data-testid={`squad-buy-${slot}`} title={def ? `${def.name} · ${def.rarity}\n${def.traits.join(' / ')}\nPassive: ${def.passive.name}. ${def.passive.description}\nSpell: ${def.spell.name} (${def.spell.mana} mana). ${def.spell.description}\n${ABILITIES[def.ability]}` : 'Purchased — reroll or wait for next round'}
             style={def ? { borderColor: RARITY_COLOURS[def.rarity] } : undefined}
             disabled={!editable || !def || me.coins < def.cost || (boardCount >= boardLimit(me.level) && benchCount >= BENCH_SIZE)} onClick={() => send({ type: 'buy', slot })}>
-            <strong>{def ? `${def.name} · ${def.cost}c` : 'Sold'}</strong><span>{def?.rarity}</span><small>{def && `HP ${def.hp} · Hit ${def.damage} · Range ${def.range}`}</small><small>{def?.role}</small>
+            <strong>{def ? `${def.name} · ${def.cost}c` : 'Sold'}</strong><span>{def?.rarity} · {def?.traits.join(' / ')}</span><small>{def && `HP ${def.hp} · Hit ${def.damage} · Range ${def.range}`}</small><small>{def && `Passive: ${def.passive.name}`}</small><small>{def && `Spell: ${def.spell.name} · ${def.spell.mana} mana`}</small>
           </button>;
         })}
       </div>
@@ -49,6 +52,7 @@ export function SquadHud({ getState, localId, contestants }: MinigameSceneProps<
       </div>
       <details className="squad-formation">
         <summary data-testid="squad-formation-toggle">Formation, reserves & merges · {boardCount}/{boardLimit(me.level)} deployed</summary>
+        <details className="squad-kit-guide"><summary>Inspect shop passives & spells</summary>{me.shop.map((kind, i) => kind && <article key={i}><strong>{ROSTER[kind].name} · {ROSTER[kind].traits.join(' / ')}</strong><p>Passive — {ROSTER[kind].passive.name}: {ROSTER[kind].passive.description}</p><p>Spell — {ROSTER[kind].spell.name} ({ROSTER[kind].spell.mana} mana): {ROSTER[kind].spell.description}</p></article>)}<small>Auto-cast at full mana. Each combat tick is 0.5s. Mana: +20 per basic attack, +8 per tick taking damage, plus unit and trait bonuses. Stars scale damage, healing, shields, poison and marks by 1/2/4; buffs, mana and durations stay fixed.</small></details>
         <small>Drag matching toys with equal stars together to merge. Two 1-stars → 2-star; two 2-stars → 3-star (maximum). Otherwise squares swap. New purchases go to reserves when your board is full.</small>
         <div className="squad-bench" aria-label="Reserve bench">{Array.from({ length: BENCH_SIZE }, (_, i) => {
           const cell = -i - 1, here = me.units.find(u => u.cell === cell);
@@ -58,7 +62,10 @@ export function SquadHud({ getState, localId, contestants }: MinigameSceneProps<
           const here = me.units.find(u => u.cell === cell);
           return <button key={cell} data-testid={`squad-cell-${cell}`} disabled={!editable} aria-pressed={!!here && here.id === selected} onClick={() => place(cell)} aria-label={`Square ${cell + 1}${here ? `: ${ROSTER[here.kind].name}, ${here.tier} stars` : ': empty'}`}>{here ? <><strong>{ROSTER[here.kind].name}</strong><span>{here.tier} stars</span></> : 'Empty'}</button>;
         })}</div>
-        {unit && <p className="squad-selection">{ROSTER[unit.kind].name} · {unit.tier} stars · {ROSTER[unit.kind].rarity} · {ROSTER[unit.kind].role}</p>}
+        {unit && <div className="squad-selection" data-testid="squad-kit"><strong>{ROSTER[unit.kind].name} · {unit.tier} stars · {ROSTER[unit.kind].traits.join(' / ')}</strong>
+          <p>Passive — {ROSTER[unit.kind].passive.name}: {ROSTER[unit.kind].passive.description}</p>
+          <p>Spell — {ROSTER[unit.kind].spell.name} ({ROSTER[unit.kind].spell.mana} mana): {ROSTER[unit.kind].spell.description}</p>
+          <small>Basic attacks: {ROSTER[unit.kind].role} A tick is 0.5s. Stars multiply spell damage, healing, shield, poison and mark values by 1/2/4.</small></div>}
         <div className="squad-unit-actions">
           <button data-testid="squad-merge" disabled={!editable || !unit || !partner} onClick={() => unit && partner && send({ type: 'merge', unit: partner.id, other: unit.id })}>Merge matching pair</button>
           <button data-testid="squad-reserve" disabled={!editable || !unit || unit.cell < 0 || benchCount >= BENCH_SIZE} onClick={() => unit && send({ type: 'bench', unit: unit.id })}>To reserves</button>
@@ -67,8 +74,11 @@ export function SquadHud({ getState, localId, contestants }: MinigameSceneProps<
         </div>
         <p>Level {me.level} odds — Common / Uncommon / Rare / Epic / Legendary: {SHOP_ODDS[me.level - 1].join('% / ')}%</p>
         <p>Passives: {me.passives.map(id => PASSIVES[id].name).join(', ') || 'Choose on rounds 3, 6 and 9'}</p>
+        <div className="squad-traits" data-testid="squad-traits">{(Object.entries(traits) as [Trait, number][]).map(([trait, count]) => <p key={trait}><strong>{trait} {count}/{count >= 4 ? 4 : count >= 2 ? 4 : 2}{count >= 2 ? ' · active' : ''}</strong> — {TRAIT_BONUSES[trait]}</p>)}<small>Bonuses affect matching toys. Count distinct deployed kinds; duplicates and reserves do not add trait counts.</small></div>
       </details>
       <small>Next round: level +1, {s.config.income} coins and a fresh shop. Maximum board size 10. Unused coins carry over.</small>
-    </section> : <section className="squad-scoreboard" aria-label="Squad standings">{s.players.map(p => <span key={p.id}>{name(p.id)} · {p.points} points · {p.wins} wins</span>)}<small>Win 3 · Draw 1 · Loss 0 · Surviving health breaks ties</small></section>}
+    </section> : <section className="squad-scoreboard" aria-label="Squad standings">{s.players.map(p => <span key={p.id}>{name(p.id)} · {p.points} points · {p.wins} wins</span>)}<small>Win 3 · Draw 1 · Loss 0 · Surviving health breaks ties</small>
+      <details className="squad-combat-kits"><summary>Unit spells & mana</summary><small>Attacks generate 20 mana; losing health generates 8 per tick. Full mana casts automatically. Silence blocks spells; stun blocks actions.</small>{fight?.fighters.filter(u => u.side === 0).map(u => <p key={u.id}><strong>{ROSTER[u.kind].name}</strong> · {u.hp > 0 ? `${u.magic.mana}/${u.magic.maxMana} mana` : 'Defeated'} · {u.magic.casts} casts · {u.magic.lastSpell || ROSTER[u.kind].spell.name}</p>)}</details>
+    </section>}
   </div>;
 }

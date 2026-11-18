@@ -22,6 +22,8 @@ Applies to Codex, Claude Code and other contributors. Read this file before edit
   balance choices configurable and labelled provisional. The owner reports Claude is handling Music Box Rhythm.
   Claude owns Find the Original, Red Light/Green Light, Wind-Up Dash and the room pass in separate
   cloud worktrees. Do not recreate or overwrite that work; recover and review it before integration.
+  Toy Squad now has 62 individual passive/spell pairs and 11 formation traits. Preserve kit
+  coverage, deterministic mana/status resolution and the separate run-wide passive choices.
 
 ## Coding conventions
 
