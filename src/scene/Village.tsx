@@ -57,6 +57,40 @@ function Playmat() {
   );
 }
 
+/** Height step between overlapping path tiles: big enough to survive a 16-bit depth buffer on phones. */
+export const TILE_STEP = 0.05;
+const TILE_HALF = 0.95;
+
+/** True when two 1.9 cm square tiles (rotated about Y) overlap: separating-axis test on their four edge normals. */
+export function tilesOverlap(a: { x: number; z: number; rot: number }, b: { x: number; z: number; rot: number }) {
+  // three.js rotation.y turns +x towards -z, so work in mirrored z to keep the edge axes at angle `rot`.
+  const dx = b.x - a.x, dz = a.z - b.z;
+  if (Math.hypot(dx, dz) >= TILE_HALF * 2 * Math.SQRT2) return false;
+  for (const r of [a.rot, a.rot + Math.PI / 2, b.rot, b.rot + Math.PI / 2]) {
+    const ax = Math.cos(r), az = Math.sin(r);
+    const proj = (q: number) => TILE_HALF * (Math.abs(Math.cos(q) * ax + Math.sin(q) * az) + Math.abs(-Math.sin(q) * ax + Math.cos(q) * az));
+    if (Math.abs(dx * ax + dz * az) >= proj(a.rot) + proj(b.rot) - 1e-6) return false;
+  }
+  return true;
+}
+
+/**
+ * Give each tile a height level so that no two overlapping tiles share one (greedy graph colouring).
+ * Overlapping tiles with equal tops z-fight, which shows as flicker when the camera turns, worst
+ * around the fountain ring where the inner edges and the spokes overlap.
+ */
+export function withTileHeights<T extends { x: number; z: number; rot: number }>(tiles: T[]): (T & { y: number; level: number })[] {
+  const levels: number[] = [];
+  tiles.forEach((t, i) => {
+    const used = new Set<number>();
+    for (let j = 0; j < i; j++) if (tilesOverlap(t, tiles[j])) used.add(levels[j]);
+    let l = 0;
+    while (used.has(l)) l++;
+    levels.push(l);
+  });
+  return tiles.map((t, i) => ({ ...t, level: levels[i], y: 0.12 + levels[i] * TILE_STEP }));
+}
+
 /** Wooden tile paths laid along polylines. */
 function Paths() {
   const tiles = useMemo(() => {
@@ -118,14 +152,13 @@ function Paths() {
     for (const t of [...ringTiles, ...out]) {
       if (kept.every((k2) => Math.hypot(k2.x - t.x, k2.z - t.z) >= 1.55)) kept.push(t);
     }
-    return kept;
+    return withTileHeights(kept);
   }, []);
   return (
     <Instances limit={tiles.length} receiveShadow castShadow material={woodMat('#ffffff')}>
       <boxGeometry args={[1.9, 0.22, 1.9]} />
       {tiles.map((t, i) => (
-        // Tiny per-tile height steps so any remaining edge overlap never has coplanar tops.
-        <Instance key={i} position={[t.x, 0.12 + (i % 3) * 0.02, t.z]} rotation={[0, t.rot, 0]} color={t.c} />
+        <Instance key={i} position={[t.x, t.y, t.z]} rotation={[0, t.rot, 0]} color={t.c} />
       ))}
     </Instances>
   );
