@@ -13,7 +13,7 @@ const out = path.join(__dirname, 'output'); fs.mkdirSync(out, { recursive: true 
       const page = await browser.newPage({ viewport, hasTouch: mobile, isMobile: mobile }); page.setDefaultTimeout(90000);
       const errors = []; page.on('pageerror', e => errors.push(e.message)); page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
       await page.addInitScript(() => localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { quality: 'low' }, version: 0 })));
-      await page.goto((process.env.BASE_URL || 'http://127.0.0.1:4174/') + '?debug#play');
+      await page.goto((process.env.BASE_URL || 'http://localhost:4173/') + '?debug#play');
       await page.waitForSelector('.loading', { state: 'detached' });
       await page.evaluate(() => window.__toybox.teleport(0, -12.6, Math.PI));
       await page.waitForSelector('.prompt');

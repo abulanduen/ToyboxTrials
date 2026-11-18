@@ -26,7 +26,7 @@ const out = path.join(__dirname,'output'); fs.mkdirSync(out,{recursive:true});
           await page.mouse.move(b.x,b.y,{steps:8}); await page.mouse.up();
         }
       };
-      await page.goto((process.env.BASE_URL||'http://127.0.0.1:4174/')+'?debug#play');
+      await page.goto((process.env.BASE_URL||'http://localhost:4173/')+'?debug#play');
       await page.waitForSelector('.loading',{state:'detached'}); await page.evaluate(()=>window.__toybox.teleport(0,-12.6,Math.PI));
       await page.waitForSelector('.prompt'); if(mobile) await page.locator('.prompt').tap(); else await page.keyboard.press('KeyE');
       await click('practice-toy-squad');
