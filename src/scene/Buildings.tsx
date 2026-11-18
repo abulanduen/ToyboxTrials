@@ -62,9 +62,11 @@ export function Fountain() {
         <mesh position={[0, FOUNTAIN.top / 2, 0]} material={paintMat('#9B7A3A', 0.4, 0.6)}>
           <cylinderGeometry args={[FOUNTAIN.r - 0.25, FOUNTAIN.r - 0.25, FOUNTAIN.top - 0.1, 32, 1, true]} />
         </mesh>
+        {/* Water and glass stay fairly rough on purpose: near-mirror surfaces threw pixel-sized sun
+            highlights above the bloom threshold that flashed on and off as the camera turned. */}
         <mesh ref={water} position={[0, FOUNTAIN.top - 0.25, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
           <circleGeometry args={[FOUNTAIN.r - 0.3, 32]} />
-          <meshStandardMaterial color={PALETTE.toyBlue} emissive={PALETTE.toyBlue} emissiveIntensity={0.25} roughness={0.08} metalness={0.1} />
+          <meshStandardMaterial color={PALETTE.toyBlue} emissive={PALETTE.toyBlue} emissiveIntensity={0.25} roughness={0.32} metalness={0.05} />
         </mesh>
         {/* thread spool pillar */}
         <mesh position={[0, 2.2, 0]} castShadow material={woodMat(PALETTE.woodLight)}>
@@ -79,7 +81,9 @@ export function Fountain() {
         {/* glass marble */}
         <mesh position={[0, 4.75, 0]} castShadow ref={camBlock}>
           <sphereGeometry args={[1.05, 24, 18]} />
-          <meshPhysicalMaterial color="#BFE2F2" roughness={0.04} transmission={0} transparent opacity={0.72} clearcoat={1} clearcoatRoughness={0.05} />
+          {/* depthWrite off: as see-through glass it must not hide the droplets behind it. With it on,
+              the droplets popped in and out as the camera turned and the transparent sort order flipped. */}
+          <meshPhysicalMaterial color="#BFE2F2" roughness={0.2} transmission={0} transparent opacity={0.72} depthWrite={false} clearcoat={0.6} clearcoatRoughness={0.3} />
         </mesh>
         <mesh position={[0.15, 4.75, 0]} rotation={[0.3, 0, 0.6]}>
           <torusGeometry args={[0.55, 0.12, 6, 18, Math.PI * 1.2]} />

@@ -151,7 +151,8 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   /** A valid answer from the category's common tier that hasn't been said yet. */
   const freshAnswer = (j) => j.tiers[0].split(',').map((e) => e.split('|')[0].trim()).find((a) => !j.said.includes(a));
   await page.evaluate(() => window.__toybox.teleport(23.2, -16.2, Math.PI - 0.961));
-  await page.waitForTimeout(2500);
+  // The prompt updates on the next rendered frames: wait for it rather than a fixed delay (slow software GL).
+  await page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Jack-in-the-Box'), null, { timeout: 60000 }).catch(() => null);
   check('coral gate prompt says Play Jack-in-the-Box', (await page.textContent('.prompt'))?.includes('Jack-in-the-Box'), await page.textContent('.prompt'));
   await page.keyboard.press('KeyE');
   await page.waitForSelector('.match-intro', { timeout: 60000 });
@@ -224,6 +225,8 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   await page.click('[data-testid=format-blitz]');
   await page.click('.intro-options .segmented >> nth=0 >> button >> nth=0'); // 1 bot
   await page.click('.intro-options .segmented >> nth=1 >> button >> nth=0'); // easy
+  // A repeatable draw covers both combat modules and Copycat; Jack practice is checked above.
+  await page.evaluate(() => { Math.random = () => 15 / 4294967296; });
   await page.click('[data-testid=tournament-start]');
   const games = [];
   for (let round = 1; round <= 3; round++) {
@@ -242,6 +245,7 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
     // Find the Original: never pick, and the bot outscores us.
     // Inferno Escape: put our toy on the furnace and let the real rules/host resolve the loss.
     // Midnight Hunger: drain our energy and let the night knock us out first.
+    // Blink Duel / Spellbox Showdown: mark our toy out and let the rules finish the round.
     // Music Box Rhythm: never tap, and the bot outscores us.
     if (game.includes('Copycat')) await failRound();
     if (game.includes('Inferno')) {
@@ -255,6 +259,11 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
       // Never tap: every pin is a miss. Fast-forward the ~68 s song (music is muted off 1x).
       await page.waitForFunction(() => window.__toybox.match.phase() === 'playing', null, { timeout: 120000 });
       await page.evaluate(() => window.__toybox.match.timeScale(8));
+    }
+    if (game.includes('Blink') || game.includes('Spellbox')) {
+      // Knock our toy out and let the real rules resolve the round (Spellbox: skip the build draft).
+      await page.waitForFunction(() => window.__toybox.match.phase() === 'playing', null, { timeout: 120000 });
+      await page.evaluate(() => { const s = window.__toybox.match.state(); if (s.kind === 'spellbox-showdown') s.players.forEach((p) => { p.ready = true; }); s.players[0].alive = false; s.players[0].outAt = s.t; });
     }
     await page.waitForSelector('.results', { timeout: 300000 });
     await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing

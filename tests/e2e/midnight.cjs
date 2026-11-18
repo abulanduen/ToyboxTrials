@@ -4,6 +4,17 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const out = path.join(__dirname, 'output'); fs.mkdirSync(out, { recursive: true });
+/** Push the touch joystick (CDP touch events) in a direction until `until(arg)` holds in the page, then let go. */
+async function stickUntil(page, [dx, dy], until, arg) {
+  const cdp = await page.context().newCDPSession(page);
+  const zone = await page.locator('.touch-stick-zone').boundingBox();
+  const x = zone.x + zone.width * 0.4, y = zone.y + zone.height * 0.55;
+  const send = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts.map(([px, py]) => ({ x: px, y: py, id: 1 })) });
+  await send('touchStart', [[x, y]]);
+  await send('touchMove', [[x + dx * 20, y + dy * 20]]);
+  await send('touchMove', [[x + dx * 60, y + dy * 60]]);
+  try { await page.waitForFunction(until, arg); } finally { await send('touchEnd', []); await cdp.detach(); }
+}
 (async () => {
   const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   try {
@@ -38,7 +49,11 @@ const out = path.join(__dirname, 'output'); fs.mkdirSync(out, { recursive: true 
         return p.x;
       });
       await page.evaluate(() => window.__toybox.match.timeScale(1));
-      if (mobile) await page.getByRole('button', { name: 'Right', exact: true }).tap(); else await page.keyboard.press('KeyD');
+      if (mobile) {
+        assert.equal(await page.locator('.touch-stick-zone').count(), 1, 'touch joystick shown');
+        assert.equal(await page.getByRole('button', { name: 'Up', exact: true }).count(), 0, 'no direction pads');
+      }
+      if (mobile) await stickUntil(page, [1, 0], () => window.__toybox.match.state().players[0].facing === 1); else await page.keyboard.press('KeyD');
       await page.waitForFunction(() => window.__toybox.match.state().players[0].facing === 1);
       assert.equal(await page.evaluate(() => window.__toybox.match.state().players[0].x), startX, 'battery bot blocks movement');
       assert.equal(await page.evaluate(() => window.__toybox.match.state().players[0].fed), false, 'contact does not collect');
@@ -48,7 +63,7 @@ const out = path.join(__dirname, 'output'); fs.mkdirSync(out, { recursive: true 
         await page.waitForFunction(n => window.__toybox.match.state().batteries[0].hits === n, hit);
         assert.equal(await page.evaluate(() => window.__toybox.match.state().players[0].fed), hit === 3);
       }
-      if (mobile) await page.getByRole('button', { name: 'Right', exact: true }).tap(); else await page.keyboard.press('KeyD');
+      if (mobile) await stickUntil(page, [1, 0], x => window.__toybox.match.state().players[0].x > x, startX); else await page.keyboard.press('KeyD');
       await page.waitForFunction(x => window.__toybox.match.state().players[0].x > x, startX);
       assert.ok(await page.evaluate(() => window.__toybox.match.state().players[0].energy > 60));
       await page.getByRole('button', { name: 'Pause', exact: true }).click(); await page.waitForSelector('.pause');
@@ -56,13 +71,13 @@ const out = path.join(__dirname, 'output'); fs.mkdirSync(out, { recursive: true 
       assert.equal(await page.evaluate(() => window.__toybox.match.state().t), pausedAt);
       await page.keyboard.press('Escape'); await page.waitForSelector('.pause', { state: 'detached' });
       await page.evaluate(() => window.__toybox.match.timeScale(0));
-      await page.screenshot({ path: path.join(out, `midnight-${layout}-night.png`) });
+      await page.screenshot({ path: path.join(out, `midnight-${layout}-night.png`), timeout: 240000 }); // software GL under load is slow
       // Cross the actual rules boundary and inspect daytime shelter behaviour.
       await page.evaluate(() => { const s = window.__toybox.match.state(); s.players[0].x = 1; s.players[0].z = 1; s.players[0].energy = 100; window.__toybox.match.timeScale(15); });
       await page.waitForFunction(() => window.__toybox.match.state().phase === 'day');
       await page.evaluate(() => window.__toybox.match.timeScale(0));
       await page.waitForFunction(() => document.querySelector('.hunger-banner')?.textContent.includes('Sheltered'));
-      await page.screenshot({ path: path.join(out, `midnight-${layout}-day.png`) });
+      await page.screenshot({ path: path.join(out, `midnight-${layout}-day.png`), timeout: 240000 }); // software GL under load is slow
       const energy = await page.evaluate(() => window.__toybox.match.state().players[0].energy);
       await page.evaluate(() => window.__toybox.match.timeScale(1));
       // Wait on the condition rather than a fixed delay: slow frames can run no step in 600 ms.

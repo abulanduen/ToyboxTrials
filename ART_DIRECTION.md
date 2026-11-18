@@ -29,9 +29,26 @@ Keep scenery lower in contrast and saturation than characters. Prefer restrained
 
 ## Presentation rules
 
-- Warm afternoon sunlight, a honey desk-lamp pool and cool window fill. Low disables shadows/post-processing; Balanced uses tilt-shift; High uses depth of field.
+- Warm afternoon sunlight, a honey desk-lamp pool and cool window fill. Low disables shadows/post-processing. In the hub, Balanced uses tilt-shift and High uses depth of field; minigames disable both focus-blur effects for clear gameplay at every quality tier.
 - Physical UI metaphors: wooden signs/buttons, taped cardboard panels, paper tickets, felt scoreboards and sticker prompts. Fredoka display and Nunito body fonts are bundled. No generic icon packs or emoji for important visuals.
 - Touch controls share the tactile language, with safe-area placement and targets at least 56 px. Respect reduced-motion preferences.
 - Synthesised mechanical sound effects: taps, springs, ratchets and music-box tones. Copycat mapping stays A coral drum, S golden bell, J blue xylophone, K green music box.
+- Audio polish: softer wooden UI clicks and muted footsteps. Spellbox uses short material cues
+  per spell, quieter distance-attenuated opponents, bounded overlap and reserved local/warning
+  cues. Its shrink countdown sounds only the final three seconds. Copycat instruments stay intact.
+- Blink Duel uses a felt practice mat, cardboard rails, oversized original toy swords and blue/brass
+  spring-pop rings. Striped sector warnings and a filling charge bar communicate timing without
+  relying on colour alone; reduced-motion suppresses the decorative sweep and ring expansion.
+- Spellbox uses a circular wooden/plastic stage, toy wands and spell-coloured projectiles, button
+  mines, ward bubbles and burst rings. Mark the open edge clearly: it is a ring-out boundary, not
+  a solid wall. Ground cones/circles/lines warn of spells; damage and cooldowns also have text cues.
+- Spellbox's eight abilities have original generated painted-wood/brass/felt icons in draft,
+  loadout and cooldown buttons. Transparent WebP assets live in `public/assets/ui/spellbox/`;
+  generation prompts are recorded in `docs/assets/spellbox-icon-prompts.md`. Keep names live text.
 - Concepts in `public/assets/concepts/` are references and excluded from production output. Older cream-mascot concepts do not override the current contender design.
 - Proposed generated room assets, including the dog, remain future work. Use compressed GLB, lazy loading, a Low-tier fallback and source/licence records. Keep the toy layer code-built; never copy reference-game characters, levels or audio.
+- The owner declined the parallax direction. Its experiment is preserved on local branch
+  `astra/parallax-trial`; this branch retains the original 3D room.
+- Current town visual references: `docs/assets/town-concept-v1/HANDOFF.md` and four accompanying
+  views. They guide 3D town polish; source anchors/collision and the character blueprint take
+  precedence over illustrative dimensions or staging. Decorative cottages are proposals.

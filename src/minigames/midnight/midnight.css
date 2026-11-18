@@ -9,11 +9,8 @@
 .hunger-field { position:absolute; top:150px; left:max(12px,env(safe-area-inset-left)); display:flex; flex-direction:column; gap:3px; font-size:12px; }
 .hunger-field span { background:#F4E8CE; padding:3px 8px; border-radius:4px; }
 .hunger-field .out { opacity:.5; text-decoration:line-through; }
-.hunger-controls { position:absolute; bottom:max(16px,env(safe-area-inset-bottom)); left:max(12px,env(safe-area-inset-left)); text-align:center; }
-.hunger-controls>div { display:flex; gap:5px; margin-top:5px; }
-.hunger-controls button,.hunger-attack button { pointer-events:auto; touch-action:none; user-select:none; min-width:56px; min-height:56px; border:3px solid #574D69; border-radius:12px; background:#F4E8CE; color:#2B2433; font:600 15px Fredoka,sans-serif; box-shadow:0 4px 0 #574D69; }
-.hunger-controls button:active { transform:translateY(3px); box-shadow:0 1px 0 #574D69; }
-.hunger-controls button:focus-visible { outline:3px solid #EFAE45; outline-offset:3px; }
+.hunger-attack button { pointer-events:auto; touch-action:none; user-select:none; min-width:56px; min-height:56px; border:3px solid #574D69; border-radius:12px; background:#F4E8CE; color:#2B2433; font:600 15px Fredoka,sans-serif; box-shadow:0 4px 0 #574D69; }
+.hunger-attack button:active { transform:translateY(3px); box-shadow:0 1px 0 #574D69; }
 .hunger-attack { position:absolute; bottom:max(88px,calc(env(safe-area-inset-bottom) + 72px)); right:max(20px,env(safe-area-inset-right)); }
 .hunger-attack button { min-width:72px; background:#EFAE45; }
 .hunger-attack button:focus-visible { outline:3px solid #6BA7C8; outline-offset:3px; }

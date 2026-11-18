@@ -112,24 +112,28 @@ function Lights({ quality }: { quality: Quality }) {
   );
 }
 
-function Effects({ quality }: { quality: Quality }) {
+function Effects({ quality, sharp }: { quality: Quality; sharp: boolean }) {
   const q = QUALITY[quality];
   const target = useMemo(() => new THREE.Vector3(), []);
   const dofRef = useRef<{ target?: THREE.Vector3 } | null>(null);
+  const tiltRef = useRef<unknown>(null);
   useFrame(() => {
     target.set(player.pos.x, player.pos.y + 1.8, player.pos.z);
     if (dofRef.current) dofRef.current.target = target;
   });
+  useEffect(() => { exposeDebug({ postprocessing: { state: () => ({ quality, focusBlur: !sharp && q.post !== 'none', focusBlurMounted: !!dofRef.current || !!tiltRef.current }) } }); }, [quality, sharp, q.post]);
   if (q.post === 'none') return null;
   return (
-    <EffectComposer multisampling={q.aa ? 4 : 0} enableNormalPass={false}>
-      {q.post === 'dof' ? (
+    // Recreate the pass chain when removing DOF so High never keeps the previous scene buffer.
+    <EffectComposer key={sharp ? 'minigame' : 'hub'} multisampling={q.aa ? 4 : 0} enableNormalPass={false}>
+      {!sharp && (q.post === 'dof' ? (
         <DepthOfField ref={dofRef as never} target={target} worldFocusRange={38} bokehScale={4.5} resolutionScale={0.5} />
       ) : (
-        <TiltShift2 blur={0.22} taper={0.42} start={[0, 0.42]} end={[1, 0.42]} samples={8} direction={[1, 1]} />
-      )}
-      <Bloom intensity={0.5} luminanceThreshold={1.0} luminanceSmoothing={0.25} mipmapBlur />
-      <Vignette offset={0.28} darkness={0.5} eskil={false} />
+        <TiltShift2 ref={tiltRef as never} blur={0.22} taper={0.42} start={[0, 0.42]} end={[1, 0.42]} samples={8} direction={[1, 1]} />
+      ))}
+      {/* Threshold stays at 1.0: lower let pixel-sized highlights on glossy props flash (hub flicker). */}
+      <Bloom intensity={0.35} luminanceThreshold={1.0} luminanceSmoothing={0.2} mipmapBlur />
+      <Vignette offset={0.28} darkness={0.55} eskil={false} />
       {/* The composer renders the scene in linear HDR and switches the renderer's own tone
           mapping off, so apply the same ACES curve here: every tier then shares one grade. */}
       <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
@@ -162,7 +166,7 @@ function SceneContents() {
           <PlayerController />
         </>
       )}
-      <Effects quality={quality} />
+      <Effects quality={quality} sharp={inMatch} />
     </>
   );
 }

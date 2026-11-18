@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { copycatRules, inputDeadline, lengthFor, type CopycatInput, type CopycatState } from '../../src/minigames/copycat/rules';
+import { copycatRules, inputDeadline, lengthFor, sequenceForRound, type CopycatInput, type CopycatState } from '../../src/minigames/copycat/rules';
 import { createCopycatBot } from '../../src/minigames/copycat/bot';
 import { makeBots } from '../../src/minigames/bots';
 import { seededRng } from '../../src/minigames/rng';
@@ -33,8 +33,32 @@ describe('Copycat Conductor rules', () => {
   it('same seed → same sequence; never three identical notes in a row', () => {
     const a = copycatRules.init([human('you')], 123);
     expect(copycatRules.init([human('you')], 123).sequence).toEqual(a.sequence);
-    expect(copycatRules.init([human('you')], 124).sequence).not.toEqual(a.sequence);
-    for (let i = 2; i < a.sequence.length; i++) expect(a.sequence[i] === a.sequence[i - 1] && a.sequence[i] === a.sequence[i - 2]).toBe(false);
+    expect(sequenceForRound(124, 10, 12)).not.toEqual(sequenceForRound(123, 10, 12));
+    for (let r = 1; r <= 30; r++) {
+      const seq = sequenceForRound(123, r, r + 2);
+      for (let i = 2; i < seq.length; i++) expect(seq[i] === seq[i - 1] && seq[i] === seq[i - 2]).toBe(false);
+    }
+  });
+
+  it('every round plays a brand-new sequence, not the last one plus a note', () => {
+    for (let seed = 1; seed <= 200; seed++) {
+      for (let r = 2; r <= 12; r++) {
+        const prev = sequenceForRound(seed, r - 1, r + 1);
+        const next = sequenceForRound(seed, r, r + 2);
+        expect(next).toHaveLength(prev.length + 1);
+        expect(next.slice(0, prev.length)).not.toEqual(prev);
+      }
+    }
+    // The state's sequence is replaced at each round start.
+    const s = copycatRules.init([human('you')], 7);
+    const seen: string[] = [];
+    run(s, (st, id) => {
+      const key = st.sequence.join('');
+      if (seen[seen.length - 1] !== key) seen.push(key);
+      return perfect({ you: 6 })(st, id);
+    });
+    expect(seen.length).toBeGreaterThanOrEqual(6);
+    for (let i = 1; i < seen.length; i++) expect(seen[i].startsWith(seen[i - 1])).toBe(false);
   });
 
   it('sequence grows by one per round and demonstrations speed up', () => {

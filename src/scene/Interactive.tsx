@@ -219,7 +219,7 @@ export function Marble() {
   return (
     <mesh ref={mesh} castShadow>
       <sphereGeometry args={[R, 28, 20]} />
-      <meshPhysicalMaterial color="#9FD0E6" roughness={0.05} clearcoat={1} transparent opacity={0.85} />
+      <meshPhysicalMaterial color="#9FD0E6" roughness={0.2} clearcoat={0.6} clearcoatRoughness={0.3} transparent opacity={0.85} />
       {/* inner swirl */}
       <mesh rotation={[0.4, 0, 0.8]}>
         <torusGeometry args={[0.7, 0.16, 6, 20, Math.PI * 1.3]} />
@@ -369,7 +369,7 @@ export function KeyTower() {
         <boxGeometry args={[T.domino.hx * 2, T.domino.top, T.domino.hz * 2]} />
       </mesh>
       {[-1, 1].map((s) => (
-        <mesh key={s} position={[T.domino.x + s * 1.2, T.domino.top + 0.01, T.domino.z]} rotation={[-Math.PI / 2, 0, 0]} material={paintMat(PALETTE.ink, 0.5)}>
+        <mesh key={s} position={[T.domino.x + s * 1.2, T.domino.top + 0.04, T.domino.z]} rotation={[-Math.PI / 2, 0, 0]} material={paintMat(PALETTE.ink, 0.5)}>
           <circleGeometry args={[0.28, 10]} />
         </mesh>
       ))}
@@ -379,7 +379,7 @@ export function KeyTower() {
         <mesh position={[0.5, 0, 0]} material={paintMat('#F3EBDD', 1)}>
           <boxGeometry args={[T.book.hx * 2 - 0.4, T.book.top - 0.5, T.book.hz * 2 + 0.02]} />
         </mesh>
-        <mesh position={[0, T.book.top / 2 + 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]} material={paintMat(PALETTE.honey, 0.5)}>
+        <mesh position={[0, T.book.top / 2 + 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]} material={paintMat(PALETTE.honey, 0.5)}>
           <ringGeometry args={[1.6, 2.0, 24]} />
         </mesh>
       </group>

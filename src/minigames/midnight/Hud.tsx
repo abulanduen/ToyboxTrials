@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { pressVirtual, releaseVirtual, type Action } from '../../game/input';
 import { unlockAudio } from '../../game/audio';
 import { useMatch } from '../session';
+import { MoveTouch } from '../shared/MoveTouch';
 import type { MinigameSceneProps } from '../types';
 import { sheltered, type HungerState } from './rules';
 import './midnight.css';
@@ -37,9 +38,7 @@ export function HungerHud({ getState, localId }: MinigameSceneProps<HungerState>
     <div className="hunger-field" aria-label="Contender energy">
       {s.players.map(p => <span key={p.id} className={!p.alive ? 'out' : ''}>{p.id === localId ? 'You' : `Toy ${s.players.indexOf(p) + 1}`} · {Math.ceil(p.energy)}</span>)}
     </div>
-    {!paused && me.alive && <div className="hunger-controls"><DirectionPad action="forward" label="Up" /><div>
-      <DirectionPad action="left" label="Left" /><DirectionPad action="back" label="Down" /><DirectionPad action="right" label="Right" />
-    </div></div>}
+    {!paused && me.alive && <MoveTouch jump={false} />}
     {!paused && me.alive && <div className="hunger-attack"><DirectionPad action="slot1" label="Hit" /></div>}
     <div className="hunger-hint">{night ? 'Face a bot · Space / Hit · 3 hits' : 'Hold against a push to resist'}</div>
   </div>;
