@@ -68,8 +68,8 @@ export const DEFAULT_CONFIG: FindConfig = {
     { cols: 3, rows: 2, diffs: [2, 3], tierWeights: [3, 2, 1], needTier: 0, drift: 0, turn: 0, hardness: 0 },
     { cols: 4, rows: 3, diffs: [1, 2], tierWeights: [2, 3, 1], needTier: 1, drift: 0, turn: 0, hardness: 0.25 },
     { cols: 5, rows: 3, diffs: [1, 2], tierWeights: [0, 3, 2], needTier: 2, drift: 0.08, turn: 0.12, hardness: 0.5 },
-    { cols: 5, rows: 4, diffs: [1, 1], tierWeights: [0, 3, 3], needTier: 2, drift: 0.11, turn: 0.22, hardness: 0.8 },
-    { cols: 6, rows: 4, diffs: [1, 1], tierWeights: [0, 1, 3], needTier: 2, drift: 0.14, turn: 0.32, hardness: 1 },
+    { cols: 5, rows: 4, diffs: [1, 1], tierWeights: [0, 3, 3], needTier: 2, drift: 0.1, turn: 0.22, hardness: 0.8 },
+    { cols: 6, rows: 4, diffs: [1, 1], tierWeights: [0, 1, 3], needTier: 2, drift: 0.1, turn: 0.32, hardness: 1 },
   ],
   introMs: 900,
   firstStudyMs: 3400,
@@ -195,7 +195,9 @@ function buildCrowd(seed: number, round: number, spec: RoundSpec): Toy[] {
     traits,
     col: i % spec.cols,
     row: Math.floor(i / spec.cols),
-    jx: (rng() - 0.5) * 0.12,
+    // Static jitter + drift stay ≤ 0.14 cell per toy, so neighbours never come closer than
+    // 72 % of a cell: keeps every target ≥ 56 px apart on phones (see e2e findoriginal.cjs).
+    jx: (rng() - 0.5) * 0.08,
     jz: (rng() - 0.5) * 0.06,
     ph: rng() * TAU,
     ph2: rng() * TAU,
