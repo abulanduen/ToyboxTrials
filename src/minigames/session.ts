@@ -116,6 +116,10 @@ function enterMinigameScreen() {
 async function loadGame(id: MinigameId) {
   const def = gameById(id);
   if (!def.load) throw new Error(`${def.title} isn't playable yet.`);
+  // The previous game's state must never reach the next game's Scene (it renders behind the
+  // intro card before beginCountdown builds fresh state) — e.g. between tournament rounds.
+  runtime.state = null;
+  runtime.bot = null;
   useMatch.getState().set({ phase: 'loading', gameId: id, module: null, error: null });
   try {
     const mod = await def.load();
