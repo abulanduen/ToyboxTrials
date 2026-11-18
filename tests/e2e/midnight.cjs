@@ -1,0 +1,73 @@
+/* Preview browser flow: Pavilion → Midnight → battery/energy/day/shelter → results → hub. */
+const { chromium } = require('playwright');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const out = path.join(__dirname, 'output'); fs.mkdirSync(out, { recursive: true });
+(async () => {
+  const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+  try {
+    for (const layout of (process.env.MIDNIGHT_LAYOUTS || 'desktop,portrait,landscape').split(',')) {
+      const mobile = layout !== 'desktop';
+      const viewport = layout === 'portrait' ? { width: 390, height: 844 } : layout === 'landscape' ? { width: 844, height: 390 } : { width: 1280, height: 800 };
+      const page = await browser.newPage({ viewport, hasTouch: mobile, isMobile: mobile }); page.setDefaultTimeout(90000);
+      const errors = []; page.on('pageerror', e => errors.push(e.message)); page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+      await page.addInitScript(() => localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { quality: 'low' }, version: 0 })));
+      await page.goto((process.env.BASE_URL || 'http://127.0.0.1:4174/') + '?debug#play');
+      await page.waitForSelector('.loading', { state: 'detached' });
+      await page.evaluate(() => window.__toybox.teleport(0, -12.6, Math.PI));
+      await page.waitForSelector('.prompt');
+      if (mobile) await page.locator('.prompt').tap(); else await page.keyboard.press('KeyE');
+      await page.getByTestId('practice-midnight-hunger').click(); await page.waitForTimeout(800);
+      await page.getByTestId('match-start').click();
+      await page.waitForFunction(() => window.__toybox.match.phase() === 'playing');
+      await page.evaluate(() => window.__toybox.match.timeScale(0));
+      assert.equal(await page.evaluate(() => { const s = window.__toybox.match.state(); return s.batteries.length === s.players.length - 1; }), true);
+      // Controlled battery next to the local toy tests the real movement and collection adapter.
+      const startX = await page.evaluate(() => {
+        const s = window.__toybox.match.state(); const p = s.players[0];
+        p.energy = 40; s.nextTarget = 99999;
+        s.players.slice(1).forEach((other, i) => { other.x = 9; other.z = i; other.nextMove = 999999; });
+        p.nextMove = 0;
+        s.batteries[0].x = p.x + 1; s.batteries[0].z = p.z;
+        return p.x;
+      });
+      await page.evaluate(() => window.__toybox.match.timeScale(1));
+      if (mobile) await page.getByRole('button', { name: 'Right', exact: true }).tap(); else await page.keyboard.press('KeyD');
+      await page.waitForFunction(x => { const p = window.__toybox.match.state().players[0]; return p.x > x && p.fed; }, startX).catch(async e => {
+        console.error('Movement/collection state:', await page.evaluate(() => window.__toybox.match.state())); throw e;
+      });
+      assert.ok(await page.evaluate(() => window.__toybox.match.state().players[0].energy > 60));
+      await page.getByRole('button', { name: 'Pause', exact: true }).click(); await page.waitForSelector('.pause');
+      const pausedAt = await page.evaluate(() => window.__toybox.match.state().t); await page.waitForTimeout(250);
+      assert.equal(await page.evaluate(() => window.__toybox.match.state().t), pausedAt);
+      await page.keyboard.press('Escape'); await page.waitForSelector('.pause', { state: 'detached' });
+      await page.evaluate(() => window.__toybox.match.timeScale(0));
+      await page.screenshot({ path: path.join(out, `midnight-${layout}-night.png`) });
+      // Cross the actual rules boundary and inspect daytime shelter behaviour.
+      await page.evaluate(() => { const s = window.__toybox.match.state(); s.players[0].x = 1; s.players[0].z = 1; s.players[0].energy = 100; window.__toybox.match.timeScale(15); });
+      await page.waitForFunction(() => window.__toybox.match.state().phase === 'day');
+      await page.evaluate(() => window.__toybox.match.timeScale(0));
+      await page.waitForFunction(() => document.querySelector('.hunger-banner')?.textContent.includes('Sheltered'));
+      await page.screenshot({ path: path.join(out, `midnight-${layout}-day.png`) });
+      const energy = await page.evaluate(() => window.__toybox.match.state().players[0].energy);
+      await page.evaluate(() => window.__toybox.match.timeScale(1)); await page.waitForTimeout(600);
+      const after = await page.evaluate(() => window.__toybox.match.state().players[0].energy);
+      assert.ok(after < energy, 'shelter slows drain without stopping it');
+      await page.evaluate(() => window.__toybox.match.timeScale(40));
+      await page.waitForSelector('.results');
+      const record = await page.evaluate(() => JSON.parse(localStorage.getItem('toybox-trials:prototype:v1')).state.records['midnight-hunger']);
+      assert.equal(record.plays, 1);
+      await page.waitForTimeout(800); await page.getByTestId('results-again').click();
+      await page.waitForFunction(() => window.__toybox.match.phase() === 'playing');
+      await page.evaluate(() => window.__toybox.match.timeScale(0));
+      assert.equal(await page.evaluate(() => window.__toybox.match.state().players[0].batteries), 0);
+      await page.getByRole('button', { name: 'Pause', exact: true }).click(); await page.waitForSelector('.pause');
+      await page.waitForTimeout(800); // shared buttons deliberately ignore the first 700 ms
+      await page.locator('.pause__actions .toy-btn').nth(1).click(); await page.waitForSelector('.hud-sign');
+      assert.deepEqual(errors, []);
+      console.log(`PASS Midnight ${layout}: entry, scarcity, movement, battery/recharge, pause, day/shelter, results, record, restart, hub return; no console/page errors`);
+      await page.close();
+    }
+  } finally { await browser.close(); }
+})().catch(e => { console.error(e); process.exitCode = 1; });

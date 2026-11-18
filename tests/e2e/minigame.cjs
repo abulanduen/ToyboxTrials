@@ -200,12 +200,16 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
     await page.waitForSelector('[data-testid=match-start]', { timeout: 60000 });
     await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
     await page.click('[data-testid=match-start]');
-    const game = await page.evaluate(() => { const s = window.__toybox.match.state(); return s?.category ? 'jack' : s?.furnace ? 'inferno' : 'copycat'; });
+    const game = await page.evaluate(() => { const s = window.__toybox.match.state(); return s?.kind === 'midnight-hunger' ? 'midnight' : s?.category ? 'jack' : s?.furnace ? 'inferno' : 'copycat'; });
     games.push(game);
     if (game === 'copycat') await failRound(); // Jack: just never answer, and the jack pops on us
     if (game === 'inferno') {
       // Set up an exposed player, then let the real rules/host resolve the loss.
       await page.evaluate(() => { const s = window.__toybox.match.state(); s.players[0].x = s.furnace.x; s.players[0].z = s.furnace.z; });
+    }
+    if (game === 'midnight') {
+      // Force an exposed low-energy contestant, then let the real rules produce results.
+      await page.evaluate(() => { const s = window.__toybox.match.state(); s.players[0].energy = 0.01; });
     }
     await page.waitForSelector('.results', { timeout: 180000 });
     await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
@@ -224,7 +228,7 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
   const title = await page.textContent('.final h2');
   check('final standings: placed 2nd of 2 after losing every trial', title.includes('2nd of 2'), title);
-  check('tournament mixes the playable games', games.includes('jack') && games.includes('copycat'), games.join(','));
+  check('tournament uses three distinct playable games', new Set(games).size === 3 && games.every(g => ['jack', 'copycat', 'inferno', 'midnight'].includes(g)), games.join(','));
   await page.waitForTimeout(2500);
   await page.screenshot({ path: `${OUT}/m4-09-final.png` });
   const hist = await page.evaluate(() => JSON.parse(localStorage.getItem('toybox-trials:prototype:v1')).state.tournamentHistory);

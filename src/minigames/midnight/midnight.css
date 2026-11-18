@@ -1,0 +1,19 @@
+.hunger-hud { position:absolute; inset:0; pointer-events:none; color:#2B2433; }
+.hunger-banner { position:absolute; top:max(12px,env(safe-area-inset-top)); left:50%; transform:translateX(-50%); width:min(450px,calc(100% - 124px)); padding:10px 14px; background:#F4E8CE; border:3px solid #574D69; border-radius:10px; text-align:center; box-shadow:0 4px 0 #574D69; }
+.hunger-banner strong,.hunger-banner span,.hunger-banner small { display:block; }
+.hunger-banner strong { font-family:Fredoka,sans-serif; }
+.hunger-banner span { font-size:13px; margin:4px 0; }
+.hunger-day .hunger-banner { border-color:#EFAE45; }
+.hunger-energy { height:12px; background:#574D69; border-radius:5px; overflow:hidden; margin:5px 0; }
+.hunger-energy>div { height:100%; background:#89B78A; }
+.hunger-field { position:absolute; top:150px; left:max(12px,env(safe-area-inset-left)); display:flex; flex-direction:column; gap:3px; font-size:12px; }
+.hunger-field span { background:#F4E8CE; padding:3px 8px; border-radius:4px; }
+.hunger-field .out { opacity:.5; text-decoration:line-through; }
+.hunger-controls { position:absolute; bottom:max(16px,env(safe-area-inset-bottom)); left:max(12px,env(safe-area-inset-left)); text-align:center; }
+.hunger-controls>div { display:flex; gap:5px; margin-top:5px; }
+.hunger-controls button { pointer-events:auto; touch-action:none; user-select:none; min-width:56px; min-height:56px; border:3px solid #574D69; border-radius:12px; background:#F4E8CE; color:#2B2433; font:600 15px Fredoka,sans-serif; box-shadow:0 4px 0 #574D69; }
+.hunger-controls button:active { transform:translateY(3px); box-shadow:0 1px 0 #574D69; }
+.hunger-controls button:focus-visible { outline:3px solid #EFAE45; outline-offset:3px; }
+.hunger-hint { position:absolute; bottom:max(22px,env(safe-area-inset-bottom)); right:max(12px,env(safe-area-inset-right)); max-width:150px; background:#F4E8CE; border:2px solid #574D69; border-radius:8px; padding:8px; font-size:13px; text-align:center; }
+@media(max-height:500px) { .hunger-banner { padding:4px 10px; } .hunger-banner span { display:none; } .hunger-field { top:90px; } }
+@media(max-width:500px) { .hunger-field { top:160px; font-size:10px; } }

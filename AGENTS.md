@@ -17,6 +17,7 @@ Applies to Codex, Claude Code and other contributors. Read this file before edit
 - Preserve localStorage key `toybox-trials:prototype:v1` and saved data. Schema changes need a compatible migration.
 - Do not implement planned features merely because they appear in documentation. This documentation task authorizes no gameplay changes.
 - Subsequent owner authorization: Astra may implement Inferno Escape on `astra/inferno-escape`.
+  Midnight Hunger is also authorized on `astra/midnight-hunger`, based on the Inferno branch.
   Claude owns Find the Original, Red Light/Green Light, Wind-Up Dash and the room pass in separate
   cloud worktrees. Do not recreate or overwrite that work; recover and review it before integration.
 

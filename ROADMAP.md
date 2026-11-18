@@ -22,6 +22,12 @@ them. The completed/next sections below describe only the older local clone.
 
 ## Completed first passes
 
+**Midnight branch update:** `astra/midnight-hunger` adds the fourth local playable minigame:
+night/day energy rules, N−1 battery targets, shelters, bots, keyboard/touch controls and tournament
+integration. Balance/interpretations are in `src/minigames/midnight/README.md`. It is based on the
+Inferno branch; merge that work first. Seven catalogue entries remain planned in this clone;
+Claude's separate work is still described in the handoff section above.
+
 **Astra branch update:** `astra/inferno-escape` adds a local Inferno Escape module, Pavilion practice
 entry via the registry, bots and tournament eligibility. See `src/minigames/inferno/README.md` for
 provisional rules and integration notes. Claude retains the three worktrees listed above; recover

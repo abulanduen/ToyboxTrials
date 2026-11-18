@@ -77,7 +77,7 @@ export const MINIGAMES: MinigameDefinition[] = [
     status: 'playable',
     load: () => import('./inferno').then(m => m.default),
   },
-  planned({
+  {
     id: 'midnight-hunger',
     title: 'Midnight Hunger',
     tagline: 'Scavenge by night, shelter by day.',
@@ -89,8 +89,13 @@ export const MINIGAMES: MinigameDefinition[] = [
     eligibility: { tournament: true, ranked: true, casual: true },
     scoring: 'elimination-order',
     tieBreak: 'Out later ranks higher',
-    controls: [],
-  }),
+    controls: [{ keys: 'WASD / arrows', action: 'Move; touch a battery bot at night to catch it' }],
+    inputs: ['keyboard', 'mouse', 'touch'], bots: 'available', recordUnit: 'seconds',
+    touch: { movement: 'none', look: 'none', orientation: 'any',
+      buttons: [{ id: 'forward', label: 'Up', hold: true }, { id: 'left', label: 'Left', hold: true }, { id: 'back', label: 'Down', hold: true }, { id: 'right', label: 'Right', hold: true }],
+      notes: 'Hold directional pads to move. Touch a battery bot at night to recharge (one per night). Green corner shelters slow daytime drain; they do not stop it.' },
+    status: 'playable', load: () => import('./midnight').then(m => m.default),
+  },
   planned({
     id: 'find-the-original',
     title: 'Find the Original',

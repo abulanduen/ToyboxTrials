@@ -191,6 +191,11 @@ mechanical hazard. **Tech:** top-down destructible tile grid, no 3D destruction 
 updates as tiles change.
 
 ### 03 · Midnight Hunger (Survival / Scarcity · 2–8)
+**Local first pass on `astra/midnight-hunger`:** rules, bots, scene, energy HUD and keyboard/touch
+controls now exist (four local playable games on this branch, seven remaining planned entries).
+See `src/minigames/midnight/README.md` for provisional phase/drain balance, one-catch-per-night policy,
+shelter layout and time-limit ties. These choices await playtesting and are not final design.
+
 Each contender's energy drains continuously, and play alternates between two phases until one player remains.
 - **Night:** about 10 s to catch a target. Only **N−1** targets spawn for N survivors, so at least one player goes without.
   Catching one restores energy.

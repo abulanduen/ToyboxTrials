@@ -4,6 +4,14 @@ Source audit: 18 November 2026, starting commit `59744b7`. Source-inspected, not
 
 ## Implemented client
 
+Midnight branch update: `astra/midnight-hunger` adds a fourth lazy-loaded local game. Its pure rules
+split elapsed time at phase, target-movement and energy-depletion boundaries; seeded target movement
+and collection tie order are repeatable. Scene/HUD are separate; existing input, sound, characters,
+host lifecycle and local record storage are reused. No online/ranked functionality is added.
+Validation: 55 unit tests and production build pass; Midnight desktop/portrait/landscape flows,
+Copycat/Jack and mixed Blitz regressions, and the existing mobile suite pass without reported
+console/page errors. Balance and real-device performance remain unverified.
+
 Branch update: `astra/inferno-escape` adds a third playable local module, Inferno Escape, with
 independent deterministic tile rules, bots, scene/HUD and lazy registry integration. Earlier
 two-module counts below describe the starting audit. Eight catalogue entries remain planned
