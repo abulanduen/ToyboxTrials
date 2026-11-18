@@ -69,7 +69,8 @@ const out = path.join(__dirname,'output'); fs.mkdirSync(out,{recursive:true});
       await page.getByTestId('match-start').waitFor({state:'visible'}); await page.waitForTimeout(900); await click('match-start');
       await page.waitForFunction(()=>window.__toybox.match.phase()==='countdown');
       await page.evaluate(()=>window.__toybox.match.timeScale(10));
-      await page.waitForFunction(()=>window.__toybox.match.phase()==='playing');
+      // The first frames compile shaders and draw the first shop pictures; on a loaded software-GL machine that can take minutes.
+      await page.waitForFunction(()=>window.__toybox.match.phase()==='playing',null,{timeout:600000});
       await page.evaluate(()=>window.__toybox.match.timeScale(1));
       // This first build phase carries every interaction check, so give it far more than its 35 seconds (test hook only).
       await page.evaluate(()=>{window.__toybox.match.state().phaseEnds+=900000;});

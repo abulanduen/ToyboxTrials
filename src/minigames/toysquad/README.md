@@ -178,14 +178,17 @@ dragging cancels on pause, focus loss and phase change. Storage keys/schemas are
 games and room pass when merging; runtime edits outside this module are only its registry entry.
 
 Checks: `npm test`, `npm run build`, `node tests/e2e/toysquad.cjs` against a preview server with
-Playwright/Chromium. The test uses controlled stock to exercise automatic merges, Q/R/E shortcuts,
-hover details and physical reserve dragging/swaps, then plays all ten rounds and chooses the three
-passives. Real-device performance,
-audio quality and strategic balance still need human playtesting.
+Playwright/Chromium (`SQUAD_LAYOUTS=desktop|portrait|landscape` runs one layout). The test uses
+controlled stock to exercise automatic merges, owned 1/2-star indicators, shop pictures, rarity
+colours, the five offers fitting without sideways scrolling, trait symbols and trait details, the
+Toy Handbook with filters and a saved star shown on a shop card, unit details Close, the Sell
+button, drag-to-sell, keyboard placement, Q/R/E shortcuts and physical reserve dragging/swaps.
+It checks the damage overview in battle, then plays all ten rounds, where the passive modal must
+block Q/R/E until a choice is made. Real-device performance, audio quality and strategic balance
+still need human playtesting.
 
-Verification, 18 November 2026: 98 unit tests and production build pass. Desktop, portrait-touch and
-landscape-touch ten-round checks pass automatic chain merges, hover details, Q/R/E shortcuts,
-physical reserve dragging/swaps, spells, passive picks, records and restart, without console/page errors.
+Verification, 18 November 2026 (HUD update): 284 unit tests and the production build pass. The
+desktop, portrait-touch and landscape-touch ten-round checks above pass without console/page errors.
 
 The existing mobile hub/Copycat/Jack/Workshop regression suite passed with the prior unit-kit update. Headless software
 rendering is not a real-device FPS measurement.

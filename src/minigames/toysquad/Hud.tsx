@@ -106,7 +106,8 @@ export function SquadHud({ getState, localId, contestants }: MinigameSceneProps<
               {def && <small className="squad-card__more">HP {def.hp} · Hit {def.damage} · Range {def.range}</small>}{def && <small className="squad-card__more">Passive: {def.passive.name}</small>}{def && <small className="squad-card__more">Spell: {def.spell.name} · {def.spell.mana} mana</small>}
               {owned.some(Boolean) && <small className="squad-owned" data-testid={`squad-owned-${slot}`} data-owned={ownedSummary(owned)}>Owned{owned.map((n, i) => n ? <span key={i}>{stars(i + 1)}×{n}</span> : null)}
                 <span className="squad-sr"> {owned.map((n, i) => n ? `${n} at ${i + 1} star${i ? 's' : ''}` : '').filter(Boolean).join(', ')}</span></small>}
-              {!!upgrades.length && <small className="squad-upgrade-label">Auto-upgrade → {upgrades.length + 1} stars</small>}
+              {!!upgrades.length && <small className="squad-upgrade-label"><span className="squad-upgrade-label__full">Auto-upgrade → {upgrades.length + 1} stars</span>
+                <span className="squad-upgrade-label__short">Merge → {upgrades.length + 1}<StarIcon size={10} /><span className="squad-sr"> stars</span></span></small>}
             </span>
           </button>;
         })}
