@@ -13,6 +13,13 @@ try{for(const layout of(process.env.SPELLBOX_LAYOUTS||'desktop,portrait,landscap
   await click('practice-spellbox-showdown');await page.waitForTimeout(800);await page.getByRole('button',{name:'7 bots',exact:true}).click();await click('match-start');await page.waitForFunction(()=>window.__toybox.match.phase()==='playing');
   await page.evaluate(()=>window.__toybox.match.timeScale(.25));await click('spellbox-slot-2');await click('spellbox-equip-repair-stitches');await click('spellbox-slot-1');await click('spellbox-equip-pinwheel-storm');
   await page.waitForFunction(()=>window.__toybox.match.state().players[0].build.join(',')==='pop-rocket,pinwheel-storm,repair-stitches');
+  const iconFiles=new Set();
+  for(let slot=0;slot<3;slot++){
+    await click(`spellbox-slot-${slot}`);
+    await page.waitForFunction(()=>Array.from(document.querySelectorAll('.spellbox-icon')).every(img=>img.complete&&img.naturalWidth===512));
+    (await page.locator('.spellbox-icon').evaluateAll(images=>images.map(img=>img.src))).forEach(src=>iconFiles.add(src));
+  }
+  assert.equal(iconFiles.size,8,'all eight production icons decode');await click('spellbox-slot-1');
   assert.equal(await page.locator('.spellbox-catalogue button').count(),3);assert.equal((await state()).radius,39);
   await page.screenshot({path:path.join(out,`spellbox-${layout}-draft.png`)});await click('spellbox-ready');await page.evaluate(()=>window.__toybox.match.timeScale(1));await page.waitForFunction(()=>window.__toybox.match.state().phase==='arena');
   // Keep a visible target stationary while real input adapters launch and resolve a rocket.
@@ -46,5 +53,5 @@ try{for(const layout of(process.env.SPELLBOX_LAYOUTS||'desktop,portrait,landscap
   const record=await page.evaluate(()=>JSON.parse(localStorage.getItem('toybox-trials:prototype:v1')).state.records['spellbox-showdown']);assert.equal(record.plays,1);
   await page.waitForTimeout(800);await click('results-again');await page.waitForFunction(()=>window.__toybox.match.phase()==='playing');assert.equal((await state()).phase,'draft');assert.equal((await state()).players[0].damage,0);
   await page.getByRole('button',{name:'Pause',exact:true}).click();await page.waitForTimeout(800);await page.locator('.pause__actions .toy-btn').nth(1).click();await page.waitForSelector('.hud-sign');
-  assert.deepEqual(errors,[]);console.log(`PASS Spellbox ${layout}: three offers per button, eight-player arena, ten-second shrink warning, two-player arena, movement/aim, Q/E/R and click/touch casts, projectile damage/knockback, cooldowns, repair, ring-out, pause, results, record, restart, hub return; no console/page errors`);await page.close();
+  assert.deepEqual(errors,[]);console.log(`PASS Spellbox ${layout}: eight generated icons, three offers per button, eight-player arena, ten-second shrink warning, two-player arena, movement/aim, Q/E/R and click/touch casts, projectile damage/knockback, cooldowns, repair, ring-out, pause, results, record, restart, hub return; no console/page errors`);await page.close();
 }}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

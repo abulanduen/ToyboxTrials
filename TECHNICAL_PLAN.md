@@ -73,7 +73,7 @@ in this clone; Claude's separate cloud work is recorded in `ROADMAP.md`.
 | --- | --- |
 | Build | React 19, strict TypeScript, Vite; `npm run build` typechecks and emits static `dist/` with relative asset paths |
 | Rendering | three.js via React Three Fiber/drei; browser WebGL canvas, procedural geometry/textures, DOM/CSS overlays |
-| Quality | Low: no shadows/post FX, DPR up to 1.25; Balanced: tilt-shift/1024 shadows, DPR up to 1.5; High: depth of field/2048 shadows, DPR up to 2 |
+| Quality | Low: no shadows/post FX, DPR up to 1.25; Balanced: 1024 shadows, DPR up to 1.5; High: 2048 shadows, DPR up to 2. Hub uses tilt-shift/DOF respectively; minigames disable focus blur at both tiers |
 | State | Zustand; localStorage settings, cosmetics, secrets, records and limited tournament history; no secure online persistence |
 | World | Tabletop hub and oversized room; third-person movement, simple planar/height collision, camera blockers, interactive props |
 | Input/audio | Shared keyboard/touch action layer; Web Audio synthesis |

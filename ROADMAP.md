@@ -29,6 +29,8 @@ results and local tournaments. Values and tie rules remain provisional in its mo
 Owner revision adds much larger population-based rings, 10-second shrink warnings, a smooth
 moving edge, camera scaling and three role-specific choices per spell button. Human playtesting
 should check the larger travel distances, camera readability, transition speed and slot grouping.
+Visual follow-up adds eight generated ability icons to Spellbox draft/loadout/cooldown buttons
+and disables focus blur during all minigames at every graphics tier. Hub focus effects remain.
 Four games remain absent here: Claude's Find the Original, Red Light/Green Light, Wind-Up Dash
 and Music Box Rhythm. Recover/review that work before integration; do not recreate it.
 
