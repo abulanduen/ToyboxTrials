@@ -1,10 +1,10 @@
 # Online Hub
 
 Friends (or anyone) can enter the Playroom hub together, see one another (paint, hat, key and
-accessories), walk around and use their four equipped gestures (emotes). Trials (minigames) stay
-local and single-player: entering a gate or the Pavilion starts the usual practice game, and the
-other players see a "playing <game>" tag above you until you're back ("in the Workshop" and "at the
-Odds & Ends shop" work the same way).
+accessories), walk around and use their four equipped gestures (emotes). Trials can be played two
+ways: **practice with bots** (local, as before) or in an **online lobby**, where the server runs
+the match (see "Lobbies and online matches" below). Other players see a "playing <game>" tag above
+you until you're back ("in the Workshop" and "at the Odds & Ends shop" work the same way).
 
 - **Server:** a small always-on Node server using plain WebSockets (`ws`), hosted on **Railway**.
 - **Client:** the same static Vite build as before (Vercel). It connects to `VITE_SERVER_URL`.
@@ -84,18 +84,135 @@ Odds & Ends shop" work the same way).
 - The welcome message carries a secret resume token. If a connection drops, the player's slot is
   held for 30 s, and others see "reconnecting…". The client retries with backoff and gets the
   same room, slot and player id back. The client also treats 6 s without any message as a drop.
-- Messages over 2 KB close the socket. Each connection may send 30 messages a second, in bursts of
-  40; persistent flooding closes it. The server pings every 10 s and drops sockets that don't
-  answer. A socket that hasn't joined a room within 10 s is closed. The server turns players away
+- Messages over 2 KB close the socket. Each connection may send 45 messages a second, in bursts of
+  60 (match inputs go out about 30 times a second); persistent flooding closes it. The server pings every 10 s and drops sockets that miss
+  three pings in a row (about 30 s; a busy phone can stop reading its socket for a few seconds). A socket that hasn't joined a room within 10 s is closed. The server turns players away
   above 1000 connected (`server_full`).
 - Only origins in `ALLOWED_ORIGINS` may connect. Logs contain counts only, never nicknames or IP
   addresses.
 
-## Protocol (version 2)
+## Lobbies and online matches
 
-Version 2 (the shop): looks gained the accessory slots `back`, `face` and `neck`; the emote list
-grew from 4 to 10 ids; and `shop` became an activity. Clients still on version 1 get the
-"refresh the page" message.
+Anyone in an online Hub room can **host a lobby**: at the Tournament Pavilion (tab "Host an online
+lobby", a tournament in the chosen format) or at any trial gate (the intro card's "Host this trial
+online"). The other choice in both places is the existing **practice with bots**, unchanged.
+
+- **The alert.** Everyone else in the same Hub room gets a banner, e.g. "Ticker is hosting a Blitz
+  tournament · 1/8 · Join", until they dismiss it, join a lobby, or that lobby closes. The HUD's **Lobbies** button (and the Pavilion's online tab)
+  lists every open lobby in the room with Join. Anyone can join at any time unless the host has
+  locked the lobby or it is at its cap.
+- **Host controls** (`server/lobby.ts` checks every one: only the host's are accepted): kick a
+  player (they can't rejoin that lobby), player cap 2–8, lock/unlock, bot fill on/off, bot skill,
+  and the mode: **one trial** (picked from a card grid of all trials) or a **tournament**
+  (Blitz 3, Normal 5, Treasure 8 trials, as locally), then **Start**. When the host leaves, the
+  longest-present member becomes host; when the last member leaves, the lobby closes.
+- **The lobby screen** lists the members (host, ready, reconnecting) and shows the settings to
+  everyone; non-hosts press "I'm ready". At most 8 lobbies per Hub room; a player may host a new
+  one at most every 10 s; lobby actions are rate-limited (12 burst, 4 a second per player).
+- **Joining mid-match:** the newcomer watches the match live (following a player's view, with
+  "Watch next"), and is seated at the **next trial** (a tournament's next trial; for one trial, the
+  next start). Their tournament row starts with 0 for the trials they missed. This works for all
+  thirteen trials through the same path (no per-game special case).
+
+### How a match runs on the server
+
+- `server/lobbyMatch.ts` runs the phases: reveal (4.5 s) → countdown (3 s) → playing → results
+  (9 s) → standings (8 s, tournaments) → … → final table (15 s) → back to the lobby. Everyone
+  pressing Continue skips results, standings and the final table.
+- **The server owns the seed** and picks the tournament's trials with the same `selectGames` as
+  local tournaments, from the format's pool (`poolForFormat`: Toy Squad only in Normal and
+  Treasure). Bots (`makeBots`, the same bot policies as practice) fill the empty seats up to the
+  cap when the host turned bot fill on; if players leave and a trial would have fewer toys than it
+  needs, bots top it up even with bot fill off.
+- `server/matchRunner.ts` steps the **same pure rules cores** (`src/minigames/<game>/rules.ts`)
+  in fixed **60 Hz sub-steps** (what the rules expect; the local host does the same). The server's
+  match timer runs at **30 Hz** (`MATCH_TICK_HZ`), so each tick runs about two rules steps.
+- **Inputs:** the browser calls the game's own `readLocalInput` every frame, exactly as in
+  practice, and sends the queued inputs to the server about 30 times a second (`in`, at most 32
+  per message, under the 2 KB frame limit). The protocol checks their shape (flat objects of plain
+  values, no `__proto__`), and `server/games.ts` checks their meaning per game; a player may have at
+  most 64 waiting for the next step. They are applied on the next server step (arrival time is the
+  timestamp; Music Box Rhythm also carries its own song-time stamp, below). Held-input games
+  (Inferno Escape, Midnight Hunger) repeat the latest batch on each step until the next arrives,
+  for at most 250 ms of match time; an empty batch lets go.
+- **State to clients:** after each tick, every member gets their view of the state: a full
+  keyframe at the start of each trial (or after a reconnect), then **patches** (`src/net/delta.ts`:
+  only what changed, numbers rounded to 3 decimals). **30 snapshots a second** (Toy Squad, whose
+  state is large: 15). Rules events (sounds, animations) travel with them. The browser's match
+  host (`src/minigames/remote.ts`, plugged into `session.ts` through `remoteHost`) applies them and
+  renders through the game's unchanged `Scene` and `Hud`; between snapshots it runs the state's
+  clock `t` on smoothly (at most 120 ms past the newest snapshot, never backwards), which keeps
+  animations and the rhythm song clock at frame rate. Positions are not predicted or
+  interpolated: moving toys step at 30 Hz (the Racer scenes smooth them; Blink Duel and Spellbox
+  show the steps).
+- **Results and placements come from the server**; the clients only show them.
+- **Disconnects:** a dropped player's seat is kept for 30 s (`RESUME_WINDOW_MS`, the Hub's own
+  resume window): the match goes on without their inputs, and on reconnect they get the lobby and
+  a fresh keyframe. After 30 s (or on leaving, or a kick) they **forfeit**: last place in that
+  trial (marked "forfeit"), out of the rest of the tournament, and not on the leaderboard.
+- **Timing-sensitive games:**
+  - Music Box Rhythm presses carry the song time the client saw them at (its song clock follows
+    the server's state clock). Online, the rules accept a press up to 450 ms older than the server
+    clock (`maxInputAgeMs`, 120 ms locally) and call a miss correspondingly later. This hides
+    latency but means a modified client could claim good timings within that window.
+  - Blink Duel and Spellbox Showdown: inputs act on the next server step after they arrive, so a
+    blink or swing lands one network trip (plus up to ~33 ms of input batching) after the press.
+    There is no client-side prediction. Not measured on a real network.
+- **Spellbox Showdown** runs online through the generic path: its inputs are only shape-checked
+  here and validated by its own rules core, so changes to its inputs keep working online. Like
+  practice, it skips the 3 s countdown and opens on its draft (`skipStartCountdown`, mirrored in
+  `src/minigames/facts.ts`).
+- **New trials** join online play by adding an entry to `src/minigames/facts.ts` and
+  `server/games.ts` (input validator, hidden-information filter). A trial without them is shown
+  as "Not online yet" in the host's picker and is never drawn for an online tournament.
+
+### Hidden information
+
+`server/games.ts` removes secrets from every view before it leaves the server:
+- **Jack-in-the-Box:** the fuse. `fuseMs`, `fuseTotalMs` and the pre-rolled `fuses` are replaced
+  (clients only learn how long the box has been held this round, which the Scene's tension wobble
+  uses and which anyone can count anyway); the category order is not sent.
+- **Copycat Conductor:** notes not yet demonstrated are masked; the seed is not sent.
+- **Red Light, Green Light:** the pre-rolled light timings (`cycles`) are not sent.
+- **Every game with a seed** (Midnight Hunger, Find the Original, Blink Duel, Spellbox, Toy Squad,
+  Odd Page Out, Toy Tower Tumble): the seed is not sent (it would predict batteries, crowds,
+  shops, matchups and later pictures).
+- **Toy Tower Tumble:** each board's random-draw state (`rng`) is not sent (it would tell which
+  tower the next Build gives).
+- **Blink Duel, Spellbox:** other players' queued inputs (`pending`) are not sent.
+- **Toy Squad:** you get your own shop, passive offers and battle; other players' shops and
+  offers are blanked and their battles are not sent.
+- Inferno Escape, Wind-Up Dash and Music Box Rhythm have nothing hidden (the course and chart are
+  what everyone plays). Find the Original's real Baldwyn is not a stored secret: it is whichever
+  toy matches the card everyone sees. Likewise Odd Page Out's differences are drawn on the two
+  pages everyone sees, so the round's picture data (including its list of differing slots) is
+  sent: a modified client could read the answers from it, as it could from the pictures.
+- A spectator gets the view of the player they watch.
+
+### Leaderboard
+
+- Every finished online **tournament** is stored per human player: name, format, final place,
+  field size, points and date. Single-trial lobby matches are stored too, under the trial's id
+  (points = what that place earns in a tournament). Bots and forfeits are not stored.
+- **Names:** signed-in players appear by their account **username** (the client links the
+  account with an `auth` message holding its session token; the server checks it against the
+  accounts store); everyone else by their (sanitised) nickname. Guests with the same nickname share
+  a line.
+- **Storage:** the accounts PostgreSQL database when `DATABASE_URL` is set (table
+  `leaderboard_results`, created by migration 2 of the existing migration list); otherwise in
+  memory (lost on restart).
+- **API:** `GET /api/leaderboard?board=blitz|normal|treasure|<trial-id>` (also `?format=`), with
+  the accounts API's CORS rules, 60 requests a minute per IP. Answers `{ board, entries: [{ name,
+  account, played, wins, points, best, last }], recent: [...] }`, ranked by wins, then points.
+  There is no endpoint that accepts a result: results only come from matches the server ran.
+- **In the game:** the Hub Scoreboard panel shows the top ten per format above your local records
+  (which stay on this device), and the TV beside it has a "Leaderboard" channel (Blitz).
+
+## Protocol (version 3)
+
+Version 3 (lobbies): adds the lobby, match and account-link messages below. Version 2 (the shop)
+added the accessory slots `back`, `face` and `neck`, ten emote ids and the `shop` activity.
+Clients on an older version get the "refresh the page" message.
 
 
 JSON objects with a `t` field. Bump `PROTOCOL_VERSION` when a shape changes. The server turns away
@@ -111,12 +228,21 @@ Client → server:
 | `activity` | `a` | A minigame id, `workshop`, `shop`, or null. |
 | `look` | `look` | Cosmetics changed (at most twice a second). |
 | `leave` | | Leaving on purpose (frees the slot at once). |
+| `lobby` | `a`: `create {settings}`, `join {id}`, `leave`, `kick {id}`, `settings {settings}` (any subset), `ready {ready}`, `start`, `watch {id}`, `timescale {k, hold?}` | Lobby actions. Settings: `mode` (single, tournament), `game`, `format` (blitz, normal, treasure), `cap` 2–8, `locked`, `botFill`, `difficulty`. `timescale` (speed, 0 = frozen; `hold`: freeze on reaching that phase) is only honoured by a test server (`MATCH_DEBUG=1`). |
+| `in` | `m` (match sequence), `i` (inputs) | Match inputs as the game's `readLocalInput` produces them; at most 32, each a flat object of plain values. |
+| `auth` | `token` | Links a signed-in account (leaderboard name). At most 5 per connection. |
 
 Server → client: `welcome` (your id, resume token, room, roster, spawn point, server time),
 `joined`, `left`, `room` (host changed), `snap` (`now`, players: `id x y z r s g e es a off`),
 `emote`, `look`, and `error` (`code`, `message`, `fatal`). The error codes are
 `version_mismatch`, `room_full`, `no_such_room`, `bad_request`, `not_joined`, `replaced`,
 `server_full` and `shutting_down`.
+
+Lobbies (v3): `lobbies` (the room's list, on joining and on every change), `lobbyAlert` (someone
+started hosting), `lobby` (your lobby: members, settings, and the running match's phase, field,
+tournament table and result; `null` with a reason when you left, were kicked or it closed),
+`lobbyErr` (a refused action, with player-facing text), and `ms` (match state: `m` sequence, `k`
+1 = keyframe / 0 = patch, `d` data, `e` events, `n` server time).
 
 ## Optional accounts
 
@@ -225,11 +351,13 @@ Server environment:
 - `DATABASE_URL`: PostgreSQL for accounts. Without it, accounts are off (the API answers 503 and
   the game hides the Account entries) unless `ACCOUNTS_STORE=memory`, which keeps accounts in
   memory (lost on restart). `npm run server:dev` sets `ACCOUNTS_STORE=memory` for you.
+- `MATCH_DEBUG`: `1` lets lobby members speed up, freeze or hold their match at a phase (`timescale`). Test servers only;
+  never set it in production.
 - `ALLOWED_ORIGINS`: comma-separated origins. A `*` matches one host label or a port. The default
   is localhost, 127.0.0.1 and `https://toybox-trials.vercel.app`; setting the variable replaces
   the default.
 
-`GET /health` returns `{ ok, protocol, rooms, players, connected, accounts }`. `accounts` is
+`GET /health` returns `{ ok, protocol, rooms, players, connected, lobbies, matches, accounts }`. `accounts` is
 `postgres` or `memory` when accounts work, `starting` while the database is being reached, and
 `off` without a database.
 
@@ -245,7 +373,11 @@ BASE_URL=http://localhost:4190/ node tests/e2e/online.cjs   # starts the server 
 VITE_SERVER_URL=ws://localhost:2570 npx vite build --outDir /tmp/acct-dist
 npx vite preview --outDir /tmp/acct-dist --port 4198 --strictPort &
 BASE_URL=http://localhost:4198/ node tests/e2e/account.cjs  # starts the server on 2570 (in memory, or ACCOUNT_DATABASE_URL=postgres://…)
-TEST_DATABASE_URL=postgres://… npx vitest run tests/unit/accounts-pg.test.ts   # the Postgres store, on a throwaway database
+TEST_DATABASE_URL=postgres://… npx vitest run tests/unit/accounts-pg.test.ts   # the Postgres store (and leaderboard table), on a throwaway database
+# lobbies and online matches: the client build must point at port 2572
+VITE_SERVER_URL=ws://localhost:2572 npx vite build --outDir /tmp/lobby-dist
+setsid nohup npx vite preview --outDir /tmp/lobby-dist --port 4199 --strictPort &
+BASE_URL=http://localhost:4199/ node tests/e2e/lobby.cjs   # starts the server on 2572 with MATCH_DEBUG=1
 ```
 
 ## Deploy on Railway (owner steps)
@@ -298,7 +430,20 @@ Railway pushes a new server on every commit to the branch it watches. The client
   against the built server on localhost. The Railway steps above have not been tried here.
 - No latency, capacity or real-device measurements. Phones were tested in emulation only, on
   software rendering.
-- Minigames are local only. There are no online matches, parties or matchmaking (M8/M9).
+- Online lobby matches were tested in this container only (unit tests, and `tests/e2e/lobby.cjs`
+  with real browsers against the built server on localhost). **Nothing about real latency,
+  jitter, bandwidth or how many matches one server can run has been measured.** The snapshot and
+  input rates are design choices, not tuned values.
+- Every trial runs headless on the server path with bots in the unit tests
+  (`tests/unit/lobby-match.test.ts`). In real browsers, online play was exercised with Copycat
+  Conductor (one trial) and Blitz tournaments whose seeds drew Find the Original, Midnight Hunger,
+  Wind-Up Dash, Music Box Rhythm, Copycat Conductor, Inferno Escape and Odd Page Out, with the players idle. The
+  other trials' Scenes and Huds have not been watched on server state in a browser yet, and
+  nobody has played a trial online by hand.
+- No client-side prediction or position interpolation in online matches (see above); no
+  matchmaking queues, parties or ranked play (M9/M10). Online matches don't pay cogs or update
+  local records yet.
+- One process holds every lobby and match in memory: a restart or redeploy ends them.
 - No interest management: everyone in a room receives everyone, and rooms are capped at 24.
 - Remote toys are always full `WindupBot`s. The planned fallback to `MiniContender` for distant
   players in a crowded room is not built.

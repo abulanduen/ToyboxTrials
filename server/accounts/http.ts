@@ -48,8 +48,14 @@ function readBody(req: IncomingMessage): Promise<string> {
   });
 }
 
+/** A read-only endpoint served beside the accounts API with the same CORS (the leaderboard). */
+export interface ExtraRoute {
+  matches(path: string): boolean;
+  handle(req: { method: string; query: URLSearchParams; ip: string }): Promise<{ status: number; body: unknown }>;
+}
+
 /** Returns a request handler for `/api/*`; it answers and returns true, or returns false for other paths. */
-export function accountsHttp(api: AccountsApi, origins: RegExp[]) {
+export function accountsHttp(api: AccountsApi, origins: RegExp[], extra: ExtraRoute[] = []) {
   return async function handle(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
     const path = (req.url ?? '/').split('?')[0];
     if (path !== '/api' && !path.startsWith('/api/')) return false;
@@ -82,6 +88,13 @@ export function accountsHttp(api: AccountsApi, origins: RegExp[]) {
       headers['access-control-allow-methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
       headers['access-control-allow-headers'] = 'authorization, content-type';
       send(204);
+      return true;
+    }
+    const route = extra.find((r) => r.matches(path));
+    if (route) {
+      const query = new URL(req.url ?? '/', 'http://localhost').searchParams;
+      const out = await route.handle({ method, query, ip: clientIp(req) });
+      send(out.status, out.body);
       return true;
     }
     let body: unknown;

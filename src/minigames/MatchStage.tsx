@@ -11,13 +11,14 @@ import { WindupBot } from '../character/WindupBot';
 import { createToyAnim, type ToyAnim } from '../character/anim';
 import { MiniContender, createMiniAnim, type MiniAnim } from '../character/MiniContender';
 import { feltMat, woodMat } from '../scene/props';
-import { LOCAL_ID, getMatchState, tickMatch, useMatch } from './session';
+import { getMatchState, tickMatch, useMatch } from './session';
 import { rankStandings } from './scoring';
 
 export function MatchStage() {
   const module = useMatch((s) => s.module);
   const contestants = useMatch((s) => s.contestants);
   const phase = useMatch((s) => s.phase);
+  const localId = useMatch((s) => s.localId);
 
   useFrame((_, dt) => {
     tickMatch(dt * 1000);
@@ -27,7 +28,8 @@ export function MatchStage() {
   const showGame = module && phase !== 'final' && phase !== 'reveal' && phase !== 'loading';
   if (showGame) {
     const Scene = module.Scene;
-    return <Scene getState={getMatchState} contestants={contestants} localId={LOCAL_ID} />;
+    // Remounted per trial and per viewer, so a spectator switching toys starts from a clean Scene.
+    return <Scene key={localId} getState={getMatchState} contestants={contestants} localId={localId} />;
   }
   return <Lineup podium={phase === 'final'} />;
 }

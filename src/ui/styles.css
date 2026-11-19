@@ -3858,3 +3858,465 @@ canvas {
     top: calc(8px + env(safe-area-inset-top));
   }
 }
+
+/* ---------- Online lobbies (LobbyUI.tsx) ---------- */
+.length-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 2px solid var(--ink-deep);
+  background: #e8f3e3;
+  font: 700 0.72rem var(--font-body);
+  white-space: nowrap;
+}
+.length-chip--medium {
+  background: #fff1cf;
+}
+.length-chip--long {
+  background: #fbe0dc;
+}
+.intro-length {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 2px;
+  font: 600 0.85rem var(--font-body);
+}
+.intro-online .host-btn:not(:disabled) {
+  min-height: 56px;
+  border: 2.5px solid var(--ink-deep);
+  border-radius: 12px;
+  background: var(--blue);
+  color: var(--ink-deep);
+  cursor: pointer;
+  box-shadow: 0 3px 0 rgba(43, 36, 51, 0.35);
+}
+
+/* Game card grid: the host's trial picker and the Pavilion's practice list. */
+.game-grid-wrap {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.game-grid__sort {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font: 700 0.75rem var(--font-body);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.game-grid__sort button {
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 2px solid var(--ink-deep);
+  background: var(--paper);
+  font: 700 0.8rem var(--font-display);
+  cursor: pointer;
+}
+.game-grid__sort button.on {
+  background: var(--honey);
+}
+.game-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+@media (orientation: portrait) {
+  .game-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.game-card {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  min-height: 56px;
+  min-width: 0;
+  padding: 6px 6px 8px;
+  text-align: left;
+  border-radius: 14px;
+  border: 2.5px solid var(--ink-deep);
+  background: var(--paper);
+  box-shadow: 0 4px 0 rgba(43, 36, 51, 0.35);
+  color: var(--ink-deep);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.game-card:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 rgba(43, 36, 51, 0.35);
+}
+.game-card.on {
+  background: #fff3d6;
+  outline: 4px solid var(--honey);
+  outline-offset: 1px;
+}
+.game-card:disabled {
+  cursor: default;
+}
+.game-card--off {
+  opacity: 0.55;
+}
+.game-card__thumb {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 9;
+  border-radius: 9px;
+  overflow: hidden;
+  border: 2px solid var(--ink-deep);
+}
+.game-card__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.game-card__initial {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font: 700 2rem var(--font-display);
+  color: rgba(255, 249, 238, 0.85);
+}
+.game-card__title {
+  font: 700 0.95rem var(--font-display);
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+.game-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  align-items: center;
+  font: 600 0.72rem var(--font-body);
+}
+.game-card__sub {
+  font: 600 0.72rem var(--font-body);
+  opacity: 0.75;
+}
+
+/* Hub: the lobby alert, the Lobbies button, lists. */
+.lobby-alert {
+  position: absolute;
+  top: calc(14px + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(560px, calc(100vw - 24px));
+  padding: 6px 6px 6px 14px;
+  border-radius: 16px;
+  border: 3px solid var(--ink-deep);
+  background: #fff3d6;
+  box-shadow: var(--shadow);
+  font: 600 0.9rem var(--font-body);
+  pointer-events: auto;
+  z-index: 5;
+  animation: ticket-in 0.35s ease-out;
+}
+.lobby-alert__text {
+  min-width: 0;
+}
+.lobby-alert__join {
+  flex: none;
+  min-height: 56px;
+  min-width: 72px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 2.5px solid var(--ink-deep);
+  background: var(--sage);
+  font: 700 1rem var(--font-display);
+  cursor: pointer;
+}
+.lobby-alert__x {
+  flex: none;
+  width: 44px;
+  height: 56px;
+  border: 0;
+  background: transparent;
+  font: 700 1.4rem var(--font-display);
+  cursor: pointer;
+}
+.lobbies-btn {
+  position: absolute;
+  top: calc(172px + env(safe-area-inset-top));
+  left: calc(18px + env(safe-area-inset-left));
+  min-height: 48px;
+  padding: 0 16px;
+  border-radius: 14px;
+  border: 2.5px solid var(--ink-deep);
+  background: var(--paper);
+  box-shadow: 0 3px 0 rgba(43, 36, 51, 0.3);
+  font: 700 0.95rem var(--font-display);
+  pointer-events: auto;
+  cursor: pointer;
+}
+@media (max-width: 700px), (max-height: 500px) {
+  .lobbies-btn {
+    top: calc(150px + env(safe-area-inset-top));
+  }
+}
+@media (pointer: coarse) {
+  .lobbies-btn {
+    min-height: 56px;
+  }
+}
+.lobby-list {
+  list-style: none;
+  margin: 6px 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.lobby-list__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px 8px 12px;
+  border-radius: 12px;
+  border: 2px solid var(--ink-deep);
+  background: var(--paper);
+}
+.lobby-list__what {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  font: 600 0.85rem var(--font-body);
+}
+.lobby-list__what strong {
+  font: 700 1rem var(--font-display);
+}
+
+/* The Pavilion's two choices. */
+.pavilion-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 0.3rem 0 0.8rem;
+}
+.pavilion-tabs button {
+  display: grid;
+  gap: 2px;
+  min-height: 64px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  border: 2.5px solid var(--ink-deep);
+  background: var(--paper);
+  box-shadow: 0 4px 0 rgba(43, 36, 51, 0.35);
+  text-align: left;
+  cursor: pointer;
+  color: var(--ink-deep);
+}
+.pavilion-tabs button strong {
+  font: 700 1rem var(--font-display);
+}
+.pavilion-tabs button span {
+  font: 600 0.75rem var(--font-body);
+  opacity: 0.75;
+}
+.pavilion-tabs button.on {
+  background: #dcecf5;
+  outline: 4px solid var(--blue);
+}
+.pavilion-tabs button:first-child.on {
+  background: #fff3d6;
+  outline-color: var(--honey);
+}
+
+/* The lobby screen. */
+.lobby-card {
+  width: min(760px, calc(100vw - 20px));
+}
+.lobby-members {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 6px;
+}
+.lobby-member {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 48px;
+  padding: 4px 6px 4px 10px;
+  border-radius: 12px;
+  border: 2px solid var(--ink-deep);
+  background: var(--paper);
+  font: 700 0.9rem var(--font-body);
+}
+.lobby-member.me {
+  background: #fff3d6;
+}
+.lobby-member.off {
+  opacity: 0.6;
+}
+.lobby-member__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lobby-tag {
+  padding: 1px 6px;
+  border-radius: 8px;
+  border: 1.5px solid var(--ink-deep);
+  font: 700 0.68rem var(--font-body);
+  text-transform: uppercase;
+}
+.lobby-tag--host {
+  background: var(--honey);
+}
+.lobby-tag--ready {
+  background: var(--sage);
+}
+.lobby-kick {
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 2px solid var(--ink-deep);
+  background: var(--coral);
+  font: 700 0.8rem var(--font-display);
+  cursor: pointer;
+}
+.lobby-note {
+  margin: 2px 0 6px;
+}
+.lobby-settings {
+  display: grid;
+  gap: 6px;
+}
+.lobby-setting {
+  grid-template-columns: minmax(80px, 0.6fr) 2fr;
+}
+.lobby-seg {
+  display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.lobby-seg button {
+  min-height: 44px;
+  min-width: 44px;
+}
+.lobby-seg button:disabled {
+  cursor: default;
+  color: inherit;
+}
+@media (pointer: coarse) {
+  .lobby-seg button,
+  .lobby-kick,
+  .game-grid__sort button {
+    min-height: 56px;
+  }
+}
+@media (orientation: portrait) {
+  .lobby-setting {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}
+.spectator-bar {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 6px 6px 14px;
+  border-radius: 14px;
+  border: 2.5px solid var(--ink-deep);
+  background: var(--paper);
+  font: 600 0.9rem var(--font-body);
+  pointer-events: auto;
+  max-width: calc(100vw - 100px);
+}
+.spectator-bar button {
+  min-height: 56px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 2px solid var(--ink-deep);
+  background: var(--blue);
+  font: 700 0.9rem var(--font-display);
+  cursor: pointer;
+}
+
+/* Online leaderboard (Hub Scoreboard panel). */
+.leaderboard {
+  display: grid;
+  gap: 6px;
+  margin: 4px 0 10px;
+}
+.leaderboard__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.leaderboard__head strong {
+  font: 700 1.05rem var(--font-display);
+}
+.leaderboard__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.leaderboard__list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 10px;
+  background: var(--paper);
+  border: 2px solid rgba(43, 36, 51, 0.25);
+  font: 700 0.9rem var(--font-body);
+}
+.leaderboard__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.leaderboard__num {
+  font: 600 0.8rem var(--font-body);
+  white-space: nowrap;
+}
+@media (max-width: 480px) {
+  .leaderboard__played {
+    display: none;
+  }
+}
+
+/* Lobby segmented controls: one row that shares the width (the player cap's seven numbers fit a
+   phone), and finger-sized targets. Declared after `.intro-options .segmented button` so these win. */
+.segmented.lobby-seg {
+  display: flex;
+  flex-wrap: nowrap;
+}
+.segmented.lobby-seg button {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 48px;
+  padding: 6px 4px;
+}
+@media (pointer: coarse), (max-width: 700px), (orientation: portrait) {
+  .segmented.lobby-seg button,
+  .game-grid__sort button,
+  .lobby-kick,
+  .lobby-card .toy-btn {
+    min-height: 56px;
+  }
+}

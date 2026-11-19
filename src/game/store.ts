@@ -29,7 +29,7 @@ export interface Ticket {
 }
 
 export interface Panel {
-  kind: 'tournament' | 'preview' | 'scoreboard';
+  kind: 'tournament' | 'preview' | 'scoreboard' | 'lobbies';
   title: string;
   subtitle?: string;
   body?: string;

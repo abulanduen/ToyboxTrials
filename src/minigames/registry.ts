@@ -4,6 +4,7 @@
  */
 import { PALETTE } from '../game/palette';
 import type { MinigameDefinition, MinigameId, TouchLayout } from './types';
+import { poolForFormat, type TournamentFormat } from './tournament';
 
 /** Placeholder for planned games: must be replaced with a real layout before a game ships. */
 const TOUCH_TBD: TouchLayout = { movement: 'none', look: 'none', buttons: [], orientation: 'any', notes: 'To be designed with the minigame.' };
@@ -253,7 +254,8 @@ export const MINIGAMES: MinigameDefinition[] = [
     accent: PALETTE.sage,
     players: { min: 1, max: 8 },
     durationSec: [300, 630],
-    eligibility: { tournament: false, ranked: false, casual: true },
+    // Owner decision (19 Nov 2026): the full 5–10 minute game, in the longer formats only (never Blitz).
+    eligibility: { tournament: true, ranked: false, casual: true, formats: ['normal', 'treasure'] },
     scoring: 'score',
     tieBreak: 'Remaining unit health',
     controls: [{ keys: 'Drag / Click / Tab + Enter', action: 'Buy or reroll; drag matching equal-star toys together to merge. Formation drawer manages reserves and keyboard placement.' }],
@@ -387,5 +389,8 @@ export const MINIGAMES: MinigameDefinition[] = [
 
 export const gameById = (id: MinigameId) => MINIGAMES.find((g) => g.id === id)!;
 
-/** Games that can appear in tournaments right now. */
-export const tournamentPool = () => MINIGAMES.filter((g) => g.status === 'playable' && g.eligibility.tournament);
+/** Games that can appear in tournaments right now: in `format` when given (see poolForFormat), else in any format. */
+export const tournamentPool = (format?: TournamentFormat) =>
+  format ? poolForFormat(format, MINIGAMES) : MINIGAMES.filter((g) => g.status === 'playable' && g.eligibility.tournament);
+
+export { lengthClassOf, durationLabel, durationChip } from './length';

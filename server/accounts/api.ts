@@ -126,6 +126,16 @@ export class AccountsApi {
     this.stateValue = 'ready';
   }
 
+  /**
+   * The username a session token belongs to, or null (accounts off, unknown or expired token).
+   * The online Hub uses it to put signed-in players on the leaderboard by username.
+   */
+  async usernameFor(token: string, now = this.now()): Promise<string | null> {
+    if (this.stateValue !== 'ready' || !this.store) return null;
+    const a = await this.authed({ method: 'GET', path: '/api/me', authorization: `Bearer ${token}`, ip: 'hub' }, now);
+    return a?.user.username ?? null;
+  }
+
   /** Housekeeping, about hourly: expired sessions and idle rate-limit keys. */
   async sweep(): Promise<number> {
     const now = this.now();

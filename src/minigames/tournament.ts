@@ -39,3 +39,32 @@ export function selectGames(seed: number, count: number, pool: { id: MinigameId;
   }
   return out;
 }
+
+export const FORMAT_IDS = Object.keys(FORMATS) as TournamentFormat[];
+
+export const isTournamentFormat = (v: unknown): v is TournamentFormat => typeof v === 'string' && (FORMAT_IDS as string[]).includes(v);
+
+/** What `poolForFormat` needs to know about a game (the registry entries and the server's GAME_FACTS both fit). */
+export interface PoolEntry {
+  id: MinigameId;
+  category: MinigameCategory;
+  players: { min: number; max: number };
+  /** Registry entries: only 'playable' games are eligible. Absent = playable. */
+  status?: 'playable' | 'planned';
+  eligibility: { tournament: boolean; formats?: readonly TournamentFormat[] };
+}
+
+/**
+ * The games a tournament of `format` may draw from, for a field of `field` toys (when given).
+ * A game with `eligibility.formats` only appears in those formats (Toy Squad: Normal and
+ * Treasure, never Blitz — owner decision, 19 Nov 2026). Used by local and online tournaments.
+ */
+export function poolForFormat<G extends PoolEntry>(format: TournamentFormat, games: readonly G[], field?: number): G[] {
+  return games.filter(
+    (g) =>
+      (g.status ?? 'playable') === 'playable' &&
+      g.eligibility.tournament &&
+      (!g.eligibility.formats || g.eligibility.formats.includes(format)) &&
+      (field === undefined || (field >= g.players.min && field <= g.players.max)),
+  );
+}

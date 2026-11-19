@@ -9,7 +9,7 @@ import { MINIGAMES } from '../minigames/registry';
 import type { Activity } from '../net/protocol';
 import { gateFor } from './layout';
 
-export const TV_CARDS = ['online', 'friends', 'shop', 'records'] as const;
+export const TV_CARDS = ['online', 'friends', 'leaders', 'shop', 'records'] as const;
 export type TvCardId = (typeof TV_CARDS)[number];
 /** Seconds each card stays up before the TV flips to the next. */
 export const TV_CARD_SECONDS = 6;
@@ -56,6 +56,10 @@ export interface TvInputs {
   secretTotal: number;
   /** Items the shop can feature (read from the cosmetics catalogue); one is picked per cycle. */
   featured: TvFeatured[];
+  /** The online leaderboard (server-run lobby tournaments), when it has been fetched. */
+  leaders?: { board: 'blitz' | 'normal' | 'treasure'; entries: { name: string; wins: number; points: number }[] } | null;
+  /** Lobbies open in this Hub room. */
+  lobbies?: number;
 }
 
 const short = (game: MinigameId) => gateFor(game)?.short ?? MINIGAMES.find((g) => g.id === game)?.title ?? game;
@@ -101,6 +105,19 @@ export function tvCard(id: TvCardId, inp: TvInputs, cycle = 0): TvCard {
       const lines: TvLine[] = busy.slice(0, TV_ROWS - 1).map((p) => ({ text: clip(`${clip(p.name, 11)} > ${activityLabel(p.activity!)}`, TV_COLS) }));
       if (busy.length > TV_ROWS - 1) lines.push({ text: `+${busy.length - (TV_ROWS - 1)} MORE` });
       return { id, title: 'NOW PLAYING', accent: P.coral, lines };
+    }
+    case 'leaders': {
+      const l = inp.leaders;
+      const title = 'LEADERBOARD';
+      if (!l || !l.entries.length) {
+        const lines: TvLine[] = [{ text: 'NO ONLINE CHAMPIONS' }, { text: 'YET!' }, { text: '' }, { text: 'HOST A LOBBY AT THE', color: P.honey }, { text: 'TOURNAMENT PAVILION.', color: P.honey }];
+        if (inp.lobbies) lines.push({ text: '' }, { text: `${inp.lobbies} LOBB${inp.lobbies === 1 ? 'Y' : 'IES'} OPEN NOW`, color: P.sage });
+        return { id, title, accent: P.inkPurple, lines };
+      }
+      const lines: TvLine[] = [{ text: `${l.board.toUpperCase()} TOURNAMENTS`, color: P.honey }];
+      l.entries.slice(0, TV_ROWS - 2).forEach((e, i) => lines.push({ text: clip(`${i + 1} ${clip(e.name, 12).padEnd(12)} W${e.wins} ${e.points}`, TV_COLS), color: i === 0 ? P.sage : undefined }));
+      if (inp.lobbies) lines.push({ text: `${inp.lobbies} LOBB${inp.lobbies === 1 ? 'Y' : 'IES'} OPEN NOW`, color: P.sage });
+      return { id, title, accent: P.inkPurple, lines };
     }
     case 'shop': {
       const item = inp.featured.length ? inp.featured[((cycle % inp.featured.length) + inp.featured.length) % inp.featured.length] : null;

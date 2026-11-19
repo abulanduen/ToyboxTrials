@@ -34,9 +34,17 @@ import {
   type ServerMsg,
 } from '../src/net/protocol';
 import { sanitizeLook, sanitizeNickname, uniqueName, type CleanLook } from './sanitize';
+import { LobbyBoard, type LobbyOut, type LobbyPlayer } from './lobby';
+import type { LeaderboardResult } from '../src/net/leaderboardProtocol';
 
-/** What the host must do: send a message to some connections, or close one. */
-export type Outgoing = { kind: 'send'; to: string[]; msg: ServerMsg } | { kind: 'close'; conn: string; code: number; reason: string };
+/**
+ * What the host must do: send a message to some connections, close one, or store finished lobby
+ * results on the leaderboard (the socket layer does the storage; the room stays pure).
+ */
+export type Outgoing =
+  | { kind: 'send'; to: string[]; msg: ServerMsg }
+  | { kind: 'close'; conn: string; code: number; reason: string }
+  | { kind: 'record'; rows: LeaderboardResult[] };
 
 /** WebSocket close codes (4000–4999 are application codes). */
 export const CLOSE = {
@@ -74,6 +82,8 @@ interface PlayerRecord {
   activity: Activity | null;
   /** When the connection dropped (slot held for RESUME_WINDOW_MS), or null while connected. */
   disconnectedAt: number | null;
+  /** Signed-in account's username, linked with an `auth` message (leaderboard names). */
+  account: string | null;
 }
 
 export interface RoomOptions {
@@ -83,6 +93,8 @@ export interface RoomOptions {
   random: () => number;
   publicCap?: number;
   privateCap?: number;
+  /** Test servers only: lobbies accept the `timescale` action. */
+  matchDebug?: boolean;
 }
 
 interface Player extends PlayerRecord {
@@ -126,6 +138,8 @@ export class HubRoom {
   private readonly players = new Map<string, Player>();
   private readonly byConn = new Map<string, Player>();
   private readonly byToken = new Map<string, Player>();
+  /** Tournament lobbies hosted in this room (lobby.ts). */
+  private readonly lobbies: LobbyBoard;
 
   /** Throws for an id that is neither `public-<n>` nor a valid room code. */
   constructor(opts: RoomOptions) {
@@ -138,6 +152,7 @@ export class HubRoom {
     this.cap = s.kind === 'public' ? (opts.publicCap ?? PUBLIC_ROOM_CAP) : (opts.privateCap ?? PRIVATE_ROOM_CAP);
     this.random = opts.random;
     this.open = s.kind === 'public';
+    this.lobbies = new LobbyBoard({ random: opts.random, debug: opts.matchDebug });
   }
 
   // ------------------------------------------------------------ inspection (directory, tests)
@@ -165,6 +180,17 @@ export class HubRoom {
   hasConn(conn: string) {
     return this.byConn.has(conn);
   }
+  /** Lobbies open in this room, and how many are running a match. */
+  get lobbyCount() {
+    return this.lobbies.count;
+  }
+  get runningMatches() {
+    return this.lobbies.running;
+  }
+  /** The lobby board (tests). */
+  get lobbyBoard() {
+    return this.lobbies;
+  }
   /** Is this resume token one of this room's players? */
   hasToken(token: string) {
     return this.byToken.has(token);
@@ -189,7 +215,20 @@ export class HubRoom {
     p.speed = 0;
     p.emote = null;
     this.updateEmpty(now);
-    return [];
+    return this.fromLobby(this.lobbies.playerDropped(p.id, now));
+  }
+
+  /** Link a signed-in account (the socket layer has checked the token). */
+  setAccount(conn: string, username: string | null, now: number): Outgoing[] {
+    const p = this.byConn.get(conn);
+    if (!p) return [];
+    p.account = username;
+    return this.fromLobby(this.lobbies.updatePlayer(this.lobbyPlayer(p), now));
+  }
+
+  /** Step this room's lobby matches (MATCH_TICK_HZ, from the socket layer's match timer). */
+  tickLobbies(now: number): Outgoing[] {
+    return this.lobbies.running ? this.fromLobby(this.lobbies.tick(now)) : [];
   }
 
   handle(conn: string, msg: ClientMsg, now: number): Outgoing[] {
@@ -210,6 +249,11 @@ export class HubRoom {
         return this.setLook(p, msg.look, now);
       case 'leave':
         return this.removePlayer(p, now);
+      case 'lobby':
+      case 'in':
+        return this.fromLobby(this.lobbies.handle(this.lobbyPlayer(p), msg, now));
+      case 'auth':
+        return []; // checked asynchronously by the socket layer, then setAccount()
     }
   }
 
@@ -302,6 +346,7 @@ export class HubRoom {
       lastLookAt: -Infinity,
       activity: null,
       disconnectedAt: null,
+      account: null,
       clamped: 0,
     };
     const others = this.conns();
@@ -313,6 +358,7 @@ export class HubRoom {
 
     const out: Outgoing[] = [this.welcome(p, false, now)];
     if (others.length) out.push({ kind: 'send', to: others, msg: { t: 'joined', player: this.playerInfo(p) } });
+    out.push(...this.fromLobby(this.lobbies.playerArrived(this.lobbyPlayer(p), now)));
     return out;
   }
 
@@ -323,7 +369,7 @@ export class HubRoom {
     p.budgetAt = now;
     this.byConn.set(conn, p);
     this.emptySince = null;
-    return [this.welcome(p, true, now)];
+    return [this.welcome(p, true, now), ...this.fromLobby(this.lobbies.playerArrived(this.lobbyPlayer(p), now))];
   }
 
   private refuse(conn: string, code: ErrorCode): Outgoing[] {
@@ -398,7 +444,7 @@ export class HubRoom {
     if (now - p.lastLookAt < LOOK_COOLDOWN_MS) return [];
     p.lastLookAt = now;
     p.look = sanitizeLook(look);
-    return [{ kind: 'send', to: this.conns(), msg: { t: 'look', id: p.id, look: { ...p.look } } }];
+    return [{ kind: 'send', to: this.conns(), msg: { t: 'look', id: p.id, look: { ...p.look } } }, ...this.fromLobby(this.lobbies.updatePlayer(this.lobbyPlayer(p), now))];
   }
 
   private removePlayer(p: Player, now: number): Outgoing[] {
@@ -406,7 +452,7 @@ export class HubRoom {
     if (p.conn) this.byConn.delete(p.conn);
     p.conn = null;
     this.byToken.delete(p.resume);
-    const out: Outgoing[] = [];
+    const out: Outgoing[] = this.fromLobby(this.lobbies.playerGone(p.id, now));
     const others = this.conns();
     if (others.length) out.push({ kind: 'send', to: others, msg: { t: 'left', id: p.id } });
     if (this.host === p.id) {
@@ -420,6 +466,7 @@ export class HubRoom {
   }
 
   private closeRoom() {
+    this.lobbies.clear();
     this.players.clear();
     this.byConn.clear();
     this.byToken.clear();
@@ -474,6 +521,29 @@ export class HubRoom {
       a: p.activity,
       off: p.conn ? 0 : 1,
     };
+  }
+
+  private lobbyPlayer(p: Player): LobbyPlayer {
+    return { id: p.id, name: p.name, look: p.look, account: p.account };
+  }
+
+  /** Lobby output → room output: player ids become connections ('room' = everyone connected). */
+  private fromLobby(list: LobbyOut[]): Outgoing[] {
+    const out: Outgoing[] = [];
+    for (const o of list) {
+      if (o.kind === 'record') {
+        out.push(o);
+        continue;
+      }
+      const to: string[] = [];
+      if (o.to === 'room') to.push(...this.conns());
+      else for (const id of o.to) {
+        const c = this.players.get(id)?.conn;
+        if (c) to.push(c);
+      }
+      if (to.length) out.push({ kind: 'send', to, msg: o.msg });
+    }
+    return out;
   }
 
   private conns(except?: Player): string[] {

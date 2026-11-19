@@ -10,8 +10,12 @@
 import { EMOTE_IDS, isEmoteId, type EmoteId } from '../game/emotes';
 import { MINIGAME_IDS, type MinigameId } from '../minigames/ids';
 
-/** v2: looks carry the accessory slots (back/face/neck), six more gesture ids, and a 'shop' activity. */
-export const PROTOCOL_VERSION = 2;
+/**
+ * v2: looks carry the accessory slots (back/face/neck), six more gesture ids, and a 'shop' activity.
+ * v3: tournament lobbies (`lobby`, `lobbies`, `lobbyAlert`, `lobbyErr`), server-run matches (`in`,
+ *     `ms`) and the account link for the leaderboard (`auth`).
+ */
+export const PROTOCOL_VERSION = 3;
 
 // ---------------------------------------------------------------- limits and rates
 /** Largest client → server frame the server accepts (bytes). Bigger frames close the socket. */
@@ -148,6 +152,172 @@ export type ErrorCode =
   | 'server_full'
   | 'shutting_down';
 
+// ---------------------------------------------------------------- lobbies and online matches (v3)
+/** Player cap a host can set on a lobby (humans; bot fill tops the field up to it). */
+export const LOBBY_MIN_CAP = 2;
+export const LOBBY_MAX_CAP = 8;
+/** Open lobbies one Hub room can hold. */
+export const MAX_LOBBIES_PER_ROOM = 8;
+/** Lobby ids: 4 characters from the room-code alphabet, unique within a Hub room. */
+export const LOBBY_ID_LENGTH = 4;
+/** The server steps every running match on a timer at this rate, in fixed 60 Hz rules sub-steps. */
+export const MATCH_TICK_HZ = 30;
+/** Most inputs one `in` message may carry. */
+export const MAX_INPUTS_PER_MSG = 32;
+/** How often a client flushes its queued match inputs to the server (ms). */
+export const INPUT_FLUSH_MS = 1000 / MATCH_TICK_HZ;
+
+export const LOBBY_FORMATS = ['blitz', 'normal', 'treasure'] as const;
+export type LobbyFormat = (typeof LOBBY_FORMATS)[number];
+export const LOBBY_DIFFICULTIES = ['easy', 'normal', 'hard'] as const;
+export type LobbyDifficulty = (typeof LOBBY_DIFFICULTIES)[number];
+export type LobbyMode = 'single' | 'tournament';
+
+/** Everything the host controls. Visible to every member. */
+export interface LobbySettings {
+  mode: LobbyMode;
+  /** The trial for `single` mode. */
+  game: MinigameId;
+  /** The tournament format for `tournament` mode. */
+  format: LobbyFormat;
+  /** Most players (humans) allowed in, LOBBY_MIN_CAP..LOBBY_MAX_CAP. */
+  cap: number;
+  /** Locked: nobody new can join (members stay). */
+  locked: boolean;
+  /** Bots fill the empty seats up to the cap. */
+  botFill: boolean;
+  difficulty: LobbyDifficulty;
+}
+
+export const DEFAULT_LOBBY_SETTINGS: LobbySettings = { mode: 'tournament', game: 'copycat-conductor', format: 'blitz', cap: 8, locked: false, botFill: true, difficulty: 'normal' };
+
+/** One lobby in the room's list (and in the "someone is hosting" alert). */
+export interface LobbySummary {
+  id: string;
+  hostId: string;
+  host: string;
+  mode: LobbyMode;
+  game: MinigameId;
+  format: LobbyFormat;
+  /** Human players in the lobby (spectators included). */
+  players: number;
+  cap: number;
+  locked: boolean;
+  /** A match is running (newcomers watch and enter at the next trial). */
+  playing: boolean;
+}
+
+export interface LobbyMember {
+  id: string;
+  name: string;
+  look: Look;
+  ready: boolean;
+  /** Connection lost; the slot is held for RESUME_WINDOW_MS. */
+  off: boolean;
+  /** Joined while a match was running: watching, and enters at the next trial. */
+  spectating: boolean;
+}
+
+/** One toy in a server-run match. Bots have `bot` set. */
+export interface MatchSeat {
+  id: string;
+  name: string;
+  look: Look;
+  bot: LobbyDifficulty | null;
+}
+
+export interface WirePlacement {
+  contestantId: string;
+  place: number;
+  score: number;
+  eliminated?: boolean;
+  forfeit?: boolean;
+}
+
+export interface WireStanding {
+  contestantId: string;
+  points: number;
+  rounds: number[];
+  wins: number;
+}
+
+export const MATCH_PHASES = ['reveal', 'countdown', 'playing', 'results', 'standings', 'final'] as const;
+export type MatchPhaseWire = (typeof MATCH_PHASES)[number];
+
+/** The match a lobby is running: phase, field, tournament table and the last result. */
+export interface MatchInfo {
+  /** Bumped for every trial; `in` and `ms` messages carry it. */
+  seq: number;
+  phase: MatchPhaseWire;
+  game: MinigameId;
+  /** Server time (ms, the snapshot clock) when this phase moves on by itself, or null. */
+  endsAt: number | null;
+  seats: MatchSeat[];
+  tournament: { format: LobbyFormat; games: MinigameId[]; round: number; standings: WireStanding[] } | null;
+  result: { placements: WirePlacement[]; durationMs: number } | null;
+  /** Players who forfeited this trial (left, kicked, or gone longer than RESUME_WINDOW_MS). */
+  forfeits: string[];
+  /** Server time scale (1 in normal play; test servers may speed matches up). */
+  timeScale: number;
+}
+
+export interface LobbyState {
+  id: string;
+  hostId: string;
+  settings: LobbySettings;
+  /** In join order: the longest-present member takes over if the host leaves. */
+  members: LobbyMember[];
+  match: MatchInfo | null;
+}
+
+export type LobbyAction =
+  | { a: 'create'; settings: LobbySettings }
+  | { a: 'join'; id: string }
+  | { a: 'leave' }
+  | { a: 'kick'; id: string }
+  | { a: 'settings'; settings: Partial<LobbySettings> }
+  | { a: 'ready'; ready: boolean }
+  | { a: 'start' }
+  /** Spectators: whose view to follow. */
+  | { a: 'watch'; id: string }
+  /**
+   * Test servers only (MATCH_DEBUG=1): speed the lobby's match up (0 freezes it), and optionally
+   * freeze it when it next reaches phase `hold`. Ignored otherwise.
+   */
+  | { a: 'timescale'; k: number; hold?: MatchPhaseWire };
+
+export type LobbyEndReason = 'left' | 'kicked' | 'closed';
+
+export type LobbyErrCode =
+  | 'no_such_lobby'
+  | 'lobby_full'
+  | 'lobby_locked'
+  | 'kicked'
+  | 'not_host'
+  | 'too_many_lobbies'
+  | 'slow_down'
+  | 'need_players'
+  | 'bad_settings'
+  | 'not_in_lobby'
+  | 'not_online';
+
+export const LOBBY_ERROR_TEXT: Record<LobbyErrCode, string> = {
+  no_such_lobby: 'That lobby has closed.',
+  lobby_full: 'That lobby is full.',
+  lobby_locked: 'The host has locked that lobby.',
+  kicked: 'The host removed you from that lobby.',
+  not_host: 'Only the host can do that.',
+  too_many_lobbies: 'This Hub has as many lobbies as it can hold. Join one of them, or try again soon.',
+  slow_down: 'Slow down a little and try again.',
+  need_players: 'Not enough toys for that trial. Turn on bot fill or wait for more players.',
+  bad_settings: 'Those lobby settings are not allowed.',
+  not_in_lobby: 'You are not in a lobby.',
+  not_online: "That trial can't be played online yet. Pick another, or practise it with bots.",
+};
+
+/** Max string length of anything inside one match input (Jack-in-the-Box answers are ≤ 48). */
+const INPUT_STRING_MAX = 64;
+
 // ---------------------------------------------------------------- client → server
 export interface HelloMsg {
   t: 'hello';
@@ -182,7 +352,19 @@ export interface LookMsg {
 export interface LeaveMsg {
   t: 'leave';
 }
-export type ClientMsg = HelloMsg | MoveMsg | EmoteMsg | ActivityMsg | LookMsg | LeaveMsg;
+export type LobbyMsg = { t: 'lobby' } & LobbyAction;
+/** Match inputs, in the shape the game's `readLocalInput` produces, for match `m`. */
+export interface InputMsg {
+  t: 'in';
+  m: number;
+  i: unknown[];
+}
+/** Link a signed-in account to this connection, so the leaderboard shows the username. */
+export interface AuthMsg {
+  t: 'auth';
+  token: string;
+}
+export type ClientMsg = HelloMsg | MoveMsg | EmoteMsg | ActivityMsg | LookMsg | LeaveMsg | LobbyMsg | InputMsg | AuthMsg;
 
 // ---------------------------------------------------------------- server → client
 export interface WelcomeMsg {
@@ -233,7 +415,60 @@ export interface ErrorMsg {
   /** The server closes the connection after a fatal error. */
   fatal: boolean;
 }
-export type ServerMsg = WelcomeMsg | JoinedMsg | LeftMsg | RoomMsg | SnapMsg | EmoteEventMsg | LookEventMsg | ErrorMsg;
+export type ServerMsg =
+  | WelcomeMsg
+  | JoinedMsg
+  | LeftMsg
+  | RoomMsg
+  | SnapMsg
+  | EmoteEventMsg
+  | LookEventMsg
+  | ErrorMsg
+  | LobbiesMsg
+  | LobbyAlertMsg
+  | LobbyStateMsg
+  | LobbyErrMsg
+  | MatchStateMsg;
+
+/** The open lobbies in this Hub room (sent on joining the room and whenever one changes). */
+export interface LobbiesMsg {
+  t: 'lobbies';
+  list: LobbySummary[];
+}
+/** Someone in this Hub room started hosting a lobby. */
+export interface LobbyAlertMsg {
+  t: 'lobbyAlert';
+  lobby: LobbySummary;
+}
+/** Your lobby as it is now; null when you are no longer in one (with the reason). */
+export interface LobbyStateMsg {
+  t: 'lobby';
+  you: string;
+  lobby: LobbyState | null;
+  reason?: LobbyEndReason;
+}
+export interface LobbyErrMsg {
+  t: 'lobbyErr';
+  code: LobbyErrCode;
+  message: string;
+}
+/**
+ * Match state for match `m`: a full keyframe (`k` = 1, `d` is the state) or a patch against the
+ * last state sent to this player (`k` = 0, see delta.ts). `e` holds the rules events since the
+ * last message; `n` is the server clock. Filtered per player: secrets never leave the server.
+ */
+export interface MatchStateMsg {
+  t: 'ms';
+  m: number;
+  k: 0 | 1;
+  d: unknown;
+  e: MatchEventWire[];
+  n: number;
+}
+export interface MatchEventWire {
+  type: string;
+  [k: string]: unknown;
+}
 
 /** Player-facing text for each error. */
 export const ERROR_TEXT: Record<ErrorCode, string> = {
@@ -340,9 +575,209 @@ export function validateClientMessage(m: unknown): ClientMsg | null {
     }
     case 'leave':
       return { t: 'leave' };
+    case 'lobby':
+      return parseLobbyAction(m);
+    case 'in': {
+      if (!isInt(m.m) || !Array.isArray(m.i) || m.i.length > MAX_INPUTS_PER_MSG) return null;
+      const items: unknown[] = [];
+      for (const x of m.i) {
+        const v = parseInputItem(x);
+        if (v === null) return null;
+        items.push(v);
+      }
+      return { t: 'in', m: m.m, i: items };
+    }
+    case 'auth':
+      return isStr(m.token, 128) && m.token.length > 0 ? { t: 'auth', token: m.token } : null;
     default:
       return null;
   }
+}
+
+// ---------------------------------------------------------------- lobby validation
+const isInt = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v);
+const isOneOf = <T extends string>(list: readonly T[], v: unknown): v is T => typeof v === 'string' && (list as readonly string[]).includes(v);
+
+export const isMinigameId = (v: unknown): v is MinigameId => isOneOf(MINIGAME_IDS, v);
+
+export function isLobbyId(v: unknown): v is string {
+  if (typeof v !== 'string' || v.length !== LOBBY_ID_LENGTH) return false;
+  for (const ch of v) if (!ROOM_CODE_ALPHABET.includes(ch)) return false;
+  return true;
+}
+
+/** A player or bot id as the server issues them (`p1`, `bot-3`). */
+const isPlayerId = (v: unknown): v is string => typeof v === 'string' && v.length > 0 && v.length <= 32 && /^[A-Za-z0-9-]+$/.test(v);
+
+/**
+ * Lobby settings: every field when `partial` is false (create), any subset otherwise (a host's
+ * change). Null if any field present is the wrong type or out of range.
+ */
+export function parseLobbySettings(v: unknown, partial: true): Partial<LobbySettings> | null;
+export function parseLobbySettings(v: unknown, partial: false): LobbySettings | null;
+export function parseLobbySettings(v: unknown, partial: boolean): Partial<LobbySettings> | null {
+  if (!isObj(v)) return null;
+  const out: Partial<LobbySettings> = {};
+  const has = (k: keyof LobbySettings) => v[k] !== undefined;
+  if (has('mode')) {
+    if (v.mode !== 'single' && v.mode !== 'tournament') return null;
+    out.mode = v.mode;
+  }
+  if (has('game')) {
+    if (!isMinigameId(v.game)) return null;
+    out.game = v.game;
+  }
+  if (has('format')) {
+    if (!isOneOf(LOBBY_FORMATS, v.format)) return null;
+    out.format = v.format;
+  }
+  if (has('cap')) {
+    if (!isInt(v.cap) || v.cap < LOBBY_MIN_CAP || v.cap > LOBBY_MAX_CAP) return null;
+    out.cap = v.cap;
+  }
+  if (has('locked')) {
+    if (typeof v.locked !== 'boolean') return null;
+    out.locked = v.locked;
+  }
+  if (has('botFill')) {
+    if (typeof v.botFill !== 'boolean') return null;
+    out.botFill = v.botFill;
+  }
+  if (has('difficulty')) {
+    if (!isOneOf(LOBBY_DIFFICULTIES, v.difficulty)) return null;
+    out.difficulty = v.difficulty;
+  }
+  if (!partial && Object.keys(out).length !== 7) return null;
+  return out;
+}
+
+function parseLobbyAction(m: Obj): LobbyMsg | null {
+  switch (m.a) {
+    case 'create': {
+      const settings = parseLobbySettings(m.settings, false);
+      return settings ? { t: 'lobby', a: 'create', settings } : null;
+    }
+    case 'join':
+      return isLobbyId(m.id) ? { t: 'lobby', a: 'join', id: m.id } : null;
+    case 'leave':
+      return { t: 'lobby', a: 'leave' };
+    case 'kick':
+      return isPlayerId(m.id) ? { t: 'lobby', a: 'kick', id: m.id } : null;
+    case 'settings': {
+      const settings = parseLobbySettings(m.settings, true);
+      return settings && Object.keys(settings).length ? { t: 'lobby', a: 'settings', settings } : null;
+    }
+    case 'ready':
+      return typeof m.ready === 'boolean' ? { t: 'lobby', a: 'ready', ready: m.ready } : null;
+    case 'start':
+      return { t: 'lobby', a: 'start' };
+    case 'watch':
+      return isPlayerId(m.id) ? { t: 'lobby', a: 'watch', id: m.id } : null;
+    case 'timescale':
+      if (!isNum(m.k) || m.k < 0 || m.k > 50 || (m.hold !== undefined && !isOneOf(MATCH_PHASES, m.hold))) return null;
+      return { t: 'lobby', a: 'timescale', k: m.k, ...(m.hold ? { hold: m.hold as MatchPhaseWire } : {}) };
+    default:
+      return null;
+  }
+}
+
+/**
+ * One match input, structurally: a flat object of at most 8 fields whose names are plain letters
+ * (so never `__proto__`) and whose values are finite numbers, booleans, null or short strings.
+ * Every game's input fits; the game's own validator (server/games.ts) checks the meaning.
+ */
+export function parseInputItem(v: unknown): Record<string, unknown> | null {
+  if (!isObj(v)) return null;
+  const keys = Object.keys(v);
+  if (keys.length > 8) return null;
+  const out: Record<string, unknown> = {};
+  for (const k of keys) {
+    if (!/^[A-Za-z]{1,16}$/.test(k)) return null;
+    const x = v[k];
+    if (x === null || typeof x === 'boolean' || isNum(x) || isStr(x, INPUT_STRING_MAX)) out[k] = x;
+    else return null;
+  }
+  return out;
+}
+
+function parseSummary(v: unknown): LobbySummary | null {
+  if (!isObj(v) || !isLobbyId(v.id) || !isPlayerId(v.hostId) || !isStr(v.host, 64)) return null;
+  if ((v.mode !== 'single' && v.mode !== 'tournament') || !isMinigameId(v.game) || !isOneOf(LOBBY_FORMATS, v.format)) return null;
+  if (!isInt(v.players) || !isInt(v.cap)) return null;
+  return { id: v.id, hostId: v.hostId, host: v.host, mode: v.mode, game: v.game, format: v.format, players: v.players, cap: v.cap, locked: !!v.locked, playing: !!v.playing };
+}
+
+function parseMember(v: unknown): LobbyMember | null {
+  if (!isObj(v) || !isPlayerId(v.id) || !isStr(v.name, 64)) return null;
+  const look = parseLook(v.look);
+  return look ? { id: v.id, name: v.name, look, ready: !!v.ready, off: !!v.off, spectating: !!v.spectating } : null;
+}
+
+function parseSeat(v: unknown): MatchSeat | null {
+  if (!isObj(v) || !isPlayerId(v.id) || !isStr(v.name, 64)) return null;
+  const look = parseLook(v.look);
+  if (!look) return null;
+  return { id: v.id, name: v.name, look, bot: isOneOf(LOBBY_DIFFICULTIES, v.bot) ? v.bot : null };
+}
+
+function parsePlacement(v: unknown): WirePlacement | null {
+  if (!isObj(v) || !isPlayerId(v.contestantId) || !isInt(v.place) || !isNum(v.score)) return null;
+  const p: WirePlacement = { contestantId: v.contestantId, place: v.place, score: v.score };
+  if (v.eliminated) p.eliminated = true;
+  if (v.forfeit) p.forfeit = true;
+  return p;
+}
+
+function parseStanding(v: unknown): WireStanding | null {
+  if (!isObj(v) || !isPlayerId(v.contestantId) || !isNum(v.points) || !isInt(v.wins) || !Array.isArray(v.rounds) || !v.rounds.every(isNum)) return null;
+  return { contestantId: v.contestantId, points: v.points, rounds: v.rounds as number[], wins: v.wins };
+}
+
+const parseAll = <T>(v: unknown, f: (x: unknown) => T | null): T[] | null => {
+  if (!Array.isArray(v)) return null;
+  const out: T[] = [];
+  for (const x of v) {
+    const p = f(x);
+    if (!p) return null;
+    out.push(p);
+  }
+  return out;
+};
+
+function parseMatchInfo(v: unknown): MatchInfo | null {
+  if (!isObj(v) || !isInt(v.seq) || !isOneOf(MATCH_PHASES, v.phase) || !isMinigameId(v.game) || !isNum(v.timeScale)) return null;
+  const seats = parseAll(v.seats, parseSeat);
+  if (!seats) return null;
+  let tournament: MatchInfo['tournament'] = null;
+  if (v.tournament !== null && v.tournament !== undefined) {
+    const t = v.tournament;
+    if (!isObj(t) || !isOneOf(LOBBY_FORMATS, t.format) || !isInt(t.round) || !Array.isArray(t.games) || !t.games.every(isMinigameId)) return null;
+    const standings = parseAll(t.standings, parseStanding);
+    if (!standings) return null;
+    tournament = { format: t.format, games: t.games as MinigameId[], round: t.round, standings };
+  }
+  let result: MatchInfo['result'] = null;
+  if (v.result !== null && v.result !== undefined) {
+    const r = v.result;
+    const placements = isObj(r) ? parseAll(r.placements, parsePlacement) : null;
+    if (!isObj(r) || !placements || !isNum(r.durationMs)) return null;
+    result = { placements, durationMs: r.durationMs };
+  }
+  const forfeits = Array.isArray(v.forfeits) ? v.forfeits.filter(isPlayerId) : [];
+  return { seq: v.seq, phase: v.phase, game: v.game, endsAt: isNum(v.endsAt) ? v.endsAt : null, seats, tournament, result, forfeits, timeScale: v.timeScale };
+}
+
+function parseLobbyState(v: unknown): LobbyState | null {
+  if (!isObj(v) || !isLobbyId(v.id) || !isPlayerId(v.hostId)) return null;
+  const settings = parseLobbySettings(v.settings, false);
+  const members = parseAll(v.members, parseMember);
+  if (!settings || !members) return null;
+  let match: MatchInfo | null = null;
+  if (v.match !== null && v.match !== undefined) {
+    match = parseMatchInfo(v.match);
+    if (!match) return null;
+  }
+  return { id: v.id, hostId: v.hostId, settings, members, match };
 }
 
 function parseRoom(v: unknown): RoomInfo | null {
@@ -418,6 +853,31 @@ export function validateServerMessage(m: unknown): ServerMsg | null {
       const code = m.code as ErrorCode;
       if (typeof m.code !== 'string' || !Object.prototype.hasOwnProperty.call(ERROR_TEXT, code)) return null;
       return { t: 'error', code, message: isStr(m.message, 300) ? m.message : ERROR_TEXT[code], fatal: !!m.fatal };
+    }
+    case 'lobbies': {
+      const list = parseAll(m.list, parseSummary);
+      return list ? { t: 'lobbies', list } : null;
+    }
+    case 'lobbyAlert': {
+      const lobby = parseSummary(m.lobby);
+      return lobby ? { t: 'lobbyAlert', lobby } : null;
+    }
+    case 'lobby': {
+      if (!isPlayerId(m.you)) return null;
+      const reason = m.reason === 'left' || m.reason === 'kicked' || m.reason === 'closed' ? m.reason : undefined;
+      if (m.lobby === null) return { t: 'lobby', you: m.you, lobby: null, ...(reason ? { reason } : {}) };
+      const lobby = parseLobbyState(m.lobby);
+      return lobby ? { t: 'lobby', you: m.you, lobby } : null;
+    }
+    case 'lobbyErr': {
+      const code = m.code as LobbyErrCode;
+      if (typeof m.code !== 'string' || !Object.prototype.hasOwnProperty.call(LOBBY_ERROR_TEXT, code)) return null;
+      return { t: 'lobbyErr', code, message: isStr(m.message, 300) ? m.message : LOBBY_ERROR_TEXT[code] };
+    }
+    case 'ms': {
+      if (!isInt(m.m) || (m.k !== 0 && m.k !== 1) || !isNum(m.n) || !Array.isArray(m.e) || m.d === undefined) return null;
+      const e = m.e.filter((x): x is MatchEventWire => isObj(x) && typeof x.type === 'string');
+      return { t: 'ms', m: m.m, k: m.k, d: m.d, e, n: m.n };
     }
     default:
       return null;
