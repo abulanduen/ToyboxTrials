@@ -222,8 +222,10 @@ const shot = (page, name) => page.screenshot({ path: path.join(OUT, name), timeo
     await D.evaluate(() => window.__toybox.lobby.host({ mode: 'single', game: 'wind-up-dash', format: 'blitz', cap: 6, locked: false, botFill: true, difficulty: 'normal' }));
     await waitPhase(D, 'lobby', T);
     await D.waitForSelector('[data-testid=pick-wind-up-dash]');
-    const big = await D.$$eval('[data-testid^=lobby-cap-], [data-testid^=pick-], [data-testid=lobby-start]', (els) => els.filter((e) => e.getBoundingClientRect().height > 0).every((e) => e.getBoundingClientRect().height >= 55));
-    check('host controls on the phone are at least 56 px tall', big);
+    // Layout height (offsetHeight): the card's entrance animation scales its bounding box for a moment.
+    const short = await D.$$eval('[data-testid^=lobby-cap-], [data-testid^=pick-], [data-testid=lobby-start], [data-testid=lobby-leave]', (els) => els.filter((e) => e.offsetHeight > 0 && e.offsetHeight < 56).map((e) => `${e.dataset.testid}:${e.offsetHeight}`));
+    const big = short.length === 0;
+    check('host controls on the phone are at least 56 px tall', big, short.join(', '));
     await shot(D, 'lobby-09-phone-host-controls.png');
     await D.evaluate(() => document.querySelector('[data-testid=pick-wind-up-dash]').scrollIntoView());
     await shot(D, 'lobby-10-phone-game-grid.png');
