@@ -107,8 +107,8 @@ function Go({ touch }: { touch?: boolean }) {
       <Toy x={92} y={126} s={0.8} className="ta-run" style={vars({ dx: 64, t: '2.6s' })} />
       {touch ? (
         <>
-          <Stick x={36} y={46} r={22} className="ta-push" style={vars({ dx: 0, dy: -12 })} />
-          <Arrow x1={36} y1={20} x2={36} y2={4} w={4} head={10} />
+          <Stick x={36} y={54} r={22} className="ta-push" style={vars({ dx: 0, dy: -12 })} />
+          <Arrow x1={36} y1={28} x2={36} y2={12} w={4} head={10} />
         </>
       ) : (
         <>
