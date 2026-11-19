@@ -117,7 +117,7 @@ async function pickBots(page, mobile, n, skill) {
 const THEME_TITLES = { toyshop: 'The Toy Shop', picnic: 'The Garden Picnic', bathtime: 'Pirate Bath-Time', bedtime: 'Bedtime' };
 
 async function desktop(browser, errors) {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+  const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
   page.setDefaultTimeout(120000);
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
@@ -144,7 +144,8 @@ async function desktop(browser, errors) {
   f = await d.frozenSearch(1);
   const themes = [f.theme];
   const L = f.layout;
-  check('desktop: pages side by side, 4 : 3, inside the window and below the HUD', !L.portrait && L.pics[0].x + L.pics[0].w <= L.pics[1].x && L.pics.every((p) => p.x >= 0 && p.x + p.w <= 1280 && p.y + p.h <= 800 && Math.abs(p.h / p.w - 0.75) < 0.01), JSON.stringify(L.pics));
+  check('desktop: pages side by side, 4 : 3, inside the window and below the HUD', !L.portrait && L.pics[0].x + L.pics[0].w <= L.pics[1].x && L.pics.every((p) => p.x >= 0 && p.x + p.w <= 1920 && p.y + p.h <= 1080 && Math.abs(p.h / p.w - 0.75) < 0.01), JSON.stringify(L.pics));
+  check('desktop: storybook pictures use the enlarged 820 px cap', L.pics[0].w === 820);
   const hudBottom = await page.evaluate(() => document.querySelector('.sd-top').getBoundingClientRect().bottom);
   check('desktop: the HUD does not cover the book', hudBottom <= L.book.y + 2, `${Math.round(hudBottom)} vs ${L.book.y}`);
   check('desktop: 15 differences, each with a hit circle on both pages', f.slots.length === 15 && f.slots.every((s) => s.a.r > 20 && Math.abs(s.a.x - (s.b.x - (L.pics[1].x - L.pics[0].x))) < 1));

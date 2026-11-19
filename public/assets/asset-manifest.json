@@ -1,20 +1,36 @@
 {
-  "$comment": "Toybox Trials asset manifest. Concept art is reference only and stripped from production builds. World models/textures/audio are code-generated; production UI icons are generated raster assets recorded below.",
+  "$comment": "Toybox Trials asset manifest. Concept art is reference only and stripped from production builds. World models/textures/audio are code-generated; production UI icons and gameplay tutorial screenshots are recorded below.",
   "version": 1,
-  "updated": "2026-11-19",
+  "updated": "2026-11-20",
   "conventions": {
     "folders": {
       "concepts": "Art-direction reference images. Never loaded by the game.",
       "environments": "Production environment assets (room-layer GLBs such as the dog; optional low-end room plate). Empty: the room is built and lit in code (src/scene/Room.tsx, src/scene/room/).",
       "characters": "Production character assets. Empty: the contender is built procedurally (src/character/WindupBot.tsx).",
       "props": "Production prop assets. Empty: all props are code-built primitives (src/scene/*).",
-      "ui": "Production UI images, including generated transparent Spellbox ability icons; other UI uses CSS and inline SVG.",
+      "ui": "Production UI images, including transparent Spellbox ability icons and real gameplay tutorial screenshots; other UI uses CSS and inline SVG.",
       "audio": "Production audio files. Empty: all sound is synthesised at runtime (src/game/audio.ts), including the three Music Box Rhythm tracks, which are composed in code (see the music-* entries)."
     },
     "naming": "<category>-<nn>-<kebab-case-subject>[-<variant>].<ext>",
     "units": "3D world units are centimetres (1 unit = 1 cm); the contender is 3.5 cm tall."
   },
   "assets": [
+    {
+      "id": "tutorial-gameplay-photos",
+      "type": "gameplay-screenshot-set",
+      "status": "production",
+      "directory": "ui/tutorials/",
+      "naming": "<minigame-id>-<step-number>.webp",
+      "count": 42,
+      "width": 960,
+      "height": 540,
+      "transparency": false,
+      "where": "src/minigames/tutorials.ts lists every game/step and its exact image URL, caption and emphasis",
+      "intendedUse": "Visual aid beside each of the 42 quick tutorial steps across 13 minigames",
+      "source": "Toybox Trials gameplay, captured 2026-11-20 with tests/e2e/tutorial-capture.cjs (seed 1978); existing rules stage reproducible examples",
+      "license": "Project-owned gameplay screenshots",
+      "notes": "Real game rendering, not AI artwork. Keyboard and touch copy share the photo. Regeneration instructions: ui/tutorials/README.md."
+    },
     {
       "id": "concept-01",
       "file": "concepts/concept-01-main-menu-living-playroom.png",

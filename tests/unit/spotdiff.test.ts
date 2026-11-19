@@ -391,6 +391,8 @@ describe('Odd Page Out: layout', () => {
       [1280, 800],
       [1024, 600],
       [768, 1024],
+      [1920, 1080],
+      [2560, 1440],
     ]) {
       const L = bookLayout(w, h);
       for (const p of L.pics) {
@@ -407,6 +409,12 @@ describe('Odd Page Out: layout', () => {
       const [a, b] = L.pics;
       expect(a.x + a.w <= b.x || a.y + a.h <= b.y).toBe(true);
     }
+  });
+  it('enlarges the desktop pictures beyond the old 640 px cap while fitting the book', () => {
+    const lay = bookLayout(1920, 1080);
+    expect(lay.pics[0].w).toBe(820);
+    expect(lay.book.x).toBeGreaterThanOrEqual(0);
+    expect(lay.book.x + lay.book.w).toBeLessThanOrEqual(1920);
   });
 });
 
