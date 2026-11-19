@@ -15,7 +15,7 @@ describe.skipIf(!URL)('PostgreSQL account store', () => {
   beforeAll(async () => {
     const c = new pg.Client({ connectionString: URL });
     await c.connect();
-    await c.query('DROP TABLE IF EXISTS sessions, profiles, users, schema_migrations');
+    await c.query('DROP TABLE IF EXISTS leaderboard_results, sessions, profiles, users, schema_migrations');
     await c.end();
     store = new PgStore(URL!);
     await store.init();
@@ -31,8 +31,8 @@ describe.skipIf(!URL)('PostgreSQL account store', () => {
     const tables = (await c.query("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name")).rows.map((r) => r.table_name);
     const versions = (await c.query('SELECT version FROM schema_migrations')).rows.map((r) => r.version);
     await c.end();
-    expect(tables).toEqual(expect.arrayContaining(['profiles', 'schema_migrations', 'sessions', 'users']));
-    expect(versions).toEqual([1]);
+    expect(tables).toEqual(expect.arrayContaining(['leaderboard_results', 'profiles', 'schema_migrations', 'sessions', 'users']));
+    expect(versions).toEqual([1, 2]);
   });
 
   it('users, sessions, profiles with rev checks, and delete cascading', async () => {
@@ -80,5 +80,20 @@ describe.skipIf(!URL)('PostgreSQL account store', () => {
     expect(((await call('GET', '/api/me', undefined, login.token)).body as MeResponse).profile?.wallet.cogs).toBe(60);
     expect((await call('DELETE', '/api/account', { password: 'long enough' }, login.token)).status).toBe(200);
     expect((await call('GET', '/api/me', undefined, reg.token)).status).toBe(401);
+  });
+  it('stores leaderboard results (migration 2) and aggregates them in SQL', async () => {
+    await store.addResults([
+      { name: 'Ticker', account: false, board: 'blitz', place: 1, of: 4, points: 26, at: 1_700_000_000_000 },
+      { name: 'ticker', account: false, board: 'blitz', place: 2, of: 4, points: 20, at: 1_700_000_001_000 },
+      { name: 'Bobbin', account: true, board: 'blitz', place: 1, of: 4, points: 28, at: 1_700_000_002_000 },
+      { name: 'Pip', account: false, board: 'normal', place: 1, of: 4, points: 40, at: 1_700_000_003_000 },
+    ]);
+    const b = await store.leaderboard('blitz', 20);
+    expect(b.entries.map((e) => [e.played, e.wins, e.points, e.account])).toEqual([
+      [2, 1, 46, false],
+      [1, 1, 28, true],
+    ]);
+    expect(b.recent[0].name).toBe('Bobbin');
+    expect((await store.leaderboard('normal', 20)).entries.map((e) => e.name)).toEqual(['Pip']);
   });
 });

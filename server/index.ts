@@ -1,5 +1,6 @@
 /**
- * Toybox Trials online Hub server: HTTP (`GET /health`, the optional accounts API on `/api/*`)
+ * Toybox Trials online Hub server: HTTP (`GET /health`, the optional accounts API on `/api/*`,
+ * the leaderboard on `GET /api/leaderboard`)
  * plus plain WebSockets (`ws`) on `/`. Deployed on Railway; also what `npm run server:dev` and the
  * e2e tests run locally.
  *
@@ -14,6 +15,7 @@
  *   ACCOUNTS_STORE    `memory` keeps accounts in memory when there's no DATABASE_URL (local
  *                     development and tests; everything is lost on restart). Unset and no
  *                     DATABASE_URL: accounts are off (the API answers 503) and online play works.
+ *   MATCH_DEBUG       `1` lets lobby members speed their match up (e2e tests only; never in production).
  *
  * Logs carry counts and room codes only: never nicknames, usernames, passwords, tokens, IP
  * addresses or other personal data.
@@ -21,7 +23,8 @@
 import { createServer } from 'node:http';
 import { randomInt } from 'node:crypto';
 import { WebSocketServer, type WebSocket } from 'ws';
-import { MAX_MESSAGE_BYTES, PROTOCOL_VERSION, SNAPSHOT_HZ, parseClientMessage } from '../src/net/protocol';
+import { MATCH_TICK_HZ, MAX_MESSAGE_BYTES, PROTOCOL_VERSION, SNAPSHOT_HZ, parseClientMessage } from '../src/net/protocol';
+import type { LeaderboardResult } from '../src/net/leaderboardProtocol';
 import { CLOSE, type Outgoing } from './hubRoom';
 import { HubDirectory } from './hubDirectory';
 import { RateLimiter, isOriginAllowed, parseAllowedOrigins } from './limits';
@@ -29,6 +32,7 @@ import { AccountsApi } from './accounts/api';
 import { accountsHttp } from './accounts/http';
 import { MemoryStore, type AccountStore } from './accounts/store';
 import { PgStore } from './accounts/pgStore';
+import { LeaderboardApi, MemoryLeaderboard, type LeaderboardStore } from './leaderboard';
 
 const PORT = Number(process.env.PORT) || 2567;
 const ORIGINS = parseAllowedOrigins(process.env.ALLOWED_ORIGINS);
@@ -38,18 +42,24 @@ const HELLO_TIMEOUT_MS = 10_000;
 /** Refused messages before a connection is closed for flooding. */
 const MAX_DROPPED = 200;
 const MAX_SOCKETS = 1200;
+/** Account links (`auth`) one connection may attempt. */
+const MAX_AUTH_PER_CONN = 5;
+const MATCH_DEBUG = process.env.MATCH_DEBUG === '1';
 
 /** CSPRNG-backed [0, 1): room codes and resume tokens must not be guessable. */
 const secureRandom = () => randomInt(0, 2 ** 47) / 2 ** 47;
 const log = (msg: string) => console.log(`${new Date().toISOString()} ${msg}`);
 
-const hub = new HubDirectory({ random: secureRandom });
+const hub = new HubDirectory({ random: secureRandom, matchDebug: MATCH_DEBUG });
 
 // ---------------------------------------------------------------- accounts (optional)
 const DATABASE_URL = process.env.DATABASE_URL?.trim();
 const accountStore: AccountStore | null = DATABASE_URL ? new PgStore(DATABASE_URL) : process.env.ACCOUNTS_STORE === 'memory' ? new MemoryStore() : null;
 const accounts = new AccountsApi({ store: accountStore, log });
-const handleApi = accountsHttp(accounts, ORIGINS);
+// The leaderboard lives in the accounts database when there is one, else in memory.
+const leaderboardStore: LeaderboardStore = accountStore instanceof PgStore ? accountStore : new MemoryLeaderboard();
+const leaderboardApi = new LeaderboardApi(leaderboardStore);
+const handleApi = accountsHttp(accounts, ORIGINS, [leaderboardApi]);
 let accountsRetry: NodeJS.Timeout | undefined;
 async function startAccounts(attempt = 1): Promise<void> {
   if (!accountStore) {
@@ -74,9 +84,27 @@ interface Conn {
   limiter: RateLimiter;
   alive: boolean;
   helloTimer: NodeJS.Timeout;
+  auths: number;
 }
 const conns = new Map<string, Conn>();
 let connSeq = 0;
+
+/** Finished lobby matches: results for the leaderboard (only ever from server-run matches). */
+function record(rows: LeaderboardResult[]) {
+  // The Postgres store is only usable once its migrations ran; until then results wait in memory.
+  const store = leaderboardStore.kind === 'postgres' && accounts.state !== 'ready' ? null : leaderboardStore;
+  if (!store) {
+    pendingResults.push(...rows);
+    if (pendingResults.length > 5000) pendingResults.splice(0, pendingResults.length - 5000);
+    return;
+  }
+  const all = pendingResults.splice(0).concat(rows);
+  store.addResults(all).then(
+    () => log(`leaderboard: ${all.length} result(s) stored (${store.kind})`),
+    () => log('leaderboard: storing results failed'),
+  );
+}
+const pendingResults: LeaderboardResult[] = [];
 
 function deliver(out: Outgoing[]) {
   for (const o of out) {
@@ -86,7 +114,8 @@ function deliver(out: Outgoing[]) {
         const c = conns.get(id);
         if (c && c.ws.readyState === c.ws.OPEN) c.ws.send(data);
       }
-    } else conns.get(o.conn)?.ws.close(o.code, o.reason);
+    } else if (o.kind === 'record') record(o.rows);
+    else conns.get(o.conn)?.ws.close(o.code, o.reason);
   }
 }
 
@@ -110,7 +139,7 @@ const http = createServer((req, res) => {
   if (req.method === 'GET' && path === '/health') {
     const s = hub.stats();
     res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
-    res.end(JSON.stringify({ ok: true, protocol: PROTOCOL_VERSION, rooms: s.rooms, players: s.players, connected: s.connected, accounts: accountsHealth() }));
+    res.end(JSON.stringify({ ok: true, protocol: PROTOCOL_VERSION, rooms: s.rooms, players: s.players, connected: s.connected, lobbies: s.lobbies, matches: s.matches, accounts: accountsHealth() }));
     return;
   }
   if (req.method === 'GET' && path === '/') {
@@ -143,8 +172,10 @@ function onConnection(ws: WebSocket) {
   const id = `c${(++connSeq).toString(36)}`;
   const c: Conn = {
     ws,
-    limiter: new RateLimiter(40, 30, Date.now()),
+    // Hub moves (~15/s) or match inputs (MATCH_TICK_HZ), plus lobby actions and the odd emote.
+    limiter: new RateLimiter(60, 45, Date.now()),
     alive: true,
+    auths: 0,
     helloTimer: setTimeout(() => {
       if (!hub.roomOf(id)) ws.close(CLOSE.badRequest, 'no hello');
     }, HELLO_TIMEOUT_MS),
@@ -163,6 +194,15 @@ function onConnection(ws: WebSocket) {
     }
     const msg = parseClientMessage(data.toString());
     if (!msg) return deliver([{ kind: 'send', to: [id], msg: { t: 'error', code: 'bad_request', message: 'Malformed message.', fatal: false } }]);
+    if (msg.t === 'auth') {
+      // Link a signed-in account (leaderboard names): checked against the accounts store.
+      if (++c.auths > MAX_AUTH_PER_CONN) return;
+      accounts.usernameFor(msg.token, now).then(
+        (username) => deliver(hub.setAccount(id, username, Date.now())),
+        () => {},
+      );
+      return;
+    }
     const before = hub.stats();
     deliver(hub.handle(id, msg, now));
     if (msg.t === 'hello' && hub.roomOf(id)) clearTimeout(c.helloTimer);
@@ -187,6 +227,9 @@ const snapshotTimer = setInterval(() => {
   logRooms(before);
 }, 1000 / SNAPSHOT_HZ);
 
+// Lobby matches: every running match is stepped (fixed 60 Hz sub-steps) and snapshotted.
+const matchTimer = setInterval(() => deliver(hub.tickMatches(Date.now())), 1000 / MATCH_TICK_HZ);
+
 // Heartbeat: ping everyone; a socket that didn't answer the previous ping is dead.
 const heartbeatTimer = setInterval(() => {
   for (const c of conns.values()) {
@@ -201,7 +244,7 @@ const heartbeatTimer = setInterval(() => {
 
 const statsTimer = setInterval(() => {
   const s = hub.stats();
-  if (s.players) log(`players ${s.players} (connected ${s.connected}) in ${s.rooms} room(s): ${s.publicRooms} public, ${s.privateRooms} private`);
+  if (s.players) log(`players ${s.players} (connected ${s.connected}) in ${s.rooms} room(s): ${s.publicRooms} public, ${s.privateRooms} private; ${s.lobbies} lobby(ies), ${s.matches} match(es) running`);
 }, 60_000);
 
 // Hourly: expired sessions and idle rate-limit keys.
@@ -212,12 +255,13 @@ const sweepTimer = setInterval(() => {
   );
 }, 60 * 60_000);
 
-http.listen(PORT, () => log(`Toybox Trials online Hub listening on port ${PORT} (protocol v${PROTOCOL_VERSION})`));
+http.listen(PORT, () => log(`Toybox Trials online Hub listening on port ${PORT} (protocol v${PROTOCOL_VERSION})${MATCH_DEBUG ? ' with MATCH_DEBUG on (test server)' : ''}`));
 void startAccounts();
 
 function shutdown(signal: string) {
   log(`${signal}: shutting down`);
   clearInterval(snapshotTimer);
+  clearInterval(matchTimer);
   clearInterval(heartbeatTimer);
   clearInterval(statsTimer);
   clearInterval(sweepTimer);

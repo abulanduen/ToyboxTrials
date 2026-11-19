@@ -30,6 +30,8 @@ export interface DirectoryOptions {
   publicCap?: number;
   privateCap?: number;
   maxPlayers?: number;
+  /** Test servers only (MATCH_DEBUG=1): lobbies accept the `timescale` action. */
+  matchDebug?: boolean;
 }
 
 export class HubDirectory {
@@ -43,12 +45,16 @@ export class HubDirectory {
     let players = 0;
     let connected = 0;
     let publicRooms = 0;
+    let lobbies = 0;
+    let matches = 0;
     for (const r of this.rooms.values()) {
       players += r.playerCount;
       connected += r.connectedCount;
+      lobbies += r.lobbyCount;
+      matches += r.runningMatches;
       if (r.kind === 'public') publicRooms++;
     }
-    return { rooms: this.rooms.size, publicRooms, privateRooms: this.rooms.size - publicRooms, players, connected };
+    return { rooms: this.rooms.size, publicRooms, privateRooms: this.rooms.size - publicRooms, players, connected, lobbies, matches };
   }
   roomOf(conn: string): RoomInfo | null {
     return this.byConn.get(conn)?.info() ?? null;
@@ -86,6 +92,23 @@ export class HubDirectory {
       this.sweep(room);
     }
     return out;
+  }
+
+  /** Step every running lobby match (MATCH_TICK_HZ). */
+  tickMatches(now: number): Outgoing[] {
+    const out: Outgoing[] = [];
+    for (const room of this.rooms.values()) if (room.runningMatches) out.push(...room.tickLobbies(now));
+    return out;
+  }
+
+  /** Link a signed-in account's username to a connection (after the socket layer checked the token). */
+  setAccount(conn: string, username: string | null, now: number): Outgoing[] {
+    return this.byConn.get(conn)?.setAccount(conn, username, now) ?? [];
+  }
+
+  /** The room a connection is in (tests). */
+  roomFor(conn: string): HubRoom | null {
+    return this.byConn.get(conn) ?? null;
   }
 
   shutdown(): Outgoing[] {
@@ -128,7 +151,7 @@ export class HubDirectory {
     for (let n = 1; n <= MAX_PUBLIC_INSTANCES; n++) {
       const id = publicRoomId(n);
       const r = this.rooms.get(id);
-      if (!r) return this.add(new HubRoom({ id, random: this.opts.random, publicCap: this.opts.publicCap }));
+      if (!r) return this.add(new HubRoom({ id, random: this.opts.random, publicCap: this.opts.publicCap, matchDebug: this.opts.matchDebug }));
       if (r.playerCount < r.cap) return r;
     }
     return undefined;
@@ -138,7 +161,7 @@ export class HubDirectory {
     for (let i = 0; i < 1000; i++) {
       const code = generateRoomCode(this.opts.random);
       if (this.rooms.has(code)) continue;
-      return this.add(new HubRoom({ id: code, random: this.opts.random, privateCap: this.opts.privateCap }));
+      return this.add(new HubRoom({ id: code, random: this.opts.random, privateCap: this.opts.privateCap, matchDebug: this.opts.matchDebug }));
     }
     return undefined;
   }

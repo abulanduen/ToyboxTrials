@@ -14,8 +14,9 @@
 import type { ComponentType } from 'react';
 import type { PaintJob } from '../game/palette';
 import type { Accessories, HatId, KeySkinId } from '../game/cosmetics';
-import type { Action } from '../game/input';
+import type { Action } from '../game/actions';
 import type { MinigameId } from './ids';
+import type { TournamentFormat } from './tournament';
 
 /** The id list lives in `ids.ts` (pure data the online server can import). */
 export type { MinigameId };
@@ -128,7 +129,8 @@ export interface MinigameDefinition {
   durationSec: [number, number];
   inputs: ('keyboard' | 'mouse' | 'touch')[];
   bots: 'none' | 'planned' | 'available';
-  eligibility: { tournament: boolean; ranked: boolean; casual: boolean };
+  /** `formats`: the tournament formats this trial may appear in (absent = all of them). */
+  eligibility: { tournament: boolean; ranked: boolean; casual: boolean; formats?: readonly TournamentFormat[] };
   scoring: 'elimination-order' | 'score' | 'time' | 'progress';
   tieBreak: string;
   /** What the record score counts, e.g. "rounds" or "answers" (plural). */

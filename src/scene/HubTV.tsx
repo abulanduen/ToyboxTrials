@@ -23,6 +23,8 @@ import { SECRET_IDS } from '../game/interactables';
 import { exposeDebug } from '../game/debug';
 import { useNet } from '../net/store';
 import { remotes } from '../net/remotes';
+import { fetchLeaderboard, useLeaderboard } from '../net/leaderboard';
+import { useLobby } from '../net/lobby';
 import { Kit } from './kit';
 import { TV } from './layout';
 import { drawPixelText, textWidth, ADVANCE } from './pixelFont';
@@ -65,6 +67,9 @@ function buildBody() {
 function gatherInputs(featured: TvFeatured[]): TvInputs {
   const net = useNet.getState();
   const g = useGame.getState();
+  // The online leaderboard card (refreshed at most every LEADERBOARD_TTL_MS while online).
+  if (net.status === 'online') void fetchLeaderboard('blitz');
+  const blitz = useLeaderboard.getState().boards.blitz;
   const players = net.players.map((p) => ({
     id: p.id,
     name: p.name,
@@ -81,6 +86,8 @@ function gatherInputs(featured: TvFeatured[]): TvInputs {
     secrets: g.secretsFound.length,
     secretTotal: SECRET_IDS.length,
     featured,
+    leaders: blitz?.data ? { board: 'blitz', entries: blitz.data.entries } : null,
+    lobbies: useLobby.getState().list.length,
   };
 }
 

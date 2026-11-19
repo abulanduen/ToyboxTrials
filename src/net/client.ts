@@ -29,6 +29,9 @@ import { player } from '../game/player';
 import { paintIndexOf } from '../game/cosmetics';
 import { sfx } from '../game/audio';
 import { exposeDebug } from '../game/debug';
+import { netLink } from './link';
+import { onLobbies, onLobbyAlert, onLobbyErr, onLobbyState, onMatchState, resetLobbies } from './lobby';
+import { accountToken } from './account';
 
 /** Give up on a room that hasn't welcomed us by then. */
 const WELCOME_TIMEOUT_MS = 12_000;
@@ -164,6 +167,7 @@ export function leaveOnline(quiet = false) {
 }
 
 function reset() {
+  resetLobbies('offline');
   window.clearTimeout(welcomeTimer);
   window.clearTimeout(retryTimer);
   session = null;
@@ -235,6 +239,11 @@ const handlers: { [K in ServerMsg['t']]: (m: Extract<ServerMsg, { t: K }>) => vo
     if (m.room.kind === 'private' && m.room.code) joinReq = { kind: 'code', code: m.room.code };
     remotes.clear();
     netClock.reset();
+    // A fresh slot (not a resume) has no lobby: leave any lobby screen we were on.
+    if (!m.resumed) resetLobbies('fresh');
+    // Signed in: link the account so finished lobby matches go on the leaderboard by username.
+    const token = accountToken();
+    if (token) send({ t: 'auth', token });
     for (const p of m.players) if (p.id !== m.you) upsertRemote(p);
     sentActivity = undefined;
     sentLook = JSON.stringify(m.players.find((p) => p.id === m.you)?.look ?? null);
@@ -304,6 +313,11 @@ const handlers: { [K in ServerMsg['t']]: (m: Extract<ServerMsg, { t: K }>) => vo
   error(m) {
     if (m.fatal) fail(m.message || ERROR_TEXT[m.code]);
   },
+  lobbies: onLobbies,
+  lobbyAlert: onLobbyAlert,
+  lobby: onLobbyState,
+  lobbyErr: onLobbyErr,
+  ms: onMatchState,
 };
 
 // ---------------------------------------------------------------- outgoing intent
@@ -353,6 +367,10 @@ let installed = false;
 export function installNet() {
   if (installed) return;
   installed = true;
+  netLink.send = (msg) => {
+    if (useNet.getState().status === 'online') send(msg);
+  };
+  netLink.serverTime = () => netClock.serverTime(performance.now());
   window.setInterval(pump, MOVE_INTERVAL_MS);
   events.on('player:emote', ({ id }) => {
     if (useNet.getState().status === 'online') send({ t: 'emote', id });
