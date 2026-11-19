@@ -24,6 +24,8 @@ const MOMENT = {
   'toy-squad': 2500,
   'spellbox-showdown': 16000,
   'jack-in-the-box': 7000,
+  'odd-page-out': 6000,
+  'toy-tower-tumble': 26000,
 };
 
 (async () => {

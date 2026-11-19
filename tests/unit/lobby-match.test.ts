@@ -246,6 +246,15 @@ describe('lobby tournaments on the server', () => {
     expect(snapshots.some((m) => m.k === 0)).toBe(true);
   });
 
+  it('bots never share a name with a human in the field', () => {
+    const settings: LobbySettings = { ...DEFAULT_LOBBY_SETTINGS, mode: 'tournament', format: 'blitz', cap: 8, botFill: true };
+    for (let seed = 0; seed < 40; seed++) {
+      const members = [member('p1', 'Ticker'), member('p2', 'Bobbin'), member('p3', 'pip')];
+      const names = new MatchFlow(settings, members, seed, 0, 1).info(0).seats.map((s) => s.name.toLowerCase());
+      expect(new Set(names).size, `seed ${seed}: ${names}`).toBe(names.length);
+    }
+  });
+
   it('a single trial records each human finish under that trial', () => {
     const settings: LobbySettings = { ...DEFAULT_LOBBY_SETTINGS, mode: 'single', game: 'red-light-green-light', cap: 3, botFill: true };
     const members = [member('p1')];

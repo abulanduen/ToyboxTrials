@@ -85,6 +85,21 @@ export function fieldSize(s: LobbySettings, humans: number): number {
   return Math.min(MAX_FIELD, s.botFill ? Math.max(humans, s.cap) : humans);
 }
 
+/** Bots for a field: never sharing a name with a human in it (nor with each other). */
+export function botsFor(seed: number, n: number, difficulty: LobbyDifficulty, taken: string[], idPrefix = 'bot-'): Contestant[] {
+  if (n <= 0) return [];
+  const used = new Set(taken.map((t) => t.toLowerCase()));
+  const pool = makeBots(seed, n + taken.length + 8, difficulty);
+  const out: Contestant[] = [];
+  for (const b of pool) {
+    if (out.length === n) break;
+    if (used.has(b.name.toLowerCase())) continue;
+    used.add(b.name.toLowerCase());
+    out.push({ ...b, id: `${idPrefix}${out.length + 1}` });
+  }
+  return out;
+}
+
 const lookOf = (c: Contestant): Look => ({ ...DEFAULT_LOOK, paint: Math.max(0, PAINT_JOBS.indexOf(c.paint)), hat: c.hat, keySkin: c.keySkin });
 
 function contestantOf(m: { id: string; name: string; look: Look }, bot?: LobbyDifficulty): Contestant {
@@ -129,7 +144,7 @@ export class MatchFlow {
     this.lastNow = now;
     this.timeScale = timeScale;
     const nBots = Math.max(0, fieldSize(settings, humans.length) - humans.length);
-    this.bots = makeBots(subSeed(seed, 'bots'), nBots, settings.difficulty, humans[0]?.name).map((c) => ({ ...c, look: lookOf(c) }));
+    this.bots = botsFor(subSeed(seed, 'bots'), nBots, settings.difficulty, humans.map((h) => h.name)).map((c) => ({ ...c, look: lookOf(c) }));
     const seated = humans.map((h) => ({ ...contestantOf(h), look: h.look, account: h.account }));
     this.field = [...seated, ...this.bots.map((b) => ({ ...b, account: null }))];
     if (settings.mode === 'tournament') {
@@ -260,8 +275,11 @@ export class MatchFlow {
     const want = Math.min(MAX_FIELD, def.players.max, fieldSize(this.settings, humans.length));
     while (humans.length + bots.length > want && bots.length) bots.pop();
     if (humans.length + bots.length < def.players.min) {
-      const extra = makeBots(subSeed(this.seed, `fill-${this.seq}`), def.players.min - humans.length - bots.length, this.settings.difficulty, humans[0]?.name)
-        .map((c, i) => ({ ...c, id: `bot-x${this.seq}-${i + 1}`, look: lookOf(c) }));
+      const taken = [...humans, ...bots].map((c) => c.name);
+      const extra = botsFor(subSeed(this.seed, `fill-${this.seq}`), def.players.min - humans.length - bots.length, this.settings.difficulty, taken, `bot-x${this.seq}-`).map((c) => ({
+        ...c,
+        look: lookOf(c),
+      }));
       bots = [...bots, ...extra];
     }
     this.field = [...humans, ...bots.map((b) => ({ ...b, account: null }))];

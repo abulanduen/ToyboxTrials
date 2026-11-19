@@ -4223,3 +4223,24 @@ canvas {
     display: none;
   }
 }
+
+/* Lobby segmented controls: one row that shares the width (the player cap's seven numbers fit a
+   phone), and finger-sized targets. Declared after `.intro-options .segmented button` so these win. */
+.segmented.lobby-seg {
+  display: flex;
+  flex-wrap: nowrap;
+}
+.segmented.lobby-seg button {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 48px;
+  padding: 6px 4px;
+}
+@media (pointer: coarse), (max-width: 700px), (orientation: portrait) {
+  .segmented.lobby-seg button,
+  .game-grid__sort button,
+  .lobby-kick,
+  .lobby-card .toy-btn {
+    min-height: 56px;
+  }
+}
