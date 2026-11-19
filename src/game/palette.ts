@@ -72,6 +72,18 @@ export const ROOM = {
   bin: '#D9CDB8',
   globeSea: '#6F9DB5',
   globeLand: '#9DB58A',
+  toyChest: '#6F96AE',
+  toyChestTrim: '#E9DCC3',
+  drawers: '#EDE5D6',
+  beanbag: '#D9A45B',
+  dogBed: '#8F7462',
+  dogBedCushion: '#C9B49A',
+  slipper: '#C79AA2',
+  bowl: '#9AA3AD',
+  /** The code-built stand-in dog (a brown pit bull with a pale chest and muzzle). */
+  dog: '#8A5E40',
+  dogLight: '#D8BC9A',
+  dogDark: '#2E2522',
   bookSpines: ['#C46A5D', '#5E86A3', '#7E9C78', '#D9B26A', '#574D69', '#D8CBB5', '#A0705A', '#8C9AAE'],
   // Baked light colours (linear multipliers are applied in src/scene/room/bake.ts)
   sunWarm: '#FFD9A0',

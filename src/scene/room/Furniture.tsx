@@ -1,25 +1,34 @@
 /**
- * Room furniture: the things that make the playroom feel like a real, lived-in, giant room.
+ * Room furniture: everything that makes the room around the two tables a real, lived-in kid's
+ * bedroom. Positions are data in roomLayout.ts (with the family dog's route and the slots for the
+ * generated models).
  *
  * Loaded lazily (its own chunk) once the hub is interactive. Everything is built in code, baked
  * (bake.ts) and merged, so the whole lot is three draw calls: solid furniture, wall art (one small
- * atlas) and the rug. Nothing here has a collider: all of it sits off the table.
+ * atlas) and the rug. Nothing here has a collider: all of it sits off the tables.
  *
- * From toy height only things taller than the table (75 cm) are visible, so the layout favours
- * tall pieces: bookshelf, wardrobe, chair backs, floor lamps, a big plant, things on high shelves.
+ * From toy height only things taller than the tables (75 cm) are visible, so the layout favours
+ * tall pieces: bookshelf, wardrobe, the bed's headboard and the pictures over it, the chest of
+ * drawers and what stands on it, floor lamps, a big plant, things on high shelves.
  *
- * Floor kept clear for the family dog (docs/06, docs/07): the strip in front of the table,
- * roughly x −180…140, z 60…200 (the rug). Its bed spot is the rug; its walk goes round the
- * right-hand chair to the table's front edge.
+ * The layout: the desk (gates table) under the window with the bookshelf beside it; the bed in the
+ * right-hand corner, headboard to the window wall, with a bedside table and lamp; a chest of
+ * drawers on the right wall; the wardrobe and the door on the left wall; the toy chest, a beanbag,
+ * the cube storage (with the teddy) and the moving boxes along the wall behind the usual camera;
+ * a rug in front of the spawn table, where the sun lands; slippers by the bed; the dog's bed and
+ * water bowl by the cube storage. The floor between them is kept clear for the dog (roomLayout.ts
+ * DOG_PATH, a 60 cm corridor at least).
  *
- * Placeholders a generated GLB could replace (see docs/07-asset-requests.md): PLANT, TEDDY, SOFA
- * cushions (sleeping cat spot), GLOBE, the armchair-side floor lamp.
+ * Placeholders a generated GLB could replace (docs/07-asset-requests.md, asset manifest): PLANT,
+ * TEDDY, GLOBE, the dog stand-in (RoomDog.tsx); the beanbag is the sleeping cat's spot.
  */
 import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { ROOM } from '../../game/palette';
 import { ATLAS, roomAtlasTexture, rugTexture } from '../textures';
 import { Builder, SHELL, WINDOW, bakeGeometry, bakedMaterial, irradiance } from './bake';
+import { ROOM_LAYOUT as RL } from './roomLayout';
+import { RoomDog } from './RoomDog';
 
 const F = SHELL.floorY;
 
@@ -165,32 +174,113 @@ function wardrobe(b: Builder) {
   b.pop();
 }
 
-function bed(b: Builder) {
-  b.push(204, F, 14, -0.12);
+function bed(b: Builder, detail: boolean) {
+  b.push(RL.bed.x, F, RL.bed.z, 0);
   b.box(110, 30, 200, 0, 21, 0, ROOM.bedFrame);
   b.soft(112, 22, 150, 0, 49, 22, ROOM.blanket, 8);
   b.soft(108, 16, 46, 0, 45, -76, ROOM.throwBlanket, 6);
   b.soft(70, 14, 34, 0, 56, -74, ROOM.pillow, 6, { rx: -0.25 });
   b.box(118, 96, 6, 0, 72, -101, ROOM.bedFrame);
   b.box(124, 6, 9, 0, 121, -101, ROOM.shelfWood);
+  // quilt hanging over the side facing the room, and a plush rabbit on the pillow
+  b.box(3, 26, 140, -57, 44, 22, ROOM.blanket);
+  if (detail) {
+    b.ball(7, 22, 66, -66, ROOM.teddyLight, 10, [1, 1.1, 0.9]);
+    b.ball(5, 22, 77, -66, ROOM.teddyLight, 10);
+    for (const s of [-1, 1]) b.ball(1.6, 22 + s * 2.5, 86, -66, ROOM.teddyLight, 6, [1, 3.2, 0.8]);
+  }
   b.pop();
 }
 
-function sofa(b: Builder) {
-  b.push(34, F, SHELL.maxZ - 46, Math.PI); // faces the table
-  b.box(196, 20, 84, 0, 20, 0, ROOM.sofaDark);
-  for (const s of [-1, 1]) {
-    b.soft(96, 18, 70, s * 48.5, 38, 8, ROOM.sofa, 6);
-    b.soft(92, 44, 18, s * 48.5, 68, -22, ROOM.sofa, 7, { rx: -0.14 });
-    b.soft(22, 46, 88, s * 109, 40, 0, ROOM.sofa, 8);
-  }
-  b.soft(204, 60, 20, 0, 62, -36, ROOM.sofaDark, 8);
-  // cushions; the left seat is left free for the sleeping-cat asset (docs/07)
-  b.soft(36, 36, 12, 72, 62, -8, ROOM.cushionA, 5, { rx: -0.3, ry: -0.2 });
-  b.soft(32, 32, 11, 40, 60, -6, ROOM.cushionB, 5, { rx: -0.35, ry: 0.25 });
-  b.box(30, 2, 60, -109, 64, 4, ROOM.throwBlanket);
-  b.box(2, 30, 60, -121, 49, 4, ROOM.throwBlanket);
+/** Bedside table with a drawer, a lamp, a book and a glass of water. */
+function nightstand(b: Builder) {
+  const n = RL.nightstand;
+  b.push(n.x, F, n.z, 0);
+  b.box(n.w, n.h - 4, n.d, 0, (n.h - 4) / 2 + 4, 0, ROOM.drawers);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) b.box(3, 4, 3, sx * (n.w / 2 - 3), 2, sz * (n.d / 2 - 3), ROOM.darkWood);
+  b.box(n.w - 6, 14, 1.5, 0, n.h - 12, n.d / 2 + 0.4, ROOM.paleWood);
+  b.ball(1.4, 0, n.h - 12, n.d / 2 + 1.8, ROOM.curtainRod, 6);
+  // table lamp
+  b.cyl(6, 7, 2, -6, n.h + 1, -4, ROOM.lampMetal, 14);
+  b.rod([-6, n.h + 2, -4], [-6, n.h + 30, -4], 0.8, ROOM.lampMetal, 6);
+  b.cyl(8, 12, 15, -6, n.h + 34, -4, ROOM.lampShade, 16, { glow: 0.55 });
+  b.box(14, 3, 10, 8, n.h + 1.5, 6, ROOM.bookSpines[3], { ry: 0.3 });
+  b.cyl(2.6, 2.3, 9, 9, n.h + 7.5, -6, ROOM.radiator, 10);
   b.pop();
+}
+
+/** Chest of drawers on the right wall: four rows of drawers, a photo, a trophy and a piggy bank on top. */
+function chestOfDrawers(b: Builder, detail: boolean) {
+  const c = RL.drawers;
+  b.push(c.x, F, c.z, -Math.PI / 2); // local +z → room −x (the drawer fronts)
+  b.box(c.w, c.h - 6, c.d, 0, (c.h - 6) / 2 + 6, 0, ROOM.drawers);
+  b.box(c.w + 4, 3, c.d + 3, 0, c.h + 0.5, 0.5, ROOM.paleWood);
+  b.box(c.w - 4, 6, c.d - 4, 0, 3, 0, ROOM.darkWood);
+  const rows = 4;
+  const rh = (c.h - 14) / rows;
+  for (let r = 0; r < rows; r++)
+    for (const sx of r === 0 ? [-1, 1] : [0]) {
+      const w = r === 0 ? c.w / 2 - 5 : c.w - 6;
+      const y = 8 + rh * (r + 0.5);
+      b.box(w, rh - 3, 2, sx * (c.w / 4), y, c.d / 2 + 0.6, ROOM.drawers);
+      for (const kx of r === 0 ? [0] : [-c.w / 4, c.w / 4]) b.ball(1.8, sx * (c.w / 4) + kx, y, c.d / 2 + 2.2, ROOM.curtainRod, 8);
+    }
+  // on top: a framed photo (art cell added by the caller), a trophy and a piggy bank
+  b.box(18, 24, 2, -28, c.h + 14, -8, ROOM.darkWood, { rx: -0.12 });
+  b.cyl(5, 6, 3, 10, c.h + 3.5, 0, ROOM.darkWood, 12);
+  b.cyl(1.4, 2.4, 8, 10, c.h + 9, 0, ROOM.cushionA, 10);
+  b.cyl(6, 2, 8, 10, c.h + 17, 0, ROOM.cushionA, 14);
+  if (detail) {
+    b.ball(8, 32, c.h + 9, 4, ROOM.slipper, 12, [1.25, 1, 1]);
+    b.ball(3, 42, c.h + 10, 4, ROOM.slipper, 8);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) b.cyl(1.5, 1.5, 4, 32 + sx * 5, c.h + 2, 4 + sz * 4, ROOM.slipper, 6);
+  }
+  b.pop();
+}
+
+/** Toy chest with its lid propped open, a ball and a toy rocket peeking out. */
+function toyChest(b: Builder, detail: boolean) {
+  const t = RL.toyChest;
+  b.push(t.x, F, t.z, Math.PI); // local +z → room −z (faces the tables)
+  b.box(t.w, t.h, t.d, 0, t.h / 2, 0, ROOM.toyChest);
+  for (const x of [-t.w / 2 + 14, t.w / 2 - 14]) b.box(6, t.h + 0.4, t.d + 0.6, x, t.h / 2, 0, ROOM.toyChestTrim);
+  b.box(t.w + 1, 4, t.d + 1, 0, 2, 0, ROOM.toyChestTrim);
+  // lid hinged at the back, propped half open
+  b.push(0, t.h, -t.d / 2, 0);
+  b.box(t.w + 2, 3, t.d + 2, 0, 1.5, t.d / 2, ROOM.toyChest, { rx: -0.85 });
+  b.pop();
+  b.ball(11, -20, t.h + 4, 4, ROOM.cushionB, 12);
+  if (detail) {
+    b.cyl(4, 4, 26, 18, t.h + 6, -2, ROOM.windowFrame, 10, { rz: 0.5 });
+    b.add(new THREE.ConeGeometry(4, 8, 10), ROOM.cushionB, 18 - Math.sin(0.5) * 17, t.h + 6 + Math.cos(0.5) * 17, -2, { rz: 0.5 });
+    b.box(9, 9, 9, 34, t.h + 1, 6, ROOM.cushionA, { ry: 0.4, rz: 0.2 });
+  }
+  b.pop();
+}
+
+/** A squashy beanbag (the sleeping cat's spot when that model arrives). */
+function beanbag(b: Builder) {
+  const g = RL.beanbag;
+  b.ball(g.r, g.x, F + g.r * 0.55, g.z, ROOM.beanbag, 16, [1, 0.6, 1]);
+  b.ball(g.r * 0.7, g.x + 6, F + g.r * 0.95, g.z + 10, ROOM.beanbag, 14, [1, 0.55, 0.9]);
+}
+
+/** The dog's round bed and water bowl. */
+function dogCorner(b: Builder) {
+  const d = RL.dogBed;
+  b.cyl(d.r, d.r + 2, 6, d.x, F + 3, d.z, ROOM.dogBed, 24);
+  b.add(new THREE.TorusGeometry(d.r - 5, 6, 8, 24), ROOM.dogBed, d.x, F + 9, d.z, { rx: Math.PI / 2 });
+  b.cyl(d.r - 9, d.r - 9, 4, d.x, F + 7, d.z, ROOM.dogBedCushion, 22);
+  const w = RL.waterBowl;
+  b.cyl(9, 11, 6, w.x, F + 3, w.z, ROOM.bowl, 16);
+  b.cyl(7.5, 7.5, 0.6, w.x, F + 5.4, w.z, ROOM.globeSea, 16);
+}
+
+/** A pair of slippers by the bed. */
+function slippers(b: Builder) {
+  const s = RL.slippers;
+  b.soft(10, 5, 25, s.x - 7, F + 2.5, s.z, ROOM.slipper, 2.4, { ry: 0.15 });
+  b.soft(10, 5, 25, s.x + 7, F + 2.5, s.z + 4, ROOM.slipper, 2.4, { ry: -0.1 });
 }
 
 function cubeStorage(b: Builder, detail: boolean) {
@@ -200,7 +290,7 @@ function cubeStorage(b: Builder, detail: boolean) {
   const w = cols * cell + 4;
   const h = rows * cell + 4;
   const d = 36;
-  b.push(-150, F, SHELL.maxZ - d / 2 - 1.5, Math.PI);
+  b.push(RL.cubes.x, F, RL.cubes.z, Math.PI);
   b.box(w, h, d - 2, 0, h / 2, -1, ROOM.darkWood); // dark interior
   for (let i = 0; i <= cols; i++) b.box(3, h, d, -w / 2 + 1.5 + i * (cell + 0.33), h / 2, 0, ROOM.paleWood);
   for (let j = 0; j <= rows; j++) b.box(w, 3, d, 0, 1.5 + j * (cell + 0.33), 0, ROOM.paleWood);
@@ -262,8 +352,7 @@ function buildFurniture(detail: boolean) {
 
   // ----- window wall (the hero view) -----
   bookshelf(b, detail);
-  floorLamp(b, 152, -150, 152);
-  plant(b, 226, -138, detail);
+  nightstand(b);
   // on the sill, silhouetted against the garden
   {
     const sy = W.y0 + 0.6;
@@ -304,8 +393,16 @@ function buildFurniture(detail: boolean) {
   q.add(b, 7, 2, 86, 0.9, 28, 78);
   b.pop();
 
-  // ----- right wall: bed, shelf of treasures, pictures, pennants -----
-  bed(b);
+  // ----- right-hand corner and right wall: bed, chest of drawers, shelf of treasures, pictures, pennants -----
+  bed(b, detail);
+  chestOfDrawers(b, detail);
+  slippers(b);
+  {
+    // the photo on the chest of drawers (the frame is part of chestOfDrawers)
+    b.push(RL.drawers.x, F, RL.drawers.z, -Math.PI / 2);
+    q.add(b, 3, -28, RL.drawers.h + 14.3, -8 + 1.2, 14, 20);
+    b.pop();
+  }
   b.push(SHELL.maxX, 0, 0, -Math.PI / 2);
   // local x runs along +z here
   b.box(120, 3, 20, -40, 62, 10, ROOM.shelfWood);
@@ -335,16 +432,19 @@ function buildFurniture(detail: boolean) {
   }
   b.pop();
 
-  // ----- wall behind the usual camera: sofa, cube storage, lamp, boxes -----
-  sofa(b);
+  // ----- wall behind the usual camera: toy chest, beanbag, cube storage, dog corner, lamp, boxes, plant -----
+  toyChest(b, detail);
+  beanbag(b);
   cubeStorage(b, detail);
-  floorLamp(b, 168, SHELL.maxZ - 34, 148);
+  dogCorner(b);
+  floorLamp(b, RL.floorLamp.x, RL.floorLamp.z, 148);
+  plant(b, RL.plant.x, RL.plant.z, detail);
   b.push(0, 0, SHELL.maxZ, Math.PI);
   // local x = −world x
   framed(b, q, 0, -60, 96, 60, 44);
   framed(b, q, 1, -6, 104, 36, 36, ROOM.shelfWood);
   framed(b, q, 2, 36, 92, 30, 40);
-  // a swag of fairy lights above the sofa (tiny self-lit bulbs: they bokeh nicely on High)
+  // a swag of fairy lights above the toy chest (tiny self-lit bulbs: they bokeh nicely on High)
   {
     const n = detail ? 16 : 9;
     let prev: [number, number, number] | null = null;
@@ -368,9 +468,8 @@ function buildFurniture(detail: boolean) {
   b.box(40, 34, 36, 262, F + 103, 228, ROOM.cardboardBox, { ry: 0.3 });
   b.ball(13, 262, F + 133, 228, ROOM.cushionB, 12);
 
-  // ----- around the table -----
-  chair(b, -106, -6, Math.PI / 2);
-  chair(b, 118, 12, -Math.PI / 2 + 0.3);
+  // ----- around the spawn table -----
+  chair(b, RL.chair.x, RL.chair.z, RL.chair.ry);
   // pendant lamp over the table
   b.rod([0, SHELL.ceilY, -8], [0, 134, -8], 0.5, ROOM.lampMetal, 5);
   b.cyl(5, 6, 3, 0, SHELL.ceilY - 1.5, -8, ROOM.trim, 12);
@@ -378,9 +477,9 @@ function buildFurniture(detail: boolean) {
   b.cyl(28, 28, 1.2, 0, 109.8, -8, ROOM.lampShade, 20, { glow: 0.5 });
 
   // ----- rug (its own texture) -----
-  const rug = new THREE.PlaneGeometry(270, 190, 9, 7);
+  const rug = new THREE.PlaneGeometry(RL.rug.w, RL.rug.d, 10, 5);
   rug.rotateX(-Math.PI / 2);
-  rug.translate(36, F + 0.6, 134);
+  rug.translate(RL.rug.x, F + 0.6, RL.rug.z);
   bakeGeometry(rug, '#FFFFFF');
 
   return { solid: b.build(), art: q.build(), rug };
@@ -413,6 +512,7 @@ export default function RoomFurniture({ detail }: { detail: boolean }) {
       <mesh geometry={o.solid} material={o.mat} />
       <mesh geometry={o.art} material={o.artMat} />
       <mesh geometry={o.rug} material={o.rugMat} />
+      <RoomDog />
     </group>
   );
 }

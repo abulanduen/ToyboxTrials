@@ -9,7 +9,7 @@ import { GATES_WALK, HUB_WALK, WALK_AREAS, type WalkRect } from '../game/hubBoun
 import { events } from '../game/events';
 import { INTERACTABLES } from '../game/interactables';
 import { feltTexture } from './textures';
-import { Block, Bunting, Dominoes, FeltTree, woodMat } from './props';
+import { Blocks, Bunting, Dominoes, FeltTrees, woodMat } from './props';
 import { Fountain, Pavilion, Scoreboard, Shop, Workshop } from './Buildings';
 import { Bridge } from './Bridge';
 import { HubTV, TV_AERIAL_TIP } from './HubTV';
@@ -151,12 +151,9 @@ export function Village() {
       <JackInTheBox />
       <KeyTower />
       <PencilLog />
-      {TREES.map(([x, z, s], i) => (
-        <FeltTree key={i} x={x} z={z} s={s} />
-      ))}
-      {BLOCKS.map((b, i) => (
-        <Block key={i} x={b.x} y={b.y} z={b.z} rot={b.rot} color={b.color} size={(b.s ?? 1) * BLOCK_SIZE} />
-      ))}
+      {/* trees and blocks are instanced: a handful of draws for all of them */}
+      <FeltTrees trees={TREES} />
+      <Blocks items={BLOCKS.map((b) => ({ ...b, size: (b.s ?? 1) * BLOCK_SIZE }))} />
       <Bunting from={[SCOREBOARD.x + SCOREBOARD.w / 2 - 0.4, SCOREBOARD.h + 0.2, SCOREBOARD.z]} to={[pav.x, PAVILION.h + 0.6, pav.z]} sag={2.5} count={13} />
       <Bunting from={[SCOREBOARD.x - SCOREBOARD.w / 2 + 0.4, SCOREBOARD.h + 0.2, SCOREBOARD.z]} to={[aerial.x, TV_AERIAL_TIP[1], aerial.z]} sag={1.6} count={6} />
     </group>
