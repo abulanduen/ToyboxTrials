@@ -40,6 +40,8 @@ import { createSpotBot } from '../src/minigames/spotdiff/bot';
 import { tumbleRules } from '../src/minigames/towertumble/rules';
 import { createTumbleBot } from '../src/minigames/towertumble/bot';
 import { createJackBot } from '../src/minigames/jackbox/bot';
+import { siegeRules, CLASS_IDS as SIEGE_CLASSES } from '../src/minigames/siege/rules';
+import { createSiegeBot } from '../src/minigames/siege/bot';
 
 type Obj = Record<string, unknown>;
 
@@ -253,6 +255,54 @@ const GAMES: ServerGame[] = [
       hideSeed(v);
       for (const p of v.players as Obj[]) if ('rng' in p) p.rng = 0;
     },
+  },
+  {
+    id: 'toybox-siege',
+    rules: siegeRules as RulesCoreAny,
+    createBot: createSiegeBot as () => BotPolicy,
+    validate(i) {
+      const who = (v: unknown) => v === undefined || v === null || (typeof v === 'string' && v.length <= 64);
+      switch (i.type) {
+        case 'move':
+          return num(i.x, 1.5) && num(i.y, 1.5) ? { type: 'move', x: i.x, y: i.y } : null;
+        case 'class':
+          return SIEGE_CLASSES.includes(i.cls as never) ? { type: 'class', cls: i.cls } : null;
+        case 'choose':
+          return int(i.index, 0, 3) && who(i.target) ? { type: 'choose', index: i.index, target: i.target ?? null } : null;
+        case 'skill':
+          return who(i.target) ? { type: 'skill', target: i.target ?? null } : null;
+        case 'target':
+          return who(i.id) ? { type: 'target', id: i.id ?? null } : null;
+        case 'revive':
+        case 'giveup':
+          return { type: i.type };
+        case 'watch':
+          return (i.dir === 1 || i.dir === -1) && who(i.id) ? { type: 'watch', dir: i.dir, ...(typeof i.id === 'string' ? { id: i.id } : {}) } : null;
+        default:
+          return null;
+      }
+    },
+    // The match-wide random counter would tell a client what spawns and which cards come next.
+    publicView(v) {
+      hideSeed(v);
+      v.rng = 0;
+    },
+    // A board is a few hundred pooled entities: send whole boards only for the viewer's own toy
+    // and the board it is watching. Everyone else's board is cut to its live elites (the HUD's
+    // send-limit check reads them); the players' own fields (status, level, points, incoming
+    // elites, ghost position) always go out in full.
+    viewFor(v, viewer) {
+      const players = v.players as Obj[];
+      const me = players.find((p) => p.id === viewer);
+      const keep = new Set<unknown>([viewer, me?.watching ?? null]);
+      if (!me) keep.add(players.find((p) => p.status === 'alive')?.id ?? players[0]?.id);
+      const stub = (b: Obj): Obj => ({ ...b, mobs: [], projs: [], shots: [], gems: [], chests: [], blasts: [], bigs: (b.bigs as Obj[]).filter((g) => g.on) });
+      return { ...v, players: players.map((p) => (keep.has(p.id) ? p : { ...p, board: stub(p.board as Obj) })) };
+    },
+    snapshotEvery: 2,
+    // Online, nobody may stall a shared match: the class pick closes after a minute (first class
+    // for anyone still choosing) and a level-up or treasure card after 20 s (its first option).
+    config: { pickTimeoutMs: 60_000, choiceTimeoutMs: 20_000 },
   },
 ];
 

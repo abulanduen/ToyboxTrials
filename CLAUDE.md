@@ -88,6 +88,7 @@ node tests/e2e/rhythm.cjs       # Music Box Rhythm, desktop + phone portrait/lan
 node tests/e2e/tutorials.cjs    # every game's How to play pictures + intro thumbnails + Hub sheet, desktop + phone (LAYOUTS=, GAMES=; shots to $TMPDIR)
 node tests/e2e/spotdiff.cjs     # Odd Page Out (spot the difference), desktop + phone portrait/landscape (ONLY=desktop|portrait|landscape)
 node tests/e2e/towertumble.cjs  # Toy Tower Tumble, desktop + phone portrait/landscape (arg: desktop,portrait,landscape)
+node tests/e2e/siege.cjs        # Toybox Siege, desktop + phone portrait/landscape (ONLY=desktop|portrait|landscape; slow under software GL)
 npm test                        # vitest unit tests for rules cores, scoring, tournament selection
 npm run server:dev              # online Hub server on ws://localhost:2567, rebuilt on change (dev builds connect to it)
 npm run server:build            # typecheck + esbuild bundle → server-dist/index.cjs (Railway runs this)
