@@ -162,7 +162,7 @@ async function run(name) {
     // ---- The elite falls, drops a chest; walk onto it: treasure card; skip it to send an elite to a bot
     await state(() => {
       const p = window.__toybox.match.state().players.find((q) => q.id === 'you');
-      const g = p.board.bigs.find((b) => b.on); g.hp = 1;
+      const g = p.board.bigs.find((b) => b.on); g.hp = 1; g.x = p.x + 2.5; g.z = p.z; g.mode = 0; // the nearest enemy, so every weapon picks it
       if (!p.weapons.some((w) => w.id === 'popgun')) p.weapons.push({ id: 'popgun', level: 3, evolved: false, cd: 0, aux: 0 }); // reach the elite from afar
     });
     await page.evaluate(() => window.__toybox.match.timeScale(1));
@@ -179,6 +179,8 @@ async function run(name) {
       if (card === 'level') await tap(page.getByTestId('siege-option-0')).catch(() => {});
       await page.waitForTimeout(200);
     }
+    console.log(`  [${name}] before the treasure: ${JSON.stringify(await state(() => { const p = window.__toybox.match.state().players.find((q) => q.id === 'you');
+      return { choice: p.choice?.kind ?? null, pendingChests: p.pendingChests, chests: p.board.chests.filter((c) => c.on).length, elites: p.board.bigs.filter((g) => g.on).length }; }))}`);
     await page.getByTestId('siege-treasure').waitFor();
     // Any rival that can take an elite right now (bots send them to each other too).
     await page.waitForSelector('[data-testid^="siege-target-"]:not([data-testid="siege-target-leader"]):not([disabled])');

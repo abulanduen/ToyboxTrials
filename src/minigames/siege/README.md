@@ -9,6 +9,13 @@ Status: **implemented, local only** (one local player plus bots, each on its own
 balance numbers are **provisional**. They come from headless bot matches, not from play-testing
 with people. They live in one place, `config.ts`, which the rules, bots, HUD and this README read.
 
+## Hub gate
+
+Both south-row spots beside the bridge landing are taken (Odd Page Out and Toy Tower Tumble), so
+the Siege gate stands **inside the loop road**: at (46, −127), east of the avenue and facing it,
+with a cardboard toy-fort tower and a chest guarded by dust bunnies. The loop road makes a short
+detour to its door between Toy Tower Tumble and the bridge landing (`paths.ts`).
+
 ## Files
 
 | File | What it is |
@@ -108,6 +115,10 @@ Experience to the next level is `5 + 3(L−1) + ⌊0.3(L−1)²⌋`, giving 5, 8
 | The Boiler Baron (4:00) | 6500 | Ring of 16 bullets every 2.6 s, charge every 8 s, a ring of 10 mice at ⅔ and ⅓ health | Victory (+600 and +300 points) |
 
 Charges show a coral lane on the floor during the wind-up.
+
+A board holds at most `bigCap` (4) elites at once, and the last free slot is kept for the boss
+until it is beaten: scheduled and sent elites that find the board full wait for a slot rather
+than being dropped, and the boss always arrives at 4:00.
 
 ## Rivals: sending elites
 
