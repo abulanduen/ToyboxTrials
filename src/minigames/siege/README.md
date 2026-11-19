@@ -141,7 +141,7 @@ Charges show a coral lane on the floor during the wind-up.
   Points are the in-match score: knockouts, elites, level-ups and the boss.
 - A toy that cannot pay, or has already revived, becomes a **ghost** at once.
 - **Ghosts** watch the leader's board first. They cycle through boards with Prev/Next, Q/E or
-  Space, and drift around the watched toy with the stick or WASD. Every ghost watching a board is
+  Space (or tap a rival's row to jump to that board), and drift around the watched toy with the stick or WASD. Every ghost watching a board is
   drawn over it as a translucent toy, so ghosts can see each other.
 - A **victor** (boss slain) spectates the same way but is not drawn as a ghost.
 

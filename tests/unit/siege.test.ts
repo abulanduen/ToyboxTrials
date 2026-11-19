@@ -333,6 +333,9 @@ describe('Toybox Siege: down, revive once, ghosts', () => {
     siegeRules.step(s, { you: [{ type: 'watch', dir: -1 }] }, STEP);
     siegeRules.step(s, { you: [{ type: 'watch', dir: -1 }] }, STEP);
     expect(me.watching).toBe('b1');
+    siegeRules.step(s, { you: [{ type: 'watch', dir: 1, id: 'b3' }] }, STEP);
+    expect(me.watching).toBe('b3');
+    siegeRules.step(s, { you: [{ type: 'watch', dir: 1, id: 'b1' }] }, STEP);
     siegeRules.step(s, { you: [{ type: 'move', x: 1, y: 0 }] }, STEP);
     run(s, 2000);
     expect(me.gx).toBeGreaterThan(5);

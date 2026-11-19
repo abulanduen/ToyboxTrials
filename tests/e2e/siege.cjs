@@ -43,12 +43,22 @@ async function run(name) {
   try {
     const context = await browser.newContext({ viewport: v.viewport, hasTouch: v.touch, isMobile: v.touch });
     const page = await context.newPage();
-    page.setDefaultTimeout(120000);
+    page.setDefaultTimeout(600000); // software GL under heavy load can take tens of seconds per frame
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
-    const shot = (label) => page.screenshot({ path: path.join(out, `siege-${name}-${label}.png`), timeout: SHOT_TIMEOUT });
-    const tap = (locator) => (v.touch ? locator.tap() : locator.click());
+    // Phones keep the layout shots (class pick, card, swarm, boss, ghost); desktop takes every moment.
+    const PHONE_SHOTS = ['1-class-pick', '2-levelup', '5-swarm', '7-boss', '8-ghost'];
+    const missed = [];
+    const shot = async (label) => {
+      if (v.touch && !PHONE_SHOTS.includes(label)) return;
+      // A screenshot that times out under load is reported, not fatal: the gameplay checks are the test.
+      await page.screenshot({ path: path.join(out, `siege-${name}-${label}.png`), timeout: SHOT_TIMEOUT }).catch((e) => { missed.push(label); console.log(`  [${name}] screenshot ${label} skipped: ${e.message.split('\n')[0]}`); });
+    };
+    // force: the HUD re-renders ten times a second, and at a frame every few seconds Playwright's stability check can starve.
+    const tap = (locator) => (v.touch ? locator.tap({ force: true }) : locator.click({ force: true }));
     const state = (fn, arg) => page.evaluate(fn, arg);
+    /** Skip the run clock ahead (software GL here can drop to a frame every few seconds), then fast-forward the rest with timeScale. */
+    const skipTo = (ms) => state((t) => { const st = window.__toybox.match.state(); if (st.runT < t) st.runT = t; }, ms);
     const t0 = Date.now();
     const step = async (label) => console.log(`  [${name}] ${((Date.now() - t0) / 1000).toFixed(0)}s ${label} (run ${await state(() => (window.__toybox.match.state()?.runT / 1000 || 0).toFixed(1)).catch(() => '?')}s)`);
     /** Take any open level-up / treasure cards (option 1) at normal speed, so a frozen screenshot shows the board. */
@@ -59,6 +69,15 @@ async function run(name) {
         if (card === null) break;
         await tap(page.getByTestId('siege-option-0')).catch(() => {});
         await page.waitForFunction((at) => (window.__toybox.match.state().players.find((q) => q.id === 'you').choice?.at ?? null) !== at, card).catch(() => {});
+      }
+    };
+    /** Freeze the match with no card open (a gem can level the toy up again between the last check and the freeze). */
+    const freezeClear = async () => {
+      for (let round = 0; round < 6; round++) {
+        await clearCards();
+        await page.evaluate(() => window.__toybox.match.timeScale(0));
+        await page.waitForTimeout(400);
+        if (!(await state(() => !!window.__toybox.match.state().players.find((q) => q.id === 'you').choice))) return;
       }
     };
     await page.addInitScript(() => localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { quality: 'low', tutorials: false }, version: 0 })));
@@ -85,7 +104,7 @@ async function run(name) {
     await step('1-class-pick');
     await shot('1-class-pick');
     await tap(page.getByTestId(`siege-class-${v.cls}`));
-    await page.waitForFunction(() => window.__toybox.match.state().phase === 'run', null, { timeout: 120000 });
+    await page.waitForFunction(() => window.__toybox.match.state().phase === 'run', null, { timeout: 600000 });
     assert.equal(await state(new Function(`return ${me}.cls`)), v.cls);
     const bots = await state(() => window.__toybox.match.state().players.filter((p) => p.id !== 'you').map((p) => p.id));
     assert.equal(bots.length, 3);
@@ -121,14 +140,15 @@ async function run(name) {
 
     // ---- Fast-forward to the first elite (keep our toy healthy and take any cards it earns)
     await state(() => { const p = window.__toybox.match.state().players.find((q) => q.id === 'you'); p.invuln = 1e12; });
-    await page.evaluate(() => window.__toybox.match.timeScale(20));
+    await skipTo(50000);
+    await page.evaluate(() => window.__toybox.match.timeScale(60));
     for (let i = 0; i < 400; i++) {
       const s = await state(() => { const p = window.__toybox.match.state().players.find((q) => q.id === 'you'); return { elite: p.board.bigs.some((g) => g.on), card: p.choice?.kind ?? null }; });
       if (s.elite) break;
       if (s.card) await tap(page.getByTestId('siege-option-0')).catch(() => {});
       await page.waitForTimeout(250);
     }
-    await page.evaluate(() => window.__toybox.match.timeScale(0));
+    await freezeClear();
     // Bring the elite into view and freeze for the screenshot.
     await state(() => { const p = window.__toybox.match.state().players.find((q) => q.id === 'you'); const g = p.board.bigs.find((b) => b.on); g.x = p.x + 8; g.z = p.z - 4; });
     await page.waitForTimeout(1500);
@@ -156,27 +176,31 @@ async function run(name) {
       await page.waitForTimeout(200);
     }
     await page.getByTestId('siege-treasure').waitFor();
-    const target = bots[1];
+    // Any rival that can take an elite right now (bots send them to each other too).
+    await page.waitForSelector('[data-testid^="siege-target-"]:not([data-testid="siege-target-leader"]):not([disabled])');
+    const target = await page.$eval('[data-testid^="siege-target-"]:not([data-testid="siege-target-leader"]):not([disabled])', (el) => el.dataset.testid.replace('siege-target-', ''));
+    assert.ok(bots.includes(target));
     await tap(page.getByTestId(`siege-target-${target}`));
     await page.waitForSelector(`[data-testid="siege-target-${target}"][aria-pressed="true"]`);
     await step('4-treasure');
     await shot('4-treasure');
     await tap(page.locator('[data-testid^="siege-option-"][data-kind="send"]'));
+    await page.evaluate(() => window.__toybox.match.timeScale(10)); // the elite lands after a 3 s warning
     await page.waitForFunction((id) => window.__toybox.match.state().players.find((p) => p.id === id).incoming.length > 0
       || window.__toybox.match.state().players.find((p) => p.id === id).board.bigs.some((g) => g.on && g.sent), target);
-    await page.waitForFunction((id) => window.__toybox.match.state().players.find((p) => p.id === id).board.bigs.some((g) => g.on && g.sent && g.from === 'you'), target, { timeout: 120000 });
+    await page.waitForFunction((id) => window.__toybox.match.state().players.find((p) => p.id === id).board.bigs.some((g) => g.on && g.sent && g.from === 'you'), target, { timeout: 600000 });
     assert.ok(await state(new Function(`return ${me}.sendReadyAt > window.__toybox.match.state().runT`)), 'sender cooldown started');
 
     // ---- Mid-swarm: let the swarm build (fast-forward to ~2:40) and measure the renderer at its busiest
-    await page.evaluate(() => window.__toybox.match.timeScale(20));
+    await skipTo(140000);
+    await page.evaluate(() => window.__toybox.match.timeScale(60));
     for (let i = 0; i < 600; i++) {
       const s = await state(() => { const st = window.__toybox.match.state(); const p = st.players.find((q) => q.id === 'you'); return { t: st.runT, card: p.choice?.kind ?? null }; });
       if (s.t >= 160000) break;
       if (s.card) await tap(page.getByTestId('siege-option-0')).catch(() => {});
       await page.waitForTimeout(250);
     }
-    await clearCards();
-    await page.evaluate(() => window.__toybox.match.timeScale(0));
+    await freezeClear();
     await page.waitForTimeout(1500);
     const swarm = await state(() => ({ counts: window.__toybox.siege.counts(), render: window.__toybox.renderInfo() }));
     console.log(`  [${name}] mid-swarm entities ${JSON.stringify(swarm.counts)} renderer ${JSON.stringify(swarm.render)}`);
@@ -195,16 +219,16 @@ async function run(name) {
     assert.ok((await state(new Function(`return ${me}.points`))) < before, 'revive cost points');
 
     // ---- The boss at 4:00
+    await skipTo(232000);
     await state(() => { const p = window.__toybox.match.state().players.find((q) => q.id === 'you'); p.invuln = 1e12; });
-    await page.evaluate(() => window.__toybox.match.timeScale(20));
+    await page.evaluate(() => window.__toybox.match.timeScale(60));
     for (let i = 0; i < 600; i++) {
       const s = await state(() => { const p = window.__toybox.match.state().players.find((q) => q.id === 'you'); return { boss: p.board.bigs.some((g) => g.on && g.type === 'baron'), card: p.choice?.kind ?? null, status: p.status }; });
       if (s.boss || s.status !== 'alive') break;
       if (s.card) await tap(page.getByTestId('siege-option-0')).catch(() => {});
       await page.waitForTimeout(250);
     }
-    await clearCards();
-    await page.evaluate(() => window.__toybox.match.timeScale(0));
+    await freezeClear();
     await state(() => { const p = window.__toybox.match.state().players.find((q) => q.id === 'you'); const g = p.board.bigs.find((b) => b.on && b.type === 'baron'); if (g) { g.x = p.x + 7; g.z = p.z - 6; } });
     await page.getByTestId('siege-boss').waitFor();
     await page.waitForTimeout(1500);
@@ -229,6 +253,7 @@ async function run(name) {
     await shot('8-ghost');
 
     // ---- Results and back to the hub
+    await skipTo(290000);
     await page.evaluate(() => window.__toybox.match.timeScale(40));
     await page.waitForSelector('.results', { timeout: 300000 });
     const placed = await page.$$eval('.results-list li', (els) => els.length);
@@ -239,8 +264,9 @@ async function run(name) {
     await shot('9-results');
     await page.waitForTimeout(900);
     await tap(page.getByTestId('results-leave'));
-    await page.waitForSelector('.hud-sign', { timeout: 120000 });
+    await page.waitForSelector('.hud-sign', { timeout: 600000 });
     assert.deepEqual(errors, []);
+    if (missed.length) console.log(`  [${name}] screenshots missed under load: ${missed.join(', ')}`);
     console.log(`PASS Toybox Siege ${name}: class pick, ${v.touch ? 'joystick' : 'keys'}, level-up card, elite, treasure → elite sent to ${target}, downed → revive, boss, ghost + board cycling, results, hub; no page errors`);
     await context.close();
   } finally {

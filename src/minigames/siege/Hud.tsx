@@ -130,7 +130,7 @@ export function SiegeHud({ getState, localId, contestants }: MinigameSceneProps<
       {s.players.map((p) => {
         const isMe = p.id === localId, aim = !isMe && me.horn && (me.target ?? hornTarget?.id) === p.id;
         return <li key={p.id} className={`siege-row siege-row--${p.status}${viewed.id === p.id ? ' watching' : ''}${aim ? ' aimed' : ''}`}>
-          <button disabled={isMe || !active} onClick={() => spectating ? send({ type: 'watch', dir: 1 }) : send({ type: 'target', id: me.target === p.id ? null : p.id })} aria-label={`${names(p.id)}: ${STATUS_TEXT[p.status]}, level ${p.level}`} data-testid={`siege-row-${p.id}`}>
+          <button disabled={isMe || !active} onClick={() => spectating ? send({ type: 'watch', dir: 1, id: p.id }) : send({ type: 'target', id: me.target === p.id ? null : p.id })} aria-label={`${names(p.id)}: ${STATUS_TEXT[p.status]}, level ${p.level}`} data-testid={`siege-row-${p.id}`}>
             <i style={{ background: p.cls ? CLASS_COLOUR[p.cls] : '#A8998A' }} />
             <span className="siege-name">{names(p.id)}</span>
             <span className="siege-row-meta">{STATUS_TEXT[p.status]} · Lv {p.level}{p.incoming.length ? ' · elite incoming!' : ''}</span>

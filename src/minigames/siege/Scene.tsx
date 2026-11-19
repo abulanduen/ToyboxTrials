@@ -111,7 +111,7 @@ class SiegeView {
   private readonly particles: Particle[];
   private cursor = 0;
   // Per-slot memory to spot defeated enemies and fresh blasts (reset when the board on screen changes).
-  private prevSerial: Int32Array; private prevX: Float32Array; private prevZ: Float32Array; private prevBlast: Int8Array; private prevBig: Int32Array; private prevBigX: Float32Array; private prevBigZ: Float32Array;
+  private prevSerial: Int32Array; private prevX: Float32Array; private prevZ: Float32Array; private prevBlast: Int8Array; private prevProj: Int8Array; private prevBig: Int32Array; private prevBigX: Float32Array; private prevBigZ: Float32Array;
   private board: Board | null = null;
   readonly cam = { x: 0, z: 0, ready: false };
   readonly sounds: SiegeCue[] = [];
@@ -139,7 +139,7 @@ class SiegeView {
     this.stars = instanced(fxShapeGeometry('star'), UNLIT_VERTEX_MATERIAL, pool, 'siege-stars');
     for (const m of [...this.mobs, this.gems, this.snacks, this.corks, this.planes, this.shots, this.yoyos, this.marbles, this.rings, this.arcs, this.discs, this.chests, this.chips, this.stars]) this.group.add(m);
     this.prevSerial = new Int32Array(caps.mobs); this.prevX = new Float32Array(caps.mobs); this.prevZ = new Float32Array(caps.mobs);
-    this.prevBlast = new Int8Array(caps.blasts); this.prevBig = new Int32Array(caps.bigs); this.prevBigX = new Float32Array(caps.bigs); this.prevBigZ = new Float32Array(caps.bigs);
+    this.prevBlast = new Int8Array(caps.blasts); this.prevProj = new Int8Array(caps.projs); this.prevBig = new Int32Array(caps.bigs); this.prevBigX = new Float32Array(caps.bigs); this.prevBigZ = new Float32Array(caps.bigs);
     this.heroShadow.scale.setScalar(1.3); this.heroShadow.position.y = 0.09;
     this.heroRing.scale.setScalar(1.55); this.heroRing.position.y = 0.1;
     this.pickupRing.position.y = 0.08;
@@ -186,7 +186,7 @@ class SiegeView {
     const switched = b !== this.board;
     if (switched) {
       this.board = b;
-      this.prevSerial.fill(0); this.prevBlast.fill(0); this.prevBig.fill(0);
+      this.prevSerial.fill(0); this.prevBlast.fill(0); this.prevBig.fill(0); this.prevProj.fill(1);
       for (const p of this.particles) p.on = false;
       this.cam.ready = false;
     }
@@ -272,8 +272,10 @@ class SiegeView {
 
     // ---------------- projectiles
     let nk = 0, np = 0, nb = 0, ny = 0;
-    for (const q of b.projs) {
-      if (!q.on) continue;
+    for (let i = 0; i < b.projs.length; i++) {
+      const q = b.projs[i];
+      if (!q.on) { this.prevProj[i] = 0; continue; }
+      if (!this.prevProj[i]) { this.prevProj[i] = 1; this.sounds.push(q.kind === 0 ? 'pop' : 'plane'); }
       obj.position.set(q.x, 1.4, q.z); obj.rotation.set(0, Math.atan2(q.vx, q.vz), 0);
       if (q.kind === 0) { obj.scale.setScalar(0.75); this.put(this.corks, nk++, tint(WEAPON_COLOUR.popgun)); }
       else { obj.rotation.set(0, Math.atan2(q.vx, q.vz), Math.sin(sec * 8) * 0.3); obj.scale.setScalar(1.3); this.put(this.planes, np++, tint(WEAPON_COLOUR.planes)); }

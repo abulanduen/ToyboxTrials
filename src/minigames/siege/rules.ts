@@ -110,7 +110,7 @@ export type SiegeInput =
   | { type: 'target'; id: string | null }
   | { type: 'revive' }
   | { type: 'giveup' }
-  | { type: 'watch'; dir: 1 | -1 };
+  | { type: 'watch'; dir: 1 | -1; id?: string };
 
 // ---------------------------------------------------------------- helpers
 
@@ -957,6 +957,7 @@ function applyInput(s: SiegeState, p: SiegePlayer, i: SiegeInput) {
       if (p.status !== 'ghost' && p.status !== 'victor') break;
       const others = s.players.filter((q) => q !== p);
       if (!others.length) break;
+      if (i.id && others.some((q) => q.id === i.id)) { p.watching = i.id; break; }
       const at = others.findIndex((q) => q.id === p.watching);
       p.watching = others[(at + i.dir + others.length * 2) % others.length].id;
       break;
