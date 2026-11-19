@@ -57,9 +57,14 @@ The full brief is `docs/06-room-dog-asset-brief.md`. Refinements now that the ro
   `tail_wag` (additive or upper-body only if possible; otherwise a standing loop with the tail wagging).
   Minimum useful set: `idle`, `walk`, `sniff`, `lie_idle`.
 - **Scale:** ~90 cm nose to tail tip, ~50 cm at the shoulder, head carried at ~55 cm.
-- **Where it goes:** the floor strip in front of the table is kept clear for it: x −180…140,
-  z 60…200 (the rug at x 36, z 134 is its bed spot). Its walk goes from the rug round the
-  right-hand chair to the table's front edge (z ≈ 50), where the head comes up over the edge.
+- **Where it goes (updated 19 Nov 2026):** the room now has two tables (the spawn table and a desk
+  under the window) and is laid out as a bedroom. The dog's route is data: `DOG_PATH` and
+  `DOG_SPOTS` in `src/scene/room/roomLayout.ts`, a loop from its own round bed (x −168, z 166, by
+  the cube storage) up the west side to sniff at the bookshelf, across the rug to lie in the sun
+  patch in front of the spawn table (x −30, z 112), past the toy chest, up the east side to sit by
+  the bed (x 150, z −55), and home. Every leg keeps a 60 cm corridor clear of furniture (unit
+  tested). Until the model exists a temporary code-built stand-in (`src/scene/room/RoomDog.tsx`)
+  walks it; the GLB should use the same route (`GLB_SLOTS.dog`).
 - **Open problem (unchanged from doc 06):** the table top is 75 cm up and a pit bull's head is at
   ~55 cm, so standing it barely clears the edge. Options, in order of preference: (a) it puts its
   **front paws on the table edge** to sniff (needs one more clip, `paws_up`, and looks great),
@@ -70,7 +75,7 @@ The full brief is `docs/06-room-dog-asset-brief.md`. Refinements now that the ro
   (`room-dog-pitbull-lying.glb`, same prompt with "lying on its side asleep, legs relaxed, eyes
   closed"). I animate breathing by scaling the chest. No walking in that case.
 
-## P1 · Sleeping cat on the sofa: `room-cat-sleeping.glb`
+## P1 · Sleeping cat on the beanbag: `room-cat-sleeping.glb`
 
 - **Purpose:** a second living thing, on the wall behind the usual camera, so turning around is
   rewarded. It needs **no rig**: a curled-up cat only breathes (I scale the body) and flicks an
@@ -80,18 +85,20 @@ The full brief is `docs/06-room-dog-asset-brief.md`. Refinements now that the ro
   > its body, eyes closed, ginger tabby coat with soft stripes, realistic proportions. Sitting on
   > nothing: no cushion, no ground plane. Game-ready single mesh, PBR textures, flat neutral
   > lighting, no baked shadows.
-- **Style notes:** soft and round, readable as "cat" from 2–3 m away through blur. Ginger is chosen
-  to pop against the blue-grey sofa.
+- **Style notes:** soft and round, readable as "cat" from 2–3 m away through blur. Ginger reads
+  against the honey beanbag through its darker stripes.
 - **Budget:** 6k–12k triangles, 1024² textures, ≤ 1 MB.
 - **Rig:** none needed. Optional: 2 tail bones + ear bones for an occasional twitch.
 - **Scale:** ~45 cm across the curl, ~18 cm high.
-- **Where it goes:** the free seat cushion on the sofa (left seat as you face it, x ≈ 82, z ≈ 206,
-  seat height 47 cm above the floor). The code leaves that cushion empty on purpose.
+- **Where it goes:** the sofa was replaced by a toy chest and a beanbag when the room became a
+  bedroom (19 Nov 2026). The cat curls on the beanbag: `GLB_SLOTS.cat` in
+  `src/scene/room/roomLayout.ts` (x ≈ 116, z ≈ 212, about 36 cm above the floor).
 
 ## P2 · Tall houseplant: `room-plant-fiddle-leaf.glb`
 
-- **Purpose:** replaces the `PLANT` placeholder (stacked ellipsoid leaves) right of the window.
-  It stands in the brightest part of the room next to the hero window, so it is seen a lot.
+- **Purpose:** replaces the `PLANT` placeholder (stacked ellipsoid leaves). Since the bedroom
+  layout (19 Nov 2026) it stands in the front-right corner beside the chest of drawers
+  (`GLB_SLOTS.plant`), seen when you turn round from the hub.
 - **Prompt:**
   > Fiddle-leaf fig houseplant, about 1.5 metres tall, slender brown trunk, large glossy
   > violin-shaped green leaves, in a plain round terracotta pot with a saucer. Realistic, healthy,
@@ -178,13 +185,14 @@ no logos or text, game-ready, PBR textures, flat neutral lighting, no baked shad
 | --- | --- | --- |
 | Tall plant (ellipsoid leaves) | `plant()` in `src/scene/room/Furniture.tsx` | `room-plant-fiddle-leaf.glb` |
 | Teddy (spheres) | `cubeStorage()` in `Furniture.tsx` | `room-teddy.glb` |
-| Empty sofa cushion | `sofa()` in `Furniture.tsx` | `room-cat-sleeping.glb` |
+| Empty beanbag | `beanbag()` in `Furniture.tsx` | `room-cat-sleeping.glb` |
+| Stand-in dog (chunky boxes) | `src/scene/room/RoomDog.tsx` | `room-dog-pitbull.glb` |
 | Globe (ball + blobs) | `bookshelf()` in `Furniture.tsx` | `room-globe.glb` |
 | Sill plant (cone leaves) | sill block in `buildFurniture()` | optional: a small potted herb, same rules, 3k triangles |
 | Garden outside the window (painted texture) | `gardenTexture()` in `src/scene/textures.ts` | optional: a blurred photo or generated image of a garden, 1024×768, your own or licensed |
 
-Everything else in the room (walls, window, drapes, bookshelf, wardrobe, bed, sofa, chairs, lamps,
-shelves, pictures, rug) is meant to stay code-built: hard-surface furniture is cheap, crisp and
+Everything else in the room (walls, window, drapes, bookshelf, wardrobe, bed, bedside table, chest
+of drawers, toy chest, beanbag, dog bed, chair, lamps, shelves, pictures, rug) is meant to stay code-built: hard-surface furniture is cheap, crisp and
 bakes well.
 
 ## What I don't need

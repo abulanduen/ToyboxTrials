@@ -98,6 +98,34 @@ Checks: `tests/unit/online-*.test.ts` and `tests/e2e/online.cjs`, which runs aga
 server on localhost. **Not yet deployed:** latency, capacity and real devices are unmeasured.
 Owner steps (Railway, then `VITE_SERVER_URL` on Vercel) and limitations: `docs/ONLINE.md`.
 
+**Two tables, a domino bridge, the hub TV and the bedroom (19 November 2026):** the owner asked
+for a roomier hub, the trial gates on a second table reached by a domino bridge, the leaderboard
+as the spawn hub's centrepiece with a TV beside it, fixed hut roofs, and a believable bedroom with
+room for the family dog. This supersedes the single-playmat layout in the "Hub gates pass" above.
+- *Spawn table* (play mat x −68…68, z −46…36, was x −48…46, z −43…33): spawn, fountain and the
+  secrets are where they were. The Scoreboard is the centrepiece behind the fountain (0, −19)
+  facing spawn; the Pavilion moved to the plaza's east side (34, −10); the Workshop (−36, −6) and
+  shop (−44, 12) moved west. The Pavilion's tent roof, the shop awning and the Workshop lid/sign
+  were misplaced and are fixed.
+- *Gates table*: a desk under the window (x −76…130, z −172…−86), 26 cm from the spawn table, with
+  all eleven gates round a loop road and a signpost. *Bridge* at x = 24: a deck of 12 dominoes on
+  two ruler beams, a domino ramp each end and a ruler rail each side. Where you can walk is a union
+  of three rectangles (`src/game/hubBounds.ts`), used by the client and by the online server.
+- *TV* beside the Scoreboard: a pixel-type screen cycling who is online, who is in a trial, a
+  featured shop item (read from the cosmetics catalogue) and your records; Interact changes channel.
+- *Bedroom* (room layer, baked): bed in the right-hand corner with bedside table and lamp, chest of
+  drawers, toy chest and beanbag instead of the sofa, slippers, dog bed and bowl. The dog's route
+  is data (`DOG_PATH` in `src/scene/room/roomLayout.ts`, 60 cm corridors, unit-tested) and a
+  temporary code-built stand-in dog walks it until the generated GLB arrives. Slots for the dog,
+  cat (beanbag) and plant GLBs are recorded; no GLB files were added.
+- Renderer counts at the spawn view (`?debug` `renderInfo()`, SwiftShader, 1280 × 720; counts
+  only, no frame rates): Low 256 → 230 draw calls, 81.5k → 98.5k triangles; Balanced 476 → 412
+  calls, 153k → 181k triangles (Balanced includes the shadow pass, whose frustum now covers both
+  tables). Felt trees and blocks became instanced to pay for the new content.
+- Unverified: real-device performance, touch feel on the bridge on a real phone, how long the
+  walk from spawn to the gates feels in play (about 100 cm, ~8–12 s), and the dog stand-in's look
+  beyond the screenshots.
+
 ## Current milestone and priorities
 
 **Current milestone: integrate and playtest the seven local games; recover Claude's separate work.**
