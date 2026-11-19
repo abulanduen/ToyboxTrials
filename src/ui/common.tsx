@@ -14,6 +14,7 @@ export function ToyButton({
   className = '',
   testId,
   armDelay = 0,
+  type = 'button',
 }: {
   children: React.ReactNode;
   onClick: () => void;
@@ -25,6 +26,8 @@ export function ToyButton({
   /** Ignore activation for this many ms after mounting (tap-through protection for screens that
    *  pop up under a player's finger, e.g. results appearing while they're still tapping pads). */
   armDelay?: number;
+  /** `submit` inside a form (sign-in), so Enter and password managers work. */
+  type?: 'button' | 'submit';
 }) {
   const ref = useRef<HTMLButtonElement>(null);
   const mountedAt = useRef(performance.now());
@@ -37,6 +40,7 @@ export function ToyButton({
   return (
     <button
       ref={ref}
+      type={type}
       data-testid={testId}
       className={`toy-btn toy-btn--${tone} ${className}`}
       disabled={disabled}

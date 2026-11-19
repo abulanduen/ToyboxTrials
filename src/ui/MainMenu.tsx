@@ -12,6 +12,8 @@ import { CardboardSheet, KeyCap, SettingsForm, ToyButton } from './common';
 import { GearIcon, StarSticker, TickerBadge } from './icons';
 import { openOnlineSheet } from './OnlineUI';
 import { useNet } from '../net/store';
+import { useAccount } from '../net/account';
+import { AccountSettingsRow, MenuAccountButton } from './AccountUI';
 
 export function MainMenu() {
   const s = useGame();
@@ -29,7 +31,7 @@ export function MainMenu() {
   // Enter starts (only when no sheet is open and focus isn't on another control).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (useGame.getState().menuSheet || useNet.getState().sheetOpen) return;
+      if (useGame.getState().menuSheet || useNet.getState().sheetOpen || useAccount.getState().sheetOpen) return;
       const el = document.activeElement as HTMLElement | null;
       const onOtherButton = el && el.tagName === 'BUTTON' && !el.dataset.testid?.startsWith('menu-play');
       if ((e.code === 'Enter' || e.code === 'Space') && !onOtherButton) {
@@ -96,6 +98,8 @@ export function MainMenu() {
         </div>
       </div>
 
+      <MenuAccountButton />
+
       {!s.touchUI && (
         <p className="menu-hint">
           <KeyCap k="Enter" wide /> to play
@@ -109,6 +113,7 @@ export function MainMenu() {
       {s.menuSheet === 'settings' && (
         <CardboardSheet title="Settings" icon={<GearIcon />} className="pause" onBackdrop={() => s.set({ menuSheet: null })}>
           <SettingsForm />
+          <AccountSettingsRow />
           <div className="pause__actions">
             <ToyButton onClick={() => s.set({ menuSheet: null })} autoFocus>
               Done

@@ -126,7 +126,7 @@ room for the family dog. This supersedes the single-playmat layout in the "Hub g
   walk from spawn to the gates feels in play (about 100 cm, ~8–12 s), and the dog stand-in's look
   beyond the screenshots.
 
-**Shop and cog economy (local, no login):** one soft currency, **cogs**, earned by finishing
+**Shop and cog economy (local, with an optional account):** one soft currency, **cogs**, earned by finishing
 trials (scaled by placement), tournaments, a first win of the day and Playroom secrets. A 48-item
 catalogue (paints, hats, keys, back/face/neck accessories, gestures) with rarities, prices and
 unlock sources (starter, shop, secret, achievement). The Odds & Ends shop (hub building, main menu,
@@ -134,10 +134,17 @@ pause menu, `#shop`) has try-on, buy and equip, and a daily featured row. The Wo
 accessories and the four gestures. Six new gestures have their own animations and synthesised
 sounds. A versioned profile replaces the old top-level cosmetics, with a migration that keeps
 existing unlocks. Online looks carry accessories, and the server accepts the new gestures
-(protocol v2), but ownership is not verified until accounts exist. Optional login and sync are
-designed but not built; they need owner decisions (login method, Railway Postgres). Details:
-`docs/ECONOMY.md`. Checks: `tests/unit/economy.test.ts`, `tests/e2e/shop.cjs`. Prices and
-rewards have not been playtested.
+(protocol v2), but ownership is not verified. Details: `docs/ECONOMY.md`. Checks:
+`tests/unit/economy.test.ts`, `tests/e2e/shop.cjs`. Prices and rewards have not been playtested.
+
+**Optional account (username and password):** the profile (cogs, items, loadout, achievements,
+paid secrets) can be saved to an account on the online server, in a Railway PostgreSQL database,
+so it follows the player across devices. Playing never needs it, and it hides when the server has
+no database. Account entry in the main menu, Settings and the pause menu; first sign-in merges the
+guest toy (items a union, the larger cog balance); debounced saves with conflict merging; a soft cap
+on wallet growth (not anti-cheat); delete account. scrypt passwords, hashed bearer sessions, CORS,
+rate limits. Tested with unit tests, a real local PostgreSQL 16 and `tests/e2e/account.cjs`; not
+yet deployed (the owner adds the Postgres service: `docs/ONLINE.md`). Privacy: `docs/PRIVACY.md`.
 
 ## Current milestone and priorities
 
@@ -170,6 +177,6 @@ All games previously assigned to Astra now have local modules. Online multiplaye
 - Final balance, durations and tie/forfeit policies; Red Light penalty choice; Toy Squad scoring/eligibility (its ten rounds are owner-confirmed; it is currently excluded from tournaments/ranked).
 - Measured server cost and lobby capacity on Railway. Multiplayer proof game remains to be chosen between the existing Copycat scope and Jack's candidacy.
 - Music source/licensing, room dog asset, hardware/device validation and any external competition requirements.
-- Optional login for syncing the cog profile: login method (username and password, magic link or Google) and whether to add a Railway Postgres database (`docs/ECONOMY.md`).
+- Optional accounts (built): add the Railway Postgres service and redeploy (`docs/ONLINE.md`); publish a privacy policy and decide age requirements; whether usernames ever become public; password recovery (no email is stored).
 
-Guest-friendly casual access remains an established design requirement. Accounts, social systems, persistent online progression and all ranked/online features remain future work. Cosmetics are bought with cogs earned in play; there are no real-money purchases.
+Guest-friendly casual access remains an established design requirement: the optional account only saves the cosmetic profile. Social systems, persistent online progression and all ranked/online features remain future work. Cosmetics are bought with cogs earned in play; there are no real-money purchases.

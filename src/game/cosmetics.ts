@@ -207,6 +207,11 @@ export const KEY_SKINS: Cosmetic<KeySkinId>[] = itemsIn('key').map((i) => asCosm
 export const BOT_HATS: readonly HatId[] = ['none', 'thimble', 'bottlecap', 'paperboat', 'acorn'];
 export const BOT_KEY_SKINS: readonly KeySkinId[] = ['classic', 'heart', 'star', 'golden'];
 
+/** The four Playroom secrets (interactables.ts finds them; profiles record which have paid out). */
+export const SECRET_IDS = ['musicbox', 'marble', 'jack', 'key'] as const;
+/** Achievement ids (the rules live in economy.ts; listed here so the pure profile clean-up can check them). */
+export const ACHIEVEMENT_IDS = ['champion', 'trial-winner', 'regular'] as const;
+
 export const SECRET_LABELS: Record<string, string> = {
   musicbox: 'Find the forgotten music box',
   marble: 'Push the giant marble',
