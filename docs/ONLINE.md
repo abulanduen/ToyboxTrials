@@ -312,3 +312,5 @@ Railway pushes a new server on every commit to the branch it watches. The client
 - Accounts were tested with unit tests (in-memory store and a real PostgreSQL 16 on localhost) and
   the browser test `tests/e2e/account.cjs`. Not tried on Railway's Postgres. No password reset, no
   email, no admin tools; rate-limit state lives in one process's memory and resets on restart.
+- The client asks `GET /api/status` once on load (retrying twice, 20 s apart). If the server is
+  down, the browser logs those failed requests in its console and the Account entries stay hidden.
