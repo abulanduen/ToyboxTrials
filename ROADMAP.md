@@ -146,6 +146,19 @@ on wallet growth (not anti-cheat); delete account. scrypt passwords, hashed bear
 rate limits. Tested with unit tests, a real local PostgreSQL 16 and `tests/e2e/account.cjs`; not
 yet deployed (the owner adds the Postgres service: `docs/ONLINE.md`). Privacy: `docs/PRIVACY.md`.
 
+**Online lobbies and server-run matches (19 Nov 2026, M8 first pass):** at the Pavilion and every
+gate a player chooses practice with bots or hosting an online lobby; the Hub room is alerted and
+anyone can join (lock, cap 2–8, kick, bot fill, difficulty, one trial or a Blitz/Normal/Treasure
+tournament; host handover; join mid-match to watch and play from the next trial). The server owns
+the seed, steps the shared rules cores (60 Hz sub-steps on a 30 Hz timer) with server-side bots,
+filters hidden information per player (Jack's fuse, Copycat's undemonstrated notes, Red Light's
+timings, seeds, Toy Squad's private shops and battles), decides results, and stores finished
+tournaments on a leaderboard (Postgres when configured, else memory; `GET /api/leaderboard`;
+Hub Scoreboard and TV). All eleven trials run online. Tested with unit tests and
+`tests/e2e/lobby.cjs` on localhost only; latency and capacity are unmeasured. Details: `docs/ONLINE.md`.
+Toy Squad is in tournaments again, Normal and Treasure only (owner decision). Trial choosers show
+a length chip (short ≤ 4 min, medium ≤ 6, long) and the practice/host pickers are picture-card grids.
+
 ## Current milestone and priorities
 
 **Current milestone: integrate and playtest the seven local games; recover Claude's separate work.**
@@ -162,7 +175,7 @@ All games previously assigned to Astra now have local modules. Online multiplaye
 
 | Stage | Planned scope / dependency |
 | --- | --- |
-| M8 | Host chosen (Railway, `ws`). Online Hub built and tested locally, not yet deployed. Still to do: one authoritative online minigame |
+| M8 | Host chosen (Railway, `ws`). Online Hub, lobbies and server-run matches for all eleven trials built and tested locally, not yet deployed. Still to do: deploy, measure latency/capacity, prediction for the combat games |
 | M9 | Friends rooms/codes, public casual, configurable Custom Party, guest nicknames and bot fill |
 | M10 | Ranked ratings, history and leaderboards. Blitz/Normal/Treasure must have independent ratings; older plan stages launch one ladder first as population allows |
 | M11 | Emotes, inspection, parties, lobby instancing and interest management; grow toward the unverified 500-player lobby-server goal |
@@ -174,7 +187,7 @@ All games previously assigned to Astra now have local modules. Online multiplaye
 - Separate authoritative conversation/specification, including any changes to the existing 11-game catalogue. Do not reconstruct missing conversation history from guesses.
 - Confirm launch sequencing for the three independent ranked modes: older amendment A3 launches one ladder first; the current request specifies three independent modes without deciding release timing.
 - Rating algorithm, first ranked format, ranked identity/guest policy, ranked bot policy and disconnect/reconnect rules. The older plan proposes no ranked bots; that is not implemented enforcement.
-- Final balance, durations and tie/forfeit policies; Red Light penalty choice; Toy Squad scoring/eligibility (its ten rounds are owner-confirmed; it is currently excluded from tournaments/ranked).
+- Final balance, durations and tie/forfeit policies; Red Light penalty choice; Toy Squad scoring (its ten rounds are owner-confirmed; owner decision 19 Nov 2026: in Normal and Treasure tournaments only, never Blitz; still not ranked).
 - Measured server cost and lobby capacity on Railway. Multiplayer proof game remains to be chosen between the existing Copycat scope and Jack's candidacy.
 - Music source/licensing, room dog asset, hardware/device validation and any external competition requirements.
 - Optional accounts (built): add the Railway Postgres service and redeploy (`docs/ONLINE.md`); publish a privacy policy and decide age requirements; whether usernames ever become public; password recovery (no email is stored).

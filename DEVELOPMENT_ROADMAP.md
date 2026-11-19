@@ -101,15 +101,22 @@ scale change, lazy-loading, and the sniff routine.
 
 ## Multiplayer (needs a server)
 
-### M8 · Multiplayer proof of concept 🚧 (online Hub built; online match not started)
+### M8 · Multiplayer proof of concept 🚧 (online Hub, lobbies and server-run matches built; not deployed)
 Host decided (19 Nov 2026): an always-on Node server on **Railway**, plain WebSockets (`ws`). The
 client stays a static build on Vercel and connects through `VITE_SERVER_URL`. Details: `docs/ONLINE.md`.
 - ✅ First part built: two or more browsers share a hub room (public Hub instances, or private rooms
   with a code or share link), see each other move with name tags, and use four emotes. The server
   validates movement. Tested locally only (unit tests plus a browser test against the built server);
   not yet deployed to Railway.
-- ⏳ Two real browsers play **one full Copycat match**.
-- The rules cores run on the server, and clients send inputs and render state.
+- ✅ Lobbies: host from the Pavilion or a gate (practice with bots stays the other choice), Hub-wide
+  alert and Lobbies list, kick, cap, lock, bot fill, difficulty, one trial or a tournament, host
+  handover, join mid-match to watch and play from the next trial (`server/lobby.ts`).
+- ✅ Server-run matches for all eleven trials: the rules cores and bots run on the server, clients send
+  inputs and render the (filtered) state; tournaments with standings; forfeits after 30 s offline.
+  Two real browsers played a Copycat match and a Blitz tournament to the same results in
+  `tests/e2e/lobby.cjs` (localhost, software rendering).
+- ✅ Leaderboard of online tournaments (Postgres or memory), on the Hub Scoreboard and TV.
+- ⏳ Deploy, measure latency and capacity, decide on prediction for Blink Duel and Spellbox.
 - The client stays a static build on Vercel.
 
 _Depends on:_ M4, and the hosting decision.
@@ -162,4 +169,8 @@ _Depends on:_ M8.
 | 19 Nov 2026 | Online transport: plain **WebSockets with `ws`**, with a shared typed protocol (`src/net/protocol.ts`). Not Colyseus |
 | 19 Nov 2026 | Online Hub joining: a public Hub (24 per instance, overflowing to new instances) and private rooms (16, 5-character codes, share links). No login: players pick a nickname |
 | 19 Nov 2026 | Optional login: **username and password**, stored in a **Railway PostgreSQL** database on the existing server (`/api/*`). Playing never requires it. Guest toys merge into the account on first sign-in (items a union, the larger cog balance); saved wallets are soft-capped only (docs/ECONOMY.md, docs/ONLINE.md) |
+| 19 Nov 2026 | Online lobbies: anyone in a Hub room can host; the room is alerted; open to join unless the host locks or caps it; host controls kick, cap, lock, bot fill, difficulty, one trial or tournament. Matches are server-run (shared rules cores, server seed, server bots) |
+| 19 Nov 2026 | Leaderboard: everyone by nickname, guests included; signed-in players by username. Only server-run online results count |
+| 19 Nov 2026 | Toy Squad (5–10 min) is in tournaments again, but only in Normal and Treasure, never Blitz (local and online) |
+| 19 Nov 2026 | Trial length classes from `durationSec`: short ≤ 4 min, medium ≤ 6 min, long beyond; shown as a chip wherever a trial is chosen |
 | _pending_ | Rating algorithm, ranked guest access, Base44 competition eligibility |

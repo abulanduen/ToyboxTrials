@@ -102,6 +102,20 @@ Hub only (`docs/ONLINE.md`): public instances and private rooms, validated movem
 emotes and reconnect. The room logic (`server/hubRoom.ts`, `server/hubDirectory.ts`) is pure and
 unit-tested; `server/index.ts` is only the socket layer. Not yet deployed or measured on Railway.
 
+**M8 status (19 Nov 2026): lobbies and authoritative matches implemented, local tests only.** Tournament
+lobbies live inside Hub rooms (`server/lobby.ts`, pure). A started lobby runs its match on the server
+(`server/lobbyMatch.ts`, `server/matchRunner.ts`): the server owns the seed, picks tournament trials from the
+format pool, seats humans plus server-side bots, steps the shared rules cores in fixed 60 Hz sub-steps on a
+30 Hz timer, validates and rate-limits inputs (shape in the protocol, meaning per game in `server/games.ts`),
+removes hidden information per player, sends keyframes then patches (30 Hz; Toy Squad 15 Hz), and decides
+results, standings and forfeits (30 s reconnect window). The browser's shared host gained a remote mode
+(`remoteHost` in `session.ts`, `src/minigames/remote.ts`) that renders the server state through each game's
+unchanged Scene and Hud and sends `readLocalInput` output to the server; local practice is untouched.
+Finished online tournaments go to a leaderboard (accounts Postgres or memory; `GET /api/leaderboard`).
+All eleven trials run online. Not done: client-side prediction and position interpolation (combat inputs act
+one network trip later), matchmaking queues, ranked ratings, deployment, and any latency or capacity
+measurement.
+
 | Service | Required responsibility |
 | --- | --- |
 | Lobby | Presence, validated movement, nearby visibility, emotes and party grouping |
@@ -110,11 +124,13 @@ unit-tested; `server/index.ts` is only the socket layer. Not yet deployed or mea
 | Progression | Trusted inventory/rewards, independent format ratings, history and leaderboards |
 | Browser | Input collection, rendering, animation, interpolation and approved prediction |
 
-Clients send intent, not trusted scores or outcomes. The hub protocol (version 1, `src/net/protocol.ts`)
-already validates movement (bounds, speed budget, non-finite values), emote and activity ids, cosmetics and
-nicknames, limits message size and rate, and resumes dropped players for 30 s. Still to plan before competitive
-play: state visibility (including hidden Jack fuse data), authoritative minigame timing, identity and latency
-policies. Database storage is suitable for durable profiles/results; polling it does not replace authoritative
+Clients send intent, not trusted scores or outcomes. The protocol (version 3, `src/net/protocol.ts`)
+validates movement (bounds, speed budget, non-finite values), emote and activity ids, cosmetics, nicknames,
+lobby actions and match inputs, limits message size and rate, and resumes dropped players for 30 s. Hidden
+state (Jack's fuse, seeds, Red Light timings, Copycat's coming notes, Toy Squad's private shops/battles) is
+filtered per player. Still to decide before competitive play: identity for ranked play, latency policy for the
+combat games (prediction or lag compensation), and Music Box Rhythm's trust in client press timestamps
+(accepted within 450 ms online). Database storage is suitable for durable profiles/results; polling it does not replace authoritative
 real-time simulation.
 
 First proof: two real browser clients in one hub and one complete authoritative minigame. The existing roadmap proposes Copycat; the design file also identifies Jack-in-the-Box as a candidate. Choose scope before implementation, then verify agreement on timing, outcomes and return to the lobby.
