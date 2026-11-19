@@ -189,7 +189,7 @@ export const rlglRules: RulesCore<RlglState, RlglInput, RlglConfig> = {
         held: false,
       })),
       // Room to back up behind the start line and to run on past the finish.
-      world: { solids: [], bounds: { minX: -cfg.halfWidth, maxX: cfg.halfWidth, minZ: cfg.finishZ - 5, maxZ: cfg.startZ + 3 } },
+      world: { solids: [], bounds: { minX: -cfg.halfWidth, maxX: cfg.halfWidth, minZ: cfg.finishZ - 7, maxZ: cfg.startZ + 3 } },
       events: [],
     };
   },
@@ -237,10 +237,9 @@ export const rlglRules: RulesCore<RlglState, RlglInput, RlglConfig> = {
       }
 
       let input = p.input;
-      if (p.finished) {
-        // Trot a little past the line and wait there.
-        input = p.m.z > c.finishZ - 3 ? { ax: 0, ay: 0.7, run: false, jump: false } : NO_INPUT;
-      } else if (p.held || s.phase === 'intro') {
+      // Home toys keep their own controls (they can no longer be caught), so a player can wander
+      // the finish area while the others race in. Bots trot a little past the line themselves.
+      if (!p.finished && (p.held || s.phase === 'intro')) {
         input = NO_INPUT;
       }
       const rep = stepMover(p.m, input, dtMs, s.world, TOY_TUNING);
