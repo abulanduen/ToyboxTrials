@@ -91,7 +91,7 @@ async function run(name) {
     await tap(page.getByTestId('practice-toybox-siege'));
     await page.getByTestId('match-start').waitFor({ state: 'visible' });
     await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after they appear
-    await tap(page.getByRole('button', { name: '3 bots', exact: true }));
+    await tap(page.getByRole('button', { name: /^3 bots$/i }));
     await tap(page.getByTestId('match-start'));
     await page.waitForFunction(() => window.__toybox.match.phase() === 'countdown');
     await page.evaluate(() => window.__toybox.match.timeScale(10));

@@ -19,7 +19,7 @@ fs.mkdirSync(out, { recursive: true });
 const BASE = process.env.BASE_URL || 'http://localhost:4173/';
 // Find the Original goes last: switching away from its card keeps a software-rendered page busy
 // for minutes on a loaded machine, and nothing needs to follow it (the page is simply closed).
-const GAMES = (process.env.GAMES || 'copycat-conductor,jack-in-the-box,red-light-green-light,wind-up-dash,inferno-escape,midnight-hunger,music-box-rhythm,blink-duel,spellbox-showdown,toy-squad,odd-page-out,toy-tower-tumble,find-the-original').split(',');
+const GAMES = (process.env.GAMES || 'copycat-conductor,jack-in-the-box,red-light-green-light,wind-up-dash,inferno-escape,midnight-hunger,music-box-rhythm,blink-duel,spellbox-showdown,toy-squad,odd-page-out,toy-tower-tumble,find-the-original,toybox-siege').split(',');
 const VIEWPORTS = {
   desktop: { width: 1280, height: 800 },
   portrait: { width: 390, height: 844 },
