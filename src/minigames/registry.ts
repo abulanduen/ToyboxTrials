@@ -312,6 +312,37 @@ export const MINIGAMES: MinigameDefinition[] = [
     status: 'playable',
     load: () => import('./jackbox').then((m) => m.default),
   },
+  {
+    id: 'odd-page-out',
+    title: 'Odd Page Out',
+    tagline: 'Two storybook pictures. Fifteen differences. Thirty seconds.',
+    description:
+      'A picture book lies open on the table, the same scene on both pages. Or nearly: fifteen things are different. Tap them on either page before the 30 seconds run out. Every round turns to a new scene, and even the first picture is re-drawn each time. Each find scores, and finding all fifteen first scores the most. A wrong tap holds you up for a second. Four pages.',
+    category: 'observation',
+    accent: PALETTE.toyBlue,
+    players: { min: 1, max: 8 },
+    durationSec: [60, 145],
+    inputs: ['keyboard', 'mouse', 'touch'],
+    bots: 'available',
+    eligibility: { tournament: true, ranked: true, casual: true },
+    scoring: 'score',
+    tieBreak: 'More differences found, then quicker finds',
+    recordUnit: 'points',
+    controls: [
+      { keys: 'Click', action: 'Circle a difference (either page)' },
+      { keys: 'Arrows', action: 'Move the ring' },
+      { keys: 'Enter', action: 'Circle the ringed spot' },
+    ],
+    touch: {
+      movement: 'none',
+      look: 'none',
+      buttons: [],
+      orientation: 'any',
+      notes: 'Tap a difference on either page. The pages are the control: side by side in landscape, one above the other in portrait, every difference a finger-sized target.',
+    },
+    status: 'playable',
+    load: () => import('./spotdiff').then((m) => m.default),
+  },
 ];
 
 export const gameById = (id: MinigameId) => MINIGAMES.find((g) => g.id === id)!;
