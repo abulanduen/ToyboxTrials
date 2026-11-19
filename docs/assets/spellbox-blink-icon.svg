@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Spellbox "Blink" ability icon. Original vector drawing for Toybox Trials (hand-written SVG,
+       no reference artwork): a toy-blue wind-up spinning top zipping in on cream speed puffs,
+       landing in a honey/coral shockwave ring. Rendered to public/assets/ui/spellbox/blink.webp. -->
+  <defs>
+    <radialGradient id="body" cx="0.36" cy="0.32" r="0.8">
+      <stop offset="0" stop-color="#A9D4EA"/>
+      <stop offset="0.38" stop-color="#6BA7C8"/>
+      <stop offset="0.85" stop-color="#3E6F8E"/>
+      <stop offset="1" stop-color="#335C77"/>
+    </radialGradient>
+    <linearGradient id="band" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#C9B38E"/>
+      <stop offset="0.3" stop-color="#FBF2DE"/>
+      <stop offset="0.7" stop-color="#F4E8CE"/>
+      <stop offset="1" stop-color="#B9A37E"/>
+    </linearGradient>
+    <linearGradient id="lid" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFF9EE"/>
+      <stop offset="0.6" stop-color="#F4E8CE"/>
+      <stop offset="1" stop-color="#D2BE98"/>
+    </linearGradient>
+    <linearGradient id="brass" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F3D27A"/>
+      <stop offset="0.45" stop-color="#C8973A"/>
+      <stop offset="1" stop-color="#8A6522"/>
+    </linearGradient>
+    <radialGradient id="rivet" cx="0.35" cy="0.3" r="0.7">
+      <stop offset="0" stop-color="#FCE7A6"/>
+      <stop offset="0.5" stop-color="#C8973A"/>
+      <stop offset="1" stop-color="#7E5A1E"/>
+    </radialGradient>
+    <radialGradient id="puff" cx="0.38" cy="0.32" r="0.75">
+      <stop offset="0" stop-color="#FFFDF6"/>
+      <stop offset="0.6" stop-color="#F4E8CE"/>
+      <stop offset="1" stop-color="#D9C6A1"/>
+    </radialGradient>
+    <linearGradient id="wave" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#E76B62"/>
+      <stop offset="0.5" stop-color="#EFAE45"/>
+      <stop offset="1" stop-color="#E76B62"/>
+    </linearGradient>
+    <linearGradient id="streak" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#F4E8CE" stop-opacity="0"/>
+      <stop offset="1" stop-color="#FFF9EE"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(256 258) scale(0.86) translate(-260 -265)">
+
+  <!-- Shockwave ring on the ground: back half behind the top -->
+  <path d="M96 404 A176 54 0 0 1 448 404" fill="none" stroke="url(#wave)" stroke-width="20" stroke-linecap="round"/>
+  <path d="M150 404 A122 36 0 0 1 394 404" fill="none" stroke="#F7D89A" stroke-width="10" stroke-linecap="round" opacity="0.9"/>
+
+  <!-- Speed streaks and puffs trailing up-left (where the top blinked from) -->
+  <g stroke-linecap="round" fill="none">
+    <path d="M70 178 L196 228" stroke="url(#streak)" stroke-width="22"/>
+    <path d="M52 250 L188 280" stroke="url(#streak)" stroke-width="18"/>
+    <path d="M92 320 L196 330" stroke="url(#streak)" stroke-width="14"/>
+  </g>
+  <g>
+    <circle cx="74" cy="138" r="30" fill="url(#puff)"/>
+    <circle cx="104" cy="122" r="22" fill="url(#puff)"/>
+    <circle cx="50" cy="212" r="22" fill="url(#puff)"/>
+    <circle cx="70" cy="292" r="17" fill="url(#puff)"/>
+  </g>
+
+  <!-- The spinning top, tilted into its landing -->
+  <g transform="rotate(-14 300 270)">
+    <!-- soft contact shadow -->
+    <ellipse cx="300" cy="408" rx="52" ry="12" fill="#2B2433" opacity="0.28"/>
+    <!-- brass tip -->
+    <path d="M282 372 L300 412 L318 372 Z" fill="url(#brass)" stroke="#6E4E19" stroke-width="3" stroke-linejoin="round"/>
+    <!-- body: dome over a tapering cone -->
+    <path d="M168 214 C168 168 230 138 300 138 C370 138 432 168 432 214 C432 262 398 300 362 334 C340 355 322 372 300 380 C278 372 260 355 238 334 C202 300 168 262 168 214 Z"
+          fill="url(#body)" stroke="#2F546C" stroke-width="5" stroke-linejoin="round"/>
+    <!-- cream band with rivets -->
+    <path d="M172 222 C200 248 250 260 300 260 C350 260 400 248 428 222 L420 252 C392 278 348 288 300 288 C252 288 208 278 180 252 Z"
+          fill="url(#band)" stroke="#9C845C" stroke-width="3" stroke-linejoin="round"/>
+    <circle cx="214" cy="258" r="9" fill="url(#rivet)"/>
+    <circle cx="257" cy="270" r="9" fill="url(#rivet)"/>
+    <circle cx="300" cy="274" r="9" fill="url(#rivet)"/>
+    <circle cx="343" cy="270" r="9" fill="url(#rivet)"/>
+    <circle cx="386" cy="258" r="9" fill="url(#rivet)"/>
+    <!-- coral star decal on the cone -->
+    <path d="M300 300 L307 316 L324 317 L311 328 L315 345 L300 336 L285 345 L289 328 L276 317 L293 316 Z"
+          fill="#E76B62" stroke="#B9524B" stroke-width="2" stroke-linejoin="round"/>
+    <!-- glossy highlight -->
+    <path d="M206 192 C214 170 246 156 276 154" fill="none" stroke="#FFFFFF" stroke-opacity="0.55" stroke-width="10" stroke-linecap="round"/>
+    <!-- cream lid -->
+    <ellipse cx="300" cy="150" rx="78" ry="24" fill="url(#lid)" stroke="#9C845C" stroke-width="3"/>
+    <!-- brass wind-up key on top -->
+    <rect x="290" y="96" width="20" height="54" rx="6" fill="url(#brass)" stroke="#6E4E19" stroke-width="3"/>
+    <path d="M300 104 C278 104 258 90 258 70 C258 50 278 40 300 54 C322 40 342 50 342 70 C342 90 322 104 300 104 Z"
+          fill="url(#brass)" stroke="#6E4E19" stroke-width="4" stroke-linejoin="round"/>
+    <circle cx="279" cy="72" r="9" fill="#574D69" opacity="0.85"/>
+    <circle cx="321" cy="72" r="9" fill="#574D69" opacity="0.85"/>
+  </g>
+
+  <!-- Shockwave ring: front half over the tip -->
+  <path d="M96 404 A176 54 0 0 0 448 404" fill="none" stroke="url(#wave)" stroke-width="20" stroke-linecap="round"/>
+  <path d="M150 404 A122 36 0 0 0 394 404" fill="none" stroke="#F7D89A" stroke-width="10" stroke-linecap="round" opacity="0.9"/>
+  <!-- little burst marks on the ring -->
+  <g stroke="#EFAE45" stroke-width="10" stroke-linecap="round">
+    <path d="M70 380 L52 368"/>
+    <path d="M474 380 L492 368"/>
+    <path d="M272 470 L268 490"/>
+  </g>
+  </g>
+</svg>

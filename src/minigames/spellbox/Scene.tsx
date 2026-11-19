@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { PALETTE } from '../../game/palette';
-import { unlockAudio } from '../../game/audio';
+import { spellCueStats, unlockAudio } from '../../game/audio';
 import { createSpellboxAudio } from './audio';
 import { exposeDebug } from '../../game/debug';
 import { WindupBot } from '../../character/WindupBot';
@@ -31,8 +31,9 @@ function MageToy({c,getState}:{c:Contestant;getState:()=>SpellboxState|null}){
     if(p.cast&&p.alive){
       const d=SPELLS[p.cast.spell],charge=Math.max(.03,(s.t-p.cast.start)/Math.max(10,d.windup));
       zone.current.visible=true;zone.current.position.set(p.x,.1,p.z);zone.current.rotation.y=p.cast.angle;
-      cone.current.visible=d.effect==='cone';circle.current.visible=['nova','shield','repair','mine'].includes(d.effect);line.current.visible=['bolt','bomb','pull'].includes(d.effect);
-      circle.current.scale.setScalar(d.effect==='nova'?d.range:d.effect==='mine'?3:1.7);circle.current.position.z=d.effect==='mine'?d.range:0;
+      cone.current.visible=d.effect==='cone';circle.current.visible=['nova','shield','repair','mine','blink'].includes(d.effect);line.current.visible=['bolt','bomb','pull'].includes(d.effect);
+      // Blink marks where its shockwave lands (before any clamp at the edge or beside another toy).
+      circle.current.scale.setScalar(d.effect==='nova'?d.range:d.effect==='mine'?3:d.effect==='blink'?d.radius:1.7);circle.current.position.z=d.effect==='mine'||d.effect==='blink'?d.range:0;
       for(const mesh of [cone.current,circle.current,line.current]){const mat=mesh.material as THREE.MeshBasicMaterial;mat.color.set(d.colour);mat.opacity=.18+charge*.35;}
     }
   });
@@ -50,20 +51,61 @@ function MageToy({c,getState}:{c:Contestant;getState:()=>SpellboxState|null}){
     </group>
   </>;
 }
+/** Blink effect pools: puffs per departure, one trail and one shockwave per blink. */
+const PUFFS_PER_BLINK=6,BLINK_FX=12,EFFECT_MS=550;
 function Spells({getState}:{getState:()=>SpellboxState|null}){
   const shots=useRef<THREE.InstancedMesh>(null!),bursts=useRef<THREE.InstancedMesh>(null!),mines=useRef<THREE.InstancedMesh>(null!),rings=useRef<THREE.InstancedMesh>(null!);
+  const puffs=useRef<THREE.InstancedMesh>(null!),trails=useRef<THREE.InstancedMesh>(null!),waves=useRef<THREE.InstancedMesh>(null!),waveCores=useRef<THREE.InstancedMesh>(null!);
   const marker=useMemo(()=>new THREE.Object3D(),[]),colour=useMemo(()=>new THREE.Color(),[]);
+  const cream=useMemo(()=>new THREE.Color(PALETTE.cream),[]),white=useMemo(()=>new THREE.Color(PALETTE.white),[]),honey=useMemo(()=>new THREE.Color(PALETTE.honey),[]),coral=useMemo(()=>new THREE.Color(PALETTE.coral),[]);
   const reduced=useRef(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   useFrame(()=>{
     const s=getState(),valid=s?.kind==='spellbox-showdown';
     const projectiles=valid?s.projectiles:[],effects=valid?s.effects:[],buttons=valid?s.mines:[];
-    shots.current.count=projectiles.length;bursts.current.count=effects.length;mines.current.count=buttons.length;rings.current.count=buttons.length;
+    shots.current.count=projectiles.length;mines.current.count=buttons.length;rings.current.count=buttons.length;
     projectiles.forEach((p,i)=>{marker.position.set(p.x,1.2,p.z);marker.rotation.set(0,Math.atan2(p.dx,p.dz),0);const pull=SPELLS[p.spell].effect==='pull';marker.scale.set(pull?.18:.48,pull?.18:.48,pull?1.5:.48);marker.updateMatrix();shots.current.setMatrixAt(i,marker.matrix);colour.set(SPELLS[p.spell].colour);shots.current.setColorAt(i,colour);});
-    effects.forEach((e,i)=>{const age=(s!.t-e.at)/550;marker.position.set(e.x,.2+(e.kind==='repair'?age*2:0),e.z);marker.rotation.set(Math.PI/2,0,0);marker.scale.setScalar(reduced.current?e.radius:e.radius*(.3+age));marker.updateMatrix();bursts.current.setMatrixAt(i,marker.matrix);colour.set(SPELLS[e.spell].colour).lerp(new THREE.Color(PALETTE.cream),age);bursts.current.setColorAt(i,colour);});
+    let burst=0,puff=0,trail=0,wave=0;
+    for(const e of effects){
+      const age=Math.min(1,(s!.t-e.at)/EFFECT_MS),grow=reduced.current?1:.3+age;
+      if(e.kind==='depart'){
+        // A ring of cream puffs where the toy vanished, drifting out and up as they shrink.
+        if(puff+PUFFS_PER_BLINK>BLINK_FX*PUFFS_PER_BLINK)continue;
+        for(let k=0;k<PUFFS_PER_BLINK;k++){
+          const a=k/PUFFS_PER_BLINK*Math.PI*2+e.id,spread=reduced.current?e.radius*.6:e.radius*(.35+age*.9);
+          marker.position.set(e.x+Math.sin(a)*spread,.7+age*(reduced.current?0:1.6)+(k%2)*.4,e.z+Math.cos(a)*spread);marker.rotation.set(0,0,0);
+          marker.scale.setScalar(Math.max(.01,.55*(1-age*.85)));marker.updateMatrix();puffs.current.setMatrixAt(puff,marker.matrix);
+          colour.copy(cream).lerp(white,age);puffs.current.setColorAt(puff++,colour);
+        }
+      }else if(e.kind==='trail'){
+        // A streak from departure to arrival that thins away.
+        if(trail>=BLINK_FX||e.tx===undefined||e.tz===undefined)continue;
+        const dx=e.tx-e.x,dz=e.tz-e.z,length=Math.hypot(dx,dz);
+        marker.position.set((e.x+e.tx)/2,.7,(e.z+e.tz)/2);marker.rotation.set(0,Math.atan2(dx,dz),0);
+        marker.scale.set(Math.max(.01,1-age),Math.max(.01,1-age),Math.max(.01,length));marker.updateMatrix();trails.current.setMatrixAt(trail,marker.matrix);
+        colour.copy(white).lerp(cream,age);trails.current.setColorAt(trail++,colour); // bright on the purple floor and the blue centre
+      }else if(e.kind==='wave'){
+        // Arrival shockwave: a thick ring racing out to the push radius, plus a bright core ring.
+        if(wave>=BLINK_FX)continue;
+        const reach=e.radius*(reduced.current?1:.35+Math.sqrt(age)*.75);
+        marker.position.set(e.x,.25,e.z);marker.rotation.set(Math.PI/2,0,0);marker.scale.set(reach,reach,1+(1-age)*2);marker.updateMatrix();waves.current.setMatrixAt(wave,marker.matrix);
+        colour.copy(honey).lerp(coral,age*.5).lerp(cream,age*age);waves.current.setColorAt(wave,colour);
+        marker.position.y=.3;marker.scale.setScalar(Math.max(.01,reach*.6));marker.updateMatrix();waveCores.current.setMatrixAt(wave,marker.matrix);
+        colour.copy(white).lerp(cream,age);waveCores.current.setColorAt(wave++,colour);
+      }else{
+        if(burst>=64)continue;
+        marker.position.set(e.x,.2+(e.kind==='repair'?age*2:0),e.z);marker.rotation.set(Math.PI/2,0,0);marker.scale.setScalar(e.radius*grow);marker.updateMatrix();bursts.current.setMatrixAt(burst,marker.matrix);
+        colour.set(SPELLS[e.spell].colour).lerp(cream,age);bursts.current.setColorAt(burst++,colour);
+      }
+    }
+    bursts.current.count=burst;puffs.current.count=puff;trails.current.count=trail;waves.current.count=wave;waveCores.current.count=wave;
     buttons.forEach((m,i)=>{marker.position.set(m.x,.16,m.z);marker.rotation.set(Math.PI/2,0,0);marker.scale.setScalar(.7);marker.updateMatrix();mines.current.setMatrixAt(i,marker.matrix);colour.set(s!.t>=m.armAt?PALETTE.coral:PALETTE.brass);mines.current.setColorAt(i,colour);marker.position.y=.06;marker.scale.setScalar(3);marker.updateMatrix();rings.current.setMatrixAt(i,marker.matrix);});
-    for(const mesh of [shots.current,bursts.current,mines.current,rings.current]){mesh.instanceMatrix.needsUpdate=true;if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;}
+    for(const mesh of [shots.current,bursts.current,mines.current,rings.current,puffs.current,trails.current,waves.current,waveCores.current]){mesh.instanceMatrix.needsUpdate=true;if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;}
   });
   return<>
+    <instancedMesh ref={puffs} args={[undefined,undefined,BLINK_FX*PUFFS_PER_BLINK]} frustumCulled={false} raycast={()=>{}}><icosahedronGeometry args={[1,1]}/><meshBasicMaterial transparent opacity={.85} depthWrite={false} toneMapped={false}/></instancedMesh>
+    <instancedMesh ref={trails} args={[undefined,undefined,BLINK_FX]} frustumCulled={false} raycast={()=>{}}><boxGeometry args={[1,.35,1]}/><meshBasicMaterial transparent opacity={.8} depthWrite={false} toneMapped={false}/></instancedMesh>
+    <instancedMesh ref={waves} args={[undefined,undefined,BLINK_FX]} frustumCulled={false} raycast={()=>{}}><torusGeometry args={[1,.13,6,40]}/><meshBasicMaterial transparent opacity={.9} depthWrite={false} toneMapped={false}/></instancedMesh>
+    <instancedMesh ref={waveCores} args={[undefined,undefined,BLINK_FX]} frustumCulled={false} raycast={()=>{}}><torusGeometry args={[1,.12,6,32]}/><meshBasicMaterial transparent opacity={.7} depthWrite={false} toneMapped={false}/></instancedMesh>
     <instancedMesh ref={shots} args={[undefined,undefined,64]} frustumCulled={false} raycast={()=>{}}><sphereGeometry args={[1,10,8]}/><meshBasicMaterial toneMapped={false}/></instancedMesh>
     <instancedMesh ref={bursts} args={[undefined,undefined,64]} frustumCulled={false} raycast={()=>{}}><torusGeometry args={[1,.1,6,24]}/><meshBasicMaterial transparent opacity={.65} toneMapped={false}/></instancedMesh>
     <instancedMesh ref={mines} args={[undefined,undefined,16]} frustumCulled={false} raycast={()=>{}}><torusGeometry args={[1,.3,6,12]}/><meshBasicMaterial/></instancedMesh>
@@ -87,7 +129,10 @@ export function SpellboxScene({getState,localId,contestants}:MinigameSceneProps<
     return()=>{off();clear();gl.domElement.style.touchAction=old;gl.domElement.removeEventListener('pointermove',aim);gl.domElement.removeEventListener('pointerdown',down);gl.domElement.removeEventListener('pointerleave',leave);window.removeEventListener('blur',clear);};
   },[camera,gl,getState,localId,pointerRay,floorPlane]);
   useEffect(()=>matchBus.on('event',createSpellboxAudio(localId,getState)),[localId,getState]);
-  useEffect(()=>{exposeDebug({spellbox:{point:(x:number,z:number,height=.1)=>{const p=new THREE.Vector3(x,height,z).project(camera),r=gl.domElement.getBoundingClientRect();return{x:r.left+(p.x+1)*r.width/2,y:r.top+(1-p.y)*r.height/2};},
+  useEffect(()=>{exposeDebug({spellbox:{
+    /** Spell cues the shared audio bus has received (counts and loudest gain per cue; test aid, not a loudness measure). */
+    audio:()=>structuredClone(spellCueStats),
+    point:(x:number,z:number,height=.1)=>{const p=new THREE.Vector3(x,height,z).project(camera),r=gl.domElement.getBoundingClientRect();return{x:r.left+(p.x+1)*r.width/2,y:r.top+(1-p.y)*r.height/2};},
     /** Ground point under a screen position (test hook: checks aim against the live camera). */
     ground:(sx:number,sy:number)=>{const r=gl.domElement.getBoundingClientRect(),ray=new THREE.Raycaster(),hit=new THREE.Vector3();ray.setFromCamera(new THREE.Vector2((sx-r.left)/r.width*2-1,1-(sy-r.top)/r.height*2),camera);return ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),0),hit)?{x:hit.x,z:hit.z}:null;}}});},[camera,gl]);
   const fit=useRef({key:'',d:60}),view=useRef({x:0,z:0,d:60,ready:false}),lookAt=useMemo(()=>new THREE.Vector3(),[]);

@@ -62,7 +62,7 @@ export const TUTORIALS: Partial<Record<MinigameId, TutorialStep[]>> = {
     { title: 'Read the wind-up', text: 'A swing (J or click) charges for almost a second, and a striped cone shows where it will land. Blink out of cones, and blinking cancels your own swing.', touch: 'Swing charges for almost a second, and a striped cone shows where it will land. Blink out of cones, and blinking cancels your own swing.' },
   ],
   'spellbox-showdown': [
-    { title: 'Pick your build', text: 'Take your time: choose one spell for each of your three buttons, then lock your build. The fight starts three seconds after everyone has locked in.' },
+    { title: 'Pick your build', text: 'Take your time: pick one spell per button. R offers Blink: zip ahead and shove nearby toys away. Lock your build; the fight starts three seconds after everyone has locked in.' },
     { title: 'Push them out', text: 'Hits add damage, and the more damage a toy has, the further it flies. Cast with Q, E and R; aim with the mouse.', touch: 'Hits add damage, and the more damage a toy has, the further it flies. Tap your three spell buttons; tap the arena to aim.' },
     { title: 'Stay in the ring', text: 'Cross the edge and you are out. The ring shrinks as toys fall, with a warning first. Last toy inside wins.' },
   ],
@@ -71,6 +71,12 @@ export const TUTORIALS: Partial<Record<MinigameId, TutorialStep[]>> = {
     { title: 'Merge for stars', text: 'Matching toys merge automatically, up to three stars. Shop cards show the copies you own. Open the Toy Handbook to browse every toy and star your favourites.' },
     { title: 'Set your formation', text: 'Drag toys onto the board or keep them in reserve. Toys sharing a trait symbol earn bonuses, listed at the side. Then press Ready and your squad battles on its own.', touch: 'Drag toys onto the board or keep them in reserve. Toys sharing a trait symbol earn bonuses, listed at the side. Then tap Ready and your squad battles on its own.' },
     { title: 'Ten rounds', text: 'A win scores 3 points and a draw 1. Most points after ten rounds wins. On rounds 3, 6 and 9, you must pick one of three passive bonuses before you can carry on.' },
+  ],
+  'odd-page-out': [
+    { title: 'Two pages, nearly the same', text: 'The book shows one picture on each page. Fifteen things on the second page are different: a colour, a pattern, something missing, turned or moved.' },
+    { title: 'Circle them', text: 'Click a difference on either page to circle it. Or move the ring with the arrows and press Enter.', touch: 'Tap a difference on either page to circle it.' },
+    { title: 'Careful, quick', text: 'Each find scores 10. A wrong tap holds you up for a second. Find all fifteen for a bonus: the first to finish gets the biggest.' },
+    { title: 'Four pages', text: 'Each page lasts 30 seconds, and every page is a new scene. Most points after four pages wins.' },
   ],
   'toybox-siege': [
     { title: 'Pick a toy and keep moving', text: 'Choose the Tin Soldier, the Pop-Gun Ranger or the Clockwork Wizard. Your weapons fire on their own: move with W A S D or the arrows to dodge the swarm.', touch: 'Choose the Tin Soldier, the Pop-Gun Ranger or the Clockwork Wizard. Your weapons fire on their own: steer with the joystick to dodge the swarm.' },

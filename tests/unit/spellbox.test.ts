@@ -14,8 +14,8 @@ function equip(s:SpellboxState,id:SpellId){s.players[0].build[0]=id;}
 function cast(s:SpellboxState){send(s,'p0',[{type:'cast',slot:0}]);}
 function hit(s:SpellboxState){for(let i=0;i<180&&s.players[1].lastHit<0;i++)spellboxRules.step(s,{},10);expect(s.players[1].lastHit).toBeGreaterThanOrEqual(0);}
 describe('Spellbox Showdown',()=>{
-  it('has eight distinct spell kits with valid data and repeatable 2–8 player spawns',()=>{
-    expect(SPELL_IDS).toHaveLength(8);expect(new Set(SPELL_IDS.map(id=>SPELLS[id].name)).size).toBe(8);
+  it('has nine distinct spell kits with valid data and repeatable 2–8 player spawns',()=>{
+    expect(SPELL_IDS).toHaveLength(9);expect(new Set(SPELL_IDS.map(id=>SPELLS[id].name)).size).toBe(9);
     for(let n=2;n<=8;n++){const s=fresh(n);expect(fresh(n)).toEqual(s);for(const p of s.players){expect(Math.hypot(p.x,p.z)).toBeLessThan(s.radius-s.config.bodyRadius);expect(p.build).toHaveLength(3);}}
     expect(spellboxRules.init(people,456).players).not.toEqual(fresh(8).players);
     for(const id of SPELL_IDS){expect(SPELLS[id].cooldown).toBeGreaterThan(0);expect(SPELLS[id].description.length).toBeGreaterThan(30);}
@@ -32,10 +32,11 @@ describe('Spellbox Showdown',()=>{
     send(s,'p1',[{type:'ready'}]);expect(s.phase).toBe('draft');expect(s.fightAt).toBeGreaterThan(s.t);send(s,'p0',[{type:'equip',slot:0,spell:'pop-rocket'}]);expect(p.build[0]).toBe('marble-burst');
     spellboxRules.step(s,{},s.config.countdownMs);expect(s.phase).toBe('arena');send(s,'p0',[{type:'equip',slot:0,spell:'pop-rocket'}]);expect(p.build[0]).toBe('marble-burst');
   });
-  it('moves Mine between E and R while keeping every slot legal and the build unique',()=>{
-    const s=fresh(),p=s.players[0];send(s,'p0',[{type:'equip',slot:1,spell:'button-mine'}]);
-    send(s,'p0',[{type:'equip',slot:2,spell:'button-mine'}]);expect(p.build).toEqual(['pop-rocket','spring-fan','button-mine']);
-    send(s,'p0',[{type:'equip',slot:1,spell:'button-mine'}]);expect(p.build).toEqual(['pop-rocket','button-mine','bubble-ward']);
+  it('puts each of the nine spells on exactly one button, Blink on R, and rejects off-button picks',()=>{
+    expect(SLOT_OPTIONS.flat().sort()).toEqual([...SPELL_IDS].sort());expect(SLOT_OPTIONS[2]).toContain('blink');
+    const s=fresh(),p=s.players[0];send(s,'p0',[{type:'equip',slot:1,spell:'button-mine'},{type:'equip',slot:2,spell:'blink'}]);
+    expect(p.build).toEqual(['pop-rocket','button-mine','blink']);
+    send(s,'p0',[{type:'equip',slot:2,spell:'button-mine'},{type:'equip',slot:0,spell:'blink'}]);expect(p.build).toEqual(['pop-rocket','button-mine','blink']);
     p.build.forEach((id,slot)=>expect(SLOT_OPTIONS[slot]).toContain(id));expect(new Set(p.build).size).toBe(3);
   });
   it('uses the requested population bands, preserving the old two-player size',()=>{
