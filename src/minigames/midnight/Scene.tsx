@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
+import { Billboard } from '@react-three/drei';
 import * as THREE from 'three';
 import { PALETTE } from '../../game/palette';
 import { sfx } from '../../game/audio';
@@ -14,12 +15,22 @@ const CELL = 3.5;
 const coord = (n: number) => (n - 5) * CELL;
 function Toy({ c, getState }: { c: Contestant; getState: () => HungerState | null }) {
   const root = useRef<THREE.Group>(null!);
+  const health = useRef<THREE.Group>(null!);
+  const energyFill = useRef<THREE.Mesh>(null!);
   const full = useRef(createToyAnim()); const mini = useRef(createMiniAnim());
   const previous = useRef({ x: 0, z: 0 });
-  useFrame((_, dt) => {
+  useFrame(({ camera, size }, dt) => {
     const s = getState(); const p = s?.kind === 'midnight-hunger' ? s.players.find(p => p.id === c.id) : undefined;
     root.current.visible = !!p;
-    if (!p) return;
+    if (!p || !s) return;
+    const fraction = THREE.MathUtils.clamp(p.energy / s.config.maxEnergy, 0, 1);
+    health.current.visible = p.alive;
+    energyFill.current.visible = fraction > 0;
+    energyFill.current.scale.x = Math.max(0.001, fraction);
+    energyFill.current.position.x = -1.4 * (1 - fraction);
+    (energyFill.current.material as THREE.MeshBasicMaterial).color.set(
+      fraction > 0.5 ? PALETTE.sage : fraction > 0.25 ? PALETTE.honey : PALETTE.coral,
+    );
     const moved = previous.current.x !== p.x || previous.current.z !== p.z;
     if (moved) mini.current.hopT = 0;
     full.current.speed = moved ? 8 : full.current.speed * Math.exp(-dt * 12);
@@ -29,10 +40,19 @@ function Toy({ c, getState }: { c: Contestant; getState: () => HungerState | nul
     previous.current = { x: p.x, z: p.z };
     root.current.position.set(coord(p.x), 0.2, coord(p.z));
     root.current.rotation.y = Math.PI - p.facing * Math.PI / 2;
+    // Keep the fill readable on short landscape screens as well as a large desktop canvas.
+    const distance = Math.max(1, camera.position.distanceTo(root.current.position));
+    const pixelsPerUnit = size.height / (2 * Math.tan((camera as THREE.PerspectiveCamera).fov * Math.PI / 360) * distance);
+    health.current.scale.y = Math.max(1, 8 / (0.6 * pixelsPerUnit));
   });
   return <group ref={root}>
     {c.isLocal ? <WindupBot anim={full} paint={c.paint} hat={c.hat} keySkin={c.keySkin} /> : <MiniContender anim={mini} paint={c.paint} />}
     {c.isLocal && <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}><ringGeometry args={[1.2, 1.5, 24]} /><meshBasicMaterial color={PALETTE.honey} /></mesh>}
+    <Billboard ref={health} position={[0, 5, 0]} renderOrder={10}>
+      <mesh><planeGeometry args={[3.1, 0.6]} /><meshBasicMaterial color={c.isLocal ? PALETTE.honey : PALETTE.cream} depthTest={false} depthWrite={false} toneMapped={false} fog={false} /></mesh>
+      <mesh position={[0, 0, 0.01]}><planeGeometry args={[2.8, 0.3]} /><meshBasicMaterial color={PALETTE.inkPurple} depthTest={false} depthWrite={false} toneMapped={false} fog={false} /></mesh>
+      <mesh ref={energyFill} position={[0, 0, 0.02]}><planeGeometry args={[2.8, 0.3]} /><meshBasicMaterial color={PALETTE.sage} depthTest={false} depthWrite={false} toneMapped={false} fog={false} /></mesh>
+    </Billboard>
   </group>;
 }
 
