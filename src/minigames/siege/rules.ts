@@ -303,6 +303,9 @@ function rollKind(s: SiegeState): number {
 export function spawnBig(s: SiegeState, p: SiegePlayer, type: BigId, sent: boolean, from: string | null): Big | null {
   const b = p.board, g = b.bigs.find((x) => !x.on);
   if (!g) return null;
+  // The last free slot is kept for the boss until it has been beaten, so a crowd of elites can delay
+  // later elites (they queue) but never the boss.
+  if (type !== 'baron' && !b.bossDown && b.bigs.reduce((n, x) => n + (x.on ? 0 : 1), 0) <= 1) return null;
   const d = BIGS[type];
   spawnPoint(s, p, spot);
   g.on = true; g.serial = ++b.serial; g.type = type; g.x = spot.x; g.z = spot.z;
@@ -644,13 +647,12 @@ function stepBoard(s: SiegeState, p: SiegePlayer, dt: number) {
   }
 
   // The run's schedule: one elite a minute, the boss at 4:00, and elites sent by rivals.
-  if (b.nextElite < ELITE_SCHEDULE.length && s.runT >= ELITE_SCHEDULE[b.nextElite].at) { spawnBig(s, p, ELITE_SCHEDULE[b.nextElite].elite, false, null); b.nextElite++; }
-  if (!b.bossUp && s.runT >= BOSS_AT) { b.bossUp = true; spawnBig(s, p, 'baron', false, null); }
+  if (b.nextElite < ELITE_SCHEDULE.length && s.runT >= ELITE_SCHEDULE[b.nextElite].at) { if (spawnBig(s, p, ELITE_SCHEDULE[b.nextElite].elite, false, null)) b.nextElite++; }
+  if (!b.bossUp && s.runT >= BOSS_AT) { if (spawnBig(s, p, 'baron', false, null)) b.bossUp = true; }
   for (let i = p.incoming.length - 1; i >= 0; i--) {
     const inc = p.incoming[i];
     if (s.runT < inc.at) continue;
-    p.incoming.splice(i, 1);
-    spawnBig(s, p, sentEliteFor(s.runT), true, inc.from);
+    if (spawnBig(s, p, sentEliteFor(s.runT), true, inc.from)) p.incoming.splice(i, 1); // full board: it waits
   }
 
   // The swarm grows.

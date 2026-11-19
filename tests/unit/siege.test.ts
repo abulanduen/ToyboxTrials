@@ -112,6 +112,30 @@ describe('Toybox Siege: the swarm and the schedule', () => {
     expect(boss.at).toBeLessThan(BOSS_AT + 2500);
   });
 
+  it('never loses the boss (or a scheduled elite) to a full elite pool', () => {
+    const s = started(['you', 'b1']);
+    const me = P(s, 'you');
+    immortal(me);
+    // Two sent elites already on the board, then the scheduled ones pile up.
+    me.incoming.push({ from: 'b1', at: 0 }, { from: 'b1', at: 0 });
+    run(s, 2 * STEP);
+    s.runT = 185000;
+    run(s, 2 * STEP);
+    const live = () => me.board.bigs.filter((g) => g.on);
+    expect(live().length).toBe(s.config.bigCap - 1); // one slot kept back for the boss
+    expect(me.board.nextElite).toBeLessThan(ELITE_SCHEDULE.length); // a later elite waits its turn
+    s.runT = BOSS_AT;
+    run(s, 2 * STEP);
+    expect(live().some((g) => g.type === 'baron')).toBe(true);
+    expect(me.board.bossUp).toBe(true);
+    // Once the boss is beaten, the queued elite arrives.
+    const queued = me.board.nextElite;
+    const baron = live().find((g) => g.type === 'baron')!;
+    baron.on = false; me.board.bossDown = true;
+    run(s, 2 * STEP);
+    expect(me.board.nextElite).toBe(queued + 1);
+  });
+
   it('a defeated elite drops a treasure chest; picking it up opens the treasure card', () => {
     const s = started(['you', 'b1']);
     const me = P(s, 'you');

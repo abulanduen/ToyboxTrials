@@ -107,7 +107,7 @@
   .siege-card { padding:8px; gap:6px; }
   .siege-card header strong { font-size:16px; }
   .siege-skill { width:112px; min-height:76px !important; }
-  .siege-spectate { bottom:max(110px,calc(env(safe-area-inset-bottom) + 110px)); }
+  .siege-spectate { bottom:calc(max(14px,env(safe-area-inset-bottom)) + 210px); } /* above the floating joystick */
 }
 /* phones: landscape (short) */
 @media (max-height:500px) {
