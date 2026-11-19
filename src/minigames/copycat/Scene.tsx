@@ -5,7 +5,7 @@
  */
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { RoundedBox } from '@react-three/drei';
+import { RoundedBox } from '../../scene/RoundedBox';
 import * as THREE from 'three';
 import { PALETTE, PAINT_JOBS } from '../../game/palette';
 import { sfx } from '../../game/audio';

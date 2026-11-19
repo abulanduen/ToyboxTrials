@@ -9,7 +9,7 @@
  */
 import { useMemo } from 'react';
 import * as THREE from 'three';
-import { RoundedBox } from '@react-three/drei';
+import { RoundedBox } from '../RoundedBox';
 import { PALETTE, ROOM } from '../../game/palette';
 import { woodTexture } from '../textures';
 import { BOOKS, MUG, TABLE } from '../layout';

@@ -4,7 +4,8 @@
  */
 import { useMemo } from 'react';
 import * as THREE from 'three';
-import { Instance, Instances, RoundedBox } from '@react-three/drei';
+import { Instance, Instances } from '@react-three/drei';
+import { RoundedBox } from './RoundedBox';
 import { PALETTE } from '../game/palette';
 import { woodTexture, feltTexture } from './textures';
 import { dominoGeometry, dominoRestY, type DominoSpec } from './domino';

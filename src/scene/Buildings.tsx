@@ -3,7 +3,7 @@
  */
 import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { RoundedBox } from '@react-three/drei';
+import { RoundedBox } from './RoundedBox';
 import * as THREE from 'three';
 import { PALETTE } from '../game/palette';
 import { useGame } from '../game/store';

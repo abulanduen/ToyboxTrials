@@ -10,7 +10,7 @@
  */
 import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { RoundedBox } from '@react-three/drei';
+import { RoundedBox } from '../scene/RoundedBox';
 import * as THREE from 'three';
 import { PALETTE, type PaintJob } from '../game/palette';
 import { ELIM_DURATION, INTERACT_DURATION, RESPAWN_DURATION, type ToyAnim } from './anim';
