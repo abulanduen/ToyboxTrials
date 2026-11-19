@@ -1,6 +1,7 @@
 /**
- * The table and the real-world things lying on it around the play mat: desk lamp, book stack,
- * mug, pencils, pencil pot, ruler, sticky notes, a little cactus and the lamp's cable.
+ * The two tables and the real-world things lying on them around the play mats: on the spawn table
+ * the desk lamp, book stack, mug, pencils, pencil pot, sticky notes, a little cactus and the lamp's
+ * cable; the gates table is a desk under the window with a drawer pedestal and a ruler.
  *
  * Unlike the rest of the room these are lit in real time (they sit in the sun patch next to the
  * toys and must take and cast the same shadows). Most stand on the table margin outside the play
@@ -11,14 +12,14 @@ import { useMemo } from 'react';
 import * as THREE from 'three';
 import { RoundedBox } from '../RoundedBox';
 import { PALETTE, ROOM } from '../../game/palette';
-import { woodTexture } from '../textures';
-import { BOOKS, MUG, TABLE } from '../layout';
+import { rulerTexture, woodTexture } from '../textures';
+import { BOOKS, DESK, MUG, TABLE, TABLE_B } from '../layout';
 import { camBlock } from '../../game/player';
 
 const mat = (color: string, rough = 0.9, metal = 0) => new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal });
 
 /** Desk lamp geometry: base on the back-left of the table, shade leaning over the village. */
-const LAMP_BASE = new THREE.Vector3(-62, 0, -54);
+const LAMP_BASE = new THREE.Vector3(DESK.lampBase.x, 0, DESK.lampBase.z);
 const LAMP_ELBOW = new THREE.Vector3(-54, 40, -60);
 export const LAMP_HEAD = new THREE.Vector3(-25, 27, -52);
 export const LAMP_AIM = new THREE.Vector3(-4, 0, -14);
@@ -40,36 +41,66 @@ function Beam({ a, b, r, material }: { a: THREE.Vector3; b: THREE.Vector3; r: nu
   );
 }
 
-/** Wooden 30 cm ruler face: centimetre ticks, so the toys' scale is spelled out. */
-function rulerTexture() {
-  const c = document.createElement('canvas');
-  c.width = 1024;
-  c.height = 96;
-  const g = c.getContext('2d')!;
-  g.fillStyle = '#E9CF9A';
-  g.fillRect(0, 0, 1024, 96);
-  g.fillStyle = 'rgba(120,80,40,0.10)';
-  for (let i = 0; i < 40; i++) g.fillRect(0, (i * 37) % 96, 1024, 1);
-  g.fillStyle = PALETTE.ink;
-  g.font = '700 26px Nunito, "Trebuchet MS", sans-serif';
-  g.textAlign = 'center';
-  const cm = 1024 / 31;
-  for (let i = 0; i <= 300; i++) {
-    const x = cm * 0.5 + (i / 10) * cm;
-    const major = i % 10 === 0;
-    g.fillRect(x - (major ? 1.5 : 0.75), 0, major ? 3 : 1.5, major ? 34 : i % 5 === 0 ? 24 : 14);
-    if (major && i > 0 && i < 300) g.fillText(String(i / 10), x, 66);
-  }
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 8;
-  return t;
+type Tb = { minX: number; maxX: number; minZ: number; maxZ: number; thickness: number; legHeight: number };
+
+/** A table: rounded top, apron and legs; `pedestal` puts a chest of drawers under its east end instead of the east legs. */
+function TableBody({ tb, top, edge, pedestal }: { tb: Tb; top: THREE.Material; edge: THREE.Material; pedestal?: { w: number; knob: THREE.Material } }) {
+  const w = tb.maxX - tb.minX;
+  const d = tb.maxZ - tb.minZ;
+  const cx = (tb.maxX + tb.minX) / 2;
+  const cz = (tb.maxZ + tb.minZ) / 2;
+  const legs = [
+    [tb.minX + 6, tb.minZ + 6],
+    [tb.minX + 6, tb.maxZ - 6],
+    ...(pedestal
+      ? []
+      : [
+          [tb.maxX - 6, tb.minZ + 6],
+          [tb.maxX - 6, tb.maxZ - 6],
+        ]),
+  ];
+  const ph = tb.legHeight; // pedestal height: floor to the underside of the top
+  return (
+    <group>
+      <RoundedBox args={[w, tb.thickness, d]} radius={0.8} smoothness={2} position={[cx, -tb.thickness / 2, cz]} receiveShadow castShadow material={top} />
+      {/* apron */}
+      <mesh position={[cx, -tb.thickness - 4, cz]} material={edge}>
+        <boxGeometry args={[w - 10, 8, d - 10]} />
+      </mesh>
+      {legs.map(([x, z]) => (
+        <mesh key={`${x}${z}`} position={[x, -tb.thickness - tb.legHeight / 2, z]} material={edge}>
+          <boxGeometry args={[6, tb.legHeight, 6]} />
+        </mesh>
+      ))}
+      {pedestal && (
+        <group position={[tb.maxX - 2 - pedestal.w / 2, -tb.thickness - ph / 2, cz]}>
+          <mesh material={edge}>
+            <boxGeometry args={[pedestal.w, ph, d - 4]} />
+          </mesh>
+          {/* three drawers on the side facing the room, each with a knob */}
+          {[0, 1, 2].map((i) => (
+            <group key={i} position={[0, ph / 2 - 4 - (i + 0.5) * ((ph - 8) / 3), (d - 4) / 2]}>
+              <mesh position={[0, 0, 0.6]} material={top}>
+                <boxGeometry args={[pedestal.w - 3, (ph - 8) / 3 - 1.6, 1.2]} />
+              </mesh>
+              <mesh position={[0, 0, 1.9]} material={pedestal.knob}>
+                <sphereGeometry args={[1.4, 12, 8]} />
+              </mesh>
+            </group>
+          ))}
+        </group>
+      )}
+    </group>
+  );
 }
 
 export function Tabletop({ detail }: { detail: boolean }) {
   const m = useMemo<Mats>(
     () => ({
       table: new THREE.MeshStandardMaterial({ map: woodTexture('#C08A55', [2, 1.4], 7), roughness: 0.62 }),
+      desk: new THREE.MeshStandardMaterial({ map: woodTexture('#D2A574', [2.6, 1.1], 23), roughness: 0.62 }),
+      deskEdge: mat('#A87A4C', 0.7),
+      knob: mat(PALETTE.brass, 0.4, 0.6),
       tableEdge: mat('#9A6A3E', 0.7),
       lamp: mat('#D99A3C', 0.35, 0.6),
       lampInner: new THREE.MeshStandardMaterial({ color: '#FFF4D6', emissive: '#FFD58A', emissiveIntensity: 1.6 }),
@@ -87,7 +118,7 @@ export function Tabletop({ detail }: { detail: boolean }) {
       potInside: mat(PALETTE.inkPurple, 0.9),
       pencilRed: mat(PALETTE.coral, 0.5),
       pencilGreen: mat(PALETTE.sage, 0.5),
-      ruler: new THREE.MeshStandardMaterial({ map: rulerTexture(), roughness: 0.6 }),
+      ruler: new THREE.MeshStandardMaterial({ map: rulerTexture(30), roughness: 0.6 }),
       rulerSide: mat('#D9B77C', 0.7),
       notes: mat(PALETTE.honey, 0.9),
       notesSide: mat('#E3A23C', 0.9),
@@ -122,31 +153,11 @@ export function Tabletop({ detail }: { detail: boolean }) {
     return new THREE.TubeGeometry(curve, 40, 0.38, 6);
   }, []);
 
-  const tableW = TABLE.maxX - TABLE.minX;
-  const tableD = TABLE.maxZ - TABLE.minZ;
-  const tableCX = (TABLE.maxX + TABLE.minX) / 2;
-  const tableCZ = (TABLE.maxZ + TABLE.minZ) / 2;
-
   return (
     <group>
-      {/* ---------------- table ---------------- */}
-      <group>
-        <RoundedBox args={[tableW, TABLE.thickness, tableD]} radius={0.8} smoothness={2} position={[tableCX, -TABLE.thickness / 2, tableCZ]} receiveShadow castShadow material={m.table} />
-        {/* apron */}
-        <mesh position={[tableCX, -TABLE.thickness - 4, tableCZ]} material={m.tableEdge}>
-          <boxGeometry args={[tableW - 10, 8, tableD - 10]} />
-        </mesh>
-        {[
-          [TABLE.minX + 6, TABLE.minZ + 6],
-          [TABLE.maxX - 6, TABLE.minZ + 6],
-          [TABLE.minX + 6, TABLE.maxZ - 6],
-          [TABLE.maxX - 6, TABLE.maxZ - 6],
-        ].map(([x, z]) => (
-          <mesh key={`${x}${z}`} position={[x, -TABLE.thickness - TABLE.legHeight / 2, z]} material={m.tableEdge}>
-            <boxGeometry args={[6, TABLE.legHeight, 6]} />
-          </mesh>
-        ))}
-      </group>
+      {/* ---------------- the spawn table and the desk under the window ---------------- */}
+      <TableBody tb={TABLE} top={m.table} edge={m.tableEdge} />
+      <TableBody tb={TABLE_B} top={m.desk} edge={m.deskEdge} pedestal={{ w: 36, knob: m.knob }} />
 
       {/* ---------------- desk lamp (towering lighthouse) ---------------- */}
       <group>
@@ -204,12 +215,12 @@ export function Tabletop({ detail }: { detail: boolean }) {
       </group>
 
       {/* ---------------- spare pencil by the table edge ---------------- */}
-      <group position={[46, 0.75, 38]} rotation={[0, -0.6, Math.PI / 2]}>
+      <group position={[DESK.sparePencil.x, 0.75, DESK.sparePencil.z]} rotation={[0, DESK.sparePencil.rot, Math.PI / 2]}>
         <Pencil m={m} length={17} />
       </group>
 
       {/* ---------------- pencil pot (left margin) ---------------- */}
-      <group position={[-63, 0, 17]}>
+      <group position={[DESK.pencilPot.x, 0, DESK.pencilPot.z]}>
         <mesh position={[0, 5.2, 0]} castShadow receiveShadow material={m.pot}>
           <cylinderGeometry args={[4.4, 4, 10.4, 24]} />
         </mesh>
@@ -229,8 +240,8 @@ export function Tabletop({ detail }: { detail: boolean }) {
         ))}
       </group>
 
-      {/* ---------------- 30 cm ruler along the back edge ---------------- */}
-      <group position={[14, 0.16, -51]} rotation={[0, 0.07, 0]}>
+      {/* ---------------- 30 cm ruler on the desk's front edge (two longer ones are the bridge's rails) ---------------- */}
+      <group position={[-40, 0.16, TABLE_B.maxZ - 2.2]} rotation={[0, 0.03, 0]}>
         {/* one box, the printed face is its +y side: no decal plane to z-fight */}
         <mesh castShadow receiveShadow material={[m.rulerSide, m.rulerSide, m.ruler, m.rulerSide, m.rulerSide, m.rulerSide]}>
           <boxGeometry args={[31, 0.32, 3.4]} />
@@ -240,13 +251,13 @@ export function Tabletop({ detail }: { detail: boolean }) {
       {detail && (
         <>
           {/* sticky notes */}
-          <group position={[64, 0.6, 33]} rotation={[0, 0.35, 0]}>
+          <group position={[DESK.notes.x, 0.6, DESK.notes.z]} rotation={[0, DESK.notes.rot, 0]}>
             <mesh castShadow receiveShadow material={[m.notesSide, m.notesSide, m.notes, m.notesSide, m.notesSide, m.notesSide]}>
               <boxGeometry args={[7.6, 1.2, 7.6]} />
             </mesh>
           </group>
           {/* a little cactus */}
-          <group position={[68, 0, -10]}>
+          <group position={[DESK.cactus.x, 0, DESK.cactus.z]}>
             <mesh position={[0, 2.6, 0]} castShadow receiveShadow material={m.terracotta}>
               <cylinderGeometry args={[3.6, 2.8, 5.2, 16]} />
             </mesh>

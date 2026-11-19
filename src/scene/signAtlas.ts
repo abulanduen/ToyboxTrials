@@ -3,7 +3,7 @@
  * every fingerpost board, the letter blocks and the sheet music. Sharing it lets all of them
  * merge into a couple of draw calls.
  *
- * Layout (1024 × 2048): "board" cells are 512 × 128, two per row; "small" cells are 128 × 128,
+ * Layout (1024 × 3072): "board" cells are 512 × 128, two per row; "small" cells are 128 × 128,
  * eight per row, in the last two rows. The layout maths is pure (unit-testable); `signAtlasTexture`
  * draws it in the browser.
  */
@@ -11,13 +11,13 @@ import * as THREE from 'three';
 import { PALETTE } from '../game/palette';
 
 export const ATLAS_W = 1024;
-export const ATLAS_H = 2048;
+export const ATLAS_H = 3072;
 const BOARD_W = 512;
 const BOARD_H = 128;
 const SMALL = 128;
-/** Board cells fill rows 0–13; small cells start at row 14. */
-export const MAX_BOARDS = 28;
-const SMALL_Y0 = 14 * BOARD_H;
+/** Board cells fill rows 0–21; small cells start at row 22. */
+export const MAX_BOARDS = 44;
+const SMALL_Y0 = 22 * BOARD_H;
 
 export type UvRect = readonly [number, number, number, number];
 

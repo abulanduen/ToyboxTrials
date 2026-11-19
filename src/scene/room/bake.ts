@@ -14,7 +14,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { ROOM } from '../../game/palette';
-import { FLOOR_Y, TABLE } from '../layout';
+import { FLOOR_Y, TABLE, TABLES, TABLES_BOX } from '../layout';
 
 /** Room shell extents (cm). Table top is y = 0, so the floor is at FLOOR_Y (negative). */
 export const SHELL = { minX: -250, maxX: 300, minZ: -185, maxZ: 260, floorY: FLOOR_Y, ceilY: 185 };
@@ -43,6 +43,35 @@ export const WINDOW = {
  * back window and raking across the table toward the camera's usual side).
  */
 export const SUN_DIR = new THREE.Vector3(-0.184, -0.515, 0.837).normalize();
+
+/**
+ * Fixed sun + shadow frustum for the real-time sun (PlayroomScene). The light shines along SUN_DIR
+ * (through the window in the back wall); its orthographic shadow camera is fitted once to both
+ * table tops (the spawn table, the gates table and the bridge between them) and everything up to
+ * 50 cm above them, so shadow texels never move and nothing swims as the player walks. The window
+ * wall lies inside the same frustum (further up the rays), so it shapes the sun patch for real.
+ * Returns the light's position and target and the shadow camera's left/right/bottom/top/near/far.
+ */
+export function sunRig() {
+  const T = TABLES_BOX;
+  const target = new THREE.Vector3((T.minX + T.maxX) / 2, 0, (T.minZ + T.maxZ) / 2);
+  const position = target.clone().addScaledVector(SUN_DIR, -330);
+  const view = new THREE.Matrix4().lookAt(position, target, new THREE.Vector3(0, 1, 0)).setPosition(position).invert();
+  const box = { l: Infinity, r: -Infinity, b: Infinity, t: -Infinity, far: 0 };
+  const p = new THREE.Vector3();
+  for (const tb of TABLES)
+    for (const x of [tb.minX - 2, tb.maxX + 2])
+      for (const z of [tb.minZ - 2, tb.maxZ + 2])
+        for (const y of [-TABLE.thickness, 50]) {
+          p.set(x, y, z).applyMatrix4(view);
+          box.l = Math.min(box.l, p.x);
+          box.r = Math.max(box.r, p.x);
+          box.b = Math.min(box.b, p.y);
+          box.t = Math.max(box.t, p.y);
+          box.far = Math.max(box.far, -p.z);
+        }
+  return { target, position, view, ...box, near: 40, far: box.far + 4 };
+}
 
 /** Where a sun ray through window point (wx, wy) lands on the horizontal plane `y`. */
 export function sunHit(wx: number, wy: number, y = 0, zWall = WINDOW.zIn) {
@@ -85,12 +114,12 @@ export function sunVisibility(px: number, py: number, pz: number) {
     vis *= smooth(0, soft, sx - WINDOW.x0) * smooth(0, soft, WINDOW.x1 - sx) * smooth(0, soft, sy - WINDOW.y0) * smooth(0, soft, WINDOW.y1 - sy);
     if (vis <= 0) return 0;
   }
-  // Below the table top: the table itself is in the way.
+  // Below the table tops: the tables themselves are in the way.
   if (py < -0.5) {
     const t = py / d.y;
     const x = px - d.x * t;
     const z = pz - d.z * t;
-    if (x > TABLE.minX && x < TABLE.maxX && z > TABLE.minZ && z < TABLE.maxZ) return 0;
+    for (const tb of TABLES) if (x > tb.minX && x < tb.maxX && z > tb.minZ && z < tb.maxZ) return 0;
   }
   return vis;
 }
@@ -170,10 +199,11 @@ export function irradiance(px: number, py: number, pz: number, nx: number, ny: n
     const dist = p.d(px, py, pz);
     ao *= 0.66 + 0.34 * smooth(0, p.r, dist);
   }
-  // under the table it is dim
+  // under the tables it is dim
   if (py < -TABLE.thickness) {
     const m = 26;
-    const inside = smooth(TABLE.minX - m, TABLE.minX + m, px) * smooth(TABLE.maxX + m, TABLE.maxX - m, px) * smooth(TABLE.minZ - m, TABLE.minZ + m, pz) * smooth(TABLE.maxZ + m, TABLE.maxZ - m, pz);
+    let inside = 0;
+    for (const tb of TABLES) inside = Math.max(inside, smooth(tb.minX - m, tb.minX + m, px) * smooth(tb.maxX + m, tb.maxX - m, px) * smooth(tb.minZ - m, tb.minZ + m, pz) * smooth(tb.maxZ + m, tb.maxZ - m, pz));
     ao *= 1 - 0.45 * inside * smooth(-TABLE.thickness - 80, -TABLE.thickness, py);
   }
   ao = Math.max(ao, 0.42);

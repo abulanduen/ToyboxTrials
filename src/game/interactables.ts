@@ -34,7 +34,7 @@ export const keyAvailable = () => performance.now() > keyCooldownUntil;
 export const INTERACTABLES: Interactable[] = [
   // one gate per playable trial: E / Interact opens that trial's lobby (the practice intro card)
   ...GATES.map((g) => ({ id: g.id, ...frontOf(g.x, g.z, g.rot, GATE_STAND), radius: 4.5, verb: 'Play', label: g.title })),
-  { id: 'pavilion', ...frontOf(PAVILION.x, PAVILION.z, 0, PAVILION.d / 2 + 3), radius: 4.5, verb: 'Enter', label: 'the Tournament Pavilion' },
+  { id: 'pavilion', ...frontOf(PAVILION.x, PAVILION.z, PAVILION.rot, PAVILION.d / 2 + 3), radius: 4.5, verb: 'Enter', label: 'the Tournament Pavilion' },
   { id: 'workshop', ...frontOf(WORKSHOP.x, WORKSHOP.z, WORKSHOP.rot, WORKSHOP.d / 2 + 2.5), radius: 5, verb: 'Tinker at', label: 'the Workshop' },
   { id: 'shop', ...frontOf(SHOP.x, SHOP.z, SHOP.rot, SHOP.d / 2 + 6), radius: 5, verb: 'Browse', label: 'Odds & Ends Shop' },
   { id: 'scoreboard', ...frontOf(SCOREBOARD.x, SCOREBOARD.z, SCOREBOARD.rot, 3.5), radius: 5, verb: 'Read', label: 'the Scoreboard' },

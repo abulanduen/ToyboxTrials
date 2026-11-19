@@ -6,7 +6,7 @@ try{for(const quality of (process.env.ART_QUALITIES||'balanced,high').split(',')
 await page.addInitScript(quality=>localStorage.setItem('toybox-trials:prototype:v1',JSON.stringify({state:{quality},version:0})),quality);
 const effects=()=>page.evaluate(()=>window.__toybox.postprocessing.state());
 await page.goto((process.env.BASE_URL||'http://localhost:4173/')+'?debug#play');await page.waitForSelector('.loading',{state:'detached'});await page.waitForFunction(()=>window.__toybox.postprocessing?.state().focusBlurMounted);assert.equal((await effects()).focusBlur,true);
-await page.evaluate(()=>window.__toybox.teleport(0,-12.6,Math.PI));await page.waitForSelector('.prompt');await page.keyboard.press('KeyE');await page.getByTestId('practice-spellbox-showdown').click();await page.waitForTimeout(800);await page.getByTestId('match-start').click();await page.waitForFunction(()=>window.__toybox.match.phase()==='playing');await page.evaluate(()=>window.__toybox.match.timeScale(0));
+await page.evaluate(()=>window.__toybox.hub.goTo('pavilion'));await page.waitForSelector('.prompt');await page.keyboard.press('KeyE');await page.getByTestId('practice-spellbox-showdown').click();await page.waitForTimeout(800);await page.getByTestId('match-start').click();await page.waitForFunction(()=>window.__toybox.match.phase()==='playing');await page.evaluate(()=>window.__toybox.match.timeScale(0));
 assert.equal((await effects()).focusBlur,false);assert.equal((await effects()).focusBlurMounted,false);
 await page.waitForFunction(()=>Array.from(document.querySelectorAll('.spellbox-icon')).every(img=>img.complete&&img.naturalWidth===512));
 await page.screenshot({path:path.join(out,`spellbox-${quality}-icon-draft.png`)});

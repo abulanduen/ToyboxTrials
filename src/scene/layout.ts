@@ -2,61 +2,146 @@
  * Hub layout — single source of truth for where things are and how they collide.
  * 1 unit = 1 cm. Table top is y = 0. The toy is ~3.5 tall.
  * Visual components read these numbers; `registerHubColliders()` turns them into collision.
+ *
+ * The hub spans two tables of the same height: the spawn table (fountain plaza, Scoreboard and
+ * its TV, Pavilion, Workshop, shop, the secrets) and, across a 26 cm gap, the gates table (a desk
+ * under the window) with every trial gate. A domino bridge joins them. Where you can walk is the
+ * union of rectangles in src/game/hubBounds.ts, shared with the online server.
  */
 import { addStatic, resetStatic, type Collider } from '../game/collision';
+import { BRIDGE_WALK, BRIDGE_X, GATES_WALK, HUB_WALK, WALK_AREAS } from '../game/hubBounds';
 import { PALETTE } from '../game/palette';
 import { MINIGAMES } from '../minigames/registry';
 import type { MinigameId } from '../minigames/types';
 import { DOMINO } from './domino';
 
+export { BRIDGE_WALK, GATES_WALK, HUB_WALK, WALK_AREAS };
+
+/** The spawn table. */
 export const TABLE = { minX: -80, maxX: 80, minZ: -60, maxZ: 46, thickness: 3.5, legHeight: 72 };
 export const FLOOR_Y = -(TABLE.thickness + TABLE.legHeight);
+/**
+ * The gates table: a desk under the window, the same height as the spawn table. A 26 cm gap
+ * separates the two; the domino bridge spans it.
+ */
+export const TABLE_B = { minX: -76, maxX: 130, minZ: -172, maxZ: -86, thickness: TABLE.thickness, legHeight: TABLE.legHeight };
+export const TABLES = [TABLE, TABLE_B] as const;
+/** Bounding box of both table tops (shadow frustum, room lighting). */
+export const TABLES_BOX = {
+  minX: Math.min(TABLE.minX, TABLE_B.minX),
+  maxX: Math.max(TABLE.maxX, TABLE_B.maxX),
+  minZ: Math.min(TABLE.minZ, TABLE_B.minZ),
+  maxZ: Math.max(TABLE.maxZ, TABLE_B.maxZ),
+};
+
+// ------------------------------------------------------------------ spawn table
 
 export const FOUNTAIN = { x: 0, z: -1, r: 5.2, top: 1.4 };
-export const PAVILION = { x: 0, z: -21, w: 14, d: 10, h: 7.5 };
-export const WORKSHOP = { x: -26, z: -9, rot: 0.32, w: 15, d: 7.5, h: 6 };
-export const SHOP = { x: -30, z: 11, rot: Math.PI / 2 - 0.25, w: 11, d: 6.5, h: 8.5 };
+/** Tournament Pavilion: the east side of the plaza, its door facing the fountain. */
+export const PAVILION = { x: 34, z: -10, rot: Math.atan2(0 - 34, -1 - -10), w: 14, d: 10, h: 7.5 };
+export const WORKSHOP = { x: -36, z: -6, rot: 0.45, w: 15, d: 7.5, h: 6 };
+export const SHOP = { x: -44, z: 12, rot: Math.PI / 2 - 0.25, w: 11, d: 6.5, h: 8.5 };
 /**
- * Scoreboard: a card in a frame of dominoes. The dominoes keep their real 1 : 2 face and are
- * scaled uniformly (`s`); the frame is three dominoes wide and two-and-a-bit tall.
+ * Scoreboard (the leaderboard): the centrepiece behind the fountain, facing spawn. A card in a
+ * frame of dominoes that keep their real 1 : 2 face, scaled uniformly (`s`); the frame is three
+ * dominoes wide and two-and-a-bit tall.
  */
-export const SCOREBOARD_DOMINO = 1.15;
+export const SCOREBOARD_DOMINO = 1.3;
 export const SCOREBOARD = {
-  x: 31,
-  z: 7,
-  rot: Math.atan2(-31, -7),
+  x: 0,
+  z: -19,
+  rot: 0,
   s: SCOREBOARD_DOMINO,
   w: 3 * DOMINO.h * SCOREBOARD_DOMINO,
   h: (2 * DOMINO.h + DOMINO.w) * SCOREBOARD_DOMINO,
 };
+/** The little retro TV beside the Scoreboard (who is online, friends playing, the shop, records). */
+export const TV = { x: -15.5, z: -16.5, rot: 0.3, w: 9, d: 6, h: 8.4 };
 export const TRACK = { x: 19, z: 21.5, rx: 11, rz: 6.5 };
 export const MUSICBOX = { x: 11, z: -27.5 };
 export const JACK = { x: -35, z: -22 };
-/** Wooden fingerpost near spawn pointing at every destination. */
-export const FINGERPOST = { x: -5.5, z: 14, h: 14.6 };
 
 /**
- * Minigame gates: one building-block arch per playable trial, facing the fountain. Most stand on
- * the Trials Ring around the village and the ring road passes a few centimetres in front of each;
- * interacting at a gate opens that trial's lobby (the shared practice intro card).
+ * Signposts: wooden fingerposts with an arrow board per destination (labels and colours in
+ * gateDecor.ts `signposts()`): one by spawn, one at each end of the domino bridge.
+ */
+export const FINGERPOST = { x: -5.5, z: 14, h: 9.8 };
+export const SIGNPOSTS = {
+  spawn: FINGERPOST,
+  'bridge-hub': { x: 31.5, z: -40.5, h: 5.3 },
+  gates: { x: 15.5, z: -114, h: 8.3 },
+} as const;
+export type SignpostId = keyof typeof SIGNPOSTS;
+
+// ------------------------------------------------------------------ the domino bridge
+
+/**
+ * The bridge between the tables, along x = BRIDGE_X (hubBounds.ts). Two rulers lie flat across the
+ * gap as beams; on them a deck of dominoes lying face up, each turned across the walkway (scaled
+ * evenly, `s`, so they keep their 1 : 2 face); a domino ramp at each end; and a long ruler on edge
+ * along each side as a rail, resting on both table tops. North (−z) is the gates table.
+ */
+const DECK_N = 12;
+const DECK_S = 1.6;
+const DECK_PITCH = DOMINO.w * DECK_S + 0.04;
+const DECK_MID = (TABLE.minZ + TABLE_B.maxZ) / 2;
+const DECK_TOP = 0.32 + DOMINO.t * DECK_S;
+export const BRIDGE = {
+  x: BRIDGE_X,
+  /** Domino scale for the deck and ramps. */
+  s: DECK_S,
+  planks: DECK_N,
+  pitch: DECK_PITCH,
+  /** Deck span: z of its spawn-table end (A) and its gates-table end (B). */
+  deckA: DECK_MID + (DECK_N * DECK_PITCH) / 2,
+  deckB: DECK_MID - (DECK_N * DECK_PITCH) / 2,
+  /** Beam (a ruler lying flat) thickness; the deck rests on the beams. */
+  beamT: 0.32,
+  /** Top of the deck (what you walk on). */
+  top: DECK_TOP,
+  /** Half width of the deck (dominoes lying across, so their long side). */
+  halfW: (DOMINO.h * DECK_S) / 2,
+  /** Horizontal run of each end ramp: a domino lying lengthwise, its top end resting on the deck. */
+  ramp: Math.sqrt((DOMINO.h * DECK_S) ** 2 - DECK_TOP ** 2),
+  /** Rails: rulers on edge standing on both table tops just outside the deck. */
+  rail: { len: 61, h: 3.4, t: 0.32, z: DECK_MID },
+};
+/** The rails' centre x offset from the bridge's centre line. */
+export const BRIDGE_RAIL_X = BRIDGE.halfW + BRIDGE.rail.t / 2 + 0.02;
+/** Number of collider steps per ramp (each rise is well under the step height). */
+const RAMP_STEPS = 4;
+
+// ------------------------------------------------------------------ gates table
+
+/**
+ * Minigame gates: one building-block arch per playable trial, all on the gates table. Five stand
+ * along its north side facing south (Copycat in the middle, straight ahead off the bridge), four
+ * along its south side facing north, either side of the bridge landing, and one at each end
+ * facing in. A loop road passes GATE_ROAD in front of every arch; interacting at a gate opens that
+ * trial's lobby (the shared practice intro card).
  * Positions are data: add a playable game to the registry and give it a spot here.
  */
-type District = 'north-west' | 'north-east' | 'east' | 'west';
-const GATE_SPOTS: Record<MinigameId, { x: number; z: number; spoke: boolean; district: District; short: string }> = {
-  // north arc, west → east
-  'jack-in-the-box': { x: -38, z: -30, spoke: true, district: 'north-west', short: 'Jack' },
-  'toy-squad': { x: -23, z: -36, spoke: true, district: 'north-west', short: 'Toy Squad' },
-  'midnight-hunger': { x: 0, z: -38.5, spoke: false, district: 'north-west', short: 'Midnight' }, // tucked in the Pavilion's shadow
-  'copycat-conductor': { x: 21.5, z: -36.5, spoke: true, district: 'north-east', short: 'Copycat' },
-  'music-box-rhythm': { x: 35, z: -25.5, spoke: true, district: 'north-east', short: 'Music Box' },
-  // east side
-  'wind-up-dash': { x: 41.5, z: -9, spoke: true, district: 'east', short: 'Dash' },
-  'blink-duel': { x: 22, z: -16, spoke: true, district: 'north-east', short: 'Blink Duel' }, // inside the ring, in plain sight of the plaza
-  'red-light-green-light': { x: 39, z: 25, spoke: false, district: 'east', short: 'Red Light' }, // beside the toy railway
-  // west side
-  'inferno-escape': { x: -43.5, z: -13, spoke: false, district: 'west', short: 'Inferno' }, // behind the Workshop
-  'find-the-original': { x: -43.5, z: 5, spoke: true, district: 'west', short: 'Find the Original' },
-  'spellbox-showdown': { x: -41, z: 26, spoke: false, district: 'west', short: 'Spellbox' },
+type District = 'west' | 'centre' | 'east';
+const N_ROW = -148;
+const S_ROW = -104;
+const END_W = -61;
+const END_E = 115;
+const END_Z = -126;
+const GATE_SPOTS: Record<MinigameId, { x: number; z: number; rot: number; district: District; short: string }> = {
+  // north row, facing south (towards the bridge and the spawn table)
+  'toy-squad': { x: -50, z: N_ROW, rot: 0, district: 'west', short: 'Toy Squad' },
+  'jack-in-the-box': { x: -14, z: N_ROW, rot: 0, district: 'west', short: 'Jack' },
+  'copycat-conductor': { x: BRIDGE_X, z: N_ROW, rot: 0, district: 'centre', short: 'Copycat' },
+  'music-box-rhythm': { x: 60, z: N_ROW, rot: 0, district: 'east', short: 'Music Box' },
+  'wind-up-dash': { x: 96, z: N_ROW, rot: 0, district: 'east', short: 'Dash' },
+  // south row, facing north, either side of the bridge landing
+  'find-the-original': { x: -54, z: S_ROW, rot: Math.PI, district: 'west', short: 'Find the Original' },
+  'midnight-hunger': { x: -20, z: S_ROW, rot: Math.PI, district: 'west', short: 'Midnight' },
+  'blink-duel': { x: 68, z: S_ROW, rot: Math.PI, district: 'east', short: 'Blink Duel' },
+  'red-light-green-light': { x: 102, z: S_ROW, rot: Math.PI, district: 'east', short: 'Red Light' },
+  // the two ends, facing in
+  'inferno-escape': { x: END_W, z: END_Z, rot: Math.PI / 2, district: 'west', short: 'Inferno' },
+  'spellbox-showdown': { x: END_E, z: END_Z, rot: -Math.PI / 2, district: 'east', short: 'Spellbox' },
 };
 
 const CATEGORY_LABEL: Record<string, string> = { pvp: 'Versus' };
@@ -66,17 +151,15 @@ export interface HubGate {
   id: string;
   game: MinigameId;
   title: string;
-  /** Short name for the fingerpost. */
+  /** Short name for the signposts. */
   short: string;
   /** Short line under the title on the gate's name board. */
   sub: string;
   x: number;
   z: number;
-  /** Faces the fountain; local +z is the gate's front. */
+  /** Local +z is the gate's front; it faces the loop road. */
   rot: number;
   color: string;
-  /** Has its own street straight from the fountain plaza (the others are reached along the ring road). */
-  spoke: boolean;
   district: District;
 }
 
@@ -92,24 +175,24 @@ export const GATES: HubGate[] = MINIGAMES.filter((g) => g.status === 'playable' 
     sub: `${cat} · ${players} players`,
     x: p.x,
     z: p.z,
-    rot: Math.atan2(FOUNTAIN.x - p.x, FOUNTAIN.z - p.z),
+    rot: p.rot,
     color: g.accent,
-    spoke: p.spoke,
     district: p.district,
   };
 });
-/** The fingerpost's trial boards: one per district, west → east. */
+/** The gates signpost's trial boards: one per wing. */
 export const GATE_DISTRICTS: { id: District; label: string }[] = [
-  { id: 'west', label: 'West trials' },
-  { id: 'north-west', label: 'North-west trials' },
-  { id: 'north-east', label: 'North-east trials' },
-  { id: 'east', label: 'East trials' },
+  { id: 'west', label: 'West wing' },
+  { id: 'centre', label: 'Straight on' },
+  { id: 'east', label: 'East wing' },
 ];
 export const gateFor = (game: MinigameId) => GATES.find((g) => g.game === game);
 export const GATE = { width: 9, pillar: 2.6, height: 8.5, depth: 3 };
-/** Where the player stands to use a gate, and where the ring road passes (cm in front of the arch). */
+/** Where the player stands to use a gate, and where the loop road passes (cm in front of the arch). */
 export const GATE_STAND = 2.2;
 export const GATE_ROAD = 5.5;
+/** The loop road on the gates table: its north and south lanes (z) and its west and east ends (x). */
+export const GATE_LOOP = { north: N_ROW + GATE_ROAD, south: S_ROW - GATE_ROAD, west: END_W + GATE_ROAD, east: END_E - GATE_ROAD, z: END_Z };
 /**
  * Themed props beside every gate (see `gateDecor.ts`), in gate-local centimetres: a tall "hero"
  * piece on the gate's left and a low cluster on its right. Both are solid.
@@ -119,7 +202,9 @@ export const GATE_DECOR = {
   side: { lx: 6.8, lz: -0.3, r: 1.8, top: 3.2 },
 };
 
-/** Big household objects on the table that reach into the play area. */
+// ------------------------------------------------------------------ household objects and props
+
+/** Big household objects on the spawn table that reach into the play area. */
 export const BOOKS = { x: 56, z: -36, hx: 15.6, hz: 11.6, top: 15.6 };
 export const MUG = { x: 57, z: 14, r: 4.7, top: 11, handleX: -6.2, handleR: 2.2 };
 
@@ -133,18 +218,39 @@ export const TOWER = {
 
 export const PENCIL = { x: -6, z: 28.5, rot: 0.18, length: 18, r: 0.75 };
 
+/**
+ * Real things lying on the spawn table's margin, outside the play mat (Tabletop.tsx draws them;
+ * the domino fence parts round them). Footprint radii in cm.
+ */
+export const DESK = {
+  lampBase: { x: -62, z: -54, r: 11 },
+  pencilPot: { x: -74, z: 17, r: 4.4 },
+  cactus: { x: 75, z: -12, r: 3.6 },
+  notes: { x: 74.5, z: 41, rot: 0.35, r: 5.4 },
+  sparePencil: { x: 40, z: 43.2, rot: -0.1 },
+};
+
 export const TREES: [number, number, number][] = [
-  // x, z, scale — kept off the streets, the ring road and the gates' props
-  [-17, -20.5, 1.1],
-  [-30.5, -1.4, 0.9],
-  [-17, 6, 0.9],
-  [13.5, -15.5, 0.8],
+  // x, z, scale — kept off the streets, the loop road and the gates' props
+  // spawn table: a few round the edges, so the plaza stays open
+  [-20, -30, 1.1],
+  [-52, -34, 1.0],
+  [-57, -12, 0.9],
+  [-58, 29, 0.9],
+  [-6, -32, 0.8],
+  [32, -29, 0.9],
+  [47, 5, 1.0],
   [22, 12, 1.1],
-  [-23, 30.6, 0.9],
   [27, 31.5, 0.8], // kept clear of the menu / Workshop camera paths near spawn
-  [29.5, -3.5, 0.9],
-  [-10, -28.6, 0.8],
-  [5.5, -29, 0.7],
+  [-40, 31, 0.8],
+  // gates table: the green inside the loop road, and its corners
+  [-36, -126, 1.0],
+  [-4, -130, 0.9],
+  [52, -130, 0.9],
+  [84, -124, 1.0],
+  [-61, -157, 0.9],
+  [116, -157, 0.9],
+  [116, -98, 0.8],
 ];
 
 export const BLOCKS: { x: number; z: number; y: number; rot: number; color: string; s?: number }[] = [
@@ -156,6 +262,10 @@ export const BLOCKS: { x: number; z: number; y: number; rot: number; color: stri
   { x: -18.4, z: 30.8, y: 0, rot: 0.1, color: PALETTE.honey },
   { x: 8.5, z: 10.5, y: 0, rot: 0.7, color: PALETTE.inkPurple, s: 0.8 },
   { x: -8, z: 12, y: 0, rot: 0.3, color: PALETTE.toyBlue, s: 0.8 },
+  // gates table, behind the north row
+  { x: 41, z: -157, y: 0, rot: 0.3, color: PALETTE.coral },
+  { x: -32, z: -157, y: 0, rot: -0.2, color: PALETTE.toyBlue },
+  { x: -32, z: -157, y: 3, rot: 0.4, color: PALETTE.honey, s: 0.8 },
 ];
 export const BLOCK_SIZE = 3;
 
@@ -166,19 +276,34 @@ export function gateLocal(g: { x: number; z: number; rot: number }, lx: number, 
   return { x: g.x + lx * c + lz * s, z: g.z - lx * s + lz * c };
 }
 
+/** Collider boxes of the domino bridge: deck, stepped ramps and the two rails. */
+export function bridgeColliders(): Collider[] {
+  const b = BRIDGE;
+  const list: Collider[] = [];
+  list.push({ kind: 'box', id: 'bridge-deck', x: b.x, z: (b.deckA + b.deckB) / 2, hx: b.halfW, hz: (b.deckA - b.deckB) / 2, rot: 0, top: b.top });
+  for (const [end, dir] of [[b.deckA, 1], [b.deckB, -1]] as const) {
+    // the ramp runs from the deck end (high) out onto the table (low), in RAMP_STEPS steps
+    const seg = b.ramp / RAMP_STEPS;
+    for (let i = 0; i < RAMP_STEPS; i++) {
+      const z = end + dir * seg * (i + 0.5);
+      list.push({ kind: 'box', id: 'bridge-ramp', x: b.x, z, hx: b.halfW, hz: seg / 2, rot: 0, top: (b.top * (RAMP_STEPS - i - 0.5)) / RAMP_STEPS });
+    }
+  }
+  for (const side of [-1, 1]) list.push({ kind: 'box', id: 'bridge-rail', x: b.x + side * BRIDGE_RAIL_X, z: b.rail.z, hx: b.rail.t / 2, hz: b.rail.len / 2, rot: 0, top: b.rail.h });
+  return list;
+}
+
 /** Every static hub collider, as data (also used by the layout unit tests). */
 export function hubColliders(): Collider[] {
   const list: Collider[] = [];
   list.push({ kind: 'circle', id: 'fountain', x: FOUNTAIN.x, z: FOUNTAIN.z, r: FOUNTAIN.r, top: FOUNTAIN.top });
-  list.push({ kind: 'box', id: 'pavilion', x: PAVILION.x, z: PAVILION.z, hx: PAVILION.w / 2 + 0.3, hz: PAVILION.d / 2 + 0.3, rot: 0, top: 14 });
+  list.push({ kind: 'box', id: 'pavilion', x: PAVILION.x, z: PAVILION.z, hx: PAVILION.w / 2 + 0.3, hz: PAVILION.d / 2 + 0.3, rot: PAVILION.rot, top: 14 });
   list.push({ kind: 'box', id: 'workshop', x: WORKSHOP.x, z: WORKSHOP.z, hx: WORKSHOP.w / 2, hz: WORKSHOP.d / 2, rot: WORKSHOP.rot, top: 10 });
   list.push({ kind: 'box', id: 'shop', x: SHOP.x, z: SHOP.z, hx: SHOP.w / 2, hz: SHOP.d / 2, rot: SHOP.rot, top: SHOP.h });
   // shop counter (pulled-out matchbox drawer) — low enough to hop onto
   {
-    const c = Math.cos(SHOP.rot);
-    const s = Math.sin(SHOP.rot);
-    const lz = SHOP.d / 2 + 2.2;
-    list.push({ kind: 'box', id: 'shop-counter', x: SHOP.x + lz * s, z: SHOP.z + lz * c, hx: SHOP.w / 2 - 0.5, hz: 2.2, rot: SHOP.rot, top: 1.8 });
+    const c = frontOf(SHOP.x, SHOP.z, SHOP.rot, SHOP.d / 2 + 2.2);
+    list.push({ kind: 'box', id: 'shop-counter', x: c.x, z: c.z, hx: SHOP.w / 2 - 0.5, hz: 2.2, rot: SHOP.rot, top: 1.8 });
   }
   {
     // the frame and its feet (1.3 cm out front) and rear braces (2.3 cm behind)
@@ -202,16 +327,17 @@ export function hubColliders(): Collider[] {
   for (const b of BLOCKS) {
     const h = (b.s ?? 1) * BLOCK_SIZE;
     if (b.y > 0) continue; // stacked blocks are covered by the block underneath (top raised below)
-    const stackTop = BLOCKS.filter((o) => o.y > 0 && Math.hypot(o.x - b.x, o.z - b.z) < BLOCK_SIZE).reduce((m, o) => Math.max(m, o.y + BLOCK_SIZE), h);
+    const stackTop = BLOCKS.filter((o) => o.y > 0 && Math.hypot(o.x - b.x, o.z - b.z) < BLOCK_SIZE).reduce((m, o) => Math.max(m, o.y + (o.s ?? 1) * BLOCK_SIZE), h);
     list.push({ kind: 'box', id: 'block', x: b.x, z: b.z, hx: h / 2, hz: h / 2, rot: b.rot, top: stackTop });
   }
   list.push({ kind: 'box', id: 'musicbox', x: MUSICBOX.x, z: MUSICBOX.z, hx: 2.6, hz: 1.9, rot: 0, top: 2.6 });
   list.push({ kind: 'circle', id: 'jack', x: JACK.x, z: JACK.z, r: 2.1, top: 4.2 });
-  list.push({ kind: 'circle', id: 'fingerpost', x: FINGERPOST.x, z: FINGERPOST.z, r: 1.15, top: FINGERPOST.h });
-  // the book cliffs and the mug stand on the edge of the bigger playmat
+  for (const [id, p] of Object.entries(SIGNPOSTS)) list.push({ kind: 'circle', id: id === 'spawn' ? 'fingerpost' : `signpost-${id}`, x: p.x, z: p.z, r: 1.15, top: p.h });
+  // the book cliffs and the mug stand on the edge of the spawn table's play mat
   list.push({ kind: 'box', id: 'books', x: BOOKS.x, z: BOOKS.z, hx: BOOKS.hx, hz: BOOKS.hz, rot: 0, top: BOOKS.top });
   list.push({ kind: 'circle', id: 'mug', x: MUG.x, z: MUG.z, r: MUG.r, top: MUG.top });
   list.push({ kind: 'circle', id: 'mug-handle', x: MUG.x + MUG.handleX, z: MUG.z, r: MUG.handleR, top: MUG.top });
+  list.push(...bridgeColliders());
   return list;
 }
 

@@ -29,19 +29,19 @@ const check = (name, ok, detail = '') => { results.push(`${ok ? 'PASS' : 'FAIL'}
   let b = await st();
   check('W moves toy forward (-z)', b.z < a.z - 0.5, `z ${a.z.toFixed(2)} -> ${b.z.toFixed(2)}`);
 
-  // Collision with pavilion front wall (front face at z = -15.7, radius 0.85)
+  // Collision with the Scoreboard behind the fountain (its feet reach z = -17.7, radius 0.85)
   await T(() => window.__toybox.teleport(0, -13.6, Math.PI));
   await page.waitForTimeout(800);
   await holdFrames('KeyW', 9000);
   b = await st();
-  check('pavilion blocks movement', b.z > -15.0 && b.z < -14.3, `stopped at z=${b.z.toFixed(2)} (expected ≈ -14.85)`);
+  check('the Scoreboard blocks movement', b.z > -17.2 && b.z < -16.5, `stopped at z=${b.z.toFixed(2)} (expected ≈ -16.85)`);
 
-  // Play bounds at the table-side edge (maxZ 33 - r 0.85)
-  await T(() => window.__toybox.teleport(-20, 31, Math.PI));
+  // Play bounds at the table-side edge (spawn table mat maxZ 36 - r 0.85)
+  await T(() => window.__toybox.teleport(-20, 34, Math.PI));
   await page.waitForTimeout(600);
   await holdFrames('KeyS', 9000);
   b = await st();
-  check('play-area bound holds at the table edge', b.z <= 32.16, `z=${b.z.toFixed(2)} (max 32.15)`);
+  check('play-area bound holds at the table edge', b.z <= 35.16, `z=${b.z.toFixed(2)} (max 35.15)`);
 
   // Jump
   await T(() => window.__toybox.teleport(0, 20, Math.PI));
@@ -82,7 +82,7 @@ const check = (name, ok, detail = '') => { results.push(`${ok ? 'PASS' : 'FAIL'}
   check('Esc resumes', !(await page.isVisible('.pause')));
 
   // Workshop building opens the Workshop screen; repaint there, then return to the Playroom
-  await T(() => window.__toybox.teleport(-24.0, -2.6, 0.3 + Math.PI));
+  await T(() => window.__toybox.hub.goTo('workshop'));
   await page.waitForTimeout(2500);
   await page.keyboard.press('KeyE');
   await page.waitForTimeout(2000);

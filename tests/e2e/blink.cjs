@@ -12,7 +12,7 @@ const out=path.join(__dirname,'output');fs.mkdirSync(out,{recursive:true});
     const click=async id=>mobile?page.getByTestId(id).tap():page.getByTestId(id).click();
     const aim=async(x,z)=>{const p=await page.evaluate(v=>window.__toybox.blink.point(v.x,v.z),{x,z});if(mobile)await page.touchscreen.tap(p.x,p.y);else await page.mouse.move(p.x,p.y);};
     await page.goto((process.env.BASE_URL||'http://localhost:4173/')+'?debug#play');await page.waitForSelector('.loading',{state:'detached'});
-    await page.evaluate(()=>window.__toybox.teleport(0,-12.6,Math.PI));await page.waitForSelector('.prompt');if(mobile)await page.locator('.prompt').tap();else await page.keyboard.press('KeyE');
+    await page.evaluate(()=>window.__toybox.hub.goTo('pavilion'));await page.waitForSelector('.prompt');if(mobile)await page.locator('.prompt').tap();else await page.keyboard.press('KeyE');
     await click('practice-blink-duel');await page.getByTestId('match-start').waitFor({state:'visible'});await page.waitForTimeout(900);await click('match-start');await page.waitForFunction(()=>window.__toybox.match.phase()==='countdown');await page.evaluate(()=>window.__toybox.match.timeScale(10));await page.waitForFunction(()=>window.__toybox.match.phase()==='playing');await page.evaluate(()=>window.__toybox.match.timeScale(1));
     await page.evaluate(()=>{const s=window.__toybox.match.state();Object.assign(s.players[0],{x:0,z:0,angle:Math.PI/2,aimX:1,aimZ:0});s.players.slice(1).forEach((p,i)=>Object.assign(p,{x:-12,z:-12+i*4,moveX:0,moveZ:0,attack:{x:-12,z:-12+i*4,angle:Math.PI,start:s.t,until:1e9}}));});
     if(mobile)await page.getByRole('button',{name:'Right',exact:true}).tap();else await page.keyboard.press('KeyD');

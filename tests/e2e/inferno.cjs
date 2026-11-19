@@ -26,7 +26,7 @@ async function stickUntil(page, [dx, dy], until, arg) {
       await page.addInitScript(() => localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { quality: 'low', tutorials: false }, version: 0 })));
       await page.goto((process.env.BASE_URL || 'http://localhost:4173/') + '?debug#play');
       await page.waitForSelector('.loading', { state: 'detached' });
-      await page.evaluate(() => window.__toybox.teleport(0, -12.6, Math.PI));
+      await page.evaluate(() => window.__toybox.hub.goTo('pavilion'));
       await page.waitForSelector('.prompt');
       if (mobile) await page.locator('.prompt').tap(); else await page.keyboard.press('KeyE');
       await page.getByTestId('practice-inferno-escape').click();

@@ -1,6 +1,6 @@
 /**
  * Hub navigation signage + atmosphere.
- * - A wooden fingerpost near spawn whose arrow boards point at each destination.
+ * - Wooden signposts (by spawn and at both ends of the bridge) whose arrow boards point the way.
  * - Dust motes drifting in the desk-lamp light (skipped on the Low tier).
  */
 import { useMemo, useRef } from 'react';
@@ -9,8 +9,7 @@ import * as THREE from 'three';
 import { PALETTE } from '../game/palette';
 import { useGame } from '../game/store';
 import { woodMat } from './props';
-import { FINGERPOST as POST } from './layout';
-import { fingerpostBoards, POST_BOARD } from './gateDecor';
+import { POST_BOARD, signpostTop, signposts } from './gateDecor';
 import { LAMP_AIM, LAMP_HEAD } from './Room';
 
 /** Arrow-shaped board outline (points along +x), centred on its own origin. */
@@ -31,43 +30,51 @@ function useArrowBoardGeometry(len: number, h: number) {
 }
 
 /**
- * Fingerpost near spawn: an arrow board for each trials district (west, north-west, north-east,
- * east; each lists its gates) low down where the toy-height camera reads them, and the four
- * buildings above. The boards are instanced; their painted faces are part of the gates' merged
- * sign layer (Gates.tsx), drawn from the shared sign atlas.
+ * The signposts (one by spawn, one at each end of the domino bridge): an arrow board per
+ * destination, the lowest in view at toy height. All boards of all posts are one instanced mesh;
+ * their painted faces are part of the gates' merged sign layer (Gates.tsx), drawn from the shared
+ * sign atlas.
  */
 export function Fingerpost() {
   const boardGeo = useArrowBoardGeometry(POST_BOARD.len, POST_BOARD.h);
-  const boards = useMemo(() => fingerpostBoards(), []);
+  const posts = useMemo(() => signposts(), []);
   const plain = useMemo(() => new THREE.MeshStandardMaterial({ color: '#C8925A', roughness: 0.8 }), []);
   const mesh = useMemo(() => {
-    const m = new THREE.InstancedMesh(boardGeo, plain, boards.length);
+    const n = posts.reduce((k, p) => k + p.boards.length, 0);
+    const m = new THREE.InstancedMesh(boardGeo, plain, n);
     const o = new THREE.Object3D();
-    boards.forEach((b, i) => {
-      o.position.set(POST.x + Math.cos(b.rotY) * (POST_BOARD.len / 2 + 0.2), b.y, POST.z - Math.sin(b.rotY) * (POST_BOARD.len / 2 + 0.2));
-      o.rotation.set(0, b.rotY, 0);
-      o.updateMatrix();
-      m.setMatrixAt(i, o.matrix);
-    });
+    let i = 0;
+    for (const post of posts) {
+      for (const b of post.boards) {
+        o.position.set(post.x + Math.cos(b.rotY) * (POST_BOARD.len / 2 + 0.2), b.y, post.z - Math.sin(b.rotY) * (POST_BOARD.len / 2 + 0.2));
+        o.rotation.set(0, b.rotY, 0);
+        o.updateMatrix();
+        m.setMatrixAt(i++, o.matrix);
+      }
+    }
     m.castShadow = true;
     m.computeBoundingSphere();
     return m;
-  }, [boardGeo, plain, boards]);
-  const top = POST_BOARD.y0 + (boards.length - 1) * POST_BOARD.step + 1.2;
+  }, [boardGeo, plain, posts]);
   return (
     <group>
       <primitive object={mesh} />
-      <group position={[POST.x, 0, POST.z]}>
-        <mesh position={[0, 0.3, 0]} castShadow receiveShadow material={woodMat(PALETTE.woodMid)}>
-          <cylinderGeometry args={[1.0, 1.15, 0.6, 12]} />
-        </mesh>
-        <mesh position={[0, top / 2, 0]} castShadow material={woodMat(PALETTE.woodDark)}>
-          <cylinderGeometry args={[0.32, 0.36, top, 8]} />
-        </mesh>
-        <mesh position={[0, top + 0.1, 0]} castShadow material={woodMat(PALETTE.coral)}>
-          <sphereGeometry args={[0.55, 12, 10]} />
-        </mesh>
-      </group>
+      {posts.map((post) => {
+        const top = signpostTop(post.boards.length);
+        return (
+          <group key={post.id} position={[post.x, 0, post.z]}>
+            <mesh position={[0, 0.3, 0]} castShadow receiveShadow material={woodMat(PALETTE.woodMid)}>
+              <cylinderGeometry args={[1.0, 1.15, 0.6, 12]} />
+            </mesh>
+            <mesh position={[0, top / 2, 0]} castShadow material={woodMat(PALETTE.woodDark)}>
+              <cylinderGeometry args={[0.32, 0.36, top, 8]} />
+            </mesh>
+            <mesh position={[0, top + 0.1, 0]} castShadow material={woodMat(PALETTE.coral)}>
+              <sphereGeometry args={[0.55, 12, 10]} />
+            </mesh>
+          </group>
+        );
+      })}
     </group>
   );
 }

@@ -130,7 +130,7 @@ export function Pavilion() {
   }, []);
   const { w, d, h } = PAVILION;
   return (
-    <group position={[PAVILION.x, 0, PAVILION.z]}>
+    <group position={[PAVILION.x, 0, PAVILION.z]} rotation={[0, PAVILION.rot, 0]}>
       {/* walls */}
       <mesh position={[0, h / 2, 0]} castShadow receiveShadow material={stripes} ref={camBlock}>
         <boxGeometry args={[w, h, d]} />

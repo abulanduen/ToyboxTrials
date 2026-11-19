@@ -1,13 +1,13 @@
 /**
  * Themed surroundings for every minigame gate, plus the painted faces of the gate name boards and
- * the fingerpost. Everything is code-built in the chunky toy style and merged through one Kit
+ * the signposts. Everything is code-built in the chunky toy style and merged through one Kit
  * (see kit.ts), so all eleven districts together cost a handful of draw calls.
  *
  * Each gate has two solid spots (GATE_DECOR in layout.ts, both with colliders): a tall "hero"
  * piece on the gate's left (local −x) and a low cluster on its right (+x). Anything else is flat
  * on the felt (≤ 0.45 cm, below the step height), kept beside the gate's path and in front of
- * the pillars, never on the path tiles. Gate-local frame: +z is the gate's front (towards the
- * fountain), y = 0 is the table.
+ * the pillars, never on the path tiles. Gate-local frame: +z is the gate's front (towards its
+ * road), y = 0 is the table.
  *
  * Pure three.js (no DOM): the unit tests build it to check the footprints.
  */
@@ -17,7 +17,7 @@ import type { MinigameId } from '../minigames/types';
 import type { DominoSpec } from './domino';
 import { Kit } from './kit';
 import type { SignAtlas } from './signAtlas';
-import { FINGERPOST, GATE, GATES, GATE_DECOR, GATE_DISTRICTS, PAVILION, SCOREBOARD, SHOP, WORKSHOP, frontOf, gateLocal, type HubGate } from './layout';
+import { BRIDGE, FOUNTAIN, GATE, GATES, GATE_DECOR, GATE_DISTRICTS, GATE_LOOP, PAVILION, SCOREBOARD, SHOP, SIGNPOSTS, WORKSHOP, frontOf, gateLocal, type HubGate, type SignpostId } from './layout';
 
 const P = PALETTE;
 const H = GATE_DECOR.hero;
@@ -497,7 +497,7 @@ export function buildGateDecor(k: Kit, atlas: SignAtlas): DecorExtras {
 /** Gate name board, in gate-local space. */
 export const GATE_BOARD = { y: GATE.height + 1.25, z: 0.9, tilt: -0.12, w: 8.6, h: 2.1, d: 0.3 };
 
-/** Fingerpost arrow boards: one per building and one per trials district. */
+/** Signpost arrow boards: size, vertical spacing and the height of the lowest. */
 export const POST_BOARD = { len: 7, h: 1.3, step: 1.5, y0: 2.6 };
 
 export interface PostBoard {
@@ -508,8 +508,25 @@ export interface PostBoard {
   rotY: number;
   y: number;
 }
+export interface Signpost {
+  id: SignpostId;
+  x: number;
+  z: number;
+  boards: PostBoard[];
+}
 
-export function fingerpostBoards(): PostBoard[] {
+/** Height of a signpost's pole for a number of boards (the collider tops in layout.ts match). */
+export const signpostTop = (boards: number) => POST_BOARD.y0 + (boards - 1) * POST_BOARD.step + 1.2;
+
+/**
+ * Every signpost and its boards, lowest first (the lowest are in view at toy height):
+ *  - by spawn: the way to the trials (over the bridge), then the spawn table's buildings;
+ *  - at the spawn-table end of the bridge: on to the trials, back to the plaza;
+ *  - on the gates table by the bridge landing: each wing of gates (listing its trials), and back.
+ */
+export function signposts(): Signpost[] {
+  const toTrials = { label: 'Trials table', sub: `All ${GATES.length} trials · over the bridge`, accent: P.honey };
+  const gatesCentre = { x: BRIDGE.x, z: (GATE_LOOP.north + GATE_LOOP.south) / 2 };
   const districts = GATE_DISTRICTS.map((d) => {
     const gs = GATES.filter((g) => g.district === d.id);
     const stands = gs.map((g) => gateLocal(g, 0, 2.2));
@@ -517,15 +534,33 @@ export function fingerpostBoards(): PostBoard[] {
     const z = stands.reduce((s, p) => s + p.z, 0) / stands.length;
     return { label: d.label, sub: gs.map((g) => g.short).join(' · '), accent: gs[0]?.color ?? P.honey, x, z };
   });
-  const buildings = [
-    { label: 'Pavilion', sub: 'Tournaments', accent: P.inkPurple, x: PAVILION.x, z: PAVILION.z + PAVILION.d / 2 },
-    { label: 'Workshop', sub: 'Paint · hats · keys', accent: P.toyBlue, ...frontOf(WORKSHOP.x, WORKSHOP.z, WORKSHOP.rot, 5) },
-    { label: 'Odds & Ends', sub: 'Shop', accent: P.sage, ...frontOf(SHOP.x, SHOP.z, SHOP.rot, 8) },
-    { label: 'Scoreboard', sub: 'Secrets', accent: P.coral, ...frontOf(SCOREBOARD.x, SCOREBOARD.z, SCOREBOARD.rot, 3) },
-  ];
-  // trials boards low (in view at toy height), buildings above
-  return [...districts, ...buildings].map((t, i) => ({ label: t.label, sub: t.sub, accent: t.accent, rotY: Math.atan2(-(t.z - FINGERPOST.z), t.x - FINGERPOST.x), y: POST_BOARD.y0 + i * POST_BOARD.step }));
+  const lists: Record<SignpostId, { label: string; sub: string; accent: string; x: number; z: number }[]> = {
+    spawn: [
+      { ...toTrials, x: BRIDGE.x, z: BRIDGE.deckA },
+      { label: 'Scoreboard', sub: 'Records · secrets', accent: P.coral, ...frontOf(SCOREBOARD.x, SCOREBOARD.z, SCOREBOARD.rot, 3) },
+      { label: 'Pavilion', sub: 'Tournaments', accent: P.inkPurple, ...frontOf(PAVILION.x, PAVILION.z, PAVILION.rot, PAVILION.d / 2) },
+      { label: 'Workshop', sub: 'Paint · hats · keys', accent: P.toyBlue, ...frontOf(WORKSHOP.x, WORKSHOP.z, WORKSHOP.rot, 5) },
+      { label: 'Odds & Ends', sub: 'Shop', accent: P.sage, ...frontOf(SHOP.x, SHOP.z, SHOP.rot, 8) },
+    ],
+    'bridge-hub': [
+      { ...toTrials, ...gatesCentre },
+      { label: 'Plaza', sub: 'Scoreboard · Pavilion · shop', accent: P.coral, x: FOUNTAIN.x, z: FOUNTAIN.z },
+    ],
+    gates: [...districts, { label: 'Back to the plaza', sub: 'Over the bridge', accent: P.coral, x: BRIDGE.x, z: BRIDGE.deckB }],
+  };
+  return (Object.keys(lists) as SignpostId[]).map((id) => {
+    const post = SIGNPOSTS[id];
+    return {
+      id,
+      x: post.x,
+      z: post.z,
+      boards: lists[id].map((t, i) => ({ label: t.label, sub: t.sub, accent: t.accent, rotY: Math.atan2(-(t.z - post.z), t.x - post.x), y: POST_BOARD.y0 + i * POST_BOARD.step })),
+    };
+  });
 }
+
+/** The spawn signpost's boards. */
+export const fingerpostBoards = () => signposts().find((p) => p.id === 'spawn')!.boards;
 
 /** Painted faces of every gate board and fingerpost board, into the decal layer. */
 export function buildSignFaces(k: Kit, atlas: SignAtlas) {
@@ -537,13 +572,15 @@ export function buildSignFaces(k: Kit, atlas: SignAtlas) {
       k.pop();
     }
     const L = POST_BOARD.len;
-    for (const b of fingerpostBoards()) {
-      k.push(FINGERPOST.x, b.y, FINGERPOST.z, b.rotY);
-      const cx = L / 2 + 0.2 - 0.35;
-      // the front reads left → right with the point on the right; so does the back
-      k.quad(L - 0.9, POST_BOARD.h - 0.15, cx, 0, 0.22, atlas.board({ title: b.label, sub: b.sub, accent: b.accent, arrow: 'right' }));
-      k.quad(L - 0.9, POST_BOARD.h - 0.15, cx, 0, -0.22, atlas.board({ title: b.label, sub: b.sub, accent: b.accent, arrow: 'left' }), '#ffffff', { ry: Math.PI });
-      k.pop();
+    for (const post of signposts()) {
+      for (const b of post.boards) {
+        k.push(post.x, b.y, post.z, b.rotY);
+        const cx = L / 2 + 0.2 - 0.35;
+        // the front reads left → right with the point on the right; so does the back
+        k.quad(L - 0.9, POST_BOARD.h - 0.15, cx, 0, 0.22, atlas.board({ title: b.label, sub: b.sub, accent: b.accent, arrow: 'right' }));
+        k.quad(L - 0.9, POST_BOARD.h - 0.15, cx, 0, -0.22, atlas.board({ title: b.label, sub: b.sub, accent: b.accent, arrow: 'left' }), '#ffffff', { ry: Math.PI });
+        k.pop();
+      }
     }
   });
 }

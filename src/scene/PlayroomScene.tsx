@@ -14,48 +14,22 @@ import { player } from '../game/player';
 import { PlayerController } from '../character/PlayerController';
 import { RemotePlayers } from '../character/RemotePlayers';
 import { Room, LAMP_HEAD, LAMP_AIM } from './Room';
-import { SUN_DIR } from './room/bake';
-import { TABLE } from './layout';
+import { sunRig } from './room/bake';
 import { exposeDebug } from '../game/debug';
 import { MatchStage } from '../minigames/MatchStage';
 import { Village } from './Village';
 
 /**
- * Quality tiers. `shadow` is the sun's shadow-map size (null = no shadow maps): the map is wider
- * than tall because the fixed shadow frustum that covers the whole table is ~1.8:1 in light space.
+ * Quality tiers. `shadow` is the sun's shadow-map size (null = no shadow maps): the fixed shadow
+ * frustum covering both tables is about 1.24 : 1 in light space (sunRig), so texels stay square.
  * Low (the default on touch devices) has no shadow maps and no post-processing: the toys keep
  * their blob shadows and the room's lighting is baked, so it still reads as a sunlit room.
  */
 const QUALITY: Record<Quality, { dpr: [number, number]; shadow: [number, number] | null; post: 'none' | 'tilt' | 'dof'; aa: boolean }> = {
   low: { dpr: [1, 1.25], shadow: null, post: 'none', aa: false },
-  balanced: { dpr: [1, 1.5], shadow: [2048, 1024], post: 'tilt', aa: true },
-  high: { dpr: [1, 2], shadow: [4096, 2048], post: 'dof', aa: true },
+  balanced: { dpr: [1, 1.5], shadow: [2048, 1664], post: 'tilt', aa: true },
+  high: { dpr: [1, 2], shadow: [4096, 3328], post: 'dof', aa: true },
 };
-
-/**
- * Fixed sun + shadow frustum. The light shines along SUN_DIR (through the window in the back
- * wall); its orthographic shadow camera is fitted once to the table top and everything standing
- * on it, so shadow texels never move and nothing swims as the player walks. The window wall
- * lies inside the same frustum (further up the rays), so it shapes the sun patch for real.
- */
-function sunRig() {
-  const target = new THREE.Vector3((TABLE.minX + TABLE.maxX) / 2, 0, (TABLE.minZ + TABLE.maxZ) / 2);
-  const position = target.clone().addScaledVector(SUN_DIR, -330);
-  const view = new THREE.Matrix4().lookAt(position, target, new THREE.Vector3(0, 1, 0)).setPosition(position).invert();
-  const box = { l: Infinity, r: -Infinity, b: Infinity, t: -Infinity, far: 0 };
-  const p = new THREE.Vector3();
-  for (const x of [TABLE.minX - 2, TABLE.maxX + 2])
-    for (const z of [TABLE.minZ - 2, TABLE.maxZ + 2])
-      for (const y of [-TABLE.thickness, 50]) {
-        p.set(x, y, z).applyMatrix4(view);
-        box.l = Math.min(box.l, p.x);
-        box.r = Math.max(box.r, p.x);
-        box.b = Math.min(box.b, p.y);
-        box.t = Math.max(box.t, p.y);
-        box.far = Math.max(box.far, -p.z);
-      }
-  return { target, position, ...box, near: 40, far: box.far + 4 };
-}
 
 function Lights({ quality }: { quality: Quality }) {
   const q = QUALITY[quality];
