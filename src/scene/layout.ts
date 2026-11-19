@@ -310,6 +310,7 @@ export function hubColliders(): Collider[] {
     const c = frontOf(SCOREBOARD.x, SCOREBOARD.z, SCOREBOARD.rot, -0.5);
     list.push({ kind: 'box', id: 'scoreboard', x: c.x, z: c.z, hx: SCOREBOARD.w / 2, hz: 1.8, rot: SCOREBOARD.rot, top: SCOREBOARD.h });
   }
+  list.push({ kind: 'box', id: 'tv', x: TV.x, z: TV.z, hx: TV.w / 2, hz: TV.d / 2, rot: TV.rot, top: TV.h });
   for (const g of GATES) {
     for (const side of [-1, 1]) {
       const p = gateLocal(g, side * (GATE.width / 2 - GATE.pillar / 2), 0);

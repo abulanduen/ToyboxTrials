@@ -20,6 +20,7 @@ import {
   PAVILION,
   SCOREBOARD,
   SHOP,
+  TV,
   WORKSHOP,
   frontOf,
   gateLocal,
@@ -89,7 +90,7 @@ export const BRIDGE_ROAD_BEND: Pt = [19, -20];
 /**
  * Every street in the hub.
  * Spawn table: the approach from spawn; the avenue to the Scoreboard; spokes to the Pavilion,
- * Workshop and shop; and the road from the plaza past the Scoreboard to the bridge.
+ * Workshop, shop and TV; and the road from the plaza past the Scoreboard to the bridge.
  * Gates table: from the bridge landing onto the loop road, which passes in front of every gate
  * (south lane, the two ends, north lane), the avenue straight on to Copycat, and a short stub up
  * to each arch.
@@ -107,6 +108,7 @@ export function hubPathLines(): PathLine[] {
     ['pavilion', toFront(PAVILION.x, PAVILION.z, PAVILION.rot, PAVILION.d / 2 + 0.8)],
     ['workshop', toFront(WORKSHOP.x, WORKSHOP.z, WORKSHOP.rot, WORKSHOP.d / 2 + 1.5)],
     ['shop', toFront(SHOP.x, SHOP.z, SHOP.rot, SHOP.d / 2 + 6)],
+    ['tv', toFront(TV.x, TV.z, TV.rot, TV.d / 2 + 2)],
   ];
   for (const [id, d] of dests) lines.push({ id: `spoke:${id}`, pts: [plazaEdge(d[0], d[1]), d], toBuilding: true });
   // to the bridge: past the Scoreboard's east end, then north to the foot of the ramp

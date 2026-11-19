@@ -12,11 +12,12 @@ import { feltTexture } from './textures';
 import { Block, Bunting, Dominoes, FeltTree, woodMat } from './props';
 import { Fountain, Pavilion, Scoreboard, Shop, Workshop } from './Buildings';
 import { Bridge } from './Bridge';
+import { HubTV, TV_AERIAL_TIP } from './HubTV';
 import { Gates } from './Gates';
 import { DustMotes, Fingerpost } from './Ambience';
 import { hubFence, hubPathTiles, TILE_SIZE } from './paths';
 import { JackInTheBox, KeyTower, Marble, MusicBox, PencilLog, Train, TrainTrack } from './Interactive';
-import { BLOCKS, BLOCK_SIZE, BRIDGE, GATES, GATE_STAND, PAVILION, SCOREBOARD, SHOP, TREES, WORKSHOP, frontOf, gateLocal, registerHubColliders } from './layout';
+import { BLOCKS, BLOCK_SIZE, BRIDGE, GATES, GATE_STAND, PAVILION, SCOREBOARD, SHOP, TREES, TV, WORKSHOP, frontOf, gateLocal, registerHubColliders } from './layout';
 import { exposeDebug } from '../game/debug';
 
 function roundedRectShape(minX: number, minZ: number, maxX: number, maxZ: number, r: number) {
@@ -88,7 +89,7 @@ function DominoFence() {
 function facingTarget(id: string): { x: number; z: number } | null {
   const g = GATES.find((x) => x.id === id);
   if (g) return g;
-  const b: Record<string, { x: number; z: number }> = { pavilion: PAVILION, workshop: WORKSHOP, shop: SHOP, scoreboard: SCOREBOARD };
+  const b: Record<string, { x: number; z: number }> = { pavilion: PAVILION, workshop: WORKSHOP, shop: SHOP, scoreboard: SCOREBOARD, tv: TV };
   return b[id] ?? null;
 }
 
@@ -126,6 +127,7 @@ export function Village() {
 
   // bunting: from the Scoreboard's top corners to the Pavilion's front corner and the TV's aerial
   const pav = gateLocal(PAVILION, -PAVILION.w / 2, PAVILION.d / 2);
+  const aerial = gateLocal(TV, TV_AERIAL_TIP[0], TV_AERIAL_TIP[2]);
   return (
     <group>
       <Playmat b={HUB_WALK} />
@@ -138,6 +140,7 @@ export function Village() {
       <Workshop />
       <Shop />
       <Scoreboard />
+      <HubTV />
       <Gates />
       <Fingerpost />
       <DustMotes />
@@ -155,6 +158,7 @@ export function Village() {
         <Block key={i} x={b.x} y={b.y} z={b.z} rot={b.rot} color={b.color} size={(b.s ?? 1) * BLOCK_SIZE} />
       ))}
       <Bunting from={[SCOREBOARD.x + SCOREBOARD.w / 2 - 0.4, SCOREBOARD.h + 0.2, SCOREBOARD.z]} to={[pav.x, PAVILION.h + 0.6, pav.z]} sag={2.5} count={13} />
+      <Bunting from={[SCOREBOARD.x - SCOREBOARD.w / 2 + 0.4, SCOREBOARD.h + 0.2, SCOREBOARD.z]} to={[aerial.x, TV_AERIAL_TIP[1], aerial.z]} sag={1.6} count={6} />
     </group>
   );
 }

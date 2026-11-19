@@ -1,11 +1,12 @@
 /* Hub gates: every playable trial has a gate on the gates table whose prompt opens that trial's
  * lobby (intro card), desktop + phone (touch Interact); walking across the domino bridge from the
  * spawn table to the gates table (keyboard, and the phone joystick) and on to the Copycat gate;
+ * the TV beside the Scoreboard (offline card, channel change);
  * plus screenshots of each gate's surroundings, the Scoreboard, opposing gameplay views, the bridge
  * and a whole-hub overview of both tables, with renderer counts.
  *
  *   BASE_URL=http://localhost:4173/ node tests/e2e/hubgates.cjs [only]
- *     only  comma list of parts: gates,phone,bridge,bridgephone,shots,overview (default all)
+ *     only  comma list of parts: gates,phone,bridge,bridgephone,tv,shots,overview (default all)
  *
  * SwiftShader renders at 1–3 fps here: every wait is on a condition, frame counts, never on FPS.
  * Output: tests/e2e/output/hubgates-*.png and hubgates-renderinfo.json.
@@ -178,6 +179,37 @@ const leave = async (page) => {
       async () => { await touch('touchEnd', []); },
     );
     check('no page errors (phone bridge)', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await ctx.close();
+  }
+
+  if (want('tv')) {
+    const { ctx, page, errors } = await open(browser, desktop, process.env.SHOT_QUALITY || 'balanced');
+    await page.addStyleTag({ content: '.hud-hint,.ticket-stack{display:none!important}' }).catch(() => {});
+    await page.waitForFunction(() => window.__toybox.tv && window.__toybox.tv().draws > 0, null, { timeout: 120000 });
+    const first = await page.evaluate(() => window.__toybox.tv());
+    check('TV shows a card (offline: points at Play online)', first.card !== null && (first.card !== 'online' || first.lines.join(' ').includes('PLAY ONLINE')), JSON.stringify(first));
+    await page.evaluate(() => window.__toybox.hub.goTo('tv'));
+    const prompt = await page.waitForFunction(() => { const p = document.querySelector('.prompt'); return p && p.textContent.includes('TV') ? p.textContent : null; }, null, { timeout: 120000 }).then((h) => h.jsonValue()).catch(() => null);
+    check('prompt at the TV', !!prompt, JSON.stringify(prompt));
+    const before = await page.evaluate(() => window.__toybox.tv());
+    await page.keyboard.press('KeyE');
+    await page.waitForFunction((n) => window.__toybox.tv().draws > n, before.draws, { timeout: 60000 }).catch(() => null);
+    const after = await page.evaluate(() => window.__toybox.tv());
+    check('Interact at the TV changes channel', after.index !== before.index, `${before.card} -> ${after.card}`);
+    // the TV and the Scoreboard together, close up
+    await page.addStyleTag({ content: '.prompt{display:none!important}' }).catch(() => {});
+    await page.evaluate(() => { window.__toybox.teleport(-9, -6.5, Math.PI + 0.35); window.__toybox.aim(0.3, 0.12); });
+    await frames(page, 10);
+    await page.screenshot({ path: `${OUT}/hubgates-tv.png`, timeout: 240000 });
+    // the draw counter only moves when the card changes (a 1 s timer, never per frame)
+    const d0 = await page.evaluate(() => window.__toybox.tv().draws);
+    const t0 = Date.now();
+    await frames(page, 30);
+    const secs = (Date.now() - t0) / 1000;
+    const d1 = await page.evaluate(() => window.__toybox.tv().draws);
+    // one redraw per card flip (6 s) at most, however many frames were rendered meanwhile
+    check('TV redraws only when its card changes, not per frame', d1 - d0 <= Math.ceil(secs / 6) + 1 && d1 - d0 < 30, `${d1 - d0} redraws over 30 frames / ${secs.toFixed(1)} s`);
+    check('no page errors (tv)', errors.length === 0, errors.slice(0, 3).join(' | '));
     await ctx.close();
   }
 
