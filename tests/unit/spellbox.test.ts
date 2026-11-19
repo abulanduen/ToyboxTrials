@@ -8,7 +8,8 @@ import { createSpellboxBot } from '../../src/minigames/spellbox/bot';
 const people:Contestant[]=Array.from({length:8},(_,i)=>({id:`p${i}`,name:`Mage ${i}`,paint:PAINT_JOBS[i%5],hat:'none',keySkin:'classic',isLocal:i===0,bot:'normal'}));
 const fresh=(n=2)=>spellboxRules.init(people.slice(0,n),123);
 const send=(s:SpellboxState,id:string,inputs:SpellboxInput[],dt=10)=>spellboxRules.step(s,{[id]:inputs},dt);
-function arena(n=2){const s=fresh(n);spellboxRules.step(s,Object.fromEntries(s.players.map(p=>[p.id,[{type:'ready'}]])),10);Object.assign(s.players[0],{x:-3,z:0,angle:Math.PI/2});Object.assign(s.players[1],{x:3,z:0,angle:-Math.PI/2});return s;}
+const readyAll=(s:SpellboxState)=>spellboxRules.step(s,Object.fromEntries(s.players.map(p=>[p.id,[{type:'ready'} as SpellboxInput]])),10);
+function arena(n=2){const s=fresh(n);readyAll(s);spellboxRules.step(s,{},s.config.countdownMs);expect(s.phase).toBe('arena');Object.assign(s.players[0],{x:-3,z:0,angle:Math.PI/2});Object.assign(s.players[1],{x:3,z:0,angle:-Math.PI/2});return s;}
 function equip(s:SpellboxState,id:SpellId){s.players[0].build[0]=id;}
 function cast(s:SpellboxState){send(s,'p0',[{type:'cast',slot:0}]);}
 function hit(s:SpellboxState){for(let i=0;i<180&&s.players[1].lastHit<0;i++)spellboxRules.step(s,{},10);expect(s.players[1].lastHit).toBeGreaterThanOrEqual(0);}
@@ -18,7 +19,7 @@ describe('Spellbox Showdown',()=>{
     for(let n=2;n<=8;n++){const s=fresh(n);expect(fresh(n)).toEqual(s);for(const p of s.players){expect(Math.hypot(p.x,p.z)).toBeLessThan(s.radius-s.config.bodyRadius);expect(p.build).toHaveLength(3);}}
     expect(spellboxRules.init(people,456).players).not.toEqual(fresh(8).players);
     for(const id of SPELL_IDS){expect(SPELLS[id].cooldown).toBeGreaterThan(0);expect(SPELLS[id].description.length).toBeGreaterThan(30);}
-    expect(()=>fresh(1)).toThrow();expect(()=>spellboxRules.init([people[0],people[0]],1)).toThrow();expect(()=>spellboxRules.init(people,1,{drag:NaN})).toThrow();expect(()=>spellboxRules.init(people,1,{draftMs:11})).toThrow();
+    expect(()=>fresh(1)).toThrow();expect(()=>spellboxRules.init([people[0],people[0]],1)).toThrow();expect(()=>spellboxRules.init(people,1,{drag:NaN})).toThrow();expect(()=>spellboxRules.init(people,1,{countdownMs:11})).toThrow();
   });
   it('offers exactly three legal choices per button, rejects cross-slot picks and locks Ready',()=>{
     const s=fresh(),p=s.players[0],other=[...s.players[1].build];
@@ -28,7 +29,8 @@ describe('Spellbox Showdown',()=>{
     send(s,'p0',[{type:'equip',slot:2,spell:'repair-stitches'},{type:'equip',slot:3,spell:'button-mine'},{type:'equip',slot:0,spell:'nope' as SpellId}]);
     expect(p.build).toEqual(['marble-burst','spring-fan','repair-stitches']);expect(s.players[1].build).toEqual(other);
     send(s,'p0',[{type:'ready'},{type:'equip',slot:0,spell:'pop-rocket'}]);expect(p.build[0]).toBe('marble-burst');expect(s.phase).toBe('draft');
-    send(s,'p1',[{type:'ready'}]);expect(s.phase).toBe('arena');send(s,'p0',[{type:'equip',slot:0,spell:'pop-rocket'}]);expect(p.build[0]).toBe('marble-burst');
+    send(s,'p1',[{type:'ready'}]);expect(s.phase).toBe('draft');expect(s.fightAt).toBeGreaterThan(s.t);send(s,'p0',[{type:'equip',slot:0,spell:'pop-rocket'}]);expect(p.build[0]).toBe('marble-burst');
+    spellboxRules.step(s,{},s.config.countdownMs);expect(s.phase).toBe('arena');send(s,'p0',[{type:'equip',slot:0,spell:'pop-rocket'}]);expect(p.build[0]).toBe('marble-burst');
   });
   it('moves Mine between E and R while keeping every slot legal and the build unique',()=>{
     const s=fresh(),p=s.players[0];send(s,'p0',[{type:'equip',slot:1,spell:'button-mine'}]);
@@ -66,10 +68,39 @@ describe('Spellbox Showdown',()=>{
     spellboxRules.step(a,{},0);spellboxRules.step(a,{},NaN);expect(a).toEqual(copy);
     spellboxRules.step(a,{},13000);for(const n of[3,7,40,9950,3000])spellboxRules.step(b,{},n);expect(a).toEqual(b);
   });
-  it('keeps draft movement/casts inert, auto-locks at deadline and excludes draft from score',()=>{
-    const s=fresh(),position=[s.players[0].x,s.players[0].z];send(s,'p0',[{type:'move',x:1,z:0},{type:'cast',slot:0}],20000);
-    expect(s.phase).toBe('arena');expect(s.players.every(p=>p.ready)).toBe(true);expect([s.players[0].x,s.players[0].z]).toEqual(position);expect(s.players[0].casts).toBe(0);
-    spellboxRules.step(s,{},91400);expect(s.phase).toBe('over');expect(spellboxRules.result(s).durationMs).toBe(90000);expect(spellboxRules.result(s).placements.map(p=>p.place)).toEqual([1,1]);
+  it('never ends the draft while anyone is still choosing, however long they take',()=>{
+    const s=fresh(3),position=[s.players[0].x,s.players[0].z];
+    send(s,'p1',[{type:'ready'}]);send(s,'p2',[{type:'ready'}]);
+    send(s,'p0',[{type:'move',x:1,z:0},{type:'cast',slot:0}],10*60*1000);
+    expect(s.phase).toBe('draft');expect(s.fightAt).toBe(-1);expect(s.players[0].ready).toBe(false);
+    expect([s.players[0].x,s.players[0].z]).toEqual(position);expect(s.players[0].casts).toBe(0);
+    expect(spellboxRules.drainEvents(s).filter(e=>e.type.startsWith('spellbox-'))).toEqual([]);
+    send(s,'p0',[{type:'equip',slot:0,spell:'ribbon-tether'}]);expect(s.players[0].build[0]).toBe('ribbon-tether');
+  });
+  it('starts a three-second fight countdown only once every player has locked in, then excludes it from score',()=>{
+    const s=fresh(3);spellboxRules.step(s,{},5000);send(s,'p0',[{type:'ready'}]);send(s,'p1',[{type:'ready'}]);
+    expect(s.fightAt).toBe(-1);spellboxRules.drainEvents(s);
+    send(s,'p2',[{type:'ready'}]);const lockedAt=s.t;expect(s.fightAt).toBe(lockedAt+3000);expect(s.phase).toBe('draft');
+    spellboxRules.step(s,{},2990);expect(s.phase).toBe('draft');
+    spellboxRules.step(s,{},10);expect(s.phase).toBe('arena');expect(s.arenaAt).toBe(lockedAt+3000);
+    const events=spellboxRules.drainEvents(s);
+    expect(events.filter(e=>e.type==='spellbox-countdown').map(e=>e.seconds)).toEqual([3,2,1]);
+    expect(events.at(-1)).toEqual({type:'spellbox-start'});
+    spellboxRules.step(s,{},91400);expect(s.phase).toBe('over');expect(spellboxRules.result(s).durationMs).toBe(90000);
+  });
+  it('keeps Ready as a lock: builds cannot change or un-ready during the countdown, which is never cancelled',()=>{
+    const s=fresh(),p=s.players[0];send(s,'p0',[{type:'equip',slot:2,spell:'repair-stitches'}]);readyAll(s);const fightAt=s.fightAt;
+    send(s,'p0',[{type:'equip',slot:2,spell:'bubble-ward'},{type:'equip',slot:0,spell:'marble-burst'},{type:'ready'},{type:'move',x:1,z:0},{type:'cast',slot:0}],1000);
+    expect(p.build).toEqual(['pop-rocket','spring-fan','repair-stitches']);expect(p.ready).toBe(true);expect(s.fightAt).toBe(fightAt);expect(p.casts).toBe(0);expect(p.moveX).toBe(0);
+    spellboxRules.step(s,{},fightAt-s.t);expect(s.phase).toBe('arena');expect(p.build).toEqual(['pop-rocket','spring-fan','repair-stitches']);
+    // The countdown is simulation time, so partitioned steps (and a frozen host) give the same start.
+    const a=fresh(),b=fresh();readyAll(a);readyAll(b);spellboxRules.step(a,{},0);spellboxRules.step(a,{},2999);for(const n of[1,7,993,1000,998])spellboxRules.step(b,{},n);expect(a).toEqual(b);
+  });
+  it('lets bots lock in quickly, one by one, without a deadline pushing them',()=>{
+    const s=fresh(8),bot=createSpellboxBot(),rngs=people.map((_,i)=>seededRng(i+7)),bots=people.slice(1);const readyAt=new Map<string,number>();
+    while(s.t<20000&&!s.players.slice(1).every(p=>p.ready)){spellboxRules.step(s,Object.fromEntries(bots.map((c,i)=>[c.id,bot.decide(s,c,20,rngs[i+1])])),20);for(const p of s.players)if(p.ready&&!readyAt.has(p.id))readyAt.set(p.id,s.t);}
+    expect(readyAt.size).toBe(7);expect(Math.max(...readyAt.values())).toBeLessThanOrEqual(3500);expect(new Set(readyAt.values()).size).toBeGreaterThan(1);
+    expect(s.players[0].ready).toBe(false);spellboxRules.step(s,{},60000);expect(s.phase).toBe('draft');expect(s.fightAt).toBe(-1);
   });
   it('enforces wind-up, per-spell cooldowns, a global action gap and interrupt-on-hit',()=>{
     const s=arena();cast(s);const castAt=s.players[0].cooldowns[0];send(s,'p0',[{type:'cast',slot:0},{type:'cast',slot:1}],100);

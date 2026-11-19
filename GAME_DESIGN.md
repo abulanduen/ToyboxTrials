@@ -378,11 +378,11 @@ balance remain provisional pending playtesting.
 
 **Toybox:** toy mages in a plastic-and-wood ring, with spells as toy explosions, springs, bubbles and fireworks.
 **Tech:** planar arena physics, authoritative damage and knockback, and a small spell roster to start.
-**Implemented local first pass on `astra/spellbox-showdown`:** a timed three-slot draft from eight
-spells, seeded bots, projectiles, AoE/cone blasts, pull, mines, ward and damage repair. Q/E/R cast;
+**Implemented local first pass on `astra/spellbox-showdown`:** an untimed three-slot draft from eight
+spells (a 3-second countdown starts once everyone has locked in), seeded bots, projectiles, AoE/cone blasts, pull, mines, ward and damage repair. Q/E/R cast;
 mouse/tap aims; WASD/arrows or touch pads move. Damage increases knockback, and crossing the
 circular edge eliminates. Records, local tournaments and both mobile orientations use the shared
-host. Spell values, draft length, momentum, hitstun and tie policies are provisional; exact data
+host. Spell values, countdown length, momentum, hitstun and tie policies are provisional; exact data
 is in `src/minigames/spellbox/README.md`. Online authority and real PvP are not implemented.
 Owner revision: Q/E/R each offer three choices instead of the full roster. Arena size follows
 2 / 3 / 4–5 / 6–7 / 8 living-player bands, then contracts after a visible 10-second warning as

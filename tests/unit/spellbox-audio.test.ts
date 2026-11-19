@@ -36,4 +36,10 @@ describe('Spellbox presentation mix',()=>{
     for(let seconds=10;seconds>=0;seconds--){t.hear({type:'spellbox-shrink-tick',seconds});t.advance(1000);}
     expect(t.play.mock.calls).toEqual([['count',.8],['count',.8],['count',.8]]);
   });
+  it('counts in the fight after everyone has locked in',()=>{
+    const t=setup();
+    for(const seconds of [3,2,1,0,9]){t.hear({type:'spellbox-countdown',seconds});t.advance(1000);}
+    t.hear({type:'spellbox-start'});
+    expect(t.play.mock.calls).toEqual([['count',.8],['count',.8],['count',.8]]);
+  });
 });

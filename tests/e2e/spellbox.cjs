@@ -21,7 +21,26 @@ try{for(const layout of(process.env.SPELLBOX_LAYOUTS||'desktop,portrait,landscap
   }
   assert.equal(iconFiles.size,8,'all eight production icons decode');await click('spellbox-slot-1');
   assert.equal(await page.locator('.spellbox-catalogue button').count(),3);assert.equal((await state()).radius,39);
-  await page.screenshot({path:path.join(out,`spellbox-${layout}-draft.png`),timeout:240000});await click('spellbox-ready');await page.evaluate(()=>window.__toybox.match.timeScale(1));await page.waitForFunction(()=>window.__toybox.match.state().phase==='arena');
+  // No deadline: every bot locks in, yet the draft waits for the human well past the old 20-second limit.
+  await page.evaluate(()=>window.__toybox.match.timeScale(10));
+  await page.waitForFunction(()=>{const s=window.__toybox.match.state();if(s.t>=30000){window.__toybox.match.timeScale(0);return true;}return false;},null,{timeout:240000,polling:100});
+  {const s=await state();assert.equal(s.phase,'draft');assert.equal(s.fightAt,-1);assert.equal(s.players[0].ready,false);assert.ok(s.players.slice(1).every(p=>p.ready),'bots lock in without a timer');}
+  await page.waitForFunction(()=>document.querySelectorAll('[data-testid^="spellbox-lockin-"]').length===8&&document.querySelectorAll('[data-testid^="spellbox-lockin-"].ready').length===7);
+  // A compact card centred over a blurred, dimmed arena; it never scrolls the page sideways or covers Pause.
+  {const g=await page.evaluate(()=>{const card=document.querySelector('[data-testid=spellbox-draft]'),back=getComputedStyle(document.querySelector('[data-testid=spellbox-draft-backdrop]')),r=card.getBoundingClientRect(),pause=document.querySelector('.match-pause').getBoundingClientRect();
+    return{l:r.left,r:r.right,t:r.top,b:r.bottom,w:r.width,h:r.height,vw:innerWidth,vh:innerHeight,blur:back.backdropFilter||back.webkitBackdropFilter,bg:back.backgroundColor,pageW:document.documentElement.scrollWidth,cardX:card.scrollWidth-card.clientWidth,
+      pauseOnTop:document.elementFromPoint(pause.left+pause.width/2,pause.top+pause.height/2)?.closest('.match-pause')!==null,
+      targets:[...card.querySelectorAll('button')].map(b=>{const q=b.getBoundingClientRect();return Math.min(q.width,q.height);})};});
+   assert.match(g.blur,/blur\(\d/,'backdrop blurs the arena');assert.match(g.bg,/rgba\(.*0\.\d+\)/,'backdrop dims the arena');
+   assert.ok(g.pageW<=g.vw&&g.cardX<=1,`no horizontal scroll (${g.pageW}/${g.vw}, card ${g.cardX})`);assert.ok(g.l>=0&&g.r<=g.vw&&g.t>=0&&g.b<=g.vh,'card inside the viewport');
+   assert.ok(g.pauseOnTop,'Pause stays reachable above the draft');assert.ok(g.targets.every(n=>n>=56),`draft touch targets >= 56 px (${g.targets})`);
+   if(!mobile){assert.ok(g.w<=724&&g.w<g.vw*.6,`desktop card is compact (${g.w}px)`);assert.ok(Math.abs((g.l+g.r)/2-g.vw/2)<2&&Math.abs((g.t+g.b)/2-g.vh/2)<g.vh*.08,'desktop card is centred');}}
+  await page.screenshot({path:path.join(out,`spellbox-${layout}-draft.png`),timeout:240000});
+  await page.evaluate(()=>window.__toybox.match.timeScale(.25));await click('spellbox-ready');
+  await page.waitForFunction(()=>{const s=window.__toybox.match.state();if(s.fightAt>=0){window.__toybox.match.timeScale(0);return true;}return false;});
+  assert.match(await page.getByTestId('spellbox-countdown').textContent(),/Fight in [123]/);assert.equal(await page.getByTestId('spellbox-ready').isDisabled(),true);
+  await page.screenshot({path:path.join(out,`spellbox-${layout}-countdown.png`),timeout:240000});
+  await page.evaluate(()=>window.__toybox.match.timeScale(1));await page.waitForFunction(()=>window.__toybox.match.state().phase==='arena');await page.waitForSelector('[data-testid=spellbox-draft-backdrop]',{state:'detached'});
   // Keep a visible target stationary while real input adapters launch and resolve a rocket.
   await page.evaluate(()=>{const s=window.__toybox.match.state();Object.assign(s.players[0],{x:-4,z:0,vx:0,vz:0,moveX:0,moveZ:0,angle:Math.PI/2});s.players.slice(1).forEach((p,i)=>Object.assign(p,{x:i===0?4:-10,z:i===0?0:i*5-8,vx:0,vz:0,moveX:0,moveZ:0,cast:null,stunnedUntil:1e9,nextAction:1e9,cooldowns:[1e9,1e9,1e9]}));});
   const x=(await state()).players[0].x;if(mobile)await page.getByRole('button',{name:'Right',exact:true}).tap();else await page.keyboard.press('KeyD');await page.waitForFunction(x=>window.__toybox.match.state().players[0].x>x,x);
@@ -57,5 +76,5 @@ try{for(const layout of(process.env.SPELLBOX_LAYOUTS||'desktop,portrait,landscap
   const record=await page.evaluate(()=>JSON.parse(localStorage.getItem('toybox-trials:prototype:v1')).state.records['spellbox-showdown']);assert.equal(record.plays,1);
   await page.waitForTimeout(800);await click('results-again');await page.waitForFunction(()=>window.__toybox.match.phase()==='countdown');await page.evaluate(()=>window.__toybox.match.timeScale(10));await page.waitForFunction(()=>window.__toybox.match.phase()==='playing');await page.evaluate(()=>window.__toybox.match.timeScale(1));assert.equal((await state()).phase,'draft');assert.equal((await state()).players[0].damage,0);
   await page.getByRole('button',{name:'Pause',exact:true}).click();await page.waitForTimeout(800);await page.locator('.pause__actions .toy-btn').nth(1).click();await page.waitForSelector('.hud-sign');
-  assert.deepEqual(errors,[]);console.log(`PASS Spellbox ${layout}: eight generated icons, three offers per button, eight-player arena, ten-second shrink warning, two-player arena, movement/aim, Q/E/R and click/touch casts, projectile damage/knockback, cooldowns, repair, ring-out, pause, results, record, restart, hub return; no console/page errors`);await page.close();
+  assert.deepEqual(errors,[]);console.log(`PASS Spellbox ${layout}: eight generated icons, three offers per button, untimed draft with centred blurred card, lock-in markers and fight countdown, eight-player arena, ten-second shrink warning, two-player arena, movement/aim, Q/E/R and click/touch casts, projectile damage/knockback, cooldowns, repair, ring-out, pause, results, record, restart, hub return; no console/page errors`);await page.close();
 }}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

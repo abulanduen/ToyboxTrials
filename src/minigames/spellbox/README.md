@@ -16,9 +16,17 @@ the shared palette, WindupBot/MiniContender and synthesised sound.
 
 These numerical choices and the eight spells are provisional designs for playtesting.
 
-- Draft lasts up to 20 seconds. Each button has exactly **three options**, shown only when that
-  button is selected. Ready locks the build; all Ready starts combat early. Deadline keeps current
-  choices. Defaults are Pop Rocket, Spring Fan, Bubble Ward. Bots obey the same slot restrictions.
+- The draft has **no time limit** (owner request, 19 Nov 2026). Each button has exactly **three
+  options**, shown only when that button is selected. Defaults are Pop Rocket, Spring Fan, Bubble Ward.
+  Bots obey the same slot restrictions and lock in after a seeded 0.7–2.2 s look at their build.
+- **Lock build** is final: a locked player cannot change spells or un-ready. When every player has
+  locked in, a 3-second "Fight in 3…" countdown (`config.countdownMs`, simulation time, freezes on
+  pause) runs and cannot be cancelled, because nobody can change their build any more. The draft
+  never ends while anyone is still choosing; a solo player who idles can pause or quit via the host.
+- Events: `spellbox-countdown` `{seconds}` for 3, 2, 1 (sounded as count ticks), then `spellbox-start`.
+- The HUD shows a compact card (max 720 px wide) centred over a dimmed, blurred arena, with the
+  three slots, the three offers, everyone's lock-in state and the Lock build button. Phones keep it
+  inside the viewport and safe areas; in landscape the card scrolls internally if it must.
 
 | Button | Three options |
 | --- | --- |
@@ -86,7 +94,7 @@ The following actual dimensions are first-pass tuning; the bands and 10-second w
 - Projectiles use swept segment/body collision and hit the nearest living enemy. Area effects
   use body-circle overlap; the fan uses exact circle/sector intersection. Mines/projectiles cast
   before an elimination may still resolve in the same tick; combat stops when the outcome is known.
-- Maximum combat duration 90s; the 1.4s final animation and draft do not count toward survival
+- Maximum combat duration 90s; the 1.4s final animation, draft and fight countdown do not count toward survival
   records. Same-tick ring-outs tie; timeout survivors tie. Damage/hits do not break placement ties.
 - Bots react to public positions, projectiles, cast warnings and arena edges, with seeded choices
   and 420/260/140 ms decision intervals (easy/normal/hard). They use wards/repair situationally.
