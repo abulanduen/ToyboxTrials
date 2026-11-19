@@ -21,6 +21,8 @@ export const PALETTE = {
   brass: '#C8973A',
   ink: '#2B2433',
   white: '#FFF9EE',
+  /** Knocked-out toys (MiniContender greys them) and other dull tin. */
+  tinGrey: '#8E8A93',
 
   // Room scale (muted, slightly desaturated so the toy layer reads first)
   roomWall: '#B7A99A',

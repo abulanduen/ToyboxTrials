@@ -85,6 +85,7 @@ node tests/e2e/inferno.cjs      # Inferno Escape, desktop + phone portrait
 node tests/e2e/midnight.cjs     # Midnight Hunger, desktop + phone portrait/landscape
 node tests/e2e/toysquad.cjs     # Toy Squad, desktop + phone portrait/landscape
 node tests/e2e/rhythm.cjs       # Music Box Rhythm, desktop + phone portrait/landscape (slow: ONLY=desktop|portrait|landscape)
+node tests/e2e/tutorials.cjs    # every game's How to play pictures + intro thumbnails + Hub sheet, desktop + phone (LAYOUTS=, GAMES=; shots to $TMPDIR)
 node tests/e2e/spotdiff.cjs     # Odd Page Out (spot the difference), desktop + phone portrait/landscape (ONLY=desktop|portrait|landscape)
 node tests/e2e/towertumble.cjs  # Toy Tower Tumble, desktop + phone portrait/landscape (arg: desktop,portrait,landscape)
 node tests/e2e/siege.cjs        # Toybox Siege, desktop + phone portrait/landscape (ONLY=desktop|portrait|landscape; slow under software GL)

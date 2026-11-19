@@ -1,0 +1,311 @@
+/*
+ * Tutorial pictures (src/ui/tutorialArt). Light, looping CSS animation only; the global
+ * prefers-reduced-motion rule in styles.css stops all of it, and every picture still reads when
+ * still. Animated elements are wrapper <g>s with no transform attribute (see kit.tsx).
+ * Custom properties: --d delay, --t duration, --dx / --dy distances, --r rotation.
+ */
+.ta {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.ta-label {
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+/* rotations and scales turn about the animated element's own box (attribute transforms keep
+   the default user-space origin, so mirrored and placed groups are unaffected) */
+.ta-key,
+.ta-ratchet,
+.ta-spin,
+.ta-pulse,
+.ta-ripple,
+.ta-pop,
+.ta-swing,
+.ta-drain,
+.ta-charge,
+.ta-shrink,
+.ta-flick,
+.ta-knock {
+  transform-box: fill-box;
+}
+
+/* a toy running along +x and back to its start */
+.ta-run {
+  animation: ta-run var(--t, 2.4s) var(--d, 0s) linear infinite;
+}
+@keyframes ta-run {
+  0% { transform: translate(0, 0); }
+  10% { transform: translate(calc(var(--dx, 60px) * 0.1), -2px); }
+  20% { transform: translate(calc(var(--dx, 60px) * 0.2), 0); }
+  30% { transform: translate(calc(var(--dx, 60px) * 0.3), -2px); }
+  40% { transform: translate(calc(var(--dx, 60px) * 0.4), 0); }
+  50% { transform: translate(calc(var(--dx, 60px) * 0.5), -2px); }
+  60% { transform: translate(calc(var(--dx, 60px) * 0.6), 0); }
+  70% { transform: translate(calc(var(--dx, 60px) * 0.7), -2px); }
+  80% { transform: translate(calc(var(--dx, 60px) * 0.8), 0); }
+  90% { transform: translate(calc(var(--dx, 60px) * 0.9), -2px); opacity: 1; }
+  97% { opacity: 0; }
+  100% { transform: translate(var(--dx, 60px), 0); opacity: 0; }
+}
+
+/* a gentle idle bob (waiting, standing) */
+.ta-bob {
+  animation: ta-bob var(--t, 1.2s) var(--d, 0s) ease-in-out infinite;
+}
+@keyframes ta-bob {
+  50% { transform: translateY(-2.5px); }
+}
+
+/* a hop over something: up and along */
+.ta-hop {
+  animation: ta-hop var(--t, 2.2s) var(--d, 0s) ease-in-out infinite;
+}
+@keyframes ta-hop {
+  0%, 20% { transform: translate(0, 0); }
+  45% { transform: translate(calc(var(--dx, 40px) * 0.5), var(--dy, -26px)); }
+  70%, 100% { transform: translate(var(--dx, 40px), 0); }
+}
+
+/* the contender's own key turning (seen side-on, so it flips) */
+.ta-key {
+  transform-origin: center;
+  animation: ta-key 0.9s linear infinite;
+}
+@keyframes ta-key {
+  50% { transform: scaleY(-1); }
+}
+
+/* a big key ratcheting round in clicks (the Signalman's tell) */
+.ta-ratchet {
+  transform-origin: center;
+  animation: ta-ratchet 1.6s steps(8) infinite;
+}
+@keyframes ta-ratchet {
+  to { transform: rotate(360deg); }
+}
+/* ratchet tick marks flashing with each click */
+.ta-tick {
+  animation: ta-tick 0.2s steps(1) infinite;
+}
+@keyframes ta-tick {
+  50% { opacity: 0.15; }
+}
+
+/* steady spin (cranks, gears, rerolls) */
+.ta-spin {
+  transform-origin: center;
+  animation: ta-spin var(--t, 2s) linear infinite;
+}
+@keyframes ta-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* lamps and warnings */
+.ta-blink {
+  animation: ta-blink var(--t, 0.8s) var(--d, 0s) steps(1) infinite;
+}
+@keyframes ta-blink {
+  50% { opacity: 0.25; }
+}
+.ta-blinkfast {
+  animation: ta-blink 0.5s steps(1) infinite;
+}
+.ta-pulse {
+  transform-origin: center;
+  animation: ta-pulse var(--t, 1.2s) var(--d, 0s) ease-in-out infinite;
+}
+@keyframes ta-pulse {
+  50% { transform: scale(1.15); }
+}
+.ta-glow {
+  animation: ta-glow var(--t, 1.2s) var(--d, 0s) ease-in-out infinite;
+}
+@keyframes ta-glow {
+  50% { opacity: 0.35; }
+}
+
+/* one of a sequence lighting up in turn (--d staggers them across a --t cycle) */
+.ta-seq {
+  opacity: 0.12;
+  animation: ta-seq var(--t, 3s) var(--d, 0s) linear infinite;
+}
+@keyframes ta-seq {
+  0%, 24% { opacity: 1; }
+  28%, 100% { opacity: 0.12; }
+}
+.ta-seq--first {
+  opacity: 1;
+}
+
+/* a key cap or button being pressed */
+.ta-press {
+  animation: ta-press var(--t, 1.6s) var(--d, 0s) ease-in-out infinite;
+}
+@keyframes ta-press {
+  0%, 18%, 40%, 100% { transform: translateY(0); }
+  24%, 34% { transform: translateY(3px); }
+}
+
+/* a finger tapping, and its ripple */
+.ta-tap {
+  animation: ta-tap var(--t, 1.6s) var(--d, 0s) ease-in-out infinite;
+}
+@keyframes ta-tap {
+  0%, 100% { transform: translate(6px, 8px); }
+  24%, 34% { transform: translate(0, 0); }
+}
+.ta-ripple {
+  transform-origin: center;
+  opacity: 0;
+  animation: ta-ripple var(--t, 1.6s) var(--d, 0s) ease-out infinite;
+}
+@keyframes ta-ripple {
+  0%, 24% { transform: scale(0.4); opacity: 0; }
+  28% { opacity: 1; }
+  60%, 100% { transform: scale(1.8); opacity: 0; }
+}
+
+/* a finger or key being let go: lifts away */
+.ta-lift {
+  animation: ta-lift var(--t, 1.8s) var(--d, 0s) ease-in-out infinite;
+}
+@keyframes ta-lift {
+  0%, 15% { transform: translateY(0); opacity: 1; }
+  60%, 100% { transform: translateY(-14px); opacity: 0.25; }
+}
+
+/* a joystick knob springing back to the centre */
+.ta-recentre {
+  animation: ta-recentre var(--t, 1.8s) var(--d, 0s) cubic-bezier(0.3, 1.6, 0.5, 1) infinite;
+}
+@keyframes ta-recentre {
+  0%, 15% { transform: translate(var(--dx, 0), var(--dy, -10px)); }
+  45%, 100% { transform: translate(0, 0); }
+}
+/* a joystick knob pushed out and held */
+.ta-push {
+  animation: ta-push var(--t, 2s) var(--d, 0s) ease-in-out infinite;
+}
+@keyframes ta-push {
+  0%, 10% { transform: translate(0, 0); }
+  30%, 85% { transform: translate(var(--dx, 0), var(--dy, -10px)); }
+  100% { transform: translate(0, 0); }
+}
+
+/* a toy flicked back along an arc to the start, tumbling */
+.ta-flick {
+  transform-origin: center;
+  animation: ta-flick var(--t, 2.6s) var(--d, 0s) ease-in-out infinite;
+}
+@keyframes ta-flick {
+  0%, 25% { transform: translate(0, 0) rotate(0deg); }
+  55% { transform: translate(calc(var(--dx, -100px) * 0.5), var(--dy, -40px)) rotate(-200deg); }
+  80%, 100% { transform: translate(var(--dx, -100px), 0) rotate(-360deg); }
+}
+
+/* a toy knocked flying (hit, pushed out of the ring) */
+.ta-knock {
+  transform-origin: center;
+  animation: ta-knock var(--t, 2.2s) var(--d, 0s) ease-out infinite;
+}
+@keyframes ta-knock {
+  0%, 30% { transform: translate(0, 0) rotate(0deg); }
+  70%, 100% { transform: translate(var(--dx, 30px), var(--dy, -10px)) rotate(var(--r, 30deg)); }
+}
+
+/* something popping in (a wall dropped, a spring, a merged toy) */
+.ta-pop {
+  transform-origin: center;
+  animation: ta-pop var(--t, 2s) var(--d, 0s) cubic-bezier(0.2, 1.6, 0.4, 1) infinite;
+}
+@keyframes ta-pop {
+  0%, 20% { transform: scale(0.2); opacity: 0; }
+  40%, 100% { transform: scale(1); opacity: 1; }
+}
+/* something fading out (a broken block, a used ghost) */
+.ta-fade {
+  animation: ta-fade var(--t, 2s) var(--d, 0s) ease-in infinite;
+}
+@keyframes ta-fade {
+  0%, 30% { opacity: 1; }
+  55%, 100% { opacity: 0; }
+}
+/* the opposite of ta-fade, in step with it */
+.ta-appear {
+  animation: ta-appear var(--t, 2s) var(--d, 0s) ease-out infinite;
+}
+@keyframes ta-appear {
+  0%, 30% { opacity: 0; }
+  50%, 100% { opacity: 1; }
+}
+
+/* falling pins on the music box, lanes and so on: slide by --dx/--dy, fading in and out */
+.ta-slide {
+  animation: ta-slide var(--t, 2s) var(--d, 0s) linear infinite;
+}
+@keyframes ta-slide {
+  0% { transform: translate(0, 0); opacity: 0; }
+  12% { opacity: 1; }
+  88% { opacity: 1; }
+  100% { transform: translate(var(--dx, 0), var(--dy, 60px)); opacity: 0; }
+}
+
+/* a swinging pendulum or sword (rotate about the element's top / given origin) */
+.ta-swing {
+  transform-origin: 50% 0%;
+  animation: ta-swing var(--t, 2.4s) var(--d, 0s) ease-in-out infinite alternate;
+}
+@keyframes ta-swing {
+  from { transform: rotate(var(--r, 34deg)); }
+  to { transform: rotate(calc(var(--r, 34deg) * -1)); }
+}
+
+/* an energy bar draining (scaleX from the left) */
+.ta-drain {
+  transform-origin: 0% 50%;
+  animation: ta-drain var(--t, 4s) var(--d, 0s) linear infinite;
+}
+@keyframes ta-drain {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(var(--to, 0.15)); }
+}
+
+/* a wind-up charge filling from its origin (sword cones) */
+.ta-charge {
+  transform-origin: var(--ox, 0%) var(--oy, 50%);
+  animation: ta-charge var(--t, 1.6s) var(--d, 0s) ease-in infinite;
+}
+@keyframes ta-charge {
+  0% { transform: scale(0.05); opacity: 0.9; }
+  85% { transform: scale(1); opacity: 0.9; }
+  100% { transform: scale(1); opacity: 0; }
+}
+
+/* a ring shrinking (the Spellbox arena) */
+.ta-shrink {
+  transform-origin: center;
+  animation: ta-shrink var(--t, 3s) var(--d, 0s) ease-in-out infinite;
+}
+@keyframes ta-shrink {
+  0%, 20% { transform: scale(1); }
+  70%, 100% { transform: scale(var(--to, 0.8)); }
+}
+
+/* three things sliding together into one (Toy Squad merge) */
+.ta-merge {
+  animation: ta-merge var(--t, 2.6s) var(--d, 0s) ease-in-out infinite;
+}
+@keyframes ta-merge {
+  0%, 25% { transform: translate(0, 0); opacity: 1; }
+  60% { transform: translate(var(--dx, 0), var(--dy, 0)); opacity: 1; }
+  70%, 100% { transform: translate(var(--dx, 0), var(--dy, 0)); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ta *,
+  .ta *::before,
+  .ta *::after {
+    animation: none !important;
+  }
+}
