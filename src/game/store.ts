@@ -1,7 +1,10 @@
+import { useMemo } from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { device } from './input';
-import type { HatId, KeySkinId } from './cosmetics';
+import type { AccessorySlot } from './cosmetics';
+import { defaultProfile, normalizeProfile, type Loadout, type Profile } from './profile';
+import { STORE_VERSION, buyItem, dateKey, equipItem, migratePersisted, rewardSecret, unequipSlot, type BuyResult, type EquipResult } from './economy';
 import type { MinigameId } from '../minigames/types';
 import type { TournamentFormat } from '../minigames/tournament';
 
@@ -9,6 +12,8 @@ export type Quality = 'low' | 'balanced' | 'high';
 /** Top-level screens. `menu` = live 3D diorama main menu; `workshop` = customisation. */
 export type Screen = 'menu' | 'playing' | 'workshop' | 'minigame';
 export type MenuSheet = 'settings' | 'howto' | null;
+/** The Workshop screen hosts two panels on the same turntable: the Workshop itself and the Odds & Ends shop. */
+export type WorkshopMode = 'workshop' | 'shop';
 
 export interface Prompt {
   id: string;
@@ -24,7 +29,7 @@ export interface Ticket {
 }
 
 export interface Panel {
-  kind: 'tournament' | 'preview' | 'scoreboard' | 'shop';
+  kind: 'tournament' | 'preview' | 'scoreboard';
   title: string;
   subtitle?: string;
   body?: string;
@@ -39,10 +44,12 @@ interface SettingsSlice {
   mouseSensitivity: number; // 0.5..2
   invertY: boolean;
   showFps: boolean;
-  paintIndex: number;
-  hat: HatId;
-  keySkin: KeySkinId;
   contenderName: string;
+  /**
+   * Wallet, owned items and the equipped loadout (paint, hat, key, accessories, gestures): one
+   * serialisable object, so it can sync to an account later (docs/ECONOMY.md).
+   */
+  profile: Profile;
   secretsFound: string[];
   /** Per-minigame personal records. */
   records: Partial<Record<MinigameId, { best: number; plays: number; wins: number }>>;
@@ -65,6 +72,10 @@ interface SessionSlice {
   hubReturn: { x: number; z: number; yaw: number } | null;
   /** Where the Workshop returns to when closed. */
   workshopReturn: Screen;
+  /** Which panel the Workshop screen shows. */
+  workshopMode: WorkshopMode;
+  /** Shop try-on: parts of the loadout shown on the toy without owning or equipping them. */
+  tryOn: Partial<Loadout> | null;
   /** Overlay sheet on the main menu. */
   menuSheet: MenuSheet;
   /** First frames rendered (hides the loading card). */
@@ -87,10 +98,17 @@ interface Actions {
   openPanel: (p: Panel) => void;
   closePanel: () => void;
   togglePause: (force?: boolean) => void;
-  cyclePaint: () => void;
   goTo: (screen: Screen) => void;
   openWorkshop: () => void;
+  /** The Odds & Ends shop (same turntable as the Workshop). */
+  openShop: () => void;
+  /** Mark a secret found; the first time, also unlock its items and pay its cogs. */
   markSecret: (id: string) => boolean;
+  /** Replace the profile (the economy functions return a new one). */
+  setProfile: (p: Profile) => void;
+  buy: (id: string) => BuyResult;
+  equip: (id: string, gestureSlot?: number) => EquipResult;
+  unequip: (slot: 'hat' | AccessorySlot) => void;
 }
 
 export type GameState = SettingsSlice & SessionSlice & Actions;
@@ -108,10 +126,8 @@ export const useGame = create<GameState>()(
       mouseSensitivity: 1,
       invertY: false,
       showFps: false,
-      paintIndex: 0,
-      hat: 'none',
-      keySkin: 'classic',
       contenderName: 'Ticker',
+      profile: defaultProfile(),
       secretsFound: [],
       records: {},
       tournamentWins: {},
@@ -123,6 +139,8 @@ export const useGame = create<GameState>()(
       // session
       screen: 'menu',
       workshopReturn: 'menu',
+      workshopMode: 'workshop',
+      tryOn: null,
       hubReturn: null,
       menuSheet: null,
       ready: false,
@@ -149,20 +167,44 @@ export const useGame = create<GameState>()(
       openPanel: (p) => set({ panel: p }),
       closePanel: () => set({ panel: null }),
       togglePause: (force) => set({ paused: force ?? !get().paused }),
-      cyclePaint: () => set({ paintIndex: get().paintIndex + 1 }),
-      goTo: (screen) => set({ screen, paused: false, panel: null, menuSheet: null, prompt: null }),
+      goTo: (screen) => set({ screen, paused: false, panel: null, menuSheet: null, prompt: null, tryOn: null }),
       openWorkshop: () => {
         const from = get().screen;
-        set({ screen: 'workshop', workshopReturn: from === 'workshop' ? get().workshopReturn : from, paused: false, panel: null, menuSheet: null, prompt: null });
+        set({ screen: 'workshop', workshopMode: 'workshop', tryOn: null, workshopReturn: from === 'workshop' ? get().workshopReturn : from, paused: false, panel: null, menuSheet: null, prompt: null });
+      },
+      openShop: () => {
+        const from = get().screen;
+        set({ screen: 'workshop', workshopMode: 'shop', tryOn: null, workshopReturn: from === 'workshop' ? get().workshopReturn : from, paused: false, panel: null, menuSheet: null, prompt: null });
       },
       markSecret: (id) => {
         if (get().secretsFound.includes(id)) return false;
-        set({ secretsFound: [...get().secretsFound, id] });
+        const { profile } = rewardSecret(get().profile, id, Date.now());
+        set({ secretsFound: [...get().secretsFound, id], profile });
         return true;
       },
+      setProfile: (profile) => set({ profile }),
+      buy: (id) => {
+        const r = buyItem(get().profile, id, dateKey(new Date()), Date.now());
+        if (r.ok) set({ profile: r.profile });
+        return r;
+      },
+      equip: (id, gestureSlot) => {
+        const r = equipItem(get().profile, id, gestureSlot);
+        if (r.ok) set({ profile: r.profile });
+        return r;
+      },
+      unequip: (slot) => set({ profile: unequipSlot(get().profile, slot) }),
     }),
     {
       name: 'toybox-trials:prototype:v1',
+      // v0 kept paintIndex/hat/keySkin at the top level; v1 moved them into `profile`.
+      version: STORE_VERSION,
+      migrate: (persisted, version) => migratePersisted(persisted, version) as unknown as GameState,
+      // Whatever is stored, the profile that comes out is valid (unknown items dropped, nothing negative).
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<GameState>;
+        return { ...current, ...p, profile: normalizeProfile(p.profile) };
+      },
       partialize: (s) => ({
         masterVolume: s.masterVolume,
         sfxVolume: s.sfxVolume,
@@ -170,10 +212,8 @@ export const useGame = create<GameState>()(
         mouseSensitivity: s.mouseSensitivity,
         invertY: s.invertY,
         showFps: s.showFps,
-        paintIndex: s.paintIndex,
-        hat: s.hat,
-        keySkin: s.keySkin,
         contenderName: s.contenderName,
+        profile: s.profile,
         secretsFound: s.secretsFound,
         records: s.records,
         tournamentWins: s.tournamentWins,
@@ -189,4 +229,11 @@ export const useGame = create<GameState>()(
 /** True whenever gameplay input should be ignored (menus, panels, pause, workshop). */
 export function inputBlocked(s: GameState = useGame.getState()): boolean {
   return s.screen !== 'playing' || s.paused || s.panel !== null;
+}
+
+/** The loadout to draw on the local toy: what's equipped, with any shop try-on on top. */
+export function useShownLoadout(): Loadout {
+  const loadout = useGame((s) => s.profile.loadout);
+  const tryOn = useGame((s) => s.tryOn);
+  return useMemo(() => (tryOn ? { ...loadout, ...tryOn } : loadout), [loadout, tryOn]);
 }

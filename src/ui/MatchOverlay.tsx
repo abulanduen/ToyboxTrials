@@ -27,6 +27,31 @@ import type { BotDifficulty, Contestant } from '../minigames/types';
 import { tutorialFor, type TutorialStep } from '../minigames/tutorials';
 import { CardboardSheet, KeyCap, ToyButton } from './common';
 import { GearIcon, StarSticker, WindKeyIcon } from './icons';
+import { CogIcon } from './itemIcons';
+import type { Reward } from '../game/economy';
+
+/** "+23 cogs" with the breakdown, and anything an achievement just unlocked. */
+function CogsEarned({ reward, unlocked, testId }: { reward: Reward; unlocked: string[]; testId: string }) {
+  const wallet = useGame((s) => s.profile.wallet.cogs);
+  if (reward.total <= 0 && !unlocked.length) return null;
+  return (
+    <div className="cogs-earned" data-testid={testId}>
+      {reward.total > 0 && (
+        <div className="cogs-earned__main">
+          <CogIcon size={24} />
+          <strong>+{reward.total} cogs</strong>
+          <span className="cogs-earned__lines">{reward.lines.map((l) => `${l.label} +${l.cogs}`).join(' · ')}</span>
+          <span className="cogs-earned__wallet">Wallet: {wallet}</span>
+        </div>
+      )}
+      {unlocked.length > 0 && (
+        <div className="cogs-earned__unlock">
+          <StarSticker size={18} /> Unlocked: {unlocked.join(', ')} (Workshop)
+        </div>
+      )}
+    </div>
+  );
+}
 
 const ordinal = (n: number) => `${n}${n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd' : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th'}`;
 
@@ -319,6 +344,7 @@ function Results() {
         </ol>
       )}
       {!solo && m.newBest && <p className="intro-record"><StarSticker size={18} /> New personal best: {mine?.score} {unit(def.recordUnit, mine?.score ?? 0)}</p>}
+      <CogsEarned reward={m.reward} unlocked={m.unlocked} testId="results-cogs" />
       <div className="pause__actions">
         {isTournament ? (
           <ToyButton armDelay={700} onClick={continueAfterResults} autoFocus testId="results-next">
@@ -407,6 +433,7 @@ function Final() {
         {FORMATS[t.format].name} complete · {FORMATS[t.format].name} wins: {wins}
       </div>
       <StandingsTable />
+      <CogsEarned reward={m.tournamentReward} unlocked={m.unlocked} testId="final-cogs" />
       <div className="pause__actions">
         <ToyButton armDelay={700} onClick={() => startTournament(t.format, m.opponents, m.difficulty)} autoFocus testId="final-again">
           Play another

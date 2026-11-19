@@ -96,7 +96,7 @@ function Lineup({ podium }: { podium: boolean }) {
       {placed.map(({ c, x, y, z }) =>
         c.isLocal ? (
           <group key={c.id} position={[x, y, z]}>
-            <WindupBot anim={localAnim} paint={c.paint} hat={c.hat} keySkin={c.keySkin} />
+            <WindupBot anim={localAnim} paint={c.paint} hat={c.hat} keySkin={c.keySkin} accessories={c.accessories} />
           </group>
         ) : (
           <group key={c.id} position={[x, y, z]}>

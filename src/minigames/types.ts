@@ -13,7 +13,7 @@
  */
 import type { ComponentType } from 'react';
 import type { PaintJob } from '../game/palette';
-import type { HatId, KeySkinId } from '../game/cosmetics';
+import type { Accessories, HatId, KeySkinId } from '../game/cosmetics';
 import type { Action } from '../game/input';
 import type { MinigameId } from './ids';
 
@@ -30,6 +30,8 @@ export interface Contestant {
   paint: PaintJob;
   hat: HatId;
   keySkin: KeySkinId;
+  /** Back/face/neck accessories (the local player's full WindupBot shows them; MiniContender ignores them). */
+  accessories?: Accessories;
   isLocal: boolean;
   /** Undefined for humans. */
   bot?: BotDifficulty;

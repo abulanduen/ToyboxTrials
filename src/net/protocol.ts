@@ -10,7 +10,8 @@
 import { EMOTE_IDS, isEmoteId, type EmoteId } from '../game/emotes';
 import { MINIGAME_IDS, type MinigameId } from '../minigames/ids';
 
-export const PROTOCOL_VERSION = 1;
+/** v2: looks carry the accessory slots (back/face/neck), six more gesture ids, and a 'shop' activity. */
+export const PROTOCOL_VERSION = 2;
 
 // ---------------------------------------------------------------- limits and rates
 /** Largest client → server frame the server accepts (bytes). Bigger frames close the socket. */
@@ -75,21 +76,25 @@ export function parseRoomId(id: unknown): RoomRef | null {
 
 // ---------------------------------------------------------------- shared shapes
 /** What a player is doing away from the hub. Null = walking around the hub. */
-export const ACTIVITIES = [...MINIGAME_IDS, 'workshop'] as const;
-export type Activity = MinigameId | 'workshop';
+export const ACTIVITIES = [...MINIGAME_IDS, 'workshop', 'shop'] as const;
+export type Activity = MinigameId | 'workshop' | 'shop';
 
 export function isActivity(v: unknown): v is Activity {
   return typeof v === 'string' && (ACTIVITIES as readonly string[]).includes(v);
 }
 
 /**
- * Cosmetics on the wire. `paint` is an index into PAINT_JOBS, `hat`/`keySkin` are catalogue ids
- * from src/game/cosmetics.ts. The server replaces anything unknown with the defaults.
+ * Cosmetics on the wire. `paint` is an index into PAINT_JOBS; `hat`, `keySkin` and the accessory
+ * slots `back`, `face`, `neck` are catalogue ids from src/game/cosmetics.ts ('none' = empty). The
+ * server replaces anything unknown with the defaults. Ownership is not checked (no accounts yet).
  */
 export interface Look {
   paint: number;
   hat: string;
   keySkin: string;
+  back: string;
+  face: string;
+  neck: string;
 }
 
 export type JoinRequest = { kind: 'public' } | { kind: 'host' } | { kind: 'code'; code: string };
@@ -258,11 +263,19 @@ function parseJson(raw: unknown, maxLength: number): Obj | null {
   }
 }
 
-/** Structural check of a look (ids are checked against the catalogue by the server). */
+/**
+ * Structural check of a look (ids are checked against the catalogue by the server). A missing
+ * accessory slot reads as 'none'; a slot of the wrong type rejects the message.
+ */
 function parseLook(v: unknown): Look | null {
   if (!isObj(v)) return null;
   if (!isNum(v.paint) || !isStr(v.hat, 32) || !isStr(v.keySkin, 32)) return null;
-  return { paint: v.paint, hat: v.hat, keySkin: v.keySkin };
+  const slot = (x: unknown) => (x === undefined ? 'none' : isStr(x, 32) ? x : null);
+  const back = slot(v.back);
+  const face = slot(v.face);
+  const neck = slot(v.neck);
+  if (back === null || face === null || neck === null) return null;
+  return { paint: v.paint, hat: v.hat, keySkin: v.keySkin, back, face, neck };
 }
 
 function parseJoin(v: unknown): JoinRequest | null {

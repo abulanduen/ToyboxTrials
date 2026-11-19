@@ -59,7 +59,7 @@ export interface TvInputs {
 }
 
 const short = (game: MinigameId) => gateFor(game)?.short ?? MINIGAMES.find((g) => g.id === game)?.title ?? game;
-export const activityLabel = (a: Activity) => (a === 'workshop' ? 'Workshop' : short(a));
+export const activityLabel = (a: Activity) => (a === 'workshop' ? 'Workshop' : a === 'shop' ? 'Shop' : short(a));
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}.` : s);
 
 /** Which card is showing `t` seconds in, with `skip` manual channel changes. */
@@ -96,7 +96,7 @@ export function tvCard(id: TvCardId, inp: TvInputs, cycle = 0): TvCard {
     }
     case 'friends': {
       if (!online) return { id, title: 'NOW PLAYING', accent: P.coral, lines: [{ text: 'GO ONLINE TO SEE WHO' }, { text: 'IS IN WHICH TRIAL.' }] };
-      const busy = inp.players.filter((p) => p.id !== inp.selfId && p.activity && p.activity !== 'workshop');
+      const busy = inp.players.filter((p) => p.id !== inp.selfId && p.activity && p.activity !== 'workshop' && p.activity !== 'shop');
       if (!busy.length) return { id, title: 'NOW PLAYING', accent: P.coral, lines: [{ text: 'NO ONE IS IN A TRIAL' }, { text: 'RIGHT NOW.' }, { text: '' }, { text: 'THE GATES ARE OVER', color: P.honey }, { text: 'THE DOMINO BRIDGE!', color: P.honey }] };
       const lines: TvLine[] = busy.slice(0, TV_ROWS - 1).map((p) => ({ text: clip(`${clip(p.name, 11)} > ${activityLabel(p.activity!)}`, TV_COLS) }));
       if (busy.length > TV_ROWS - 1) lines.push({ text: `+${busy.length - (TV_ROWS - 1)} MORE` });

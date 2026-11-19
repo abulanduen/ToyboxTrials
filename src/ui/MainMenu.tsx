@@ -5,8 +5,8 @@
 import { useEffect } from 'react';
 import { useGame } from '../game/store';
 import { sfx, unlockAudio } from '../game/audio';
-import { PAINT_JOBS } from '../game/palette';
-import { HATS } from '../game/cosmetics';
+import { HATS, itemById, paintJobFor } from '../game/cosmetics';
+import { CogCount } from './Catalogue';
 import { SECRET_IDS } from '../game/interactables';
 import { CardboardSheet, KeyCap, SettingsForm, ToyButton } from './common';
 import { GearIcon, StarSticker, TickerBadge } from './icons';
@@ -15,8 +15,10 @@ import { useNet } from '../net/store';
 
 export function MainMenu() {
   const s = useGame();
-  const paint = PAINT_JOBS[s.paintIndex % PAINT_JOBS.length];
-  const hatName = HATS.find((h) => h.id === s.hat)?.name ?? '';
+  const loadout = s.profile.loadout;
+  const paint = paintJobFor(loadout.paint);
+  const paintName = itemById(loadout.paint)?.name ?? '';
+  const hatName = HATS.find((h) => h.id === loadout.hat)?.name ?? '';
 
   const play = () => {
     unlockAudio();
@@ -68,7 +70,10 @@ export function MainMenu() {
             </ToyButton>
           </div>
         </nav>
-        <div className="menu-online">
+        <div className="menu-online menu-row">
+          <ToyButton tone="coral" onClick={() => s.openShop()} className="menu-btn menu-btn--online" testId="menu-shop">
+            Shop
+          </ToyButton>
           <ToyButton tone="sage" onClick={openOnlineSheet} className="menu-btn menu-btn--online" testId="menu-online">
             Play online
           </ToyButton>
@@ -79,14 +84,15 @@ export function MainMenu() {
           <div>
             <strong>{s.contenderName || 'Contender'}</strong>
             <span>
-              {paint.name}
-              {s.hat !== 'none' ? ` · ${hatName}` : ''}
+              {paintName}
+              {loadout.hat !== 'none' ? ` · ${hatName}` : ''}
             </span>
           </div>
           <div className="menu-contender__secrets" title="Playroom secrets found">
             <StarSticker size={20} />
             {s.secretsFound.length}/{SECRET_IDS.length}
           </div>
+          <CogCount value={s.profile.wallet.cogs} testId="menu-cogs" className="menu-contender__cogs" />
         </div>
       </div>
 
@@ -119,7 +125,7 @@ function HowToPlay({ onClose, touch }: { onClose: () => void; touch: boolean }) 
   return (
     <CardboardSheet title="How to play" className="howto" onBackdrop={onClose}>
       <p className="panel__lead">
-        Explore the Playroom, step through the gates to enter trials, and hunt for the four hidden secrets. Each secret unlocks something new in the Workshop.
+        Explore the Playroom, step through the gates to enter trials, and hunt for the four hidden secrets. Each secret unlocks something new in the Workshop. Trials, tournaments and secrets pay cogs to spend at the Odds &amp; Ends shop.
       </p>
       <div className="howto__cols">
         <div className={`howto__col${touch ? '' : ' howto__col--active'}`}>

@@ -3159,3 +3159,422 @@ canvas {
   transform: translateY(2px);
   box-shadow: 0 1px 0 var(--ink-deep);
 }
+
+/* ======================================================================
+   Odds & Ends shop, cogs wallet, extended Workshop (accessories, gestures)
+   ====================================================================== */
+.cog-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 12px 3px 5px;
+  border-radius: 999px;
+  border: 2.5px solid var(--ink-deep);
+  background: var(--paper);
+  font: 700 0.95rem var(--font-display);
+  color: var(--ink-deep);
+  white-space: nowrap;
+  box-shadow: 0 3px 0 rgba(43, 36, 51, 0.3);
+}
+.cog-count strong {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.hud-cogs {
+  position: absolute;
+  top: calc(82px + env(safe-area-inset-top));
+  left: calc(112px + env(safe-area-inset-left));
+}
+@media (max-width: 700px), (max-height: 500px) {
+  .hud-cogs {
+    top: calc(64px + env(safe-area-inset-top));
+  }
+}
+.menu-contender .cog-count strong {
+  display: inline;
+  font: inherit;
+}
+.menu-contender__cogs {
+  flex-shrink: 0;
+  margin-left: 6px;
+  padding: 1px 10px 1px 3px;
+  box-shadow: none;
+}
+.pause__shop .cog-count {
+  margin-right: 6px;
+  box-shadow: none;
+}
+.pause__shop > span {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* Workshop/shop tabs: five categories, wrapping on narrow screens, 56 px targets. */
+.workshop-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  background: var(--ink-deep);
+}
+.workshop-tabs button {
+  flex: 1 1 auto;
+  min-width: 64px;
+  min-height: 56px;
+  padding: 0 8px;
+  font-size: 0.92rem;
+}
+/* Narrow panels (the Workshop column, phones): five tabs in two tidy rows, three then two. */
+.workshop-panel:not(.shop-panel) .workshop-tabs {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+.workshop-panel:not(.shop-panel) .workshop-tabs button {
+  grid-column: span 2;
+  min-width: 0;
+}
+.workshop-panel:not(.shop-panel) .workshop-tabs button:nth-child(n + 4) {
+  grid-column: span 3;
+}
+.workshop-tabs button + button {
+  border-left: 0;
+}
+.swatch {
+  min-height: 96px;
+}
+
+.shop-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 0.6rem;
+}
+.shop-head h2 {
+  margin: 0;
+}
+.shop-panel {
+  width: min(500px, 46vw);
+}
+.shop-featured {
+  margin: 0 0 12px;
+  padding: 8px 10px 10px;
+  border-radius: 12px;
+  border: 2.5px dashed rgba(110, 82, 54, 0.7);
+  background: rgba(255, 243, 214, 0.55);
+}
+.shop-featured__title {
+  margin-bottom: 6px;
+  font: 700 0.95rem var(--font-display);
+}
+.shop-featured__title span {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--coral);
+  color: var(--paper);
+  font-size: 0.78rem;
+  transform: rotate(-3deg);
+}
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 10px;
+}
+.shop-grid--featured {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.shop-group {
+  margin-bottom: 10px;
+}
+.shop-group__title {
+  margin: 4px 0 6px;
+  font: 700 0.9rem var(--font-display);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--wood-dark);
+}
+.shop-card {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  justify-items: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 118px;
+  padding: 10px 4px 7px;
+  border-radius: 14px;
+  border: 2.5px solid var(--ink-deep);
+  border-top: 7px solid var(--rarity, #a9a6ae);
+  background: var(--paper);
+  box-shadow: 0 4px 0 rgba(43, 36, 51, 0.35);
+  color: var(--ink-deep);
+  cursor: pointer;
+  transition: transform 0.06s;
+}
+.shop-card:active {
+  transform: translateY(3px);
+}
+.shop-card--on {
+  background: #fff3d6;
+  outline: 4px solid var(--honey);
+}
+.shop-card--locked .shop-card__art {
+  filter: grayscale(1) brightness(0.8);
+  opacity: 0.6;
+}
+.shop-card__art {
+  display: grid;
+  place-items: center;
+  height: 46px;
+}
+.shop-card__name {
+  font: 700 0.78rem/1.1 var(--font-body);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.shop-card__foot {
+  min-height: 22px;
+  display: flex;
+  align-items: center;
+}
+.shop-card__price {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font: 700 0.9rem var(--font-display);
+}
+.shop-card__price s {
+  margin-left: 3px;
+  font-size: 0.72rem;
+  opacity: 0.6;
+}
+.shop-card__tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(87, 77, 105, 0.12);
+  font: 700 0.72rem var(--font-body);
+}
+.shop-card__tag--equipped {
+  background: var(--sage);
+  color: var(--ink-deep);
+}
+.shop-card__tag--locked {
+  background: transparent;
+}
+.rarity-chip {
+  padding: 1px 9px;
+  border-radius: 999px;
+  border: 2px solid var(--ink-deep);
+  font: 700 0.72rem var(--font-body);
+  color: var(--ink-deep);
+}
+.shop-detail {
+  display: grid;
+  gap: 4px;
+  margin: 12px 0 14px;
+  padding: 8px 12px 10px;
+  border-radius: 10px;
+  background: rgba(255, 249, 238, 0.6);
+  border: 2px dashed rgba(110, 82, 54, 0.5);
+  font-size: 0.9rem;
+}
+.shop-detail strong {
+  font: 700 1.05rem var(--font-display);
+}
+.shop-detail__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.shop-detail__how {
+  font-weight: 700;
+  color: var(--ink);
+}
+.shop-detail__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+.shop-detail__actions .toy-btn > span,
+.workshop-panel .pause__actions .toy-btn > span {
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+}
+.shop-note {
+  font-weight: 700;
+}
+.shop-note--good {
+  color: #3f7a43;
+}
+.shop-note--bad {
+  color: #a9443e;
+}
+.shop-gestures {
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
+  font-weight: 700;
+}
+
+/* The four equipped gestures (keys 1–4). */
+.gesture-slots {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.gesture-slot {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 2px;
+  min-height: 64px;
+  min-width: 0;
+  padding: 6px 2px;
+  border-radius: 12px;
+  border: 2.5px solid var(--ink-deep);
+  background: var(--cream);
+  box-shadow: 0 3px 0 var(--ink-deep);
+  font: 700 0.74rem var(--font-display);
+  color: var(--ink-deep);
+  cursor: pointer;
+}
+.gesture-slot:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--ink-deep);
+}
+.gesture-slot--target {
+  background: #fff3d6;
+  outline: 3px dashed var(--coral);
+  outline-offset: 1px;
+}
+.gesture-slot__key {
+  position: absolute;
+  top: 3px;
+  left: 6px;
+  font-size: 0.72rem;
+  opacity: 0.7;
+}
+.gesture-slot__name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Results / final: cogs earned. */
+.cogs-earned {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 1rem;
+}
+.cogs-earned__main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 2.5px solid var(--ink-deep);
+  background: #fff3d6;
+}
+.cogs-earned__main strong {
+  font: 700 1.15rem var(--font-display);
+}
+.cogs-earned__lines {
+  order: 3;
+  flex-basis: 100%;
+  font-size: 0.82rem;
+  color: var(--ink);
+}
+.cogs-earned__wallet {
+  margin-left: auto;
+  font: 700 0.85rem var(--font-body);
+}
+.cogs-earned__unlock {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+}
+
+/* Phones: the shop panel is a bottom sheet in portrait (toy above), a right-hand column in landscape. */
+@media (orientation: portrait) {
+  .shop-panel {
+    width: calc(100vw - 20px);
+    max-height: 58vh;
+  }
+  /* Five tabs in two tidy rows: three, then two. */
+  .workshop-tabs {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  .workshop-tabs button {
+    grid-column: span 2;
+    min-width: 0;
+  }
+  .workshop-tabs button:nth-child(n + 4) {
+    grid-column: span 3;
+  }
+  .shop-grid {
+    grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+    gap: 8px;
+  }
+  .shop-card {
+    min-height: 108px;
+  }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  .shop-panel {
+    width: min(460px, 52vw);
+  }
+  .shop-grid {
+    grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+    gap: 8px;
+  }
+}
+
+/* Phones (portrait, or short landscape): a compact featured row. */
+@media (orientation: portrait), (max-height: 500px) {
+  .shop-featured {
+    padding: 6px 8px 8px;
+  }
+  .shop-grid--featured {
+    gap: 6px;
+  }
+  .shop-grid--featured .shop-card {
+    min-height: 0;
+    padding: 6px 2px 5px;
+    gap: 2px;
+  }
+  .shop-grid--featured .shop-card__art {
+    height: 34px;
+  }
+  .shop-grid--featured .shop-card__art svg {
+    width: 34px;
+    height: 34px;
+  }
+  .shop-head h2 {
+    font-size: 1.35rem;
+  }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  /* Keep Done reachable without scrolling the shop/Workshop column. */
+  .workshop-panel .pause__actions {
+    position: sticky;
+    bottom: -1rem;
+    z-index: 1;
+    margin: 0 -1rem -1rem;
+    padding: 8px 1rem 10px;
+    background: linear-gradient(rgba(201, 165, 122, 0), #c9a57a 14px);
+  }
+}

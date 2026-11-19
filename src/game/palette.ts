@@ -102,13 +102,20 @@ export const RARITY = {
   legendary: PALETTE.honey,
 } as const;
 
-/** Paint jobs available at the Workshop. Body / trim / accent. */
+/** Paint jobs (Workshop and shop). Body / trim / accent. The first five are free; see the catalogue in cosmetics.ts. */
 export const PAINT_JOBS = [
   { name: 'Toy Blue', body: PALETTE.toyBlue, trim: PALETTE.honey, accent: PALETTE.coral },
   { name: 'Coral Clank', body: PALETTE.coral, trim: PALETTE.cream, accent: PALETTE.toyBlue },
   { name: 'Sage Sprocket', body: PALETTE.sage, trim: PALETTE.honey, accent: PALETTE.inkPurple },
   { name: 'Honey Hustle', body: PALETTE.honey, trim: PALETTE.inkPurple, accent: PALETTE.coral },
   { name: 'Midnight Tin', body: PALETTE.inkPurple, trim: PALETTE.honey, accent: PALETTE.sage },
+  // Sold at the Odds & Ends shop (appended: online looks send the index, so never reorder).
+  { name: 'Mint Condition', body: '#9ED8C3', trim: PALETTE.cream, accent: PALETTE.coral },
+  { name: 'Plum Pudding', body: '#8E5B8A', trim: PALETTE.honey, accent: PALETTE.sage },
+  { name: 'Racing Red', body: '#D6463E', trim: PALETTE.white, accent: PALETTE.ink },
+  { name: 'Chalkboard', body: '#46524C', trim: PALETTE.cream, accent: PALETTE.honey },
+  { name: 'Bubblegum', body: '#F2A7C3', trim: PALETTE.white, accent: PALETTE.toyBlue },
+  { name: 'Copper Kettle', body: '#C97B4A', trim: PALETTE.cream, accent: '#3E6F8E' },
 ] as const;
 
 export type PaintJob = (typeof PAINT_JOBS)[number];

@@ -8,6 +8,8 @@ import { sfx } from './audio';
 import { useGame } from './store';
 import { PALETTE } from './palette';
 import { rewardForSecret } from './cosmetics';
+import { EARN } from './economy';
+import { exposeDebug } from './debug';
 import { openPractice } from '../minigames/session';
 import { GATES, GATE_STAND, JACK, MUSICBOX, PAVILION, SCOREBOARD, SHOP, TOWER, TV, WORKSHOP, frontOf } from '../scene/layout';
 
@@ -46,6 +48,9 @@ export const INTERACTABLES: Interactable[] = [
   { id: 'key', x: TOWER.block.x, z: TOWER.block.z, radius: 2.4, verb: 'Grab', label: 'the golden key', secret: true, minY: TOWER.block.top - 0.5, disabled: () => !keyAvailable() },
 ];
 
+// ?debug only: where each interactable is (e.g. tests teleport next to the shop's prompt).
+exposeDebug({ interactables: () => INTERACTABLES.map(({ id, x, z, radius, verb, label }) => ({ id, x, z, radius, verb, label })) });
+
 /** Live position overrides for movable interactables (the marble rolls). */
 export const livePositions = new Map<string, { x: number; z: number }>();
 
@@ -61,7 +66,7 @@ function discover(id: string, name: string) {
     const reward = rewardForSecret(id);
     g.pushTicket({
       title: 'Secret found!',
-      body: `${name}: ${n}/${SECRET_IDS.length} playroom secrets${reward ? `. Unlocked: ${reward} (Workshop)` : ''}`,
+      body: `${name}: ${n}/${SECRET_IDS.length} playroom secrets${reward ? `. Unlocked: ${reward} (Workshop)` : ''}. +${EARN.secret} cogs`,
       tone: 'reward',
     });
   }
@@ -89,14 +94,8 @@ export function interact(id: string, facing: { x: number; z: number }) {
       g.openWorkshop();
       break;
     case 'shop':
-      sfx.click();
-      g.openPanel({
-        kind: 'shop',
-        title: 'Odds & Ends Shop',
-        subtitle: 'Closed for stock-take',
-        body: 'Thimble helmets, bottle-cap crowns and button badges will be sold here once cosmetics are unlocked.',
-        accent: PALETTE.sage,
-      });
+      sfx.purchase();
+      g.openShop();
       break;
     case 'tv':
       sfx.click();

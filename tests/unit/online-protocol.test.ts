@@ -21,7 +21,7 @@ import { MINIGAME_IDS } from '../../src/minigames/ids';
 import { MINIGAMES } from '../../src/minigames/registry';
 import { seededRng } from '../../src/minigames/rng';
 
-const look = { paint: 0, hat: 'none', keySkin: 'classic' };
+const look = { paint: 0, hat: 'none', keySkin: 'classic', back: 'none', face: 'none', neck: 'none' };
 const J = (v: unknown) => JSON.stringify(v);
 
 describe('client message validation', () => {
@@ -34,6 +34,16 @@ describe('client message validation', () => {
     expect(parseClientMessage(J({ t: 'activity', a: null }))).toEqual({ t: 'activity', a: null });
     expect(parseClientMessage(J({ t: 'look', look }))).toEqual({ t: 'look', look });
     expect(parseClientMessage(J({ t: 'leave' }))).toEqual({ t: 'leave' });
+  });
+
+  it('parses looks with accessory slots (protocol v2); a missing slot reads as none', () => {
+    const full = { paint: 3, hat: 'propeller', keySkin: 'moon', back: 'cape', face: 'monocle', neck: 'scarf' };
+    expect(parseClientMessage(J({ t: 'look', look: full }))).toEqual({ t: 'look', look: full });
+    expect(parseClientMessage(J({ t: 'look', look: { paint: 0, hat: 'none', keySkin: 'classic' } }))).toEqual({ t: 'look', look });
+    expect(parseClientMessage(J({ t: 'look', look: { ...full, back: 7 } }))).toBeNull();
+    expect(parseClientMessage(J({ t: 'look', look: { ...full, neck: 'x'.repeat(40) } }))).toBeNull();
+    expect(PROTOCOL_VERSION).toBe(2);
+    expect(ACTIVITIES).toContain('shop');
   });
 
   it('drops extra fields instead of passing them through', () => {

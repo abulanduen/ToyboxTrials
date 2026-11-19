@@ -14,8 +14,9 @@ import { RoundedBox } from '../scene/RoundedBox';
 import * as THREE from 'three';
 import { PALETTE, type PaintJob } from '../game/palette';
 import { ELIM_DURATION, INTERACT_DURATION, RESPAWN_DURATION, type ToyAnim } from './anim';
-import type { HatId, KeySkinId } from '../game/cosmetics';
+import { NO_ACCESSORIES, type Accessories, type HatId, type KeySkinId } from '../game/cosmetics';
 import { HAT_HIDES_ANTENNA, Hat, KeyBow } from './Cosmetics';
+import { BackItem, FaceItem, KEY_BACK_OFFSET, NeckItem } from './Accessories';
 import { EMOTE_DURATION } from '../game/emotes';
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
@@ -32,9 +33,14 @@ interface Props {
   paint: PaintJob;
   hat?: HatId;
   keySkin?: KeySkinId;
+  /** Back / face / neck accessories (minigame scenes may leave them out). */
+  accessories?: Accessories;
 }
 
-export function WindupBot({ anim, paint, hat = 'none', keySkin = 'classic' }: Props) {
+/** Juggling beads: colours and phase offsets (the juggle gesture). */
+const JUGGLE_BALLS = [PALETTE.coral, PALETTE.honey, PALETTE.toyBlue];
+
+export function WindupBot({ anim, paint, hat = 'none', keySkin = 'classic', accessories = NO_ACCESSORIES }: Props) {
   const mats = useMemo(() => {
     const plastic = (c: string, rough = 0.42) => new THREE.MeshStandardMaterial({ color: c, roughness: rough, metalness: 0.02 });
     return {
@@ -47,8 +53,10 @@ export function WindupBot({ anim, paint, hat = 'none', keySkin = 'classic' }: Pr
       brass: new THREE.MeshStandardMaterial({ color: PALETTE.brass, roughness: 0.32, metalness: 0.85 }),
       eyeWhite: new THREE.MeshStandardMaterial({ color: '#FFFDF6', roughness: 0.2 }),
       highlight: new THREE.MeshBasicMaterial({ color: '#ffffff' }),
+      balls: JUGGLE_BALLS.map((c) => plastic(c, 0.3)),
     };
   }, [paint]);
+  const keyBack = KEY_BACK_OFFSET[accessories.back] ?? 0;
 
   // Rig nodes
   const visual = useRef<THREE.Group>(null!);
@@ -65,6 +73,7 @@ export function WindupBot({ anim, paint, hat = 'none', keySkin = 'classic' }: Pr
   const keyPivot = useRef<THREE.Group>(null!);
   const needle = useRef<THREE.Group>(null!);
   const antenna = useRef<THREE.Group>(null!);
+  const balls = useRef<THREE.Group>(null!);
 
   const st = useRef({ keyAngle: 0, lean: 0, headYaw: 0, walkAmt: 0, blinkAt: 2, lookX: 0, lookY: 0, lookAt: 1, needle: -1.2 });
 
@@ -148,6 +157,9 @@ export function WindupBot({ anim, paint, hat = 'none', keySkin = 'classic' }: Pr
     // the sides (armL negative z, armR positive z) so they stay clear of the head.
     let headTilt = 0;
     let headNod = 0;
+    let swayX = 0;
+    let fainted = false;
+    let juggling = 0;
     if (a.emote && a.elimT < 0) {
       const e = a.emoteT;
       const k = clamp(Math.min(e / 0.18, (EMOTE_DURATION - e) / 0.3), 0, 1);
@@ -196,6 +208,100 @@ export function WindupBot({ anim, paint, hat = 'none', keySkin = 'classic' }: Pr
           eyeSquint = Math.max(eyeSquint, 0.6 * lean);
           break;
         }
+        case 'dance': {
+          // A clockwork shuffle: sway side to side on the beat, bob, arms pumping in turn.
+          const beat = e * Math.PI * 4;
+          swayX = Math.sin(beat / 2) * 0.28 * body;
+          roll += Math.sin(beat / 2) * 0.16 * body;
+          rootY += Math.abs(Math.sin(beat)) * 0.28 * body;
+          armLZ = THREE.MathUtils.lerp(armLZ, -1.5 - Math.sin(beat) * 0.7, k);
+          armRZ = THREE.MathUtils.lerp(armRZ, 1.5 - Math.sin(beat) * 0.7, k);
+          armLX = THREE.MathUtils.lerp(armLX, -0.3, k);
+          armRX = THREE.MathUtils.lerp(armRX, -0.3, k);
+          legL.current.rotation.x += Math.max(0, Math.sin(beat / 2)) * -0.5 * body;
+          legR.current.rotation.x += Math.max(0, -Math.sin(beat / 2)) * -0.5 * body;
+          headTilt = Math.sin(beat / 2) * 0.18 * k;
+          eyeSquint = Math.max(eyeSquint, 0.5 * k);
+          break;
+        }
+        case 'laugh': {
+          // Head thrown back, hands on the belly, the whole tin body rattling.
+          pitch -= 0.14 * body;
+          headNod = -0.3 * k;
+          scaleY *= 1 + Math.sin(e * 38) * 0.035 * k;
+          rootY += Math.abs(Math.sin(e * 19)) * 0.1 * body;
+          roll += Math.sin(e * 27) * 0.04 * body;
+          armLX = THREE.MathUtils.lerp(armLX, -0.85, k);
+          armRX = THREE.MathUtils.lerp(armRX, -0.85, k);
+          armLZ = THREE.MathUtils.lerp(armLZ, 0.55, k);
+          armRZ = THREE.MathUtils.lerp(armRZ, -0.55, k);
+          eyeSquint = Math.max(eyeSquint, 0.9 * k);
+          break;
+        }
+        case 'sit': {
+          // Plonk down: legs out in front, hands on the knees, a contented sigh.
+          const down = clamp(Math.min(e / 0.35, (EMOTE_DURATION - e) / 0.3), 0, 1);
+          const sit = down * down * (3 - 2 * down) * (1 - w * 0.75);
+          rootY -= 0.6 * sit;
+          legL.current.rotation.x = THREE.MathUtils.lerp(legL.current.rotation.x, -1.45, sit);
+          legR.current.rotation.x = THREE.MathUtils.lerp(legR.current.rotation.x, -1.4, sit);
+          armLX = THREE.MathUtils.lerp(armLX, -0.75, sit);
+          armRX = THREE.MathUtils.lerp(armRX, -0.75, sit);
+          pitch -= 0.06 * sit;
+          headTilt = 0.12 * sit;
+          eyeSquint = Math.max(eyeSquint, 0.5 * sit);
+          break;
+        }
+        case 'salute': {
+          // Snap to attention: stand tall, right hand to the brow, left arm straight.
+          const snap = clamp(e / 0.14, 0, 1) * k;
+          scaleY *= 1 + 0.05 * snap;
+          rootY += Math.sin(Math.PI * clamp(e / 0.25, 0, 1)) * 0.18 * body;
+          // (The stubby arm can't reach the brow, so the head tips to meet the raised hand.)
+          armRZ = THREE.MathUtils.lerp(armRZ, 2.8, snap);
+          armRX = THREE.MathUtils.lerp(armRX, -0.5, snap);
+          armLZ = THREE.MathUtils.lerp(armLZ, 0.04, snap);
+          armLX = THREE.MathUtils.lerp(armLX, 0, snap);
+          headTilt = -0.14 * snap;
+          headNod = -0.06 * snap;
+          break;
+        }
+        case 'juggle': {
+          // Arms forward, bouncing in turn, three beads looping above (see the balls group below).
+          const bounce = Math.sin(e * 15);
+          armLX = THREE.MathUtils.lerp(armLX, -1.15 + bounce * 0.3, k);
+          armRX = THREE.MathUtils.lerp(armRX, -1.15 - bounce * 0.3, k);
+          armLZ = THREE.MathUtils.lerp(armLZ, 0.3, k);
+          armRZ = THREE.MathUtils.lerp(armRZ, -0.3, k);
+          headNod = -0.22 * k;
+          juggling = k;
+          break;
+        }
+        case 'faint': {
+          // A wobble, a dramatic topple onto one side with X eyes, a pause, then pop back up.
+          const tip = clamp((e - 0.18) / 0.42, 0, 1);
+          const rise = clamp((e - 1.45) / 0.35, 0, 1);
+          const lie = easeOutBack(tip) * (1 - rise * rise * (3 - 2 * rise));
+          const amt = lie * (1 - w * 0.75);
+          roll += Math.sin(e * 30) * 0.06 * (1 - tip) * k - amt * 1.42;
+          rootY += amt * 0.78 + Math.sin(Math.PI * rise) * 0.45 * body;
+          armLZ = THREE.MathUtils.lerp(armLZ, -0.6, lie);
+          armRZ = THREE.MathUtils.lerp(armRZ, 1.2, lie);
+          legL.current.rotation.x += 0.3 * lie;
+          fainted = lie > 0.5;
+          break;
+        }
+      }
+    }
+    balls.current.visible = juggling > 0.02;
+    if (juggling > 0.02) {
+      // A three-bead cascade in front of the face, scaled in and out with the gesture.
+      const e = a.emoteT;
+      for (let i = 0; i < 3; i++) {
+        const ph = e * 5.2 + (i * Math.PI * 2) / 3;
+        const b = balls.current.children[i];
+        b.position.set(Math.cos(ph) * 0.62, 2.55 + Math.sin(ph) * 0.95, 1.05);
+        b.scale.setScalar(juggling);
       }
     }
 
@@ -243,6 +349,7 @@ export function WindupBot({ anim, paint, hat = 'none', keySkin = 'classic' }: Pr
 
     // ---------- apply ----------
     const v = visual.current;
+    v.position.x = swayX;
     v.position.y = rootY;
     v.rotation.set(pitch, yawSpin, roll, 'YXZ');
     const sy = scaleY * uniform;
@@ -262,7 +369,7 @@ export function WindupBot({ anim, paint, hat = 'none', keySkin = 'classic' }: Pr
     const keyRate = dead ? 0 : 1.3 + speedN * 7 + (a.boosted ? 8 : 0);
     s.keyAngle += keyRate * dt;
     key.current.rotation.z = s.keyAngle + keyPopSpin;
-    keyPivot.current.position.set(0, 1.3 + keyPopY, -0.62 - keyPopY * 0.25);
+    keyPivot.current.position.set(0, 1.3 + keyPopY, -0.62 - keyBack - keyPopY * 0.25);
     keyPivot.current.rotation.x = keyPopSpin * 0.4;
 
     // Chest gauge: needle shows wind level (speed / boost), with mechanical jitter
@@ -285,12 +392,20 @@ export function WindupBot({ anim, paint, hat = 'none', keySkin = 'classic' }: Pr
     eyeLid.current.scale.y = blinking ? 0.1 : 1 - eyeSquint * 0.55;
     pupil.current.position.x = damp(pupil.current.position.x, s.lookX, 10, dt);
     pupil.current.position.y = damp(pupil.current.position.y, s.lookY, 10, dt);
-    pupil.current.visible = !dead;
-    xEyes.current.visible = dead;
+    pupil.current.visible = !dead && !fainted;
+    xEyes.current.visible = dead || fainted;
   });
 
   return (
     <group ref={visual}>
+      {/* juggling beads (the juggle gesture) */}
+      <group ref={balls} visible={false}>
+        {mats.balls.map((m, i) => (
+          <mesh key={i} material={m} castShadow>
+            <sphereGeometry args={[0.17, 12, 10]} />
+          </mesh>
+        ))}
+      </group>
       {/* ---- legs + feet (pivot at hip) ---- */}
       {[-1, 1].map((side) => (
         <group key={side} ref={side < 0 ? legL : legR} position={[side * 0.4, 0.62, 0]}>
@@ -366,6 +481,10 @@ export function WindupBot({ anim, paint, hat = 'none', keySkin = 'classic' }: Pr
           </group>
         ))}
 
+        {/* ---- accessories: back and neck ---- */}
+        <BackItem id={accessories.back} />
+        <NeckItem id={accessories.neck} />
+
         {/* ---- wind-up key (pops off on elimination) ---- */}
         <group ref={keyPivot} position={[0, 1.3, -0.62]}>
           <group ref={key}>
@@ -393,6 +512,7 @@ export function WindupBot({ anim, paint, hat = 'none', keySkin = 'classic' }: Pr
               </group>
             ))}
           </group>
+          <FaceItem id={accessories.face} />
           {/* side bolts / ears */}
           {[-1, 1].map((side) => (
             <mesh key={side} position={[side * 0.62, 0.45, 0]} rotation={[0, 0, Math.PI / 2]} material={mats.accent} castShadow>

@@ -23,6 +23,8 @@ export type GameEvents = {
   'gate:open': { id: string };
   /** The hub TV beside the Scoreboard changes channel. */
   'tv:next': void;
+  /** Workshop/shop: play a gesture on the local toy as a preview (not sent online). */
+  'toy:preview-gesture': { id: EmoteId };
   /** Workshop asks the turntable to show the front (paint/hats) or back (wind-up key). */
   'workshop:view': { back: boolean };
 };

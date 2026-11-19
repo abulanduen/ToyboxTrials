@@ -1,8 +1,10 @@
 /**
- * Hats and wind-up key bows for the contender — chunky, low-poly, household-object toys.
- * Hats mount on top of the eye turret; key bows mount on the key shaft (local XY plane, z = -0.34).
+ * Hats and wind-up key bows for the contender — chunky, low-poly, household-object toys, all
+ * built in code. Hats mount on top of the eye turret; key bows mount on the key shaft (local XY
+ * plane, z = -0.34). Accessories (back, face, neck) are in Accessories.tsx.
  */
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { PALETTE } from '../game/palette';
 import type { HatId, KeySkinId } from '../game/cosmetics';
@@ -11,7 +13,26 @@ const mat = (color: string, rough = 0.45, metal = 0, emissive?: string) =>
   new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal, emissive: emissive ?? '#000000', emissiveIntensity: emissive ? 0.25 : 0 });
 
 /** Hats that cover the antenna hide it. */
-export const HAT_HIDES_ANTENNA: Record<HatId, boolean> = { none: false, thimble: true, bottlecap: false, paperboat: true, acorn: true };
+export const HAT_HIDES_ANTENNA: Record<HatId, boolean> = {
+  none: false,
+  thimble: true,
+  bottlecap: false,
+  paperboat: true,
+  acorn: true,
+  reeltop: true,
+  partycone: true,
+  propeller: true,
+  laurel: false,
+};
+
+/** Spins its children about Y (propeller blades). */
+function Spinner({ rate, children }: { rate: number; children: React.ReactNode }) {
+  const ref = useRef<THREE.Group>(null!);
+  useFrame((_, dt) => {
+    ref.current.rotation.y += Math.min(dt, 1 / 20) * rate;
+  });
+  return <group ref={ref}>{children}</group>;
+}
 
 export function Hat({ id }: { id: HatId }) {
   const parts = useMemo(() => {
@@ -125,6 +146,108 @@ export function Hat({ id }: { id: HatId }) {
           </group>
         );
       }
+      case 'partycone': {
+        const card = mat(PALETTE.coral, 0.7);
+        const stripe = mat(PALETTE.cream, 0.7);
+        return (
+          <group position={[0, 0.34, 0]} rotation={[0, 0, 0.16]}>
+            <mesh position={[0, 0.42, 0]} material={card} castShadow>
+              <coneGeometry args={[0.34, 0.86, 16]} />
+            </mesh>
+            {[0.18, 0.44].map((y) => (
+              <mesh key={y} position={[0, y, 0]} rotation={[Math.PI / 2, 0, 0]} material={stripe}>
+                <torusGeometry args={[0.34 * (1 - y / 0.86) + 0.012, 0.035, 6, 18]} />
+              </mesh>
+            ))}
+            <mesh position={[0, 0.9, 0]} material={mat(PALETTE.honey, 0.95)} castShadow>
+              <icosahedronGeometry args={[0.12, 1]} />
+            </mesh>
+          </group>
+        );
+      }
+      case 'reeltop': {
+        const wood = mat(PALETTE.woodLight, 0.6);
+        const thread = mat(PALETTE.toyBlue, 0.85);
+        const groove = mat('#5A8EAE', 0.9);
+        return (
+          <group position={[0, 0.38, 0]} rotation={[0.06, 0, -0.06]}>
+            <mesh position={[0, 0.03, 0]} material={wood} castShadow>
+              <cylinderGeometry args={[0.46, 0.46, 0.07, 20]} />
+            </mesh>
+            <mesh position={[0, 0.3, 0]} material={thread} castShadow>
+              <cylinderGeometry args={[0.31, 0.31, 0.48, 18]} />
+            </mesh>
+            {[0.14, 0.24, 0.34, 0.44].map((y) => (
+              <mesh key={y} position={[0, y, 0]} rotation={[Math.PI / 2, 0, 0]} material={groove}>
+                <torusGeometry args={[0.312, 0.012, 4, 18]} />
+              </mesh>
+            ))}
+            <mesh position={[0, 0.57, 0]} material={wood} castShadow>
+              <cylinderGeometry args={[0.42, 0.42, 0.07, 20]} />
+            </mesh>
+            <mesh position={[0, 0.611, 0]} rotation={[-Math.PI / 2, 0, 0]} material={mat(PALETTE.woodDark, 0.7)}>
+              <circleGeometry args={[0.09, 12]} />
+            </mesh>
+          </group>
+        );
+      }
+      case 'propeller': {
+        const blue = mat(PALETTE.toyBlue, 0.5);
+        const honey = mat(PALETTE.honey, 0.5);
+        return (
+          <group position={[0, 0.3, 0]}>
+            <mesh material={blue} castShadow>
+              <sphereGeometry args={[0.44, 18, 8, 0, Math.PI, 0, Math.PI / 2]} />
+            </mesh>
+            <mesh rotation={[0, Math.PI, 0]} material={honey} castShadow>
+              <sphereGeometry args={[0.44, 18, 8, 0, Math.PI, 0, Math.PI / 2]} />
+            </mesh>
+            {/* peak */}
+            <mesh position={[0, 0.03, 0.36]} rotation={[0.2, 0, 0]} scale={[1, 1, 0.9]} material={blue} castShadow>
+              <cylinderGeometry args={[0.3, 0.3, 0.05, 16, 1, false, -Math.PI / 2, Math.PI]} />
+            </mesh>
+            <mesh position={[0, 0.5, 0]} material={mat(PALETTE.ink, 0.6)}>
+              <cylinderGeometry args={[0.035, 0.035, 0.18, 6]} />
+            </mesh>
+            <group position={[0, 0.6, 0]}>
+              <Spinner rate={9}>
+                {[0, Math.PI].map((a) => (
+                  <mesh key={a} position={[Math.cos(a) * 0.3, 0, Math.sin(a) * 0.3]} rotation={[0.35, -a, 0]} material={mat(PALETTE.coral, 0.45)} castShadow>
+                    <boxGeometry args={[0.52, 0.03, 0.14]} />
+                  </mesh>
+                ))}
+                <mesh material={honey}>
+                  <sphereGeometry args={[0.07, 10, 8]} />
+                </mesh>
+              </Spinner>
+            </group>
+          </group>
+        );
+      }
+      case 'laurel': {
+        const leaf = mat(PALETTE.sage, 0.7);
+        const dark = mat(PALETTE.feltDark, 0.75);
+        const n = 16;
+        return (
+          <group position={[0, 0.32, 0]} rotation={[-0.08, 0, 0]}>
+            <mesh rotation={[Math.PI / 2, 0, 0]} material={mat(PALETTE.brass, 0.35, 0.8)}>
+              <torusGeometry args={[0.43, 0.03, 6, 24]} />
+            </mesh>
+            {Array.from({ length: n }, (_, i) => {
+              if (i === 12) return null; // the gap at the back
+              const a = (i / n) * Math.PI * 2;
+              return (
+                <mesh key={i} position={[Math.cos(a) * 0.45, 0.06 + (i % 2) * 0.05, Math.sin(a) * 0.45]} rotation={[0, -a, i % 2 ? 0.6 : -0.6]} scale={[1, 0.5, 0.35]} material={i % 2 ? leaf : dark} castShadow>
+                  <sphereGeometry args={[0.13, 8, 6]} />
+                </mesh>
+              );
+            })}
+            <mesh position={[0, 0.06, 0.47]} material={mat('#F2C14E', 0.25, 0.9, '#B98A1E')}>
+              <sphereGeometry args={[0.06, 8, 6]} />
+            </mesh>
+          </group>
+        );
+      }
       default:
         return null;
     }
@@ -166,6 +289,53 @@ export function KeyBow({ skin }: { skin: KeySkinId }) {
         }
         s.closePath();
         return <mesh position={[0, 0, -0.36]} geometry={shapeGeometry(s)} material={mat(PALETTE.toyBlue, 0.3, 0.4)} castShadow />;
+      }
+      case 'clover': {
+        const green = mat(PALETTE.sage, 0.4, 0.25);
+        return (
+          <group position={[0, 0.02, -0.36]}>
+            {[0, 1, 2, 3].map((i) => {
+              const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+              return (
+                <mesh key={i} position={[Math.cos(a) * 0.19, Math.sin(a) * 0.19, 0]} rotation={[Math.PI / 2, 0, 0]} material={green} castShadow>
+                  <cylinderGeometry args={[0.17, 0.17, 0.11, 14]} />
+                </mesh>
+              );
+            })}
+            <mesh material={mat(PALETTE.feltDark, 0.5)}>
+              <sphereGeometry args={[0.09, 10, 8]} />
+            </mesh>
+          </group>
+        );
+      }
+      case 'moon': {
+        // Crescent: the left part of a circle, cut by a second, offset circle.
+        const s = new THREE.Shape();
+        s.absarc(0, 0, 0.42, 1.028, Math.PI * 2 - 1.028, false);
+        s.absarc(0.2, 0, 0.36, Math.PI * 2 - 1.523, 1.523, true);
+        return (
+          <group position={[0.05, 0, -0.36]}>
+            <mesh geometry={shapeGeometry(s)} material={mat(PALETTE.cream, 0.3, 0.2, '#E8D9A8')} castShadow />
+            <mesh position={[0.2, 0.18, 0]} material={mat(PALETTE.honey, 0.3, 0.6, PALETTE.honey)}>
+              <octahedronGeometry args={[0.07]} />
+            </mesh>
+          </group>
+        );
+      }
+      case 'gear': {
+        const s = new THREE.Shape();
+        const steps = 32; // 8 teeth, 4 points each
+        for (let i = 0; i < steps; i++) {
+          const a = (i / steps) * Math.PI * 2;
+          const r = i % 4 < 2 ? 0.44 : 0.33;
+          if (i === 0) s.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+          else s.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+        }
+        s.closePath();
+        const hole = new THREE.Path();
+        hole.absarc(0, 0, 0.13, 0, Math.PI * 2, true);
+        s.holes.push(hole);
+        return <mesh position={[0, 0, -0.36]} geometry={shapeGeometry(s, 0.1)} material={mat('#9AA3A8', 0.3, 0.9)} castShadow />;
       }
       case 'golden':
       case 'classic':

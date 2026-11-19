@@ -5,7 +5,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useGame } from '../game/store';
 import { events } from '../game/events';
-import { PAINT_JOBS, PALETTE } from '../game/palette';
+import { PALETTE } from '../game/palette';
+import { itemById } from '../game/cosmetics';
+import { CogCount } from './Catalogue';
 import { SECRET_IDS } from '../game/interactables';
 import { MatchOverlay, TournamentPicker, unit } from './MatchOverlay';
 import { MINIGAMES } from '../minigames/registry';
@@ -173,12 +175,13 @@ function Hud() {
   const name = useGame((s) => s.contenderName);
   const locked = useGame((s) => s.pointerLocked);
   const touch = useGame((s) => s.touchUI);
-  const paint = PAINT_JOBS[useGame((s) => s.paintIndex) % PAINT_JOBS.length];
+  const paintName = itemById(useGame((s) => s.profile.loadout.paint))?.name ?? '';
+  const cogs = useGame((s) => s.profile.wallet.cogs);
   return (
     <>
       <div className="hud-sign">
         <span className="hud-sign__title">The Playroom</span>
-        <span className="hud-sign__sub">{name || paint.name}</span>
+        <span className="hud-sign__sub">{name || paintName}</span>
       </div>
       <div className="hud-secrets" title="Playroom secrets found">
         <StarSticker size={24} />
@@ -186,6 +189,7 @@ function Hud() {
           {secrets}/{SECRET_IDS.length}
         </span>
       </div>
+      <CogCount value={cogs} testId="hud-cogs" className="hud-cogs" />
       <Prompt />
       <OnlineChip />
       <Tickets />
@@ -220,8 +224,24 @@ function PauseMenu() {
             Main menu
           </ToyButton>
         </div>
+        <PauseShop />
         <PauseOnline />
       </div>
+    </div>
+  );
+}
+
+/** Shop section of the pause menu: the wallet and a way into Odds & Ends. */
+function PauseShop() {
+  const cogs = useGame((s) => s.profile.wallet.cogs);
+  return (
+    <div className="pause__online pause__shop">
+      <span>
+        <CogCount value={cogs} /> Spend cogs at Odds &amp; Ends.
+      </span>
+      <ToyButton tone="honey" onClick={() => useGame.getState().openShop()} testId="pause-shop">
+        Shop
+      </ToyButton>
     </div>
   );
 }
@@ -290,7 +310,7 @@ function Panel() {
         <h2>{panel.title}</h2>
         {panel.subtitle && <div className="info-panel__sub">{panel.subtitle}</div>}
         {panel.kind === 'tournament' && <TournamentPicker onClose={close} />}
-        {(panel.kind === 'preview' || panel.kind === 'shop') && <p className="panel__lead">{panel.body}</p>}
+        {panel.kind === 'preview' && <p className="panel__lead">{panel.body}</p>}
         {panel.kind === 'scoreboard' && (
           <div className="scoreboard">
             <div className="scoreboard__row">

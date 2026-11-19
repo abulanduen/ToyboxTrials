@@ -12,7 +12,9 @@ import { create } from 'zustand';
 import { useGame } from '../game/store';
 import { HUB_BINDINGS, clearInput, getPressLog, setBindings } from '../game/input';
 import { exposeDebug } from '../game/debug';
-import { PAINT_JOBS } from '../game/palette';
+import { paintJobFor } from '../game/cosmetics';
+import { accessoriesOf } from '../game/profile';
+import { NO_REWARD, applyReward, dateKey, grantAchievements, rewardForGame, rewardForTournament, statsFrom, type Reward } from '../game/economy';
 import { sfx } from '../game/audio';
 import { Emitter } from '../game/events';
 import { player } from '../game/player';
@@ -52,6 +54,12 @@ interface MatchStore {
   tournament: TournamentRun | null;
   lastResult: MinigameResult | null;
   newBest: boolean;
+  /** Cogs paid for the last finished trial (results screen), and items it unlocked. */
+  reward: Reward;
+  /** Cogs paid for finishing the tournament (final screen). */
+  tournamentReward: Reward;
+  /** Names of items unlocked by achievements since the last results screen. */
+  unlocked: string[];
   paused: boolean;
   error: string | null;
   set: (p: Partial<MatchStore>) => void;
@@ -69,6 +77,9 @@ export const useMatch = create<MatchStore>()((set) => ({
   tournament: null,
   lastResult: null,
   newBest: false,
+  reward: NO_REWARD,
+  tournamentReward: NO_REWARD,
+  unlocked: [],
   paused: false,
   error: null,
   set: (p) => set(p),
@@ -93,12 +104,14 @@ export const getMatchState = () => runtime.state;
 
 function localContestant(): Contestant {
   const g = useGame.getState();
+  const l = g.profile.loadout;
   return {
     id: LOCAL_ID,
     name: g.contenderName || 'You',
-    paint: PAINT_JOBS[g.paintIndex % PAINT_JOBS.length],
-    hat: g.hat,
-    keySkin: g.keySkin,
+    paint: paintJobFor(l.paint),
+    hat: l.hat,
+    keySkin: l.keySkin,
+    accessories: accessoriesOf(l),
     isLocal: true,
   };
 }
@@ -203,7 +216,7 @@ export function beginCountdown() {
   runtime.pendingLocal = [];
   runtime.countdownLeft = COUNTDOWN_MS;
   runtime.lastCount = 4;
-  m.set({ contestants, seed, phase: 'countdown', paused: false, lastResult: null, newBest: false });
+  m.set({ contestants, seed, phase: 'countdown', paused: false, lastResult: null, newBest: false, reward: NO_REWARD, unlocked: [] });
   setBindings(mod.bindings);
   clearInput();
 }
@@ -272,22 +285,25 @@ function finishGame() {
   // Records: best score, plays, wins (practice and tournament both count).
   const prev = g.records[res.minigame] ?? { best: 0, plays: 0, wins: 0 };
   const newBest = !!mine && mine.score > prev.best;
-  g.set({
-    records: {
-      ...g.records,
-      [res.minigame]: {
-        best: Math.max(prev.best, mine?.score ?? 0),
-        plays: prev.plays + 1,
-        wins: prev.wins + (mine?.place === 1 && res.placements.length > 1 ? 1 : 0),
-      },
+  const records = {
+    ...g.records,
+    [res.minigame]: {
+      best: Math.max(prev.best, mine?.score ?? 0),
+      plays: prev.plays + 1,
+      wins: prev.wins + (mine?.place === 1 && res.placements.length > 1 ? 1 : 0),
     },
-  });
+  };
+  // Cogs for this trial (economy.ts), then any achievement the new records meet.
+  const today = dateKey(new Date());
+  const reward = rewardForGame({ placements: res.placements, localId: LOCAL_ID, newBest, today, firstWinDay: g.profile.firstWinDay });
+  const ach = grantAchievements(applyReward(g.profile, reward, today), statsFrom(records, g.tournamentWins), Date.now());
+  g.set({ records, profile: ach.profile });
   let tournament = m.tournament;
   if (tournament) tournament = { ...tournament, standings: addRound(tournament.standings, res.placements) };
   setBindings(HUB_BINDINGS);
   clearInput();
   if (mine?.place === 1) sfx.reward();
-  m.set({ phase: 'results', lastResult: res, newBest, tournament });
+  m.set({ phase: 'results', lastResult: res, newBest, tournament, reward, unlocked: ach.unlocked.map((i) => i.name) });
 }
 
 /** Results → next step. */
@@ -319,12 +335,13 @@ function finishTournament() {
   const me = ranked.find((s) => s.contestantId === LOCAL_ID);
   const g = useGame.getState();
   const history = [{ format: t.format, place: me?.place ?? ranked.length, of: ranked.length, games: t.games, at: Date.now() }, ...g.tournamentHistory].slice(0, 10);
-  g.set({
-    tournamentHistory: history,
-    tournamentWins: { ...g.tournamentWins, [t.format]: (g.tournamentWins[t.format] ?? 0) + (me?.place === 1 ? 1 : 0) },
-  });
+  const tournamentWins = { ...g.tournamentWins, [t.format]: (g.tournamentWins[t.format] ?? 0) + (me?.place === 1 ? 1 : 0) };
+  const today = dateKey(new Date());
+  const tournamentReward = rewardForTournament({ trials: t.games.length, place: me?.place ?? ranked.length, today, firstWinDay: g.profile.firstWinDay });
+  const ach = grantAchievements(applyReward(g.profile, tournamentReward, today), statsFrom(g.records, tournamentWins), Date.now());
+  g.set({ tournamentHistory: history, tournamentWins, profile: ach.profile });
   if (me?.place === 1) sfx.reward();
-  m.set({ phase: 'final' });
+  m.set({ phase: 'final', tournamentReward, unlocked: ach.unlocked.map((i) => i.name) });
 }
 
 export function pauseMatch(on: boolean) {

@@ -130,7 +130,7 @@ export function Racer({ c, view }: { c: Contestant; view: () => RacerView | null
       <group ref={root}>
         <group ref={tilt}>
           <group ref={inner}>
-            {c.isLocal ? <WindupBot anim={toy} paint={c.paint} hat={c.hat} keySkin={c.keySkin} /> : <MiniContender paint={c.paint} anim={mini} scale={0.92} />}
+            {c.isLocal ? <WindupBot anim={toy} paint={c.paint} hat={c.hat} keySkin={c.keySkin} accessories={c.accessories} /> : <MiniContender paint={c.paint} anim={mini} scale={0.92} />}
           </group>
         </group>
         {c.isLocal && (

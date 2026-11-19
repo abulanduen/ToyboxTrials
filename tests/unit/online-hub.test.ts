@@ -5,6 +5,7 @@ import { HubDirectory } from '../../server/hubDirectory';
 import { fallbackName, isBlockedName, sanitizeLook, sanitizeNickname, uniqueName } from '../../server/sanitize';
 import { RateLimiter, isOriginAllowed, parseAllowedOrigins } from '../../server/limits';
 import { seededRng } from '../../src/minigames/rng';
+import { EMOTE_IDS } from '../../src/game/emotes';
 import { HUB_MAX_SPEED, HUB_MAX_Y, HUB_SPAWN } from '../../src/game/hubMotion';
 import { PLAY_BOUNDS } from '../../src/game/collision';
 import { BRIDGE_X, GATES_WALK, isWalkable } from '../../src/game/hubBounds';
@@ -15,13 +16,15 @@ import {
   PUBLIC_ROOM_CAP,
   RESUME_WINDOW_MS,
   ROOM_CODE_ALPHABET,
+  parseClientMessage,
   type ClientMsg,
   type HelloMsg,
   type JoinRequest,
   type ServerMsg,
 } from '../../src/net/protocol';
 
-const look = { paint: 1, hat: 'thimble', keySkin: 'heart' };
+const NONE = { back: 'none', face: 'none', neck: 'none' } as const;
+const look = { paint: 1, hat: 'thimble', keySkin: 'heart', ...NONE };
 const hello = (name: string, join: JoinRequest, extra: Partial<HelloMsg> = {}): HelloMsg => ({ t: 'hello', v: PROTOCOL_VERSION, name, look, join, ...extra });
 const PUB: JoinRequest = { kind: 'public' };
 const HOST: JoinRequest = { kind: 'host' };
@@ -494,6 +497,18 @@ describe('movement validation', () => {
 });
 
 describe('emotes', () => {
+  it('accepts every shop gesture id from the shared list, and nothing else', () => {
+    const { room, send, advance } = setup();
+    const aw = first(send('a', hello('Alpha', PUB)), 'a', 'welcome')!;
+    send('b', hello('Bravo', PUB));
+    for (const id of EMOTE_IDS) {
+      advance(1600);
+      expect(first(send('a', { t: 'emote', id }), 'b', 'emote')).toEqual({ t: 'emote', id: aw.you, emote: id });
+      expect(room.playerOf('a')).toMatchObject({ e: id });
+    }
+    expect(parseClientMessage(JSON.stringify({ t: 'emote', id: 'moonwalk' }))).toBeNull();
+    expect(parseClientMessage(JSON.stringify({ t: 'emote', id: 'faint' }))).toEqual({ t: 'emote', id: 'faint' });
+  });
   it('broadcasts an emote to the others and shows it in snapshots for about 2 s', () => {
     const { room, send, advance } = setup();
     const aw = first(send('a', hello('Alpha', PUB)), 'a', 'welcome')!;
@@ -527,12 +542,18 @@ describe('cosmetics updates', () => {
     const { room, send, advance } = setup();
     send('a', hello('Alpha', PUB));
     send('b', hello('Bravo', PUB));
-    const out = send('a', { t: 'look', look: { paint: 3, hat: 'crown-of-lies', keySkin: 'star' } });
-    expect(first(out, 'b', 'look')?.look).toEqual({ paint: 3, hat: 'none', keySkin: 'star' });
-    expect(send('a', { t: 'look', look: { paint: 2, hat: 'acorn', keySkin: 'golden' } })).toHaveLength(0);
+    const out = send('a', { t: 'look', look: { paint: 3, hat: 'crown-of-lies', keySkin: 'star', back: 'cape', face: 'jetpack', neck: 'scarf' } });
+    expect(first(out, 'b', 'look')?.look).toEqual({ paint: 3, hat: 'none', keySkin: 'star', back: 'cape', face: 'none', neck: 'scarf' });
+    expect(send('a', { t: 'look', look: { paint: 2, hat: 'acorn', keySkin: 'golden', ...NONE } })).toHaveLength(0);
     advance(500);
-    expect(send('a', { t: 'look', look: { paint: 2, hat: 'acorn', keySkin: 'golden' } })).toHaveLength(1);
-    expect(room.playerOf('a')!.look).toEqual({ paint: 2, hat: 'acorn', keySkin: 'golden' });
+    expect(send('a', { t: 'look', look: { paint: 2, hat: 'acorn', keySkin: 'golden', ...NONE } })).toHaveLength(1);
+    expect(room.playerOf('a')!.look).toEqual({ paint: 2, hat: 'acorn', keySkin: 'golden', ...NONE });
+  });
+  it('carries accessories in the roster, so late joiners see them', () => {
+    const { send } = setup();
+    send('a', hello('Alpha', PUB, { look: { paint: 10, hat: 'propeller', keySkin: 'moon', back: 'balloon', face: 'monocle', neck: 'bowtie' } }));
+    const welcome = first(send('b', hello('Bravo', PUB)), 'b', 'welcome');
+    expect(welcome?.players.find((p) => p.name === 'Alpha')?.look).toEqual({ paint: 10, hat: 'propeller', keySkin: 'moon', back: 'balloon', face: 'monocle', neck: 'bowtie' });
   });
 });
 
@@ -571,10 +592,24 @@ describe('nickname and cosmetic sanitising', () => {
     expect(first(send('b', hello('Ticker', PUB)), 'b', 'welcome')?.players.map((p) => p.name)).toEqual(['Ticker', 'Ticker 2']);
   });
   it('replaces unknown cosmetic ids with the defaults', () => {
-    expect(sanitizeLook({ paint: 2, hat: 'acorn', keySkin: 'golden' })).toEqual({ paint: 2, hat: 'acorn', keySkin: 'golden' });
-    expect(sanitizeLook({ paint: 99, hat: 'tophat', keySkin: '__proto__' })).toEqual({ paint: 0, hat: 'none', keySkin: 'classic' });
-    expect(sanitizeLook({ paint: 1.5, hat: 'thimble', keySkin: 'heart' })).toEqual({ paint: 0, hat: 'thimble', keySkin: 'heart' });
-    expect(sanitizeLook(null)).toEqual({ paint: 0, hat: 'none', keySkin: 'classic' });
+    expect(sanitizeLook({ paint: 2, hat: 'acorn', keySkin: 'golden' })).toEqual({ paint: 2, hat: 'acorn', keySkin: 'golden', ...NONE });
+    expect(sanitizeLook({ paint: 99, hat: 'tophat', keySkin: '__proto__' })).toEqual({ paint: 0, hat: 'none', keySkin: 'classic', ...NONE });
+    expect(sanitizeLook({ paint: 1.5, hat: 'thimble', keySkin: 'heart' })).toEqual({ paint: 0, hat: 'thimble', keySkin: 'heart', ...NONE });
+    expect(sanitizeLook(null)).toEqual({ paint: 0, hat: 'none', keySkin: 'classic', ...NONE });
+  });
+  it('accepts every catalogue paint, hat and key, and new shop items', () => {
+    expect(sanitizeLook({ paint: 10, hat: 'laurel', keySkin: 'gear' })).toMatchObject({ paint: 10, hat: 'laurel', keySkin: 'gear' });
+    expect(sanitizeLook({ paint: 11, hat: 'partycone', keySkin: 'clover' })).toMatchObject({ paint: 0, hat: 'partycone', keySkin: 'clover' });
+  });
+  it('checks each accessory against its own slot from the shared catalogue', () => {
+    expect(sanitizeLook({ ...look, back: 'wings', face: 'goggles', neck: 'medal' })).toMatchObject({ back: 'wings', face: 'goggles', neck: 'medal' });
+    // Right id, wrong slot: a scarf is not a back item, a cape is not a face item.
+    expect(sanitizeLook({ ...look, back: 'scarf', face: 'cape', neck: 'monocle' })).toMatchObject(NONE);
+    // Unknown, hostile or non-string ids become empty slots.
+    expect(sanitizeLook({ ...look, back: '__proto__', face: 'constructor', neck: 'x'.repeat(30) })).toMatchObject(NONE);
+    expect(sanitizeLook({ ...look, back: 42 as unknown as string, face: null as unknown as string })).toMatchObject(NONE);
+    // A hat id is not an accessory, and an accessory is not a hat.
+    expect(sanitizeLook({ ...look, hat: 'cape', back: 'thimble' })).toMatchObject({ hat: 'none', back: 'none' });
   });
 });
 
