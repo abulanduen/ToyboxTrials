@@ -278,6 +278,8 @@ export const MINIGAMES: MinigameDefinition[] = [
     controls: [{keys:'WASD / arrows',action:'Move and face; mouse / tap arena aims'},{keys:'Q / E / R',action:'Cast your equipped spells; click also casts Q'},{keys:'Build cards',action:'Choose one of three options for each button, then lock your build'}],
     inputs:['keyboard','mouse','touch'],bots:'available',recordUnit:'seconds',
     touch:{movement:'none',look:'none',orientation:'any',buttons:[{id:'forward',label:'Up',hold:true},{id:'left',label:'Left',hold:true},{id:'back',label:'Down',hold:true},{id:'right',label:'Right',hold:true},{id:'slot1',label:'Spell Q'},{id:'slot2',label:'Spell E'},{id:'slot3',label:'Spell R'}],notes:'Each spell button has three draft choices. Hold pads to move, tap arena to aim, then tap spells to cast. Larger fields start on larger rings. After eliminations, a 10s warning marks the next smaller edge. Stay inside; last toy wins.'},
+    // The draft has no timer and its own "Fight in 3…" count once everyone locks in.
+    skipStartCountdown:true,
     status:'playable',load:()=>import('./spellbox').then(m=>m.default),
   },
   {
@@ -309,6 +311,37 @@ export const MINIGAMES: MinigameDefinition[] = [
     },
     status: 'playable',
     load: () => import('./jackbox').then((m) => m.default),
+  },
+  {
+    id: 'odd-page-out',
+    title: 'Odd Page Out',
+    tagline: 'Two storybook pictures. Fifteen differences. Thirty seconds.',
+    description:
+      'A picture book lies open on the table, the same scene on both pages. Or nearly: fifteen things are different. Tap them on either page before the 30 seconds run out. Every round turns to a new scene, and even the first picture is re-drawn each time. Each find scores, and finding all fifteen first scores the most. A wrong tap holds you up for a second. Four pages.',
+    category: 'observation',
+    accent: PALETTE.toyBlue,
+    players: { min: 1, max: 8 },
+    durationSec: [60, 145],
+    inputs: ['keyboard', 'mouse', 'touch'],
+    bots: 'available',
+    eligibility: { tournament: true, ranked: true, casual: true },
+    scoring: 'score',
+    tieBreak: 'More differences found, then quicker finds',
+    recordUnit: 'points',
+    controls: [
+      { keys: 'Click', action: 'Circle a difference (either page)' },
+      { keys: 'Arrows', action: 'Move the ring' },
+      { keys: 'Enter', action: 'Circle the ringed spot' },
+    ],
+    touch: {
+      movement: 'none',
+      look: 'none',
+      buttons: [],
+      orientation: 'any',
+      notes: 'Tap a difference on either page. The pages are the control: side by side in landscape, one above the other in portrait, every difference a finger-sized target.',
+    },
+    status: 'playable',
+    load: () => import('./spotdiff').then((m) => m.default),
   },
   {
     id: 'toy-tower-tumble',

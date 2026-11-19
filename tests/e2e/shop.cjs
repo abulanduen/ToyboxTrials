@@ -124,6 +124,15 @@ async function run(browser, dev) {
   await page.locator('[data-testid=shop-item-scarf]').scrollIntoViewIfNeeded();
   await press('[data-testid=shop-item-scarf]');
   await page.waitForSelector('[data-testid=shop-buy]');
+  // Buy sits beside the catalogue (a pinned bar on portrait phones): on screen with no scrolling.
+  const buyInView = await page.evaluate(() => {
+    const b = document.querySelector('[data-testid=shop-buy]').getBoundingClientRect();
+    const side = document.querySelector('.shop-side');
+    const sr = side.getBoundingClientRect();
+    return b.top >= 0 && b.bottom <= innerHeight && b.left >= 0 && b.right <= innerWidth && b.top >= sr.top - 1 && b.bottom <= sr.bottom + 1 && side.scrollTop === 0;
+  });
+  check(`${dev}: Buy is on screen beside the catalogue, no scrolling needed`, buyInView);
+  await shot(`shop-02b-${dev}-buy-in-view.png`);
   await page.waitForFunction(() => !!window.__toybox.three().scene.getObjectByName('accessory:scarf'), null, { timeout: T }).catch(() => null);
   check(`${dev}: picking the scarf tries it on the toy before buying`, await wearing('accessory:scarf'));
   const price = num(await page.textContent('[data-testid=shop-buy]'));

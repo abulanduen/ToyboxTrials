@@ -40,7 +40,9 @@ export function createRlglBot(): BotPolicy<RlglState, RlglInput> {
   return {
     decide(s: RlglState, bot: Contestant, _dt: number, rng: () => number): RlglInput[] {
       const p = s.players.find((x) => x.id === bot.id);
-      if (!p || p.finished || s.phase === 'intro' || s.phase === 'over') return [NO_INPUT];
+      if (!p || s.phase === 'intro' || s.phase === 'over') return [NO_INPUT];
+      // Home: trot a little past the line and wait there.
+      if (p.finished) return [p.m.z > s.config.finishZ - 3 ? { ax: 0, ay: 0.7, run: false, jump: false } : NO_INPUT];
       const tune = TUNING[bot.bot ?? 'normal'];
       const between = (r: [number, number]) => r[0] + rng() * (r[1] - r[0]);
       let m = mem.get(bot.id);

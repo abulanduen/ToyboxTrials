@@ -1,7 +1,7 @@
 import type { MatchEvent, RulesCore } from '../types';
 import { seededRng, shuffle } from '../rng';
 import { rankByKey } from '../scoring';
-import { DEFAULT_BUILD, SLOT_OPTIONS, SPELLS, type SpellId } from './spells';
+import { BLINK, DEFAULT_BUILD, SLOT_OPTIONS, SPELLS, type SpellId } from './spells';
 
 export interface SpellboxConfig { radius:number; bodyRadius:number; speed:number; drag:number; damageScale:number; maxVelocity:number; countdownMs:number; durationMs:number; endingMs:number; hitstunMs:number; shrinkWarningMs:number; shrinkMs:number }
 export const DEFAULT_CONFIG:SpellboxConfig={radius:15,bodyRadius:1.05,speed:8.5,drag:2.4,damageScale:70,maxVelocity:40,countdownMs:3000,durationMs:90000,endingMs:1400,hitstunMs:180,shrinkWarningMs:10000,shrinkMs:3000};
@@ -16,7 +16,8 @@ export interface Mage {
 }
 export interface Projectile {id:number;owner:string;spell:SpellId;x:number;z:number;dx:number;dz:number;remaining:number;sourceX:number;sourceZ:number}
 export interface Mine {id:number;owner:string;x:number;z:number;armAt:number;expireAt:number}
-export interface Effect {id:number;spell:SpellId;kind:'cast'|'hit'|'shield'|'repair'|'out';x:number;z:number;radius:number;at:number}
+/** Presentation records. Blink adds a departure puff, a trail to (tx,tz) and an arrival shockwave. */
+export interface Effect {id:number;spell:SpellId;kind:'cast'|'hit'|'shield'|'repair'|'out'|'depart'|'trail'|'wave';x:number;z:number;radius:number;at:number;tx?:number;tz?:number}
 export interface SpellboxState {kind:'spellbox-showdown';seed:number;config:SpellboxConfig;radius:number;shrink:ArenaShrink|null;phase:'draft'|'arena'|'ending'|'over';t:number;remainder:number;fightAt:number;arenaAt:number;finishAt:number;nextId:number;players:Mage[];projectiles:Projectile[];mines:Mine[];effects:Effect[];pending:Record<string,SpellboxInput[]>;events:MatchEvent[]}
 interface Hit {source:string;target:Mage;damage:number;force:number;dx:number;dz:number;spell:SpellId}
 const TICK=10,dt=TICK/1000;
@@ -34,8 +35,8 @@ export function coneHit(source:Pick<Mage,'x'|'z'>,angle:number,target:Pick<Mage,
   if(a<=Math.PI/3)return d-range<=radius;
   const side=a-Math.PI/3,along=d*Math.cos(side),across=d*Math.sin(side);return Math.hypot(along-Math.max(0,Math.min(range,along)),across)<=radius;
 }
-function effect(s:SpellboxState,spell:SpellId,kind:Effect['kind'],x:number,z:number,radius:number) {
-  s.effects.push({id:s.nextId++,spell,kind,x,z,radius,at:s.t});s.effects=s.effects.slice(-64);
+function effect(s:SpellboxState,spell:SpellId,kind:Effect['kind'],x:number,z:number,radius:number,to?:{x:number;z:number}) {
+  s.effects.push(to?{id:s.nextId++,spell,kind,x,z,radius,at:s.t,tx:to.x,tz:to.z}:{id:s.nextId++,spell,kind,x,z,radius,at:s.t});s.effects=s.effects.slice(-64);
 }
 /**
  * The draft has no deadline. Ready is a one-way lock, so once every player has locked in nobody
@@ -78,16 +79,43 @@ function updateArena(s:SpellboxState){
   if(s.t>=shrink.endsAt){s.radius=shrink.to;s.shrink=null;s.events.push({type:'spellbox-shrunk',radius:s.radius});}
   s.mines=s.mines.filter(m=>Math.hypot(m.x,m.z)<=s.radius);
 }
-function splash(s:SpellboxState,hits:Hit[],owner:string,spell:SpellId,x:number,z:number,radius:number) {
-  const def=SPELLS[spell];effect(s,spell,'hit',x,z,radius);
+function splash(s:SpellboxState,hits:Hit[],owner:string,spell:SpellId,x:number,z:number,radius:number,kind:Effect['kind']='hit') {
+  const def=SPELLS[spell];effect(s,spell,kind,x,z,radius);
+  if(def.effect==='bomb'||def.effect==='mine')s.events.push({type:'spellbox-burst',id:owner,spell,x,z});
   for(const target of s.players)if(target.alive&&target.id!==owner&&Math.hypot(target.x-x,target.z-z)<=radius+s.config.bodyRadius){
     const dx=target.x-x,dz=target.z-z,d=Math.hypot(dx,dz)||1;
     hits.push({source:owner,target,damage:def.damage,force:def.force,dx:d===1&&dx===0&&dz===0?1:dx/d,dz:dz/d,spell});
   }
 }
+/**
+ * Where a blink from `p` along unit (dx,dz) lands: the farthest point within range that stays
+ * inside the live edge minus the body radius and a margin, then stepped back toward the start
+ * until it is clear of every other living body. Aimed outward from beyond that margin, it lands
+ * on the margin circle instead, so Blink can never carry a toy out of the ring.
+ */
+export function blinkLanding(s:SpellboxState,p:Mage,dx:number,dz:number){
+  const range=SPELLS.blink.range,limit=Math.max(0,s.radius-s.config.bodyRadius-BLINK.edgeMargin);
+  const b=p.x*dx+p.z*dz,c=p.x*p.x+p.z*p.z-limit*limit,disc=b*b-c;
+  let t=-1;if(disc>=0){const root=Math.sqrt(disc),t1=-b-root,t2=-b+root;if(t2>=0&&t1<=range)t=Math.min(range,t2);}
+  let x=p.x+dx*t,z=p.z+dz*t;
+  if(t<0){const r=Math.hypot(p.x,p.z)||1;x=p.x/r*limit;z=p.z/r*limit;}
+  const free=(x:number,z:number)=>s.players.every(o=>o===p||!o.alive||Math.hypot(x-o.x,z-o.z)>=s.config.bodyRadius*2);
+  const steps=Math.max(1,Math.ceil(Math.hypot(x-p.x,z-p.z)/.25));
+  for(let i=0;i<steps;i++){const k=i/steps,cx=x+(p.x-x)*k,cz=z+(p.z-z)*k;if(free(cx,cz))return{x:cx,z:cz};}
+  return{x:p.x,z:p.z};
+}
+function blink(s:SpellboxState,p:Mage,dx:number,dz:number,hits:Hit[]){
+  const d=SPELLS.blink,from={x:p.x,z:p.z},to=blinkLanding(s,p,dx,dz);
+  p.x=to.x;p.z=to.z;p.vx*=BLINK.momentumKept;p.vz*=BLINK.momentumKept;
+  effect(s,'blink','depart',from.x,from.z,1.4);effect(s,'blink','trail',from.x,from.z,.5,to);
+  s.events.push({type:'spellbox-blink',id:p.id,fromX:from.x,fromZ:from.z,x:to.x,z:to.z});
+  splash(s,hits,p.id,'blink',to.x,to.z,d.radius,'wave');
+}
 function release(s:SpellboxState,p:Mage,hits:Hit[]) {
   const cast=p.cast!;p.cast=null;const d=SPELLS[cast.spell],dx=Math.sin(cast.angle),dz=Math.cos(cast.angle);
-  p.casts++;s.events.push({type:'spellbox-cast',id:p.id,spell:cast.spell});effect(s,cast.spell,'cast',p.x,p.z,Math.max(1,d.radius));
+  p.casts++;s.events.push({type:'spellbox-cast',id:p.id,spell:cast.spell});
+  if(d.effect==='blink'){blink(s,p,dx,dz,hits);return;}
+  effect(s,cast.spell,'cast',p.x,p.z,Math.max(1,d.radius));
   if(d.effect==='shield'){p.shieldUntil=s.t+1200;effect(s,cast.spell,'shield',p.x,p.z,1.7);}
   else if(d.effect==='repair'){p.damage=Math.max(0,p.damage-20);effect(s,cast.spell,'repair',p.x,p.z,1.5);}
   else if(d.effect==='nova')splash(s,hits,p.id,cast.spell,p.x,p.z,d.range);
@@ -159,10 +187,14 @@ function tick(s:SpellboxState) {
   for(const p of s.players)if(p.alive){
     const batch=hits.filter(h=>h.target===p);if(!batch.length)continue;
     const protection=p.shieldUntil>s.t?.35:1,damage=batch.reduce((n,h)=>n+h.damage*protection,0);p.damage=Math.min(300,p.damage+damage);
-    const scale=knockbackMultiplier(p.damage,s.config.damageScale);
-    for(const h of batch){p.vx+=h.dx*h.force*scale*protection;p.vz+=h.dz*h.force*scale*protection;const source=s.players.find(o=>o.id===h.source);if(source)source.hits++;}
+    const scale=knockbackMultiplier(p.damage,s.config.damageScale);let ix=0,iz=0;
+    for(const h of batch){ix+=h.dx*h.force*scale*protection;iz+=h.dz*h.force*scale*protection;const source=s.players.find(o=>o.id===h.source);if(source)source.hits++;}
+    p.vx+=ix;p.vz+=iz;
     const velocity=Math.hypot(p.vx,p.vz);if(velocity>s.config.maxVelocity){p.vx=p.vx/velocity*s.config.maxVelocity;p.vz=p.vz/velocity*s.config.maxVelocity;}
-    p.stunnedUntil=s.t+s.config.hitstunMs;p.lastHit=s.t;p.cast=null;s.events.push({type:'spellbox-hit',id:p.id});
+    p.stunnedUntil=s.t+s.config.hitstunMs;p.lastHit=s.t;p.cast=null;
+    // Presentation detail for sound: who hit (strongest first) and the knockback just applied (cm/s).
+    const strongest=batch.reduce((a,b)=>b.force>a.force?b:a),sources=[...new Set(batch.map(h=>h.source))];
+    s.events.push({type:'spellbox-hit',id:p.id,source:strongest.source,sources,spell:strongest.spell,impulse:Math.min(s.config.maxVelocity,Math.hypot(ix,iz))});
   }
   const offset=Math.floor(s.t/TICK)%s.players.length,order=[...s.players.slice(offset),...s.players.slice(0,offset)];
   for(const p of order)if(p.alive){
