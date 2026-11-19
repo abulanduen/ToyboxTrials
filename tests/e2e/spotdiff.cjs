@@ -157,7 +157,9 @@ async function desktop(browser, errors) {
   for (let i = 0; i < 3; i++) await d.tapSlot(f.slots[i], i % 2 === 1);
   f = await d.settle((x) => x.me.found === 3, 'three finds');
   check('desktop: clicking differences on either page finds them (+10 each)', f.me.found === 3 && f.me.score === 30, `found ${f.me.found}, ${f.me.score} pts`);
-  check('desktop: finds are ringed on both pages', (await page.$$('.sd-found')).length === 6);
+  // the HUD redraws at 12 Hz: wait for the rings rather than reading the DOM straight away
+  const rings = await page.waitForFunction(() => document.querySelectorAll('.sd-found').length === 6, null, { timeout: 60000 }).then(() => 6).catch(async () => (await page.$$('.sd-found')).length);
+  check('desktop: finds are ringed on both pages', rings === 6, `${rings} rings`);
   await d.snap('sd-04-found.png');
 
   // a wrong tap: lockout, shown, and finds during it are ignored
@@ -165,7 +167,7 @@ async function desktop(browser, errors) {
   f = await d.settle((x) => x.me.wrong === 1, 'wrong tap');
   check('desktop: a wrong tap locks you out for about a second', f.me.lockMs > 500 && f.me.lockMs <= 1000, `lock ${Math.round(f.me.lockMs)} ms`);
   await page.waitForSelector('[data-testid=sd-lock]', { timeout: 30000 });
-  check('desktop: the lockout is shown with a red X', (await page.$$('.sd-wrong')).length >= 1);
+  check('desktop: the lockout is shown with a red X', await page.waitForSelector('.sd-wrong', { timeout: 30000, state: 'attached' }).then(() => true).catch(() => false));
   await d.snap('sd-05-wrong.png');
   await d.tapSlot(f.slots[3], false);
   await d.scale(0.2);
@@ -215,7 +217,9 @@ async function desktop(browser, errors) {
   f = await d.waitS((x) => x.phase === 'reveal' && x.round === 2, 'round 2 reveal');
   await d.scale(0);
   await d.frames(2);
-  check('desktop: when time runs out the missed differences are shown', (await page.$$('.sd-missed')).length === 2 * (15 - f.me.found), `${(await page.$$('.sd-missed')).length} marks`);
+  const want = 2 * (15 - f.me.found);
+  const missed = await page.waitForFunction((n) => document.querySelectorAll('.sd-missed').length === n, want, { timeout: 60000 }).then(() => want).catch(async () => (await page.$$('.sd-missed')).length);
+  check('desktop: when time runs out the missed differences are shown', missed === want, `${missed} marks`);
   await d.snap('sd-09-reveal.png');
 
   // rounds 3 and 4: a screenshot of each scene
@@ -226,8 +230,8 @@ async function desktop(browser, errors) {
   }
   check('desktop: four pages, four different scenes', new Set(themes).size === 4, themes.join(', '));
 
-  await d.scale(10);
-  await page.waitForSelector('.results', { timeout: 240000 });
+  await d.scale(40);
+  await page.waitForSelector('.results', { timeout: 600000 });
   await page.waitForTimeout(900);
   const rows = await page.$$eval('.results-list li', (els) => els.map((e) => e.textContent));
   check('desktop: results rank all four toys by points', rows.length === 4 && rows.every((r) => /\d+ points?/.test(r)), rows.join(' | '));
@@ -301,8 +305,8 @@ async function phone(browser, errors, orientation) {
   check(`${tag}: all 15 found by touch completes the page`, f.me.done && f.me.found === 15, `found ${f.me.found}`);
   if (orientation === 'landscape') await d.snap(`sd-m${P}-05-complete.png`);
 
-  await d.scale(12);
-  await page.waitForSelector('.results', { timeout: 240000 });
+  await d.scale(40); // each frame advances at most 100 ms × scale: software GL here can run at ~1 fps
+  await page.waitForSelector('.results', { timeout: 600000 });
   await page.waitForTimeout(900);
   const rows = await page.$$eval('.results-list li', (els) => els.map((e) => e.textContent));
   check(`${tag}: results rank all four toys`, rows.length === 4, rows.join(' | '));

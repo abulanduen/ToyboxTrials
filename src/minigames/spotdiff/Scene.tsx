@@ -13,9 +13,11 @@ import type { MinigameSceneProps } from '../types';
 import { bookLayout, readInsets } from './layout';
 import type { SpotState } from './rules';
 
-/** The book's width on the table (cm) when open. */
+/** The 3D book's model size (cm, open, before it is scaled to fit the screen). */
 const BOOK_W = 46;
 const FOV = 30;
+/** The camera's height above the pages (cm). Fixed, so it never rises into the room's lamp. */
+const CAM_D = 62;
 const COVER_T = 0.9;
 const PAGES_T = 1.3;
 
@@ -65,25 +67,25 @@ export function SpotScene(_: MinigameSceneProps<SpotState>) {
     const W = size.width;
     const H = size.height;
     const lay = bookLayout(W, H, insets);
-    const bw = lay.portrait ? lay.book.h : lay.book.w; // the book is turned in portrait
-    const wpp = BOOK_W / Math.max(50, bw);
-    const bookH = (lay.portrait ? lay.book.w : lay.book.h) * wpp;
     if (Math.abs(cam.fov - FOV) > 0.01) {
       cam.fov = FOV;
       cam.updateProjectionMatrix();
     }
+    // Table cm per CSS px at the height of the pages; the book is sized to match the DOM book.
+    const wpp = (2 * CAM_D * Math.tan((FOV * Math.PI) / 360)) / H;
+    const longSide = (lay.portrait ? lay.book.h : lay.book.w) * wpp; // the book is turned in portrait
+    const shortSide = (lay.portrait ? lay.book.w : lay.book.h) * wpp;
     const top = COVER_T + PAGES_T;
-    const d = (wpp * H) / (2 * Math.tan((FOV * Math.PI) / 360));
     // Screen offset of the book's centre from the screen's centre, in table cm (screen up = −z).
     const ox = (lay.book.x + lay.book.w / 2 - W / 2) * wpp;
     const oz = (lay.book.y + lay.book.h / 2 - H / 2) * wpp;
-    cam.position.set(-ox, top + d, -oz);
+    cam.position.set(-ox, top + CAM_D, -oz);
     cam.rotation.set(-Math.PI / 2, 0, 0);
     cam.updateMatrixWorld();
 
     const g = book.current;
     g.rotation.y = lay.portrait ? Math.PI / 2 : 0;
-    g.scale.set(1, 1, bookH / 30);
+    g.scale.set(longSide / BOOK_W, 1, shortSide / 30);
     // Desk things round the book: just outside its edges, whichever way it is turned.
     const hw = (lay.book.w * wpp) / 2;
     const hh = (lay.book.h * wpp) / 2;
