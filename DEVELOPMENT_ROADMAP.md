@@ -111,7 +111,7 @@ client stays a static build on Vercel and connects through `VITE_SERVER_URL`. De
 - ✅ Lobbies: host from the Pavilion or a gate (practice with bots stays the other choice), Hub-wide
   alert and Lobbies list, kick, cap, lock, bot fill, difficulty, one trial or a tournament, host
   handover, join mid-match to watch and play from the next trial (`server/lobby.ts`).
-- ✅ Server-run matches for all eleven trials: the rules cores and bots run on the server, clients send
+- ✅ Server-run matches for all thirteen trials: the rules cores and bots run on the server, clients send
   inputs and render the (filtered) state; tournaments with standings; forfeits after 30 s offline.
   Two real browsers played a Copycat match and a Blitz tournament to the same results in
   `tests/e2e/lobby.cjs` (localhost, software rendering).

@@ -28,6 +28,8 @@ export interface GameFacts {
    * keeps walking; an empty batch lets go).
    */
   heldInputs?: boolean;
+  /** Mirrors the registry's `skipStartCountdown`: the trial opens with its own phase (Spellbox's draft). */
+  skipStartCountdown?: boolean;
 }
 
 const f = (id: MinigameId, category: MinigameCategory, min: number, durationSec: [number, number], eligibility: GameFacts['eligibility'] = { tournament: true }, heldInputs = false): GameFacts => ({
@@ -50,8 +52,10 @@ export const GAME_FACTS: Partial<Record<MinigameId, GameFacts>> = {
   'music-box-rhythm': f('music-box-rhythm', 'rhythm', 1, [60, 80]),
   // Owner decision (19 Nov 2026): the full 5–10 minute game, but only in the longer formats.
   'toy-squad': f('toy-squad', 'strategy', 1, [300, 630], { tournament: true, formats: ['normal', 'treasure'] }),
-  'spellbox-showdown': f('spellbox-showdown', 'pvp', 2, [90, 180]),
+  'spellbox-showdown': { ...f('spellbox-showdown', 'pvp', 2, [90, 180]), skipStartCountdown: true },
   'jack-in-the-box': f('jack-in-the-box', 'knowledge', 2, [60, 240]),
+  'odd-page-out': f('odd-page-out', 'observation', 1, [60, 145]),
+  'toy-tower-tumble': f('toy-tower-tumble', 'strategy', 1, [300, 600], { tournament: false }),
 };
 
 /** Every trial the online server can run. */

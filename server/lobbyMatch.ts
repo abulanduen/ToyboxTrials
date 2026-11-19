@@ -271,7 +271,8 @@ export class MatchFlow {
     this.result = null;
     this.events = [];
     this.phase = 'countdown';
-    this.phaseLeft = PHASE_MS.countdown;
+    // Trials that open with their own phase (Spellbox's draft) skip the 3-2-1, as locally.
+    this.phaseLeft = def.skipStartCountdown ? 0 : PHASE_MS.countdown;
   }
 
   private finishTrial(out: FlowTick) {

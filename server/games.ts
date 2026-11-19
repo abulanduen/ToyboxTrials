@@ -35,6 +35,10 @@ import { createSquadBot } from '../src/minigames/toysquad/bot';
 import { spellboxRules } from '../src/minigames/spellbox/rules';
 import { createSpellboxBot } from '../src/minigames/spellbox/bot';
 import { jackRules } from '../src/minigames/jackbox/rules';
+import { spotRules } from '../src/minigames/spotdiff/rules';
+import { createSpotBot } from '../src/minigames/spotdiff/bot';
+import { tumbleRules } from '../src/minigames/towertumble/rules';
+import { createTumbleBot } from '../src/minigames/towertumble/bot';
 import { createJackBot } from '../src/minigames/jackbox/bot';
 
 type Obj = Record<string, unknown>;
@@ -210,6 +214,44 @@ const GAMES: ServerGame[] = [
       v.fuseMs = HIDDEN_FUSE_MS - held;
       v.fuses = [];
       v.order = [];
+    },
+  },
+  {
+    id: 'odd-page-out',
+    rules: spotRules as RulesCoreAny,
+    createBot: createSpotBot as () => BotPolicy,
+    validate: (i) => (num(i.x, 2) && num(i.y, 2) ? { x: i.x, y: i.y } : null),
+    // The seed would deal every later round's pictures. This round's differences are drawn on the
+    // two pages everyone sees (finding them by eye is the game), so they are not a secret to keep.
+    publicView: hideSeed,
+  },
+  {
+    id: 'toy-tower-tumble',
+    rules: tumbleRules as RulesCoreAny,
+    createBot: createTumbleBot as () => BotPolicy,
+    validate(i) {
+      const cell = (v: unknown) => int(v, 0, 255);
+      switch (i.type) {
+        case 'build':
+          return i.cell === undefined ? { type: 'build' } : cell(i.cell) ? { type: 'build', cell: i.cell } : null;
+        case 'merge':
+        case 'move':
+          return cell(i.from) && cell(i.to) ? { type: i.type, from: i.from, to: i.to } : null;
+        case 'sell':
+          return cell(i.cell) ? { type: 'sell', cell: i.cell } : null;
+        case 'builder':
+        case 'ready':
+          return { type: i.type };
+        case 'speed':
+          return int(i.speed, 1, 4) ? { type: 'speed', speed: i.speed } : null;
+        default:
+          return null;
+      }
+    },
+    // Each board's random-draw state would tell a client which tower its next Build gives.
+    publicView(v) {
+      hideSeed(v);
+      for (const p of v.players as Obj[]) if ('rng' in p) p.rng = 0;
     },
   },
 ];

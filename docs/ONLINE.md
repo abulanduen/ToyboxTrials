@@ -112,7 +112,7 @@ online"). The other choice in both places is the existing **practice with bots**
 - **Joining mid-match:** the newcomer watches the match live (following a player's view, with
   "Watch next"), and is seated at the **next trial** (a tournament's next trial; for one trial, the
   next start). Their tournament row starts with 0 for the trials they missed. This works for all
-  eleven trials through the same path (no per-game special case).
+  thirteen trials through the same path (no per-game special case).
 
 ### How a match runs on the server
 
@@ -159,9 +159,12 @@ online"). The other choice in both places is the existing **practice with bots**
     blink or swing lands one network trip (plus up to ~33 ms of input batching) after the press.
     There is no client-side prediction. Not measured on a real network.
 - **Spellbox Showdown** runs online through the generic path: its inputs are only shape-checked
-  here and validated by its own rules core, so changes to its inputs keep working online. The
-  server always runs the shared 3 s countdown; if Spellbox gains a "skip the countdown" option,
-  the online flow does not read it yet.
+  here and validated by its own rules core, so changes to its inputs keep working online. Like
+  practice, it skips the 3 s countdown and opens on its draft (`skipStartCountdown`, mirrored in
+  `src/minigames/facts.ts`).
+- **New trials** join online play by adding an entry to `src/minigames/facts.ts` and
+  `server/games.ts` (input validator, hidden-information filter). A trial without them is shown
+  as "Not online yet" in the host's picker and is never drawn for an online tournament.
 
 ### Hidden information
 
@@ -171,14 +174,19 @@ online"). The other choice in both places is the existing **practice with bots**
   uses and which anyone can count anyway); the category order is not sent.
 - **Copycat Conductor:** notes not yet demonstrated are masked; the seed is not sent.
 - **Red Light, Green Light:** the pre-rolled light timings (`cycles`) are not sent.
-- **Every game with a seed** (Midnight Hunger, Find the Original, Blink Duel, Spellbox, Toy Squad):
-  the seed is not sent (it would predict batteries, crowds, shops and matchups).
+- **Every game with a seed** (Midnight Hunger, Find the Original, Blink Duel, Spellbox, Toy Squad,
+  Odd Page Out, Toy Tower Tumble): the seed is not sent (it would predict batteries, crowds,
+  shops, matchups and later pictures).
+- **Toy Tower Tumble:** each board's random-draw state (`rng`) is not sent (it would tell which
+  tower the next Build gives).
 - **Blink Duel, Spellbox:** other players' queued inputs (`pending`) are not sent.
 - **Toy Squad:** you get your own shop, passive offers and battle; other players' shops and
   offers are blanked and their battles are not sent.
 - Inferno Escape, Wind-Up Dash and Music Box Rhythm have nothing hidden (the course and chart are
   what everyone plays). Find the Original's real Baldwyn is not a stored secret: it is whichever
-  toy matches the card everyone sees.
+  toy matches the card everyone sees. Likewise Odd Page Out's differences are drawn on the two
+  pages everyone sees, so the round's picture data (including its list of differing slots) is
+  sent: a modified client could read the answers from it, as it could from the pictures.
 - A spectator gets the view of the player they watch.
 
 ### Leaderboard

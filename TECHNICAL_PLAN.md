@@ -112,7 +112,7 @@ results, standings and forfeits (30 s reconnect window). The browser's shared ho
 (`remoteHost` in `session.ts`, `src/minigames/remote.ts`) that renders the server state through each game's
 unchanged Scene and Hud and sends `readLocalInput` output to the server; local practice is untouched.
 Finished online tournaments go to a leaderboard (accounts Postgres or memory; `GET /api/leaderboard`).
-All eleven trials run online. Not done: client-side prediction and position interpolation (combat inputs act
+All thirteen trials run online. Not done: client-side prediction and position interpolation (combat inputs act
 one network trip later), matchmaking queues, ranked ratings, deployment, and any latency or capacity
 measurement.
 

@@ -16,8 +16,9 @@ describe('length classes', () => {
     expect(lengthClassOf(d(300, 600))).toBe('long'); // a 5–10 minute tower defence
   });
 
-  it('today only Toy Squad is long; every other trial is short', () => {
-    for (const g of MINIGAMES) expect(lengthClassOf(g), g.id).toBe(g.id === 'toy-squad' ? 'long' : 'short');
+  it('today Toy Squad and Toy Tower Tumble are long; every other trial is short', () => {
+    const long = ['toy-squad', 'toy-tower-tumble'];
+    for (const g of MINIGAMES) expect(lengthClassOf(g), g.id).toBe(long.includes(g.id) ? 'long' : 'short');
   });
 
   it('labels: a range in whole minutes, and a compact chip', () => {
@@ -34,8 +35,9 @@ describe('length classes', () => {
   it('sorts short to long, keeping registry order within a class', () => {
     const games = [{ id: 'a', ...d(300, 600) }, { id: 'b', ...d(60, 120) }, { id: 'c', ...d(240, 300) }, { id: 'd', ...d(10, 60) }];
     expect(byLength(games).map((g) => g.id)).toEqual(['b', 'd', 'c', 'a']);
-    const sorted = byLength(MINIGAMES);
-    expect(sorted[sorted.length - 1].id).toBe('toy-squad');
-    expect(sorted.slice(0, -1).map((g) => g.id)).toEqual(MINIGAMES.filter((g) => g.id !== 'toy-squad').map((g) => g.id));
+    const sorted = byLength(MINIGAMES).map((g) => g.id);
+    const long = MINIGAMES.filter((g) => lengthClassOf(g) === 'long').map((g) => g.id);
+    expect(long).toEqual(['toy-squad', 'toy-tower-tumble']);
+    expect(sorted).toEqual([...MINIGAMES.filter((g) => lengthClassOf(g) !== 'long').map((g) => g.id), ...long]);
   });
 });

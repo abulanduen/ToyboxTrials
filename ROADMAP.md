@@ -154,7 +154,7 @@ the seed, steps the shared rules cores (60 Hz sub-steps on a 30 Hz timer) with s
 filters hidden information per player (Jack's fuse, Copycat's undemonstrated notes, Red Light's
 timings, seeds, Toy Squad's private shops and battles), decides results, and stores finished
 tournaments on a leaderboard (Postgres when configured, else memory; `GET /api/leaderboard`;
-Hub Scoreboard and TV). All eleven trials run online. Tested with unit tests and
+Hub Scoreboard and TV). All thirteen trials run online (Odd Page Out and Toy Tower Tumble included). Tested with unit tests and
 `tests/e2e/lobby.cjs` on localhost only; latency and capacity are unmeasured. Details: `docs/ONLINE.md`.
 Toy Squad is in tournaments again, Normal and Treasure only (owner decision). Trial choosers show
 a length chip (short ≤ 4 min, medium ≤ 6, long) and the practice/host pickers are picture-card grids.
@@ -175,7 +175,7 @@ All games previously assigned to Astra now have local modules. Online multiplaye
 
 | Stage | Planned scope / dependency |
 | --- | --- |
-| M8 | Host chosen (Railway, `ws`). Online Hub, lobbies and server-run matches for all eleven trials built and tested locally, not yet deployed. Still to do: deploy, measure latency/capacity, prediction for the combat games |
+| M8 | Host chosen (Railway, `ws`). Online Hub, lobbies and server-run matches for all thirteen trials built and tested locally, not yet deployed. Still to do: deploy, measure latency/capacity, prediction for the combat games |
 | M9 | Friends rooms/codes, public casual, configurable Custom Party, guest nicknames and bot fill |
 | M10 | Ranked ratings, history and leaderboards. Blitz/Normal/Treasure must have independent ratings; older plan stages launch one ladder first as population allows |
 | M11 | Emotes, inspection, parties, lobby instancing and interest management; grow toward the unverified 500-player lobby-server goal |

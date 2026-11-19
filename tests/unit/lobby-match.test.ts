@@ -146,6 +146,16 @@ describe('hidden information never leaves the server', () => {
     }
   });
 
+  it("Toy Tower Tumble: no board's random-draw state; Odd Page Out: no seed", () => {
+    const run = new GameRun('toy-tower-tumble', field(3, ['p1']), 4);
+    run.advance(500);
+    expect((run.state.players as { rng: number }[]).some((p) => p.rng !== 0)).toBe(true);
+    const v = run.publicView();
+    expect((v.players as { rng: number }[]).every((p) => p.rng === 0)).toBe(true);
+    expect(v.seed).toBe(0);
+    expect(new GameRun('odd-page-out', field(3), 99).publicView().seed).toBe(0);
+  });
+
   it("Toy Squad: you see your own shop, passive offers and battle, nobody else's", () => {
     const run = new GameRun('toy-squad', field(3, ['p1']), 31);
     const base = run.publicView();
@@ -311,6 +321,7 @@ describe('tournament format pool (owner decision: Toy Squad only in Normal and T
       expect(f.durationSec, g.id).toEqual(g.durationSec);
       expect(f.eligibility.tournament, g.id).toBe(g.eligibility.tournament);
       expect(f.eligibility.formats ?? null, g.id).toEqual(g.eligibility.formats ?? null);
+      expect(!!f.skipStartCountdown, g.id).toBe(!!g.skipStartCountdown);
     }
     expect([...SERVER_GAMES.keys()].sort()).toEqual(onlineGames().map((g) => g.id).sort());
     // Every trial that exists today runs online.
