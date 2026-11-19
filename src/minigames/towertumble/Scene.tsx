@@ -235,7 +235,7 @@ function Enemies() {
         bars.setColorAt(barN++, c.set(f > 0.5 ? PALETTE.sage : f > 0.25 ? PALETTE.honey : PALETTE.coral));
       }
     }
-    meshes.forEach((m, k) => { m.count = counts[k]; m.visible = counts[k] > 0; if (counts[k]) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; } });
+    for (let k = 0; k < meshes.length; k++) { const m = meshes[k]; m.count = counts[k]; m.visible = counts[k] > 0; if (counts[k]) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; } }
     if (!bossShown) { boss.visible = false; bossRing.visible = false; }
     bars.count = barN; bars.visible = barN > 0; if (barN) { bars.instanceMatrix.needsUpdate = true; if (bars.instanceColor) bars.instanceColor.needsUpdate = true; }
   });
@@ -243,20 +243,20 @@ function Enemies() {
 }
 
 // ───────────── selection, cursor, twins, drag target ─────────────
+function putRing(m: THREE.Mesh, cell: number | null, r: number, mine: boolean) {
+  m.visible = cell !== null && mine;
+  if (cell !== null) { m.position.set(bw(cell % 8), 0.3, bw(Math.floor(cell / 8))); m.scale.setScalar(r); }
+}
 function Markers({ drag }: { drag: RefObject<Drag | null> }) {
   const select = useRef<THREE.Mesh>(null!), cursor = useRef<THREE.Mesh>(null!), target = useRef<THREE.Mesh>(null!);
   const twins = useMemo(() => { const m = new THREE.InstancedMesh(RING, TWIN_MAT, 16); m.count = 0; m.raycast = () => {}; m.frustumCulled = false; return m; }, []);
-  const o = useMemo(() => new THREE.Object3D(), []);
+  const o = useMemo(() => new THREE.Object3D(), []), reduced = useRef(reducedMotion());
   useEffect(() => () => { twins.dispose(); }, [twins]);
   useFrame(() => {
     const v = view, ui = useTumbleUI.getState(), mine = !!v.me && v.board === v.me && !v.me.out;
-    const pulse = reducedMotion() ? 1 : 1 + Math.sin(v.now * 6) * 0.06;
-    const put = (m: THREE.Mesh, cell: number | null, r: number) => {
-      m.visible = cell !== null && mine;
-      if (cell !== null) { m.position.set(bw(cell % 8), 0.3, bw(Math.floor(cell / 8))); m.scale.setScalar(r); }
-    };
-    put(select.current, ui.selected, CELL * 0.5 * pulse);
-    put(cursor.current, ui.cursor !== ui.selected ? ui.cursor : null, CELL * 0.44);
+    const pulse = reduced.current ? 1 : 1 + Math.sin(v.now * 6) * 0.06;
+    putRing(select.current, ui.selected, CELL * 0.5 * pulse, mine);
+    putRing(cursor.current, ui.cursor !== ui.selected ? ui.cursor : null, CELL * 0.44, mine);
     let n = 0;
     const from = drag.current?.moved ? drag.current.from : ui.selected;
     const picked = mine && from !== null && v.me ? towerAt(v.me, from) : undefined;
@@ -401,6 +401,8 @@ export function TumbleScene({ getState, localId }: MinigameSceneProps<TdState>) 
         return { x: r.left + ((p.x + 1) / 2) * r.width, y: r.top + ((1 - p.y) / 2) * r.height };
       },
       watching: () => { const s = getState(); return s ? viewedBoard(s, localId, useTumbleUI.getState().watching) : null; },
+      /** True once the camera has been fitted to the HUD's board slot. */
+      fitted: () => fit.current.key !== '',
     } });
   }, [camera, gl, getState, localId]);
 
@@ -408,8 +410,8 @@ export function TumbleScene({ getState, localId }: MinigameSceneProps<TdState>) 
     drawQueuedPortrait(renderer);
     const v = readView(getState, localId);
     if (drag.current && !editable(v)) cancel();
-    // Re-fit the camera when the board slot or the canvas changes (checked a few times a second).
-    if (fit.current.frame++ % 10 === 0) {
+    // Fit the camera as soon as the HUD's board slot exists, then re-fit when it or the canvas changes (checked every few frames).
+    if (!fit.current.key || fit.current.frame++ % 6 === 0) {
       const slotEl = document.querySelector('.td-board-slot'), canvas = gl.domElement.getBoundingClientRect();
       if (slotEl) {
         const slot = slotEl.getBoundingClientRect(), key = `${slot.left},${slot.top},${slot.width},${slot.height}|${canvas.width},${canvas.height}|${size.width},${size.height}`;
