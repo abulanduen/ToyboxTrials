@@ -153,8 +153,17 @@ const shot = (page, name) => page.screenshot({ path: path.join(OUT, name), timeo
     check("A's key press reached the server (progress or a wrong note, decided there)", true);
     const fuseless = await A.evaluate(() => window.__toybox.match.state()?.seed);
     check('the seed never reaches the client', fuseless === 0, String(fuseless));
+    // Freeze the server's match clock (test server only) while two slow pages are photographed.
+    await A.evaluate(() => window.__toybox.lobby.timeScale(0));
     await shot(A, 'lobby-04-match-client-A.png');
     await shot(B, 'lobby-04-match-client-B.png');
+    await A.evaluate(() => window.__toybox.lobby.timeScale(0.5));
+    // The moment A hears the server's result, freeze again so both pages can read it.
+    await A.waitForFunction(() => {
+      if (window.__toybox.lobby.current()?.match?.phase !== 'results') return false;
+      window.__toybox.lobby.timeScale(0);
+      return true;
+    }, null, { timeout: T, polling: 100 });
     await Promise.all([waitPhase(A, 'results'), waitPhase(B, 'results')]);
     const placeA = await A.evaluate(() => JSON.stringify(window.__toybox.lobby.current().match.result.placements));
     const placeB = await B.evaluate(() => JSON.stringify(window.__toybox.lobby.current().match.result.placements));
@@ -176,7 +185,13 @@ const shot = (page, name) => page.screenshot({ path: path.join(OUT, name), timeo
     await A.click('[data-testid=lobby-start]');
     const games = await A.waitForFunction(() => window.__toybox.lobby.current()?.match?.tournament?.games, null, { timeout: T, polling: 250 }).then((h) => h.jsonValue());
     check('the server picks three Blitz trials (never Toy Squad)', games.length === 3 && !games.includes('toy-squad'), games.join(', '));
-    await Promise.all([A, B].map((p) => p.waitForFunction(() => window.__toybox.lobby.current()?.match?.phase === 'final', null, { timeout: T0, polling: 500 })));
+    // Freeze at the final table (test server only), so both slow pages get to read it.
+    await A.waitForFunction(() => {
+      if (window.__toybox.lobby.current()?.match?.phase !== 'final') return false;
+      window.__toybox.lobby.timeScale(0);
+      return true;
+    }, null, { timeout: T * 2, polling: 100 });
+    await B.waitForFunction(() => window.__toybox.lobby.current()?.match?.phase === 'final', null, { timeout: T, polling: 500 });
     const fin = await A.evaluate(() => window.__toybox.lobby.current().match.tournament);
     check('the tournament completes: three trials scored for all four toys', fin.standings.length === 4 && fin.standings.every((s) => s.rounds.length === 3), JSON.stringify(fin.standings.map((s) => s.rounds)));
     await waitPhase(A, 'final', T);
