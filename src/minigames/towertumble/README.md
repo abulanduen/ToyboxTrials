@@ -6,8 +6,8 @@ merge into a random tower one tier up**, all the way to tier 7. Level your **bui
 odds, finish **quick quests** for gold, beat the **bosses** on waves 5, 10, 15 and 20 for free
 towers, and hold out longer than everyone else. Knocked-out players watch the other boards.
 
-Registry id `toy-tower-tumble` · gate on the gates table (south row, between the bridge landing and
-Blink Duel) · tutorial in `tutorials.ts` · browser test `tests/e2e/towertumble.cjs` · unit tests
+Registry id `toy-tower-tumble` · gate on the gates table (south row at x = 45, between the bridge
+landing and Blink Duel: the mirror of Odd Page Out's spot west of the landing) · tutorial in `tutorials.ts` · browser test `tests/e2e/towertumble.cjs` · unit tests
 `tests/unit/towertumble.test.ts`.
 
 ## Status: what is decided and what is provisional
@@ -300,8 +300,19 @@ reward). None of this has been played by a person.
 
 ## Measured (browser test)
 
-Filled in from `tests/e2e/output/towertumble-renderinfo.json` (SwiftShader, Low quality):
-see the commit that adds the browser test.
+Peak `__toybox.renderInfo()` counts sampled by `tests/e2e/towertumble.cjs` (SwiftShader, Low
+quality, 1 human + 3 bots; samples at the mid-wave, boss-wave, boss-reward and spectator moments;
+whole frame including the room, shadows and post passes):
+
+| Layout | Draw calls | Triangles | Geometries | Meshes in scene | Live effect particles |
+|---|---|---|---|---|---|
+| Desktop 1280×800 | 69 | 31,076 | 150 | 179 | 54 |
+| Phone portrait 390×844 | 57 | 29,226 | 144 | 179 | 54 |
+| Phone landscape 844×390 | 70 | 32,634 | 153 | 179 | 60 |
+
+"Meshes" counts every mesh object, hidden pooled ones included (41 tower slots, the instanced
+layers and the effect shapes), so it is constant. No frame rates are claimed: there is no GPU here.
+These boards held a handful of towers; a full 41-tower board at wave 20 has not been measured.
 
 ## Unverified
 

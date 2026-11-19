@@ -130,6 +130,8 @@ async function frames(page, n) {
       if (layout === 'landscape') {
         await state(() => { const p = window.__toybox.match.state().players[0]; p.towers.forEach(t => { t.def = 'felt-cub'; }); });
         const cells = await me('p.towers.map(t => t.cell)');
+        // The merged tower is still selected; clear it so the tap selects rather than toggles.
+        if (await page.getByTestId('td-sheet-close').count()) { await click('td-sheet-close'); await page.getByTestId('td-sheet').waitFor({ state: 'detached' }); }
         await tapSquare(cells[0]);
         await page.getByTestId(`td-merge-${cells[1]}`).waitFor();
         await size56(`td-merge-${cells[1]}`);
