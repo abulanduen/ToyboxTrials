@@ -338,6 +338,7 @@ async function landscape(browser) {
   await L.press('[data-testid=account-submit]');
   await L.page.waitForSelector('[data-testid=account-signed-in]', { timeout: T });
   check('landscape: signed in', await L.synced(1));
+  check('landscape: signing in to a never-saved account says "Signed in"', /^Signed in/.test((await L.page.textContent('[data-testid=account-notice]')) || ''));
   const lay2 = await layoutOf(L.page, '.account-sheet');
   check('landscape: signed-in sheet buttons ≥ 56 px', !lay2.small.length, JSON.stringify(lay2.small));
   await L.shot('account-07-landscape-signed-in.png');

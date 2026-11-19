@@ -3611,7 +3611,7 @@ canvas {
 .account-row .toy-btn > span,
 .account-actions .toy-btn > span {
   min-height: 50px;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
   padding: 0.6em 1.1em;
@@ -3677,6 +3677,13 @@ canvas {
 }
 .account-sheet .pause__actions {
   margin-top: 1.1rem;
+}
+/* Narrow portrait: the logo sign spans the top, so the button sits just below it. */
+@media (orientation: portrait) and (max-width: 560px) {
+  .menu-account {
+    top: calc(162px + env(safe-area-inset-top));
+    right: calc(12px + env(safe-area-inset-right));
+  }
 }
 @media (max-width: 420px) {
   .account-field {

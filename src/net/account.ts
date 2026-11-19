@@ -259,7 +259,9 @@ export async function signIn(mode: 'login' | 'register', username: string, passw
   applyProfile(merge.profile);
   // The online nickname defaults to the username (the player can still change it).
   useGame.getState().set({ contenderName: auth.username.slice(0, 16) });
-  useAccount.getState().set({ username: auth.username, notice: merge.summary, availability: 'on' });
+  // An account that exists but has never saved (rev 0) takes the guest toy too; say "signed in" then.
+  const notice = mode === 'login' ? merge.summary.replace(/^Account created/, 'Signed in') : merge.summary;
+  useAccount.getState().set({ username: auth.username, notice, availability: 'on' });
   await saveNow();
   return null;
 }

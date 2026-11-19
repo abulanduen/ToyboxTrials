@@ -66,7 +66,7 @@ export function mergeGuestIntoAccount(account: Profile | null, guest: Profile): 
   if (!account) {
     const n = Object.keys(g.owned).length;
     const summary = isBlankProfile(g)
-      ? 'Account created. Your toy will be saved to it from now on.'
+      ? 'Account created. Your toy will be saved to your account from now on.'
       : `Account created with this device's toy: ${cogs(g.wallet.cogs)}${n ? ` and ${items(n)}` : ''} are saved to it now.`;
     return { profile: g, added: n, cogsFrom: 'guest', summary };
   }

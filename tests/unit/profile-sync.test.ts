@@ -71,7 +71,7 @@ describe('first sign-in: merging the guest toy into the account', () => {
     expect(m.summary).toMatch(/cogs/);
   });
   it('a blank guest into a new account says so plainly', () => {
-    expect(mergeGuestIntoAccount(null, defaultProfile()).summary).toBe('Account created. Your toy will be saved to it from now on.');
+    expect(mergeGuestIntoAccount(null, defaultProfile()).summary).toBe('Account created. Your toy will be saved to your account from now on.');
   });
   it('an existing account: items are a union, cogs the larger balance, the account keeps its look', () => {
     const account = equip(buy(withCogs(defaultProfile(), 500, 700), 'cape'), 'cape');
