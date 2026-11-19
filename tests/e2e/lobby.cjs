@@ -23,7 +23,7 @@ fs.mkdirSync(OUT, { recursive: true });
 const res = [];
 const check = (n, ok, d = '') => { res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? '  — ' + d : ''}`); console.log(res[res.length - 1]); };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const shot = (page, name) => page.screenshot({ path: path.join(OUT, name), timeout: 240000 }).then(() => console.log(`  screenshot ${name}`)).catch((e) => console.log(`  (screenshot ${name} failed: ${e.message.split('\n')[0]})`));
+const shot = (page, name) => page.screenshot({ path: path.join(OUT, name), timeout: 240000, animations: 'disabled' }).then(() => console.log(`  screenshot ${name}`)).catch((e) => console.log(`  (screenshot ${name} failed: ${e.message.split('\n')[0]})`));
 
 (async () => {
   const child = spawn(process.execPath, [path.join(__dirname, '../../server-dist/index.cjs')], { env: { ...process.env, PORT: String(PORT), MATCH_DEBUG: '1', ACCOUNTS_STORE: 'memory' }, stdio: ['ignore', 'pipe', 'pipe'] });

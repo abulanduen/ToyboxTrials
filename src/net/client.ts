@@ -37,6 +37,8 @@ import { accountToken } from './account';
 const WELCOME_TIMEOUT_MS = 12_000;
 /** Snapshots arrive 15 times a second; this long without any message means the link is dead. */
 const SILENCE_MS = 6_000;
+/** A gap this long between two runs of the 66 ms pump timer means the page itself was stalled. */
+const STALL_MS = 2_000;
 /** Without movement, still send the position this often. */
 const KEEPALIVE_MS = 1_000;
 
@@ -321,9 +323,17 @@ const handlers: { [K in ServerMsg['t']]: (m: Extract<ServerMsg, { t: K }>) => vo
 };
 
 // ---------------------------------------------------------------- outgoing intent
+/** When pump last ran: a long gap means this page was stalled, not that the server went quiet. */
+let lastPumpAt = 0;
+
 function pump() {
-  if (useNet.getState().status !== 'online' || !conn) return;
   const now = performance.now();
+  const stalled = now - lastPumpAt > STALL_MS;
+  lastPumpAt = now;
+  if (useNet.getState().status !== 'online' || !conn) return;
+  // Our own thread was blocked (a long shader compile, a background tab): messages that arrived
+  // meanwhile are still queued behind this timer, so give them a moment before calling it silence.
+  if (stalled) lastMsgAt = Math.max(lastMsgAt, now - SILENCE_MS / 2);
   if (now - lastMsgAt > SILENCE_MS) return onDrop();
   const activity = currentActivity();
   if (activity !== sentActivity) {
