@@ -56,6 +56,8 @@ export const GAME_FACTS: Partial<Record<MinigameId, GameFacts>> = {
   'jack-in-the-box': f('jack-in-the-box', 'knowledge', 2, [60, 240]),
   'odd-page-out': f('odd-page-out', 'observation', 1, [60, 145]),
   'toy-tower-tumble': f('toy-tower-tumble', 'strategy', 1, [300, 600], { tournament: false }),
+  // A five-minute run: casual and practice only for now (registry decision, see siege/README.md).
+  'toybox-siege': f('toybox-siege', 'survival', 1, [240, 330], { tournament: false }),
 };
 
 /** Every trial the online server can run. */

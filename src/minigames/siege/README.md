@@ -207,6 +207,23 @@ the room; ranges over the final runs):
 
 The scene holds 137 meshes in total, whatever the entity count.
 
+## Online (server entry)
+
+`server/games.ts` runs the same rules core and bots on the authoritative server, and
+`src/minigames/facts.ts` lists it (casual only, no tournaments). The server entry:
+
+- validates every input shape;
+- hides the seed and the match-wide random counter;
+- sends whole boards only for the viewer's own toy and the board it watches, cutting every other
+  board to its live elites;
+- snapshots every 2 ticks;
+- closes the class pick after 60 s and any card after 20 s, so an idle player cannot stall a
+  shared match (both untimed locally).
+
+Tested headless with a full bot field (`tests/unit/lobby-match.test.ts`). **Not yet played online
+in a browser.** A full board is still a sizeable snapshot (a few hundred pooled entities), so the
+wire size needs measuring.
+
 ## Decisions and open questions (provisional)
 
 - **Tournaments:** off for now (`eligibility.tournament: false`), like Toy Squad. A five-minute
