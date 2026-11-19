@@ -5,9 +5,32 @@ import { ErrorBoundary } from './ui/ErrorBoundary';
 import { installInput } from './game/input';
 import { unlockAudio } from './game/audio';
 import { useGame, type Screen } from './game/store';
+import { installNet, joinOnline } from './net/client';
+import { useNet } from './net/store';
+import { normalizeRoomCode } from './net/protocol';
 
 /** Shareable deep links: #play and #workshop open straight onto a screen. */
 const HASH: Record<Screen, string> = { menu: '', playing: '#play', workshop: '#workshop', minigame: '#play' };
+/** `#room=K7MQX` (a shared private-room link): the room code, or null. */
+function roomFromHash(): string | null {
+  const m = /^#room=([^&]+)$/i.exec(window.location.hash);
+  return m ? normalizeRoomCode(decodeURIComponent(m[1])) : null;
+}
+/** Follow a room link: show the online sheet (for progress and errors) and join. */
+function joinFromHash(): boolean {
+  if (!/^#room=/i.test(window.location.hash)) return false;
+  const code = roomFromHash();
+  const net = useNet.getState();
+  net.set({ sheetOpen: true, error: null });
+  if (code) void joinOnline({ kind: 'code', code });
+  else net.set({ error: 'That room link is missing its code. Ask for the link again.' });
+  return true;
+}
+/** The address bar while in a private room: its share link, so a reload rejoins. */
+function hashFor(screen: Screen): string {
+  const room = useNet.getState().room;
+  return room?.kind === 'private' && room.code && screen !== 'menu' ? `#room=${room.code}` : HASH[screen];
+}
 function screenFromHash(): Screen | null {
   const h = window.location.hash;
   return h === '#play' ? 'playing' : h === '#workshop' ? 'workshop' : h === '' || h === '#' ? 'menu' : null;
@@ -19,21 +42,31 @@ function screenFromHash(): Screen | null {
  */
 export function App() {
   useEffect(() => {
+    installNet();
     const initial = screenFromHash();
     if (initial === 'workshop') useGame.getState().openWorkshop();
     else if (initial && initial !== 'menu') useGame.getState().goTo(initial);
+    else joinFromHash();
+    const syncHash = (screen: Screen) => {
+      const url = window.location.pathname + window.location.search + hashFor(screen);
+      if (url !== window.location.pathname + window.location.search + window.location.hash) window.history.replaceState(null, '', url);
+    };
     const offStore = useGame.subscribe((s, p) => {
       if (s.screen === p.screen) return;
-      const url = window.location.pathname + window.location.search + HASH[s.screen];
-      window.history.replaceState(null, '', url);
+      syncHash(s.screen);
+    });
+    const offNet = useNet.subscribe((s, p) => {
+      if (s.room !== p.room) syncHash(useGame.getState().screen);
     });
     const onHash = () => {
+      if (joinFromHash()) return;
       const sc = screenFromHash();
       if (sc && sc !== useGame.getState().screen) (sc === 'workshop' ? useGame.getState().openWorkshop() : useGame.getState().goTo(sc));
     };
     window.addEventListener('hashchange', onHash);
     return () => {
       offStore();
+      offNet();
       window.removeEventListener('hashchange', onHash);
     };
   }, []);

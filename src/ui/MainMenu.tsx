@@ -10,6 +10,8 @@ import { HATS } from '../game/cosmetics';
 import { SECRET_IDS } from '../game/interactables';
 import { CardboardSheet, KeyCap, SettingsForm, ToyButton } from './common';
 import { GearIcon, StarSticker, TickerBadge } from './icons';
+import { openOnlineSheet } from './OnlineUI';
+import { useNet } from '../net/store';
 
 export function MainMenu() {
   const s = useGame();
@@ -25,7 +27,7 @@ export function MainMenu() {
   // Enter starts (only when no sheet is open and focus isn't on another control).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (useGame.getState().menuSheet) return;
+      if (useGame.getState().menuSheet || useNet.getState().sheetOpen) return;
       const el = document.activeElement as HTMLElement | null;
       const onOtherButton = el && el.tagName === 'BUTTON' && !el.dataset.testid?.startsWith('menu-play');
       if ((e.code === 'Enter' || e.code === 'Space') && !onOtherButton) {
@@ -66,6 +68,11 @@ export function MainMenu() {
             </ToyButton>
           </div>
         </nav>
+        <div className="menu-online">
+          <ToyButton tone="sage" onClick={openOnlineSheet} className="menu-btn menu-btn--online" testId="menu-online">
+            Play online
+          </ToyButton>
+        </div>
 
         <div className="menu-contender card-felt">
           <TickerBadge size={44} body={paint.body} trim={paint.trim} accent={paint.accent} />

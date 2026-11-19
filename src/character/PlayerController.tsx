@@ -6,8 +6,10 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { WindupBot } from './WindupBot';
-import { createToyAnim, ELIM_DURATION, INTERACT_DURATION, RESPAWN_DURATION, type ToyAnim } from './anim';
-import { addMouseDelta, consumeMouseDelta, endFrame, getMoveAxis, isDown, stickRunning, wasPressed, clearInput } from '../game/input';
+import { createToyAnim, ELIM_DURATION, INTERACT_DURATION, RESPAWN_DURATION, startEmote, stepEmote, type ToyAnim } from './anim';
+import { addMouseDelta, consumeMouseDelta, endFrame, getMoveAxis, isDown, stickRunning, wasPressed, clearInput, EMOTE_ACTIONS } from '../game/input';
+import { HUB_MOTION } from '../game/hubMotion';
+import { EMOTE_COOLDOWN, EMOTE_DURATION, EMOTE_IDS } from '../game/emotes';
 import { groundHeightAt, resolve } from '../game/collision';
 import { inputBlocked, useGame } from '../game/store';
 import { sfx } from '../game/audio';
@@ -18,13 +20,8 @@ import { PAINT_JOBS } from '../game/palette';
 import { blobShadowTexture } from '../scene/textures';
 import { exposeDebug } from '../game/debug';
 
-const RADIUS = 0.85;
-const WALK = 9;
-const RUN = 14;
-const BOOST = 1.45;
-const JUMP_V = 16.5;
-const GRAVITY = 56;
-const TURN_RATE = 13;
+// Shared with the online server's movement validation (src/game/hubMotion.ts).
+const { radius: RADIUS, walk: WALK, run: RUN, boost: BOOST, jumpV: JUMP_V, gravity: GRAVITY, turnRate: TURN_RATE } = HUB_MOTION;
 
 const CAM_DIST = 14;
 const CAM_MIN_DIST = 3;
@@ -76,6 +73,8 @@ export function PlayerController() {
     snapCam: !!ret,
     /** Next idle wave on the main menu. */
     nextWave: 3,
+    /** performance.now() of the last emote (same 1.5 s cooldown as the server). */
+    lastEmoteAt: -Infinity,
   });
 
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
@@ -198,6 +197,7 @@ export function PlayerController() {
         sim.current.pos.set(x, groundHeightAt(x, z, RADIUS, 99), z);
         sim.current.vel.set(0, 0);
         if (yaw !== undefined) sim.current.yaw = yaw;
+        player.pos.copy(sim.current.pos); // publish at once (tests read it before the next frame)
       },
       aim: (camYaw: number, camPitch: number) => {
         sim.current.camYaw = camYaw;
@@ -222,6 +222,17 @@ export function PlayerController() {
       }),
       events.on('player:boost', ({ seconds }) => {
         sim.current.boostUntil = performance.now() + seconds * 1000;
+      }),
+      events.on('player:teleport', ({ x, z, yaw }) => {
+        const s = sim.current;
+        s.pos.set(x, groundHeightAt(x, z, RADIUS, 99), z);
+        s.vel.set(0, 0);
+        s.yaw = yaw;
+        s.yawTarget = null;
+        s.camYaw = yaw + Math.PI;
+        s.snapCam = true;
+        player.pos.copy(s.pos);
+        player.yaw = yaw;
       }),
       events.on('workshop:view', ({ back }) => {
         sim.current.wsYawTarget = sim.current.yaw + (back ? Math.PI + 0.6 : 0.55);
@@ -264,6 +275,23 @@ export function PlayerController() {
     }
     const eliminated = a.elimT >= 0;
     a.boosted = performance.now() < s.boostUntil;
+
+    // ---------- emotes (keys 1–4 / touch Emote menu) ----------
+    stepEmote(a, dt, EMOTE_DURATION);
+    if (playing && !blocked && !eliminated) {
+      for (let i = 0; i < EMOTE_ACTIONS.length; i++) {
+        if (!wasPressed(EMOTE_ACTIONS[i])) continue;
+        const t = performance.now();
+        if (t - s.lastEmoteAt >= EMOTE_COOLDOWN * 1000) {
+          s.lastEmoteAt = t;
+          const id = EMOTE_IDS[i];
+          startEmote(a, id);
+          sfx.emote(id);
+          events.emit('player:emote', { id });
+        }
+        break;
+      }
+    }
 
     // ---------- camera orbit from mouse ----------
     const [mdx, mdy] = consumeMouseDelta();
@@ -403,6 +431,7 @@ export function PlayerController() {
     player.pos.copy(s.pos);
     player.yaw = s.yaw;
     player.grounded = a.grounded;
+    player.speed = hSpeed;
     root.current.position.copy(s.pos);
     root.current.rotation.y = s.yaw;
     const groundBelow = groundHeightAt(s.pos.x, s.pos.z, RADIUS, s.pos.y);

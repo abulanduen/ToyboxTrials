@@ -101,10 +101,14 @@ scale change, lazy-loading, and the sniff routine.
 
 ## Multiplayer (needs a server)
 
-### M8 · Multiplayer proof of concept 🔒
-🔒 **Decision needed:** game-server host. The proposal is Colyseus (TypeScript, authoritative rooms, built-in
-matchmaking) on an always-on host (Fly.io, Railway or similar). This has a small monthly cost.
-- Two real browsers see each other move in the hub and play **one full Copycat match**.
+### M8 · Multiplayer proof of concept 🚧 (online Hub built; online match not started)
+Host decided (19 Nov 2026): an always-on Node server on **Railway**, plain WebSockets (`ws`). The
+client stays a static build on Vercel and connects through `VITE_SERVER_URL`. Details: `docs/ONLINE.md`.
+- ✅ First part built: two or more browsers share a hub room (public Hub instances, or private rooms
+  with a code or share link), see each other move with name tags, and use four emotes. The server
+  validates movement. Tested locally only (unit tests plus a browser test against the built server);
+  not yet deployed to Railway.
+- ⏳ Two real browsers play **one full Copycat match**.
 - The rules cores run on the server, and clients send inputs and render state.
 - The client stays a static build on Vercel.
 
@@ -126,7 +130,7 @@ _Depends on:_ M8.
 _Depends on:_ M9 and an active player base. Blitz and Treasure ladders follow when queues can sustain them.
 
 ### M11 · Social & lobby scale ⏳
-- emotes and gestures, cosmetic inspection, parties
+- emotes and gestures (✅ four hub emotes: wave, cheer, spin, bow), cosmetic inspection, parties
 - presence with interest management and lobby instances (target of about 50 visible players each, scaling toward 500 per server)
 
 _Depends on:_ M8.
@@ -154,5 +158,7 @@ _Depends on:_ M8.
 | 17 Nov 2026 | Start with casual and bots. One ranked ladder first, the other two later |
 | 17 Nov 2026 | Toybox Trivia replaced by Jack-in-the-Box (hot-potato categories, Puffer Party-style) |
 | 18 Nov 2026 | Music Box Rhythm music is composed in code (A6): no audio files. Presses are timestamped in the shared input layer (`getPressTimes()`) |
-| _pending_ | Game-server host for multiplayer (M8) |
+| 19 Nov 2026 | Online host: **Railway**, an always-on Node server. The client stays a static Vercel build (`VITE_SERVER_URL`) |
+| 19 Nov 2026 | Online transport: plain **WebSockets with `ws`**, with a shared typed protocol (`src/net/protocol.ts`). Not Colyseus |
+| 19 Nov 2026 | Online Hub joining: a public Hub (24 per instance, overflowing to new instances) and private rooms (16, 5-character codes, share links). No login: players pick a nickname |
 | _pending_ | Rating algorithm, ranked guest access, Base44 competition eligibility |

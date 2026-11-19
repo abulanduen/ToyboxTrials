@@ -85,4 +85,12 @@ node tests/e2e/midnight.cjs     # Midnight Hunger, desktop + phone portrait/land
 node tests/e2e/toysquad.cjs     # Toy Squad, desktop + phone portrait/landscape
 node tests/e2e/rhythm.cjs       # Music Box Rhythm, desktop + phone portrait/landscape (slow: ONLY=desktop|portrait|landscape)
 npm test                        # vitest unit tests for rules cores, scoring, tournament selection
+npm run server:dev              # online Hub server on ws://localhost:2567, rebuilt on change (dev builds connect to it)
+npm run server:build            # typecheck + esbuild bundle → server-dist/index.cjs (Railway runs this)
+npm run server:start            # run the built server (PORT, ALLOWED_ORIGINS)
+node tests/e2e/online.cjs       # online Hub: build with VITE_SERVER_URL=ws://localhost:2567, serve on a port, server:build; starts the server itself
 ```
+
+Online Hub (Railway + `ws`; see `docs/ONLINE.md`): the protocol lives in `src/net/protocol.ts` (shared, no DOM),
+the pure room logic in `server/hubRoom.ts` and `server/hubDirectory.ts`; `server/index.ts` is only the socket
+layer. Remote players' positions live in plain objects (`src/net/remotes.ts`), never per-frame React state.

@@ -16,6 +16,7 @@ import { PALETTE, type PaintJob } from '../game/palette';
 import { ELIM_DURATION, INTERACT_DURATION, RESPAWN_DURATION, type ToyAnim } from './anim';
 import type { HatId, KeySkinId } from '../game/cosmetics';
 import { HAT_HIDES_ANTENNA, Hat, KeyBow } from './Cosmetics';
+import { EMOTE_DURATION } from '../game/emotes';
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const damp = (cur: number, target: number, lambda: number, dt: number) =>
@@ -141,6 +142,63 @@ export function WindupBot({ anim, paint, hat = 'none', keySkin = 'classic' }: Pr
       eyeSquint = Math.sin(Math.PI * k);
     }
 
+    // ---------- emotes (hub social gestures) ----------
+    // Blend in over ~0.18 s and out over the last ~0.3 s. Whole-body moves (hop, twirl, bow) fade
+    // while walking so a moving toy doesn't fold in half; the arms always play. Arms swing out to
+    // the sides (armL negative z, armR positive z) so they stay clear of the head.
+    let headTilt = 0;
+    let headNod = 0;
+    if (a.emote && a.elimT < 0) {
+      const e = a.emoteT;
+      const k = clamp(Math.min(e / 0.18, (EMOTE_DURATION - e) / 0.3), 0, 1);
+      const body = k * (1 - w * 0.75);
+      switch (a.emote) {
+        case 'wave': {
+          // Right arm up high, hand swinging side to side; a friendly head tilt.
+          armRZ = THREE.MathUtils.lerp(armRZ, 2.5 + Math.sin(e * 13) * 0.4, k);
+          armRX = THREE.MathUtils.lerp(armRX, -0.15, k);
+          headTilt = 0.16 * k;
+          eyeSquint = Math.max(eyeSquint, 0.45 * k);
+          break;
+        }
+        case 'cheer': {
+          // Three springy hops with both arms thrown up.
+          const hop = Math.abs(Math.sin(e * Math.PI * 1.6));
+          rootY += hop * 0.85 * body;
+          scaleY *= 1 + (hop - 0.5) * 0.12 * body;
+          const shake = Math.sin(e * 22) * 0.18;
+          armLZ = THREE.MathUtils.lerp(armLZ, -2.45 - shake, k);
+          armRZ = THREE.MathUtils.lerp(armRZ, 2.45 + shake, k);
+          armLX = THREE.MathUtils.lerp(armLX, 0, k);
+          armRX = THREE.MathUtils.lerp(armRX, 0, k);
+          eyeSquint = Math.max(eyeSquint, 0.7 * k);
+          break;
+        }
+        case 'spin': {
+          // One full twirl (eased) in the first 1.3 s, arms out like a top.
+          const f = clamp(e / 1.3, 0, 1);
+          const eased = f < 0.5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2;
+          yawSpin += eased * Math.PI * 2 * (1 - w * 0.75);
+          rootY += Math.sin(Math.PI * f) * 0.35 * body;
+          armLZ = THREE.MathUtils.lerp(armLZ, -1.4, k);
+          armRZ = THREE.MathUtils.lerp(armRZ, 1.4, k);
+          break;
+        }
+        case 'bow': {
+          // Lean forward from the hips, one arm across the belly, head dipped; hold, then rise.
+          const f = clamp(e / 0.45, 0, 1);
+          const lean = Math.sin((Math.PI / 2) * f) * k;
+          pitch += 0.62 * lean * (1 - w * 0.75);
+          headNod = 0.25 * lean;
+          armRX = THREE.MathUtils.lerp(armRX, -1.15, lean);
+          armRZ = THREE.MathUtils.lerp(armRZ, 0.35, lean);
+          armLX = THREE.MathUtils.lerp(armLX, 0.5, lean);
+          eyeSquint = Math.max(eyeSquint, 0.6 * lean);
+          break;
+        }
+      }
+    }
+
     // ---------- elimination ----------
     let dead = false;
     let keyPopY = 0;
@@ -193,7 +251,8 @@ export function WindupBot({ anim, paint, hat = 'none', keySkin = 'classic' }: Pr
 
     torso.current.rotation.y = Math.sin(p) * 0.08 * w;
     head.current.rotation.y = s.headYaw + Math.sin(t * 0.7) * 0.08 * idle;
-    head.current.rotation.z = Math.sin(p + 0.6) * 0.05 * w + (a.interactT >= 0 && a.interactT < INTERACT_DURATION ? 0.18 : 0);
+    head.current.rotation.z = Math.sin(p + 0.6) * 0.05 * w + (a.interactT >= 0 && a.interactT < INTERACT_DURATION ? 0.18 : 0) + headTilt;
+    head.current.rotation.x = headNod;
     head.current.position.y = 1.95 + Math.sin(p * 2 + 0.8) * 0.03 * w;
 
     armL.current.rotation.set(armLX, 0, armLZ);

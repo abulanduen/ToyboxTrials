@@ -1,3 +1,5 @@
+import type { EmoteId } from '../game/emotes';
+
 /**
  * Mutable animation state shared between a controller (player input, AI, network replica…)
  * and the toy's procedural animation. Plain object — written every frame, never React state.
@@ -27,6 +29,10 @@ export interface ToyAnim {
   respawnT: number;
   /** Speed boost active (wind-up key bonus). */
   boosted: boolean;
+  /** Emote playing (wave, cheer, spin, bow), or null. */
+  emote: EmoteId | null;
+  /** Seconds since the emote started. */
+  emoteT: number;
 }
 
 export function createToyAnim(): ToyAnim {
@@ -43,6 +49,8 @@ export function createToyAnim(): ToyAnim {
     elimT: -1,
     respawnT: -1,
     boosted: false,
+    emote: null,
+    emoteT: 0,
   };
 }
 
@@ -56,3 +64,19 @@ export const ELIM_REST = 2.0;
 /** Elimination clock for a toy that stays out (minigames): counts up, then rests at ELIM_REST. */
 export const restingElimT = (t: number) => Math.min(ELIM_REST, Math.max(0, t));
 export const RESPAWN_DURATION = 0.6;
+
+/** Start an emote on a toy (restarts it if the same one is already playing). */
+export function startEmote(a: ToyAnim, id: EmoteId) {
+  a.emote = id;
+  a.emoteT = 0;
+}
+
+/** Advance the emote clock; clears it after `duration` seconds. */
+export function stepEmote(a: ToyAnim, dt: number, duration: number) {
+  if (!a.emote) return;
+  a.emoteT += dt;
+  if (a.emoteT >= duration) {
+    a.emote = null;
+    a.emoteT = 0;
+  }
+}

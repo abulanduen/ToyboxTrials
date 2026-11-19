@@ -90,6 +90,14 @@ lobbies are shown as unavailable until the M8 server exists. Dominoes everywhere
 face with pips only on the two big faces; the scoreboard frame is built from whole dominoes.
 Checks: `tests/unit/hub-layout.test.ts`, `tests/e2e/hubgates.cjs`.
 
+**Online Hub (first part of M8):** a Node `ws` server (`server/`, host: Railway) and the static
+client. Players can join a public Hub (24 per instance, overflowing to the next) or a private room
+(16 players, 5-character code or `#room=CODE` link) without logging in. They see each other with
+name tags, walk around and use four emotes (keys 1–4 or a touch Emote menu). Trials stay local.
+Checks: `tests/unit/online-*.test.ts` and `tests/e2e/online.cjs`, which runs against the built
+server on localhost. **Not yet deployed:** latency, capacity and real devices are unmeasured.
+Owner steps (Railway, then `VITE_SERVER_URL` on Vercel) and limitations: `docs/ONLINE.md`.
+
 ## Current milestone and priorities
 
 **Current milestone: integrate and playtest the seven local games; recover Claude's separate work.**
@@ -106,7 +114,7 @@ All games previously assigned to Astra now have local modules. Online multiplaye
 
 | Stage | Planned scope / dependency |
 | --- | --- |
-| M8 | Select server/host and prove two-client authoritative hub + one minigame. No server currently exists |
+| M8 | Host chosen (Railway, `ws`). Online Hub built and tested locally, not yet deployed. Still to do: one authoritative online minigame |
 | M9 | Friends rooms/codes, public casual, configurable Custom Party, guest nicknames and bot fill |
 | M10 | Ranked ratings, history and leaderboards. Blitz/Normal/Treasure must have independent ratings; older plan stages launch one ladder first as population allows |
 | M11 | Emotes, inspection, parties, lobby instancing and interest management; grow toward the unverified 500-player lobby-server goal |
@@ -119,7 +127,7 @@ All games previously assigned to Astra now have local modules. Online multiplaye
 - Confirm launch sequencing for the three independent ranked modes: older amendment A3 launches one ladder first; the current request specifies three independent modes without deciding release timing.
 - Rating algorithm, first ranked format, ranked identity/guest policy, ranked bot policy and disconnect/reconnect rules. The older plan proposes no ranked bots; that is not implemented enforcement.
 - Final balance, durations and tie/forfeit policies; Red Light penalty choice; Toy Squad scoring/eligibility (its ten rounds are owner-confirmed; it is currently excluded from tournaments/ranked).
-- Server provider/cost, networking protocol and tested lobby capacity. Multiplayer proof game remains to be chosen between the existing Copycat scope and Jack's candidacy.
+- Measured server cost and lobby capacity on Railway. Multiplayer proof game remains to be chosen between the existing Copycat scope and Jack's candidacy.
 - Music source/licensing, room dog asset, hardware/device validation and any external competition requirements.
 
 Guest-friendly casual access remains an established design requirement. Accounts, purchases, social systems, persistent online progression and all ranked/online features remain future work.

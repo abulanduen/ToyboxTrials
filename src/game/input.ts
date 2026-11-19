@@ -23,6 +23,23 @@ export type Action =
 
 export const SLOT_ACTIONS = ['slot1', 'slot2', 'slot3', 'slot4'] as const;
 
+/**
+ * Hub emotes (keys 1–4, or the touch Emote menu). Kept out of `Action` on purpose: minigames
+ * spread HUB_BINDINGS into their own maps, and emote presses must never reach a minigame's press
+ * log. Only the hub's PlayerController reads them, through `wasPressed()`.
+ */
+export type EmoteAction = 'emote1' | 'emote2' | 'emote3' | 'emote4';
+export const EMOTE_ACTIONS = ['emote1', 'emote2', 'emote3', 'emote4'] as const;
+export const EMOTE_KEYS: Record<EmoteAction, string[]> = {
+  emote1: ['Digit1', 'Numpad1'],
+  emote2: ['Digit2', 'Numpad2'],
+  emote3: ['Digit3', 'Numpad3'],
+  emote4: ['Digit4', 'Numpad4'],
+};
+/** Any action a device can trigger. */
+export type InputAction = Action | EmoteAction;
+const isEmoteAction = (a: InputAction): a is EmoteAction => a in EMOTE_KEYS;
+
 export const HUB_BINDINGS: Record<Action, string[]> = {
   forward: ['KeyW', 'ArrowUp'],
   back: ['KeyS', 'ArrowDown'],
@@ -89,8 +106,8 @@ let mouseDY = 0;
 let bindings = HUB_BINDINGS;
 
 // ---- virtual (touch) input ----
-const virtualDown = new Set<Action>();
-const virtualPressed = new Set<Action>();
+const virtualDown = new Set<InputAction>();
+const virtualPressed = new Set<InputAction>();
 /** Joystick vector: x = right, y = forward. Magnitude 0..1. */
 const stick = { x: 0, y: 0 };
 
@@ -136,13 +153,15 @@ export function setBindings(b: Record<Action, string[]>) {
   bindings = b;
 }
 
-export function isDown(a: Action): boolean {
-  return virtualDown.has(a) || bindings[a].some((c) => down.has(c));
+const keysFor = (a: InputAction): readonly string[] => (isEmoteAction(a) ? EMOTE_KEYS[a] : bindings[a]);
+
+export function isDown(a: InputAction): boolean {
+  return virtualDown.has(a) || keysFor(a).some((c) => down.has(c));
 }
 
 /** Edge-triggered: true once per physical press, until endFrame() is called. */
-export function wasPressed(a: Action): boolean {
-  return virtualPressed.has(a) || bindings[a].some((c) => pressedThisFrame.has(c));
+export function wasPressed(a: InputAction): boolean {
+  return virtualPressed.has(a) || keysFor(a).some((c) => pressedThisFrame.has(c));
 }
 
 /**
@@ -185,10 +204,10 @@ export function pressVirtual(a: Action, eventTime?: number) {
 export function releaseVirtual(a: Action) {
   virtualDown.delete(a);
 }
-/** One-shot tap (press + release on the next frame). */
-export function tapVirtual(a: Action, eventTime?: number) {
+/** One-shot tap (press + release on the next frame). Emote taps never enter the press log. */
+export function tapVirtual(a: InputAction, eventTime?: number) {
   virtualPressed.add(a);
-  logPress(a, eventTime);
+  if (!isEmoteAction(a)) logPress(a, eventTime);
 }
 
 /** Ordered presses since the last frame (for minigames where order matters, e.g. Copycat). */

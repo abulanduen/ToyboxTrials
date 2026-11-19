@@ -96,7 +96,11 @@ Preserve these seams and Copycat behaviour. Add games independently, reusing sha
 
 ## Planned authoritative multiplayer
 
-Keep static client hosting separate from an always-on game server. Colyseus/TypeScript is an existing candidate, not an installed dependency or final hosting decision.
+Keep static client hosting separate from an always-on game server. **Decided 19 Nov 2026:** a Node
+server on Railway with plain WebSockets (`ws`); Colyseus is not used. **Implemented so far:** the online
+Hub only (`docs/ONLINE.md`): public instances and private rooms, validated movement, 15 Hz snapshots,
+emotes and reconnect. The room logic (`server/hubRoom.ts`, `server/hubDirectory.ts`) is pure and
+unit-tested; `server/index.ts` is only the socket layer. Not yet deployed or measured on Railway.
 
 | Service | Required responsibility |
 | --- | --- |
@@ -106,7 +110,12 @@ Keep static client hosting separate from an always-on game server. Colyseus/Type
 | Progression | Trusted inventory/rewards, independent format ratings, history and leaderboards |
 | Browser | Input collection, rendering, animation, interpolation and approved prediction |
 
-Clients send intent, not trusted scores or outcomes. Plan validation/rate limits, state visibility (including hidden Jack fuse data), disconnect/reconnect handling and fair timing before competitive launch. Database storage is suitable for durable profiles/results; polling it does not replace authoritative real-time simulation. Protocol, tick rates, hosting, identity and latency policies remain undecided.
+Clients send intent, not trusted scores or outcomes. The hub protocol (version 1, `src/net/protocol.ts`)
+already validates movement (bounds, speed budget, non-finite values), emote and activity ids, cosmetics and
+nicknames, limits message size and rate, and resumes dropped players for 30 s. Still to plan before competitive
+play: state visibility (including hidden Jack fuse data), authoritative minigame timing, identity and latency
+policies. Database storage is suitable for durable profiles/results; polling it does not replace authoritative
+real-time simulation.
 
 First proof: two real browser clients in one hub and one complete authoritative minigame. The existing roadmap proposes Copycat; the design file also identifies Jack-in-the-Box as a candidate. Choose scope before implementation, then verify agreement on timing, outcomes and return to the lobby.
 

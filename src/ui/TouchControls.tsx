@@ -13,6 +13,7 @@ import { pressVirtual, releaseVirtual, setStick, tapVirtual, type Action } from 
 import { unlockAudio } from '../game/audio';
 import { useGame } from '../game/store';
 import { GearIcon } from './icons';
+import { TouchEmotes } from './OnlineUI';
 
 const STICK_RADIUS = 52; // px the knob can travel
 
@@ -129,6 +130,7 @@ export function TouchControls() {
           <span>Jump</span>
         </HoldButton>
       </div>
+      <TouchEmotes />
       <button
         className="touch-pause"
         aria-label="Pause"

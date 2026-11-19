@@ -15,19 +15,10 @@ import type { ComponentType } from 'react';
 import type { PaintJob } from '../game/palette';
 import type { HatId, KeySkinId } from '../game/cosmetics';
 import type { Action } from '../game/input';
+import type { MinigameId } from './ids';
 
-export type MinigameId =
-  | 'copycat-conductor'
-  | 'inferno-escape'
-  | 'midnight-hunger'
-  | 'find-the-original'
-  | 'red-light-green-light'
-  | 'blink-duel'
-  | 'wind-up-dash'
-  | 'music-box-rhythm'
-  | 'toy-squad'
-  | 'spellbox-showdown'
-  | 'jack-in-the-box';
+/** The id list lives in `ids.ts` (pure data the online server can import). */
+export type { MinigameId };
 
 export type MinigameCategory = 'memory' | 'survival' | 'observation' | 'reflex' | 'pvp' | 'racing' | 'rhythm' | 'strategy' | 'knowledge';
 

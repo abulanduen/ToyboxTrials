@@ -2907,3 +2907,255 @@ canvas {
   .tutorial { padding: 8px 10px 6px; }
   .tutorial__text { min-height: 0; font-size: 0.92rem; }
 }
+
+/* ======================================================================
+   Online Hub: Play online sheet, HUD chip, name tags, touch emotes
+   ====================================================================== */
+.toy-btn:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.toy-btn:disabled > span {
+  transform: translateY(-3px);
+}
+.menu-online .menu-btn > span {
+  padding: 0.7em 1.2em;
+}
+.pause__online {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 1.1rem;
+  padding: 0.8rem 1rem;
+  border-radius: 10px;
+  background: rgba(255, 249, 238, 0.55);
+  border: 2px dashed rgba(110, 82, 54, 0.5);
+  font: 700 0.95rem var(--font-body);
+}
+.online-sheet {
+  width: min(520px, calc(100vw - 24px));
+}
+.online-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0.2rem 0 1rem;
+  font: 700 0.95rem var(--font-body);
+}
+.online-name input,
+.online-code input {
+  flex: 1;
+  min-width: 0;
+  min-height: 56px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  border: 2.5px solid var(--ink-deep);
+  background: var(--paper);
+  font: 700 1.1rem var(--font-display);
+  color: var(--ink-deep);
+  user-select: text;
+  -webkit-user-select: text;
+}
+.online-code input {
+  max-width: 9.5em;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.online-actions {
+  display: grid;
+  gap: 12px;
+}
+.online-actions .toy-btn > span {
+  padding: 0.75em 1.2em;
+}
+.online-code {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+.online-code .toy-btn {
+  flex: 1;
+}
+.online-status,
+.online-error {
+  margin: 1rem 0 0;
+  padding: 0.55rem 0.8rem;
+  border-radius: 10px;
+  font: 700 0.95rem var(--font-body);
+}
+.online-status {
+  background: rgba(255, 249, 238, 0.6);
+}
+.online-error {
+  background: #fde3df;
+  border: 2px solid var(--coral);
+}
+.online-sheet .pause__actions {
+  margin-top: 1.1rem;
+}
+
+/* HUD chip: under the secrets counter, top-left. */
+.online-chip {
+  position: absolute;
+  top: calc(122px + env(safe-area-inset-top));
+  left: calc(18px + env(safe-area-inset-left));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px 5px 12px;
+  border-radius: 16px;
+  border: 2.5px solid var(--ink-deep);
+  background: var(--paper);
+  box-shadow: 0 3px 0 rgba(43, 36, 51, 0.3);
+  pointer-events: auto;
+  max-width: calc(100vw - 36px);
+}
+.online-chip__dot {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--ink-deep);
+  background: var(--sage);
+}
+.online-chip__dot--warn {
+  background: var(--honey);
+  animation: online-blink 0.9s ease-in-out infinite alternate;
+}
+@keyframes online-blink {
+  to {
+    opacity: 0.35;
+  }
+}
+.online-chip--warn {
+  background: #fff3d6;
+}
+.online-chip__text {
+  display: grid;
+  line-height: 1.1;
+  min-width: 0;
+}
+.online-chip__text strong {
+  font: 700 0.95rem var(--font-display);
+  white-space: nowrap;
+}
+.online-chip__text span {
+  font: 700 0.75rem var(--font-body);
+  opacity: 0.8;
+  white-space: nowrap;
+}
+.online-chip__btn {
+  min-height: 40px;
+  min-width: 56px;
+  padding: 0 12px;
+  border-radius: 11px;
+  border: 2.5px solid var(--ink-deep);
+  background: var(--honey);
+  font: 700 0.9rem var(--font-display);
+  color: var(--ink-deep);
+  box-shadow: 0 3px 0 var(--ink-deep);
+  cursor: pointer;
+}
+.online-chip__btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--ink-deep);
+}
+.online-chip__btn--leave {
+  background: var(--cream);
+}
+@media (pointer: coarse) {
+  .online-chip__btn {
+    min-height: 56px;
+  }
+}
+@media (max-width: 700px), (max-height: 500px) {
+  .online-chip {
+    top: calc(100px + env(safe-area-inset-top));
+  }
+}
+
+/* Name tags over remote toys (DOM layer, positioned each frame by RemotePlayers). */
+.name-tags {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.name-tag {
+  position: absolute;
+  left: 0;
+  top: 0;
+  will-change: transform;
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+  padding: 2px 9px 3px;
+  border-radius: 10px;
+  border: 2px solid var(--ink-deep);
+  background: rgba(255, 249, 238, 0.92);
+  box-shadow: 0 2px 0 rgba(43, 36, 51, 0.3);
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+}
+.name-tag__name {
+  font: 700 0.85rem var(--font-display);
+  color: var(--ink-deep);
+}
+.name-tag__sub {
+  font: 700 0.68rem var(--font-body);
+  color: var(--ink);
+}
+
+/* Touch emotes: an Emote button above Jump, opening a 2 × 2 grid beside it. */
+.emote-touch {
+  position: absolute;
+  right: calc(22px + 12px + env(safe-area-inset-right));
+  bottom: calc(26px + 88px + 22px + env(safe-area-inset-bottom));
+  pointer-events: none;
+}
+.touch-btn--emote {
+  width: 64px;
+  height: 64px;
+  background: radial-gradient(circle at 35% 30%, #b8d6b9, var(--sage) 65%);
+  font-size: 0.85rem;
+}
+.touch-btn--emote.is-open {
+  transform: translateY(5px);
+  box-shadow: 0 1px 0 var(--ink-deep);
+}
+.emote-menu {
+  position: absolute;
+  right: calc(100% + 10px);
+  bottom: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 64px);
+  gap: 8px;
+  padding: 8px;
+  border-radius: 16px;
+  border: 3px solid var(--ink-deep);
+  background: rgba(255, 249, 238, 0.95);
+  box-shadow: 0 5px 0 rgba(43, 36, 51, 0.35);
+  pointer-events: auto;
+  animation: prompt-pop 0.2s cubic-bezier(0.2, 1.8, 0.4, 1) both;
+}
+.emote-menu__btn {
+  display: grid;
+  place-items: center;
+  gap: 1px;
+  width: 64px;
+  height: 64px;
+  padding: 4px 0 2px;
+  border-radius: 14px;
+  border: 2.5px solid var(--ink-deep);
+  background: var(--cream);
+  box-shadow: 0 3px 0 var(--ink-deep);
+  font: 700 0.75rem var(--font-display);
+  color: var(--ink-deep);
+}
+.emote-menu__btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--ink-deep);
+}

@@ -12,6 +12,7 @@ import { useGame, type Quality } from '../game/store';
 import { PALETTE } from '../game/palette';
 import { player } from '../game/player';
 import { PlayerController } from '../character/PlayerController';
+import { RemotePlayers } from '../character/RemotePlayers';
 import { Room, LAMP_HEAD, LAMP_AIM } from './Room';
 import { SUN_DIR } from './room/bake';
 import { TABLE } from './layout';
@@ -164,6 +165,7 @@ function SceneContents() {
         <>
           <Village />
           <PlayerController />
+          <RemotePlayers />
         </>
       )}
       <Effects quality={quality} sharp={inMatch} />

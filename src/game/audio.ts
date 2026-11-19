@@ -224,6 +224,33 @@ export const sfx = {
     // clatter of tin parts
     for (let i = 0; i < 5; i++) noise(t + 0.8 + i * 0.06 + Math.random() * 0.03, 0.18 - i * 0.03, 0.04, 2500 + Math.random() * 1500, 4);
   },
+  /**
+   * Hub emotes: a tiny synthesised signature each. `gain` scales it (remote players' emotes play
+   * quieter with distance).
+   */
+  emote(id: 'wave' | 'cheer' | 'spin' | 'bow', gain = 1) {
+    const t = now();
+    const k = Math.max(0, Math.min(1, gain));
+    if (k < 0.02) return;
+    switch (id) {
+      case 'wave': // "hel-lo": two bright tines, up a fourth
+        tine(1174.7, t, 0.11 * k, 0.32);
+        tine(1568, t + 0.13, 0.1 * k, 0.4);
+        break;
+      case 'cheer': // quick rising music-box arpeggio with a little rattle
+        [1046.5, 1318.5, 1568, 2093].forEach((f, i) => tine(f, t + i * 0.055, 0.09 * k, 0.35));
+        noise(t + 0.22, 0.05 * k, 0.08, 3800, 3);
+        break;
+      case 'spin': // a wind-up whirr that slides up
+        tone(330, t, 0.08 * k, 0.5, 'triangle', 0.02, 990);
+        for (let i = 0; i < 5; i++) noise(t + i * 0.07, 0.07 * k, 0.015, 3000 + i * 250, 5);
+        break;
+      case 'bow': // a soft, polite falling pair
+        tine(1046.5, t, 0.09 * k, 0.45, 2.0);
+        tine(784, t + 0.18, 0.09 * k, 0.6, 2.0);
+        break;
+    }
+  },
   /** Respawn pop. */
   pop() {
     const t = now();

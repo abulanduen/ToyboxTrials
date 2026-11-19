@@ -1,0 +1,274 @@
+/**
+ * Online Hub UI: the "Play online" sheet (main menu, pause menu, #room= deep links), the compact
+ * HUD chip while online, and the touch Emote menu. Same cardboard/toy styling as the other menus.
+ */
+import { useEffect, useRef, useState } from 'react';
+import { useGame } from '../game/store';
+import { useNet, roomLink } from '../net/store';
+import { nameTagEls } from '../net/remotes';
+import { joinOnline, leaveOnline, onlineAvailable } from '../net/client';
+import { OFFLINE_TEXT } from '../net/config';
+import { ROOM_CODE_LENGTH } from '../net/protocol';
+import { EMOTE_IDS, EMOTE_LABELS, type EmoteId } from '../game/emotes';
+import { EMOTE_ACTIONS, tapVirtual } from '../game/input';
+import { unlockAudio } from '../game/audio';
+import { CardboardSheet, ToyButton } from './common';
+
+const cleanName = (v: string) => v.replace(/[^\p{L}\p{N} '\-]/gu, '').slice(0, 16);
+const cleanCode = (v: string) => v.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, ROOM_CODE_LENGTH);
+
+export function openOnlineSheet() {
+  useNet.getState().set({ sheetOpen: true, error: null });
+}
+
+export function OnlineSheet() {
+  const status = useNet((s) => s.status);
+  const error = useNet((s) => s.error);
+  const joining = useNet((s) => s.joining);
+  const room = useNet((s) => s.room);
+  const name = useGame((s) => s.contenderName);
+  const setGame = useGame((s) => s.set);
+  const [code, setCode] = useState(() => (joining?.kind === 'code' ? cleanCode(joining.code) : ''));
+  const available = onlineAvailable();
+  const busy = status === 'connecting';
+
+  const close = () => {
+    if (busy) leaveOnline(true);
+    useNet.getState().set({ sheetOpen: false, error: null });
+  };
+  const joinCode = () => code.length === ROOM_CODE_LENGTH && joinOnline({ kind: 'code', code });
+
+  let statusLine: string | null = null;
+  if (busy) statusLine = joining?.kind === 'host' ? 'Setting up your room…' : joining?.kind === 'code' ? `Joining room ${cleanCode(joining.code)}…` : 'Finding a public Hub…';
+  else if (status === 'online' && room) statusLine = room.kind === 'private' ? `You're in room ${room.code}.` : `You're in Public Hub ${room.instance}.`;
+
+  return (
+    <CardboardSheet title="Play online" className="online-sheet" onBackdrop={close}>
+      {!available ? (
+        <p className="panel__lead" data-testid="online-off">
+          {OFFLINE_TEXT} For now, the Playroom and every trial work on your own.
+        </p>
+      ) : (
+        <>
+          <p className="panel__lead">Walk around the Playroom with friends, see each other and wave hello. Trials stay single-player for now.</p>
+          <label className="online-name">
+            <span>Nickname</span>
+            <input
+              data-testid="online-name"
+              value={name}
+              maxLength={16}
+              autoComplete="off"
+              spellCheck={false}
+              onChange={(e) => setGame({ contenderName: cleanName(e.target.value) })}
+              onBlur={() => !name.trim() && setGame({ contenderName: 'Ticker' })}
+            />
+          </label>
+          <div className="online-actions">
+            <ToyButton testId="online-public" onClick={() => joinOnline({ kind: 'public' })} disabled={busy}>
+              Join public Hub
+            </ToyButton>
+            <ToyButton tone="blue" testId="online-host" onClick={() => joinOnline({ kind: 'host' })} disabled={busy}>
+              Host private room
+            </ToyButton>
+            <div className="online-code">
+              <input
+                data-testid="online-code"
+                value={code}
+                placeholder="CODE"
+                aria-label="Room code"
+                inputMode="text"
+                autoCapitalize="characters"
+                autoComplete="off"
+                spellCheck={false}
+                onChange={(e) => setCode(cleanCode(e.target.value))}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') joinCode();
+                }}
+              />
+              <ToyButton tone="sage" testId="online-join-code" onClick={joinCode} disabled={busy || code.length !== ROOM_CODE_LENGTH}>
+                Join with code
+              </ToyButton>
+            </div>
+          </div>
+          {statusLine && (
+            <p className="online-status" aria-live="polite">
+              {statusLine}
+            </p>
+          )}
+          {error && (
+            <p className="online-error" role="alert" data-testid="online-error">
+              {error}
+            </p>
+          )}
+        </>
+      )}
+      <div className="pause__actions">
+        <ToyButton tone="ink" onClick={close} testId="online-close">
+          {busy ? 'Cancel' : 'Back'}
+        </ToyButton>
+      </div>
+    </CardboardSheet>
+  );
+}
+
+/** Compact status chip in the hub HUD while online. */
+export function OnlineChip() {
+  const status = useNet((s) => s.status);
+  const room = useNet((s) => s.room);
+  const count = useNet((s) => s.players.length);
+  const [shared, setShared] = useState<string | null>(null);
+  const timer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+  if (status === 'offline' || status === 'connecting' || !room) return null;
+
+  const flash = (text: string) => {
+    setShared(text);
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setShared(null), 2500);
+  };
+  const share = async () => {
+    if (!room.code) return;
+    const url = roomLink(room.code);
+    const nav = navigator as Navigator & { share?: (d: ShareData) => Promise<void> };
+    if (nav.share && useGame.getState().touchUI) {
+      try {
+        await nav.share({ title: 'Toybox Trials', text: `Join my Toybox Trials room: ${room.code}`, url });
+        return;
+      } catch {
+        /* cancelled or refused: fall back to copying */
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      flash('Link copied');
+    } catch {
+      flash(`Code ${room.code}`);
+    }
+  };
+
+  const reconnecting = status === 'reconnecting';
+  return (
+    <div className={`online-chip${reconnecting ? ' online-chip--warn' : ''}`} data-testid="online-chip">
+      <span className={`online-chip__dot${reconnecting ? ' online-chip__dot--warn' : ''}`} aria-hidden />
+      <span className="online-chip__text">
+        <strong data-testid="online-room">{room.kind === 'private' ? `Room ${room.code}` : `Public Hub ${room.instance}`}</strong>
+        <span data-testid="online-count">{shared ?? (reconnecting ? 'Reconnecting…' : `${count} ${count === 1 ? 'toy' : 'toys'} online`)}</span>
+      </span>
+      {room.kind === 'private' && (
+        <button className="online-chip__btn" data-testid="online-share" onClick={share}>
+          Share
+        </button>
+      )}
+      <button className="online-chip__btn online-chip__btn--leave" data-testid="online-leave" onClick={() => leaveOnline()}>
+        Leave
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Name tags for the other players: plain DOM over the canvas. React only adds and removes them
+ * when the roster changes; the 3D frame loop (RemotePlayers) moves each one above its toy.
+ */
+export function NameTags() {
+  const players = useNet((s) => s.players);
+  const selfId = useNet((s) => s.selfId);
+  const online = useNet((s) => s.status === 'online' || s.status === 'reconnecting');
+  if (!online) return null;
+  return (
+    <div className="name-tags" aria-hidden>
+      {players
+        .filter((p) => p.id !== selfId)
+        .map((p) => (
+          <div
+            key={p.id}
+            className="name-tag"
+            data-player={p.id}
+            style={{ display: 'none' }}
+            ref={(el) => {
+              if (el) nameTagEls.set(p.id, el);
+              else if (nameTagEls.get(p.id)) nameTagEls.delete(p.id);
+            }}
+          >
+            <span className="name-tag__name">{p.name}</span>
+            <span className="name-tag__sub" style={{ display: 'none' }} />
+          </div>
+        ))}
+    </div>
+  );
+}
+
+/** Small drawn glyphs for the emote buttons (no emoji or icon packs). */
+function EmoteGlyph({ id }: { id: EmoteId }) {
+  const common = { width: 26, height: 26, viewBox: '0 0 24 24', fill: 'none', stroke: '#2B2433', strokeWidth: 2.2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true };
+  switch (id) {
+    case 'wave':
+      return (
+        <svg {...common}>
+          <path d="M8 13V6.5a1.5 1.5 0 0 1 3 0V12M11 11V5a1.5 1.5 0 0 1 3 0v6M14 11V6.5a1.5 1.5 0 0 1 3 0V14c0 4-2.5 6.5-6 6.5-2.6 0-4.2-1.4-5.4-3.6L4 13.6a1.4 1.4 0 0 1 2.4-1.4L8 14.5" />
+          <path d="M19.5 4.5c1 1 1.5 2.2 1.5 3.5M3 7.5c0-1.3.5-2.5 1.5-3.5" />
+        </svg>
+      );
+    case 'cheer':
+      return (
+        <svg {...common}>
+          <path d="M12 3l2.2 4.6 5 .7-3.6 3.5.9 5L12 14.4 7.5 16.8l.9-5L4.8 8.3l5-.7z" />
+          <path d="M5 20h14" />
+        </svg>
+      );
+    case 'spin':
+      return (
+        <svg {...common}>
+          <path d="M20 12a8 8 0 1 1-2.3-5.7" />
+          <path d="M20 4v4.5h-4.5" />
+        </svg>
+      );
+    case 'bow':
+      return (
+        <svg {...common}>
+          <circle cx="15.5" cy="6.5" r="2.3" />
+          <path d="M14 9.5L9 13l-1 8M9 13l6 1.5M8 21h4" />
+        </svg>
+      );
+  }
+}
+
+/** Touch: an Emote button that opens four emote buttons beside it. */
+export function TouchEmotes() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="emote-touch">
+      {open && (
+        <div className="emote-menu" role="menu" aria-label="Emotes" data-testid="emote-menu">
+          {EMOTE_IDS.map((id, i) => (
+            <button
+              key={id}
+              role="menuitem"
+              className="emote-menu__btn"
+              data-testid={`emote-${id}`}
+              onClick={(e) => {
+                tapVirtual(EMOTE_ACTIONS[i], e.timeStamp);
+                setOpen(false);
+              }}
+            >
+              <EmoteGlyph id={id} />
+              <span>{EMOTE_LABELS[id]}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      <button
+        className={`touch-btn touch-btn--emote${open ? ' is-open' : ''}`}
+        aria-label="Emote"
+        aria-expanded={open}
+        data-testid="emote-button"
+        onClick={() => {
+          unlockAudio();
+          setOpen((o) => !o);
+        }}
+      >
+        <span>Emote</span>
+      </button>
+    </div>
+  );
+}

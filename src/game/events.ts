@@ -3,6 +3,8 @@
  * Continuous state lives in the Zustand store; transient "something happened" signals live here,
  * which keeps React re-renders out of the frame loop.
  */
+import type { EmoteId } from './emotes';
+
 export type GameEvents = {
   'player:interact': void;
   'player:jump': void;
@@ -10,6 +12,10 @@ export type GameEvents = {
   'player:eliminate': { reason: string };
   'player:respawn': void;
   'player:boost': { seconds: number };
+  /** The local toy started an emote (the online client forwards it to the room). */
+  'player:emote': { id: EmoteId };
+  /** Put the local toy here (online: the room's spawn spot on joining). */
+  'player:teleport': { x: number; z: number; yaw: number };
   'prop:marble-push': { dirX: number; dirZ: number };
   'prop:jack-pop': void;
   'prop:musicbox-play': void;

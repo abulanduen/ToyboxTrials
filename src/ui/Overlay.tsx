@@ -15,6 +15,9 @@ import { TouchControls, tapInteract } from './TouchControls';
 import { KeyCap, SettingsForm, ToyButton } from './common';
 import { MainMenu } from './MainMenu';
 import { WorkshopScreen } from './WorkshopScreen';
+import { NameTags, OnlineChip, OnlineSheet, openOnlineSheet } from './OnlineUI';
+import { useNet } from '../net/store';
+import { leaveOnline } from '../net/client';
 
 // ---------------------------------------------------------------- HUD
 function Prompt() {
@@ -98,6 +101,12 @@ function Controls() {
         <span className="controls__mouse" /> click &amp; move mouse to look
       </div>
       <div className="controls__row">
+        <KeyCap k="1" />
+        <KeyCap k="2" />
+        <KeyCap k="3" />
+        <KeyCap k="4" /> emotes
+      </div>
+      <div className="controls__row">
         <KeyCap k="Esc" wide /> pause · <KeyCap k="H" /> hide
       </div>
     </div>
@@ -178,6 +187,7 @@ function Hud() {
         </span>
       </div>
       <Prompt />
+      <OnlineChip />
       <Tickets />
       {touch ? <TouchControls /> : <Controls />}
       <BoostMeter />
@@ -210,7 +220,34 @@ function PauseMenu() {
             Main menu
           </ToyButton>
         </div>
+        <PauseOnline />
       </div>
+    </div>
+  );
+}
+
+/** Online section of the pause menu: join from here, or see the room and leave. */
+function PauseOnline() {
+  const status = useNet((n) => n.status);
+  const room = useNet((n) => n.room);
+  const count = useNet((n) => n.players.length);
+  if (status === 'offline' || status === 'connecting' || !room)
+    return (
+      <div className="pause__online">
+        <span>Play with friends in the same Playroom.</span>
+        <ToyButton tone="sage" onClick={openOnlineSheet} testId="pause-online">
+          Play online
+        </ToyButton>
+      </div>
+    );
+  return (
+    <div className="pause__online">
+      <span>
+        {room.kind === 'private' ? `Online in room ${room.code}` : `Online in Public Hub ${room.instance}`} · {count} {count === 1 ? 'toy' : 'toys'}
+      </span>
+      <ToyButton tone="ink" onClick={() => leaveOnline()} testId="pause-leave-online">
+        Leave online
+      </ToyButton>
     </div>
   );
 }
@@ -314,13 +351,18 @@ export function Overlay() {
   const screen = useGame((s) => s.screen);
   const paused = useGame((s) => s.paused);
   const panel = useGame((s) => s.panel);
+  const onlineSheet = useNet((s) => s.sheetOpen);
 
   // Esc closes the top-most DOM layer (the canvas loop handles in-game Esc → pause).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.code !== 'Escape') return;
       const g = useGame.getState();
-      if (g.panel) g.closePanel();
+      const net = useNet.getState();
+      if (net.sheetOpen) {
+        if (net.status === 'connecting') leaveOnline(true);
+        net.set({ sheetOpen: false, error: null });
+      } else if (g.panel) g.closePanel();
       else if (g.paused) g.togglePause(false);
       else if (g.menuSheet) g.set({ menuSheet: null });
       else if (g.screen === 'workshop') g.goTo(g.workshopReturn === 'workshop' ? 'menu' : g.workshopReturn);
@@ -336,9 +378,11 @@ export function Overlay() {
       {screen === 'menu' && <MainMenu />}
       {screen === 'workshop' && <WorkshopScreen />}
       {screen === 'minigame' && <MatchOverlay />}
+      {screen === 'playing' && <NameTags />}
       {screen === 'playing' && <Hud />}
       {screen === 'playing' && panel && <Panel />}
       {screen === 'playing' && paused && !panel && <PauseMenu />}
+      {onlineSheet && screen !== 'minigame' && <OnlineSheet />}
       <LoadingCard />
     </div>
   );
