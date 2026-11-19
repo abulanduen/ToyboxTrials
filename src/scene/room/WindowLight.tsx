@@ -40,12 +40,14 @@ const SHAFT_FRAG = /* glsl */ `
   varying float vSeed;
   void main() {
     vec3 v = vWorld - cameraPosition;
-    float dist = length(v);
+    float dist = max(length(v), 1e-3);
     float facing = abs(dot(v / dist, normalize(vPlaneN)));
     float a = smoothstep(0.02, 0.4, facing);                 // sheets seen edge-on vanish
     a *= smoothstep(22.0, 90.0, dist);                       // never clip through the camera
     a *= smoothstep(0.0, 0.2, vUv.y) * smoothstep(1.0, 0.8, vUv.y);
-    a *= smoothstep(0.0, 0.24, vUv.x) * pow(1.0 - vUv.x, 1.25); // swells in past the glass, then fades
+    // pow() of a negative base is NaN on Direct3D (and allowed to be on any GPU): at the shaft's tip vUv.x
+    // can interpolate a hair past 1.0, and one NaN pixel is enough for bloom to smear a black flash.
+    a *= smoothstep(0.0, 0.24, vUv.x) * pow(max(1.0 - vUv.x, 0.0), 1.25); // swells in past the glass, then fades
     a *= smoothstep(1.0, 34.0, vWorld.y);                    // dissolve before the table top
     float streak = 0.6 + 0.4 * sin(vUv.y * 21.0 + vSeed * 6.3 + sin(uTime * 0.07 + vSeed) * 1.6);
     streak *= 0.84 + 0.16 * sin(vUv.y * 57.0 - uTime * 0.05 + vSeed * 3.1);
@@ -65,7 +67,7 @@ const DUST_VERT = /* glsl */ `
     vec3 p = position + vec3(sin(uTime * 0.11 + ph), sin(uTime * 0.07 + ph * 1.7), cos(uTime * 0.09 + ph)) * (2.0 + aSeed.y * 5.0);
     vec4 mv = viewMatrix * vec4(p, 1.0);
     float dist = -mv.z;
-    gl_PointSize = clamp((0.45 + aSeed.z * 0.7) * uScale / dist, 1.0, 9.0);
+    gl_PointSize = clamp((0.45 + aSeed.z * 0.7) * uScale / max(dist, 1e-3), 1.0, 9.0);
     float twinkle = 0.55 + 0.45 * sin(uTime * (0.6 + aSeed.w) + ph);
     vAlpha = twinkle * smoothstep(20.0, 70.0, dist) * (1.0 - smoothstep(260.0, 420.0, dist));
     gl_Position = projectionMatrix * mv;
