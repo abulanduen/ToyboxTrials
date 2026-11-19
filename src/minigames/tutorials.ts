@@ -78,6 +78,12 @@ export const TUTORIALS: Partial<Record<MinigameId, TutorialStep[]>> = {
     { title: 'Careful, quick', text: 'Each find scores 10. A wrong tap holds you up for a second. Find all fifteen for a bonus: the first to finish gets the biggest.' },
     { title: 'Four pages', text: 'Each page lasts 30 seconds, and every page is a new scene. Most points after four pages wins.' },
   ],
+  'toy-tower-tumble': [
+    { title: 'Build random towers', text: 'Enemies walk the path on your 8×8 board. Build (B) pays 20 gold for a random tower on a felt square. Click a square first to choose where.', touch: 'Enemies walk the path on your 8×8 board. Tap a felt square, then Build here: 20 gold for a random tower.' },
+    { title: 'Merge twins', text: 'Two identical towers merge into a random tower one tier up, to tier 7. Select one and click its glowing twin, or drag it onto the twin.', touch: 'Two identical towers merge into a random tower one tier up, to tier 7. Tap one, then its glowing twin, or drag it onto the twin.' },
+    { title: 'Odds, quests and bosses', text: 'Level your builder for better odds. Quick quests pay gold. Bosses on waves 5, 10, 15 and 20 drop free high-tier towers.' },
+    { title: 'Hold the line', text: 'Leaks cost lives; at zero you are out and can watch the other boards. Survive the most waves, or clear all 20, to win.' },
+  ],
   'toybox-siege': [
     { title: 'Pick a toy and keep moving', text: 'Choose the Tin Soldier, the Pop-Gun Ranger or the Clockwork Wizard. Your weapons fire on their own: move with W A S D or the arrows to dodge the swarm.', touch: 'Choose the Tin Soldier, the Pop-Gun Ranger or the Clockwork Wizard. Your weapons fire on their own: steer with the joystick to dodge the swarm.' },
     { title: 'Grab gems, level up', text: 'Defeated toys drop gems. Collect them to level up and pick one card: a new weapon, a weapon upgrade or a passive. Everything goes up to level 5.' },

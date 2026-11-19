@@ -15,6 +15,7 @@ export const MINIGAME_IDS = [
   'spellbox-showdown',
   'jack-in-the-box',
   'odd-page-out',
+  'toy-tower-tumble',
   'toybox-siege',
 ] as const;
 

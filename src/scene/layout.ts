@@ -144,8 +144,11 @@ const GATE_SPOTS: Record<MinigameId, { x: number; z: number; rot: number; distri
   'spellbox-showdown': { x: END_E, z: END_Z, rot: -Math.PI / 2, district: 'east', short: 'Spellbox' },
   // south row, between Midnight and the bridge landing
   'odd-page-out': { x: 3, z: S_ROW, rot: Math.PI, district: 'west', short: 'Odd Page' },
-  // south row, east of the bridge landing
-  'toybox-siege': { x: 45, z: S_ROW, rot: Math.PI, district: 'east', short: 'Siege' },
+  // south row, between the bridge landing and Blink Duel (Odd Page Out's mirror on the east side)
+  'toy-tower-tumble': { x: 45, z: S_ROW, rot: Math.PI, district: 'east', short: 'Towers' },
+  // inside the loop, east of the avenue, facing it: a fort in the middle of the table (both
+  // south-row spots beside the bridge landing are taken)
+  'toybox-siege': { x: 46, z: -127, rot: -Math.PI / 2, district: 'east', short: 'Siege' },
 };
 
 const CATEGORY_LABEL: Record<string, string> = { pvp: 'Versus' };

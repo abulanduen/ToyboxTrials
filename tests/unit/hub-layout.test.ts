@@ -49,7 +49,7 @@ describe('hub gates', () => {
   const playable = MINIGAMES.filter((g) => g.status === 'playable');
 
   it('every playable game has exactly one gate, in its accent colour', () => {
-    expect(playable.length).toBe(13);
+    expect(playable.length).toBe(14);
     for (const g of playable) {
       const mine = GATES.filter((x) => x.game === g.id);
       expect(mine.length, g.id).toBe(1);

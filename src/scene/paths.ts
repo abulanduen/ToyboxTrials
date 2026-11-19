@@ -132,7 +132,8 @@ export function hubPathLines(): PathLine[] {
     roadPoint(gate('spellbox-showdown')),
     roadPoint(gate('red-light-green-light')),
     roadPoint(gate('blink-duel')),
-    roadPoint(gate('toybox-siege')),
+    roadPoint(gate('toy-tower-tumble')),
+    roadPoint(gate('toybox-siege')), // a short detour inside the loop to the fort facing the avenue
     landing,
   ];
   lines.push({ id: 'loop', pts: loop });

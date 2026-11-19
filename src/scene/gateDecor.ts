@@ -503,6 +503,30 @@ const oddPageOut: Theme = (k) => {
   }
 };
 
+const towerTumble: Theme = (k) => {
+  // hero: a teetering tower of building blocks with a tin sentry on top
+  k.push(H.lx, 0, H.lz, 0.15);
+  const blocks = [P.honey, P.coral, P.toyBlue, P.sage];
+  blocks.forEach((c, i) => k.block(1.7 - i * 0.12, 1.45, 1.7 - i * 0.12, (i % 2 ? 0.12 : -0.08), 0.725 + i * 1.45, 0, c, { ry: i * 0.22 }));
+  soldier(k, 0.05, 5.8, 0, 0.22, P.toyBlue);
+  k.pop();
+  // side: a little felt defence board with a zig-zag cardboard path, two towers and a wind-up mouse
+  k.push(S.lx, 0, S.lz, -0.1);
+  k.box(2.8, 0.3, 2.8, 0, 0.15, 0, P.feltDark);
+  k.with('detail', () => {
+    k.box(2.8, 0.06, 0.55, 0, 0.33, -0.8, P.cardboard);
+    k.box(0.55, 0.06, 1.6, 0.9, 0.33, 0, P.cardboard);
+    k.box(2.0, 0.06, 0.55, 0.2, 0.33, 0.8, P.cardboard);
+  });
+  for (const [x, z, c] of [[-0.8, 0.05, P.coral], [0.0, 0.05, P.honey]] as const) {
+    k.cyl(0.42, 0.48, 0.18, x, 0.39, z, c, 12);
+    k.cyl(0.24, 0.3, 0.9, x, 0.93, z, P.cream, 10);
+    k.cone(0.32, 0.5, x, 1.63, z, c, 10);
+  }
+  k.ball(0.22, 0.9, 0.55, 0.2, '#C9CED6', 10);
+  k.pop();
+};
+
 const siege: Theme = (k) => {
   // hero: a cardboard toy-fort tower with battlements and a pennant
   k.push(H.lx, 0, H.lz);
@@ -549,6 +573,7 @@ export const GATE_THEMES: Record<MinigameId, Theme> = {
   'blink-duel': blink,
   'spellbox-showdown': spellbox,
   'odd-page-out': oddPageOut,
+  'toy-tower-tumble': towerTumble,
 };
 
 /** Build every gate's surroundings into `k` (gate-local frames are pushed here). */
