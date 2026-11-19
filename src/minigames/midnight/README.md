@@ -10,6 +10,11 @@ players. During the day, head to one of the four roofed green corner shelters. E
 everywhere; daylight accelerates it and shelter slows it. Zero energy eliminates a contender;
 the last survivor wins. Eliminated players watch until results.
 
+Living contenders also have camera-facing overhead energy bars. Fill tracks the existing
+energy pool; green above 50%, yellow above 25%, red at 25% or below. Your bar has a honey frame,
+bots have cream frames. Bar height scales for small screens. Eliminated toys have no overhead
+bar. HUD energy values remain available; the survival/recharge rules are unchanged.
+
 ## Provisional balance and interpretations
 
 These implement the existing concept; they are playtest choices, not final mechanics:

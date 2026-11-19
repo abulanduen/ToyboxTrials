@@ -32,6 +32,7 @@ async function stickUntil(page, [dx, dy], until, arg) {
       await page.getByTestId('practice-midnight-hunger').click();
       // The module loads lazily and match buttons ignore taps for 0.7 s after they appear.
       await page.getByTestId('match-start').waitFor({ state: 'visible' }); await page.waitForTimeout(900);
+      if (process.env.MIDNIGHT_BAR_REVIEW) await page.getByRole('button', { name: '7 bots', exact: true }).click();
       await page.getByTestId('match-start').click();
       // Software GL can render at ~1 fps under load; fast-forward the 3 s countdown.
       await page.waitForFunction(() => window.__toybox.match.phase() === 'countdown');
@@ -39,6 +40,16 @@ async function stickUntil(page, [dx, dy], until, arg) {
       await page.waitForFunction(() => window.__toybox.match.phase() === 'playing');
       await page.evaluate(() => window.__toybox.match.timeScale(0));
       assert.equal(await page.evaluate(() => { const s = window.__toybox.match.state(); return s.batteries.length === s.players.length - 1; }), true);
+      if (process.env.MIDNIGHT_BAR_REVIEW) {
+        const energy = await page.evaluate(() => {
+          const s = window.__toybox.match.state(), original = s.players.map(p => p.energy);
+          s.players.forEach((p, i) => { p.energy = [100, 75, 50, 25, 10, 90, 40, 5][i] / 100 * s.config.maxEnergy; });
+          return original;
+        });
+        await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+        await page.screenshot({ path: path.join(out, `midnight-${layout}-energy-bars.png`), timeout: 240000 });
+        await page.evaluate(values => { window.__toybox.match.state().players.forEach((p, i) => { p.energy = values[i]; }); }, energy);
+      }
       // Controlled battery next to the local toy tests the real movement and collection adapter.
       const startX = await page.evaluate(() => {
         const s = window.__toybox.match.state(); const p = s.players[0];
