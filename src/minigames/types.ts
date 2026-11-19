@@ -138,6 +138,12 @@ export interface MinigameDefinition {
   /** Mobile/touch controls. Required: a minigame without a touch layout is not shippable. */
   touch: TouchLayout;
   status: 'playable' | 'planned';
+  /**
+   * Skip the host's 3-2-1 countdown: Start goes straight to playing. For games whose rules open
+   * with their own untimed pre-phase (e.g. Spellbox Showdown's build draft) and count in the action
+   * themselves. Default false.
+   */
+  skipStartCountdown?: boolean;
   /** Lazy so each minigame is code-split and loaded only when entered. */
   load?: () => Promise<MinigameModule<any, any>>;
 }
