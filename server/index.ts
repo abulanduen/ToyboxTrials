@@ -37,6 +37,8 @@ import { LeaderboardApi, MemoryLeaderboard, type LeaderboardStore } from './lead
 const PORT = Number(process.env.PORT) || 2567;
 const ORIGINS = parseAllowedOrigins(process.env.ALLOWED_ORIGINS);
 const HEARTBEAT_MS = 10_000;
+/** Unanswered pings in a row before a socket counts as dead (about 30 s). */
+const MAX_MISSED_PINGS = 3;
 /** A socket that has not joined a room by now is closed. */
 const HELLO_TIMEOUT_MS = 10_000;
 /** Refused messages before a connection is closed for flooding. */
@@ -82,7 +84,8 @@ const accountsHealth = () => (accounts.state === 'ready' ? accounts.storeKind : 
 interface Conn {
   ws: WebSocket;
   limiter: RateLimiter;
-  alive: boolean;
+  /** Pings sent since the last pong. */
+  missed: number;
   helloTimer: NodeJS.Timeout;
   auths: number;
 }
@@ -174,7 +177,7 @@ function onConnection(ws: WebSocket) {
     ws,
     // Hub moves (~15/s) or match inputs (MATCH_TICK_HZ), plus lobby actions and the odd emote.
     limiter: new RateLimiter(60, 45, Date.now()),
-    alive: true,
+    missed: 0,
     auths: 0,
     helloTimer: setTimeout(() => {
       if (!hub.roomOf(id)) ws.close(CLOSE.badRequest, 'no hello');
@@ -183,7 +186,7 @@ function onConnection(ws: WebSocket) {
   conns.set(id, c);
 
   ws.on('pong', () => {
-    c.alive = true;
+    c.missed = 0;
   });
   ws.on('message', (data, isBinary) => {
     const now = Date.now();
@@ -208,8 +211,10 @@ function onConnection(ws: WebSocket) {
     if (msg.t === 'hello' && hub.roomOf(id)) clearTimeout(c.helloTimer);
     logRooms(before);
   });
-  ws.on('close', () => {
+  ws.on('close', (code) => {
     clearTimeout(c.helloTimer);
+    // Codes only: why sockets end (1000/1001 normal, 1006 lost, 4xxx ours), never who.
+    if (code !== 1000 && code !== 1001) log(`socket closed (code ${code})`);
     conns.delete(id);
     const before = hub.stats();
     deliver(hub.disconnect(id, Date.now()));
@@ -230,14 +235,17 @@ const snapshotTimer = setInterval(() => {
 // Lobby matches: every running match is stepped (fixed 60 Hz sub-steps) and snapshotted.
 const matchTimer = setInterval(() => deliver(hub.tickMatches(Date.now())), 1000 / MATCH_TICK_HZ);
 
-// Heartbeat: ping everyone; a socket that didn't answer the previous ping is dead.
+// Heartbeat: ping everyone. A socket that has missed MAX_MISSED_PINGS pings in a row is dead. One
+// missed ping isn't enough: a busy phone (or a stalled page) stops reading its socket for a few
+// seconds, and its pongs wait with it.
 const heartbeatTimer = setInterval(() => {
   for (const c of conns.values()) {
-    if (!c.alive) {
+    if (c.missed >= MAX_MISSED_PINGS) {
+      log('heartbeat: closed a socket that stopped answering pings');
       c.ws.terminate();
       continue;
     }
-    c.alive = false;
+    c.missed++;
     c.ws.ping();
   }
 }, HEARTBEAT_MS);
