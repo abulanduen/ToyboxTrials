@@ -52,17 +52,16 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     await waitStatus(B, 'offline');
     await B.waitForTimeout(1500);
     check('Leave stays offline', (await status(B)) === 'offline');
-    await B.evaluate(() => { window.__toybox.goTo?.('menu'); });
-    await B.keyboard.press('Escape').catch(() => {});
+    await A.context().close();
+    await B.context().close(); // software rendering: keep at most two pages open
 
     // 4. The Settings switch off: entering the Hub stays offline.
     const C = await open('AutoC', '#play', { autoOnline: false });
     await C.waitForTimeout(3000);
     check('with "Join the online Hub automatically" off, the Hub stays offline', (await status(C)) === 'offline');
-    await C.evaluate(() => { const g = window.__toybox; return g; });
+    await C.context().close();
 
     // 5. A room link still goes to that room, not the public Hub.
-    const AH = await A.evaluate(() => 1);
     const hostCtx = await open('AutoHost', '');
     await hostCtx.click('[data-testid=menu-online]');
     await hostCtx.click('[data-testid=online-host]');
@@ -72,7 +71,6 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     await waitStatus(D, 'online');
     const droom = await D.evaluate(() => window.__toybox.net.room());
     check('a #room= link joins that private room, not the public Hub', droom?.kind === 'private' && droom.code === code, JSON.stringify(droom));
-    void AH;
   } catch (e) {
     check('flow completed', false, e.message.split('\n')[0]);
   } finally {
