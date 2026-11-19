@@ -228,7 +228,7 @@ Client → server:
 | `activity` | `a` | A minigame id, `workshop`, `shop`, or null. |
 | `look` | `look` | Cosmetics changed (at most twice a second). |
 | `leave` | | Leaving on purpose (frees the slot at once). |
-| `lobby` | `a`: `create {settings}`, `join {id}`, `leave`, `kick {id}`, `settings {settings}` (any subset), `ready {ready}`, `start`, `watch {id}`, `timescale {k}` | Lobby actions. Settings: `mode` (single, tournament), `game`, `format` (blitz, normal, treasure), `cap` 2–8, `locked`, `botFill`, `difficulty`. `timescale` is only honoured by a test server (`MATCH_DEBUG=1`). |
+| `lobby` | `a`: `create {settings}`, `join {id}`, `leave`, `kick {id}`, `settings {settings}` (any subset), `ready {ready}`, `start`, `watch {id}`, `timescale {k, hold?}` | Lobby actions. Settings: `mode` (single, tournament), `game`, `format` (blitz, normal, treasure), `cap` 2–8, `locked`, `botFill`, `difficulty`. `timescale` (speed, 0 = frozen; `hold`: freeze on reaching that phase) is only honoured by a test server (`MATCH_DEBUG=1`). |
 | `in` | `m` (match sequence), `i` (inputs) | Match inputs as the game's `readLocalInput` produces them; at most 32, each a flat object of plain values. |
 | `auth` | `token` | Links a signed-in account (leaderboard name). At most 5 per connection. |
 
@@ -351,7 +351,7 @@ Server environment:
 - `DATABASE_URL`: PostgreSQL for accounts. Without it, accounts are off (the API answers 503 and
   the game hides the Account entries) unless `ACCOUNTS_STORE=memory`, which keeps accounts in
   memory (lost on restart). `npm run server:dev` sets `ACCOUNTS_STORE=memory` for you.
-- `MATCH_DEBUG`: `1` lets lobby members speed their match up (`timescale`). Test servers only;
+- `MATCH_DEBUG`: `1` lets lobby members speed up, freeze or hold their match at a phase (`timescale`). Test servers only;
   never set it in production.
 - `ALLOWED_ORIGINS`: comma-separated origins. A `*` matches one host label or a port. The default
   is localhost, 127.0.0.1 and `https://toybox-trials.vercel.app`; setting the variable replaces
