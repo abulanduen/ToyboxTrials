@@ -9,6 +9,7 @@ import { DEFAULT_CONFIG, buildRound, finishBonus, hitTest, pickSpread, spotRules
 import { PIC_H, PIC_W, toSvg } from '../../src/minigames/spotdiff/shapes';
 import { MIN_HIT_R, SLOTS_PER_THEME, THEMES, themeById, type ThemeDef } from '../../src/minigames/spotdiff/themes';
 import { bookLayout } from '../../src/minigames/spotdiff/layout';
+import { keyPath } from '../../src/minigames/spotdiff/local';
 
 const STEP = 1000 / 60;
 const paint = { body: '#E76B62', trim: '#EFAE45', key: '#C8973A', face: '#FFF9EE' } as unknown as Contestant['paint'];
@@ -406,5 +407,16 @@ describe('Odd Page Out: layout', () => {
       const [a, b] = L.pics;
       expect(a.x + a.w <= b.x || a.y + a.h <= b.y).toBe(true);
     }
+  });
+});
+
+describe('Odd Page Out: keyboard', () => {
+  it('the arrows can reach every slot from every slot in every scene', () => {
+    // strongly connected: everything is reachable from slot 0, and slot 0 from everything
+    for (const t of THEMES)
+      for (let a = 0; a < t.slots.length; a++) {
+        expect(keyPath(t.slots, 0, a), `${t.id}: 0 → ${a}`).not.toBeNull();
+        expect(keyPath(t.slots, a, 0), `${t.id}: ${a} → 0`).not.toBeNull();
+      }
   });
 });

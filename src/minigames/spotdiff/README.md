@@ -93,7 +93,8 @@ a menu thumbnail, if it is recorded in `public/assets/asset-manifest.json`. None
 - `npm test` (`tests/unit/spotdiff.test.ts`): scene data (60 slots, 2–4 variants, every variant draws differently,
   a slot never changes anything else), determinism from the seed, exactly 15 differing slots per round on the drawn
   pictures, a different reference picture every round, spread, hit testing and overlaps, scoring and the
-  finish-order bonus, the lockout, timing, bots, placements, and the screen layout.
+  finish-order bonus, the lockout, timing, bots, placements, the screen layout, and that the arrow keys can
+  reach every slot from every slot in every scene.
 - `node tests/e2e/spotdiff.cjs`: opens the game from the Pavilion; desktop mouse and keyboard; phone portrait
   (390 × 844) and landscape (844 × 390) with real touch events; wrong-tap lockout; a page completed; results; back to
   the hub. Screenshots: `tests/e2e/output/sd-*.png` (every scene, both phone layouts).

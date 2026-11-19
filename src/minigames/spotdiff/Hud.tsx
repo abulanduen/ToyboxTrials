@@ -11,7 +11,7 @@ import { matchBus, useMatch } from '../session';
 import type { MinigameSceneProps } from '../types';
 import { Picture } from './Picture';
 import { bookLayout, readInsets, type Rect } from './layout';
-import { local, resetLocal, submitTap } from './local';
+import { keyPath, local, resetLocal, submitTap } from './local';
 import type { SpotState } from './rules';
 import { PIC_H, PIC_W } from './shapes';
 import { themeById, type SlotDef } from './themes';
@@ -148,6 +148,11 @@ export function SpotHud({ getState, contestants, localId }: MinigameSceneProps<S
         },
         open: () => local.open,
         cursor: () => local.cursor,
+        /** Arrow keys that move the ring from where it is to slot `to` (for the keyboard e2e test). */
+        keysTo: (to: number) => {
+          const KEY = { left: 'ArrowLeft', right: 'ArrowRight', forward: 'ArrowUp', back: 'ArrowDown' } as Record<string, string>;
+          return local.cursor < 0 ? null : (keyPath(local.slots, local.cursor, to)?.map((a) => KEY[a]) ?? null);
+        },
         /** Where the keyboard ring is on page A (CSS px), or null. */
         cursorAt: () => {
           const sl = local.slots[local.cursor];

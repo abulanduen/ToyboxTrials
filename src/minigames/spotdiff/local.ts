@@ -53,23 +53,62 @@ export function moveCursor(dx: number, dy: number) {
     local.cursor = best;
     return;
   }
-  const from = sl[local.cursor];
-  let best = -1;
-  let bestCost = Infinity;
-  for (let i = 0; i < sl.length; i++) {
-    if (i === local.cursor) continue;
-    const ox = sl[i].x - from.x;
-    const oy = sl[i].y - from.y;
-    const along = ox * dx + oy * dy;
-    const across = Math.abs(ox * dy - oy * dx);
-    if (along <= 4 || across > along * 1.5) continue;
-    const cost = along + across * 2.5;
-    if (cost < bestCost) {
-      bestCost = cost;
-      best = i;
+  const next = nextSlot(sl, local.cursor, dx, dy);
+  if (next >= 0) local.cursor = next;
+}
+
+/** The slot an arrow press moves to from slot `from` (screen direction dx, dy), or -1. Pure. */
+export function nextSlot(sl: readonly SlotDef[], from: number, dx: number, dy: number): number {
+  const f = sl[from];
+  // Prefer things clearly that way (a cone); failing that, anything on that side of the page.
+  for (const cone of [1.5, Infinity]) {
+    let best = -1;
+    let bestCost = Infinity;
+    for (let i = 0; i < sl.length; i++) {
+      if (i === from) continue;
+      const ox = sl[i].x - f.x;
+      const oy = sl[i].y - f.y;
+      const along = ox * dx + oy * dy;
+      const across = Math.abs(ox * dy - oy * dx);
+      if (along <= 4 || across > along * cone) continue;
+      const cost = along + across * 1.2;
+      if (cost < bestCost) {
+        bestCost = cost;
+        best = i;
+      }
+    }
+    if (best >= 0) return best;
+  }
+  return -1;
+}
+
+const ARROWS: [Action, number, number][] = [
+  ['left', -1, 0],
+  ['right', 1, 0],
+  ['forward', 0, -1],
+  ['back', 0, 1],
+];
+
+/** Shortest list of arrow presses from slot `from` to slot `to`, or null if it can't be reached. */
+export function keyPath(sl: readonly SlotDef[], from: number, to: number): Action[] | null {
+  const prev = new Map<number, [number, Action]>([[from, [-1, 'left']]]);
+  const queue = [from];
+  while (queue.length) {
+    const at = queue.shift()!;
+    if (at === to) {
+      const out: Action[] = [];
+      for (let k = to; k !== from; k = prev.get(k)![0]) out.unshift(prev.get(k)![1]);
+      return out;
+    }
+    for (const [a, dx, dy] of ARROWS) {
+      const n = nextSlot(sl, at, dx, dy);
+      if (n >= 0 && !prev.has(n)) {
+        prev.set(n, [at, a]);
+        queue.push(n);
+      }
     }
   }
-  if (best >= 0) local.cursor = best;
+  return null;
 }
 
 /** Turn this frame's presses into cursor moves and taps, in the order they happened. */

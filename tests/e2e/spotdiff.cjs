@@ -198,14 +198,14 @@ async function desktop(browser, errors) {
   // walk the ring to the nearest difference
   const near = (f) => f.slots.slice().sort((a, b) => Math.hypot(a.a.x - f.cursorAt.x, a.a.y - f.cursorAt.y) - Math.hypot(b.a.x - f.cursorAt.x, b.a.y - f.cursorAt.y))[0];
   const target = near(f);
-  for (let i = 0; i < 30 && f.cursor !== target.slot; i++) {
-    const dx = target.a.x - f.cursorAt.x;
-    const dy = target.a.y - f.cursorAt.y;
-    const horizontal = i % 2 === 0 ? Math.abs(dx) > 8 : Math.abs(dy) <= 8;
-    await page.keyboard.press(horizontal ? (dx > 0 ? 'ArrowRight' : 'ArrowLeft') : dy > 0 ? 'ArrowDown' : 'ArrowUp');
+  // the debug hook gives the arrow keys (shortest path between the scene's things); press them for real
+  const keys = await page.evaluate((to) => window.__toybox.spotdiff.keysTo(to), target.slot);
+  check('keyboard: the difference can be reached with the arrows', Array.isArray(keys), JSON.stringify(keys));
+  for (const k of keys || []) {
+    await page.keyboard.press(k);
     await d.frames(2);
-    f = await d.S();
   }
+  f = await d.waitS((x) => x.cursor === target.slot, 'ring on target', 60000).catch(() => d.S());
   check('keyboard: arrows steer the ring onto a difference', f.cursor === target.slot, `cursor ${f.cursor} target ${target.slot}`);
   await d.snap('sd-08-keyboard-ring.png');
   await page.keyboard.press('Enter');
