@@ -114,6 +114,8 @@ export class MatchFlow {
   private readonly sent = new Map<string, { seq: number; view: Obj }>();
   private events: MatchEventWire[] = [];
   timeScale: number;
+  /** Test servers only: freeze (time scale 0) when the match next enters this phase. */
+  holdAt: MatchPhaseWire | null = null;
 
   constructor(
     readonly settings: LobbySettings,
@@ -237,6 +239,10 @@ export class MatchFlow {
       case 'final':
         if ((this.phaseLeft -= dt) <= 0 || allReady) out.done = true;
         break;
+    }
+    if (out.changed && this.holdAt === this.phase) {
+      this.timeScale = 0;
+      this.holdAt = null;
     }
     if (this.run && (this.phase === 'countdown' || this.phase === 'playing' || this.phase === 'results')) this.snapshots(members, out);
     return out;

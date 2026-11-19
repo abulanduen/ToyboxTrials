@@ -23,6 +23,7 @@ import {
   type LobbyState,
   type LobbySummary,
   type Look,
+  type MatchPhaseWire,
   type ServerMsg,
 } from '../src/net/protocol';
 import type { LeaderboardResult } from '../src/net/leaderboardProtocol';
@@ -61,6 +62,8 @@ interface Lobby {
   /** Next match sequence number (every trial gets a fresh one). */
   nextSeq: number;
   timeScale: number;
+  /** Test servers only: freeze the next match on reaching this phase. */
+  holdAt: MatchPhaseWire | null;
 }
 
 export interface LobbyBoardOptions {
@@ -199,7 +202,12 @@ export class LobbyBoard {
         const l = this.byPlayer.get(p.id);
         if (!this.opts.debug || !l) return [];
         l.timeScale = msg.k;
-        if (l.flow) l.flow.timeScale = msg.k;
+        l.holdAt = msg.hold ?? null;
+        if (l.flow) {
+          l.flow.timeScale = msg.k;
+          l.flow.holdAt = l.holdAt;
+          l.holdAt = null;
+        }
         return this.broadcastState(l, now);
       }
     }
@@ -240,7 +248,7 @@ export class LobbyBoard {
     const id = this.newId();
     if (!id) return [...out, this.err(p.id, 'too_many_lobbies')];
     lim.lastCreate = now;
-    const l: Lobby = { id, hostId: p.id, settings: { ...settings }, members: [], kicked: new Set(), flow: null, nextSeq: 1, timeScale: 1 };
+    const l: Lobby = { id, hostId: p.id, settings: { ...settings }, members: [], kicked: new Set(), flow: null, nextSeq: 1, timeScale: 1, holdAt: null };
     this.lobbies.set(id, l);
     this.addMember(l, p, now);
     out.push(...this.broadcastState(l, now), this.listToRoom());
@@ -272,6 +280,8 @@ export class LobbyBoard {
     const problem = startProblem(l.settings, l.members.length);
     if (problem) return [this.err(l.hostId, problem)];
     l.flow = new MatchFlow(l.settings, l.members, newMatchSeed(this.opts.random), now, l.nextSeq, l.timeScale);
+    l.flow.holdAt = l.holdAt;
+    l.holdAt = null;
     for (const m of l.members) m.ready = false;
     return [...this.broadcastState(l, now), this.listToRoom()];
   }

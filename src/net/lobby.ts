@@ -140,7 +140,7 @@ exposeDebug({
     start: () => startLobby(),
     watch: (id: string) => watchSeat(id),
     /** Test servers only (MATCH_DEBUG=1): speed this lobby's match up. */
-    timeScale: (k: number) => netLink.send({ t: 'lobby', a: 'timescale', k }),
+    timeScale: (k: number, hold?: 'results' | 'final') => netLink.send({ t: 'lobby', a: 'timescale', k, ...(hold ? { hold } : {}) }),
     remote: () => remoteDebug(),
   },
 });

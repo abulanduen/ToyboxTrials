@@ -280,8 +280,11 @@ export type LobbyAction =
   | { a: 'start' }
   /** Spectators: whose view to follow. */
   | { a: 'watch'; id: string }
-  /** Test servers only (MATCH_DEBUG=1): speed the lobby's match up. Ignored otherwise. */
-  | { a: 'timescale'; k: number };
+  /**
+   * Test servers only (MATCH_DEBUG=1): speed the lobby's match up (0 freezes it), and optionally
+   * freeze it when it next reaches phase `hold`. Ignored otherwise.
+   */
+  | { a: 'timescale'; k: number; hold?: MatchPhaseWire };
 
 export type LobbyEndReason = 'left' | 'kicked' | 'closed';
 
@@ -671,7 +674,8 @@ function parseLobbyAction(m: Obj): LobbyMsg | null {
     case 'watch':
       return isPlayerId(m.id) ? { t: 'lobby', a: 'watch', id: m.id } : null;
     case 'timescale':
-      return isNum(m.k) && m.k >= 0 && m.k <= 50 ? { t: 'lobby', a: 'timescale', k: m.k } : null;
+      if (!isNum(m.k) || m.k < 0 || m.k > 50 || (m.hold !== undefined && !isOneOf(MATCH_PHASES, m.hold))) return null;
+      return { t: 'lobby', a: 'timescale', k: m.k, ...(m.hold ? { hold: m.hold as MatchPhaseWire } : {}) };
     default:
       return null;
   }

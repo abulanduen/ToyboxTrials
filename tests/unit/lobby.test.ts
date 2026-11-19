@@ -226,6 +226,20 @@ describe('lobby: starting', () => {
     expect(state.match!.seats).toHaveLength(3);
   });
 
+  it('a test server can hold the match when it reaches a phase', () => {
+    const { board } = setup();
+    let now = 0;
+    create(board, A, now, { mode: 'single', game: 'wind-up-dash', cap: 3 });
+    board.handle(A, { t: 'lobby', a: 'timescale', k: 20, hold: 'results' }, (now += 10));
+    board.handle(A, { t: 'lobby', a: 'start' }, (now += 10));
+    for (let i = 0; i < 20_000 && board.flowOf(A.id)?.phase !== 'results'; i++) board.tick((now += 33));
+    const flow = board.flowOf(A.id)!;
+    expect(flow.phase).toBe('results');
+    expect(flow.timeScale).toBe(0);
+    for (let i = 0; i < 100; i++) board.tick((now += 1000));
+    expect(board.flowOf(A.id)?.phase).toBe('results'); // frozen until everyone continues
+  });
+
   it('ignores the time-scale action unless the server allows it (test servers only)', () => {
     const { board, at } = setup(false);
     create(board, A, at());
