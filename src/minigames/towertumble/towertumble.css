@@ -1,0 +1,157 @@
+/* Toy Tower Tumble HUD. Colours are palette.ts values (cream F4E8CE, honey EFAE45, coral E76B62, toy blue 6BA7C8, sage 89B78A, ink purple 574D69, ink 2B2433, white FFF9EE).
+   Layout regions: bar (top), quests (left), players + tower sheet (right), dock (bottom). The 3D camera fits the board into .td-board-slot. */
+.td-hud { position:absolute; inset:0; pointer-events:none; color:#2B2433; font:13px Nunito,sans-serif;
+  --top:max(10px,env(safe-area-inset-top)); --bottom:max(10px,env(safe-area-inset-bottom)); --l:max(10px,env(safe-area-inset-left)); --r:max(10px,env(safe-area-inset-right));
+  --bar:60px; --dock:78px; --left:262px; --right:276px; }
+.td-icon { display:inline-block; vertical-align:middle; flex:none; }
+.td-sr { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+.td-only-phone { display:none !important; }
+.td-hud button { min-width:56px; min-height:56px; color:#2B2433; border:2px solid #574D69; border-radius:9px; background:#FFF9EE; padding:5px 8px; font:600 14px Fredoka,sans-serif; cursor:pointer; touch-action:manipulation; pointer-events:auto; line-height:1.1; }
+.td-hud button small { display:block; font:600 11px Nunito,sans-serif; opacity:.85; margin-top:2px; }
+.td-hud button:disabled { opacity:.5; cursor:default; }
+.td-hud button:focus-visible { outline:3px solid #6BA7C8; outline-offset:2px; }
+.td-hud button[aria-pressed=true] { background:#EFAE45; }
+.td-hud .td-primary:not(:disabled) { background:#EFAE45; }
+.td-hud .td-next:not(:disabled) { background:#89B78A; }
+.td-hud .td-sell { background:#F4E8CE; }
+
+/* Where the camera puts the board (no visuals). */
+.td-board-slot { position:absolute; top:calc(var(--top) + var(--bar) + 8px); bottom:calc(var(--bottom) + var(--dock) + 8px); left:calc(var(--l) + var(--left) + 8px); right:calc(var(--r) + var(--right) + 8px); }
+
+/* Top bar */
+.td-bar { position:absolute; top:var(--top); left:calc(var(--l) + var(--left) + 8px); right:calc(var(--r) + var(--right) + 8px); min-height:var(--bar); box-sizing:border-box; display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:4px 14px; padding:6px 12px; background:#F4E8CE; border:3px solid #89B78A; border-radius:12px; box-shadow:0 3px 0 #574D69; }
+.td-bar b { font:600 17px Fredoka,sans-serif; }
+.td-bar__wave { display:flex; align-items:center; gap:6px; }
+.td-boss-tag { font:700 11px Nunito,sans-serif; font-style:normal; background:#E76B62; color:#FFF9EE; border-radius:6px; padding:1px 6px; }
+.td-bar__phase { font-weight:700; text-align:center; }
+.td-bar__phase small { display:block; font-weight:600; font-size:11px; opacity:.8; }
+.td-bar__stat { display:inline-flex; align-items:center; gap:4px; }
+.td-bar__score { font-size:12px; }
+.td-bar__score b { font-size:14px; }
+.td-bar__watch { font-weight:800; background:#6BA7C8; color:#FFF9EE; border-radius:6px; padding:2px 8px; }
+.td-bar.is-hit { animation:td-hit .7s ease-out; }
+@keyframes td-hit { 0% { background:#E76B62; } 100% { background:#F4E8CE; } }
+
+/* Side panels: quests (left) and players (right) */
+.td-side { position:absolute; pointer-events:auto; background:#FFF9EE; border:3px solid #C9A57A; border-radius:12px; padding:8px; box-shadow:0 3px 0 #574D69; overflow:auto; overscroll-behavior:contain; box-sizing:border-box; }
+.td-side--quests { top:var(--top); left:var(--l); width:var(--left); max-height:calc(100% - var(--top) - var(--bottom)); }
+.td-side--players { top:calc(var(--top) + 64px); right:var(--r); width:var(--right); max-height:calc(38% - 64px); }
+.td-panel__head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:4px; }
+.td-panel__head strong { font:600 16px Fredoka,sans-serif; }
+.td-quests,.td-players { list-style:none; margin:0; padding:0; display:grid; gap:4px; }
+.td-quests li { display:grid; grid-template-columns:38px minmax(0,1fr); gap:6px; align-items:center; background:#F4E8CE; border-radius:8px; padding:4px 6px; font-weight:700; font-size:12px; line-height:1.2; }
+.td-quests li small { display:block; font-weight:600; font-size:11px; opacity:.8; }
+.td-quests__mark { display:grid; place-items:center; width:38px; height:30px; border-radius:6px; background:#FFF9EE; border:2px solid #C9A57A; font:600 13px Fredoka,sans-serif; }
+.td-quests li.is-done { background:#89B78A; }
+.td-quests li.is-done .td-quests__mark { background:#EFAE45; border-color:#574D69; }
+.td-quests li.is-taken { opacity:.55; }
+.td-players li { border-left:6px solid var(--tier,#A9A6AE); border-radius:8px; background:#F4E8CE; }
+.td-players li > div,.td-hud .td-players li > button { display:block; width:100%; text-align:left; padding:5px 8px; border:0; background:transparent; border-radius:8px; min-height:44px; }
+.td-hud .td-players li > button { min-height:56px; }
+.td-players strong { display:block; font:600 13px Fredoka,sans-serif; }
+.td-players small { display:block; font:600 11px Nunito,sans-serif; }
+.td-players li.is-out { opacity:.55; }
+.td-players li.is-watched { outline:3px solid #6BA7C8; }
+
+/* The selected square's sheet: right column on desktop */
+.td-sheet { position:absolute; pointer-events:auto; right:var(--r); bottom:calc(var(--bottom) + var(--dock) + 10px); width:var(--right); box-sizing:border-box; max-height:calc(62% - var(--dock)); overflow:auto; background:#FFF9EE; border:3px solid var(--tier,#574D69); border-radius:12px; padding:8px; box-shadow:0 3px 0 #574D69; }
+.td-sheet__head { display:flex; gap:8px; align-items:center; }
+.td-sheet__head > strong { font:600 16px Fredoka,sans-serif; }
+.td-sheet__title strong { display:block; font:600 16px Fredoka,sans-serif; }
+.td-sheet__title small { display:block; font-size:11px; font-weight:700; }
+.td-tier { background:var(--tier,#A9A6AE); border:1px solid #574D69; border-radius:5px; padding:0 5px; }
+.td-portrait { width:52px; height:52px; flex:none; border-radius:8px; background:var(--tier,#C9A57A); display:block; }
+.td-portrait img { width:100%; height:100%; display:block; object-fit:contain; }
+.td-sheet__stats,.td-sheet__lead { margin:6px 0 4px; font-size:12px; font-weight:600; }
+.td-abilities { margin:0 0 4px; padding-left:16px; font-size:12px; }
+.td-sheet__dealt { display:block; font-size:11px; opacity:.8; }
+.td-sheet__actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+.td-sheet__actions button { flex:1 1 auto; }
+.td-note { flex:1 1 100%; font-size:12px; font-weight:700; }
+
+/* Dock: Build, Builder, Odds, Next wave */
+.td-dock { position:absolute; pointer-events:auto; bottom:var(--bottom); left:calc(var(--l) + var(--left) + 8px); right:calc(var(--r) + var(--right) + 8px); box-sizing:border-box; background:#F4E8CE; border:3px solid #C9A57A; border-radius:12px; padding:6px; box-shadow:0 3px 0 #574D69; }
+.td-dock__row { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
+.td-dock__level { align-self:center; text-align:center; font:600 13px Fredoka,sans-serif; }
+
+/* Odds table */
+.td-odds { position:absolute; z-index:3; pointer-events:auto; left:50%; top:50%; transform:translate(-50%,-50%); width:min(440px,calc(100% - 24px)); max-height:calc(100% - 24px); overflow:auto; box-sizing:border-box; background:#FFF9EE; border:3px solid #EFAE45; border-radius:12px; padding:10px; box-shadow:0 5px 0 #574D69; }
+.td-odds p { margin:4px 0 8px; font-size:12px; }
+.td-odds table { width:100%; border-collapse:collapse; font:600 13px Fredoka,sans-serif; text-align:center; }
+.td-odds th,.td-odds td { padding:5px 3px; border-bottom:1px solid #C9A57A; }
+.td-odds tr.is-current td { background:#EFAE45; }
+
+/* Spectating */
+.td-spectate { position:absolute; pointer-events:auto; bottom:var(--bottom); left:50%; transform:translateX(-50%); width:min(560px,calc(100% - 24px)); box-sizing:border-box; background:#F4E8CE; border:3px solid #6BA7C8; border-radius:12px; padding:8px; box-shadow:0 3px 0 #574D69; text-align:center; }
+.td-spectate strong { display:block; font:600 14px Fredoka,sans-serif; margin-bottom:6px; }
+.td-spectate__row { display:flex; flex-wrap:wrap; gap:6px; justify-content:center; }
+.td-hud.is-out { --dock:84px; --left:0px; }
+
+/* Notices */
+.td-toasts { position:absolute; top:calc(var(--top) + var(--bar) + 12px); left:50%; transform:translateX(-50%); width:min(420px,calc(100% - 24px)); margin:0; padding:0; list-style:none; display:grid; gap:4px; }
+.td-toast { background:#FFF9EE; border:2px solid #574D69; border-radius:9px; padding:6px 10px; font-weight:800; font-size:13px; text-align:center; box-shadow:0 2px 0 #574D69; animation:td-in .25s ease-out; }
+.td-toast--good { background:#89B78A; }
+.td-toast--bad { background:#E76B62; color:#FFF9EE; }
+.td-toast--boss { background:#574D69; color:#FFF9EE; }
+@keyframes td-in { from { transform:translateY(-6px); opacity:0; } to { transform:none; opacity:1; } }
+@media(prefers-reduced-motion:reduce) { .td-toast,.td-bar.is-hit { animation:none !important; } }
+
+/* Mid-size screens: narrower side columns. */
+@media(max-width:1100px) and (min-width:601px) { .td-hud { --left:220px; --right:236px; } .td-dock__row button { font-size:13px; } }
+
+/* Phone portrait: bar on top, the board under it, the sheet under the board, the dock at the bottom. Quests and players open as overlays. */
+@media(max-width:600px) {
+  .td-hud { --left:0px; --right:0px; --bar:62px; --dock:136px; font-size:12px; }
+  .td-only-phone { display:revert !important; }
+  .td-dock__row.td-only-phone { display:grid !important; grid-template-columns:repeat(3,minmax(0,1fr)); margin-top:6px; }
+  /* The board takes a square under the bar, so the sheet below never covers it. */
+  .td-board-slot { bottom:auto; height:min(calc(100vw - 8px), calc(100% - var(--top) - var(--bar) - var(--dock) - var(--bottom) - 200px)); left:var(--l); right:var(--r); }
+  .td-bar { left:var(--l); right:calc(var(--r) + 66px); gap:2px 10px; padding:4px 8px; }
+  .td-bar b { font-size:15px; }
+  .td-bar__score { display:none; }
+  .td-side { display:none; }
+  .td-side.is-open { display:block; z-index:2; top:calc(var(--top) + var(--bar) + 6px); left:var(--l); right:var(--r); width:auto; max-height:calc(100% - var(--top) - var(--bar) - var(--dock) - var(--bottom) - 20px); }
+  .td-dock { left:var(--l); right:var(--r); padding:5px; }
+  .td-dock__row { gap:4px; }
+  .td-hud .td-dock button { font-size:13px; padding:4px; }
+  .td-hud .td-dock button small { font-size:10px; }
+  .td-sheet { left:var(--l); right:var(--r); width:auto; bottom:calc(var(--bottom) + var(--dock) + 8px); max-height:calc(100% - var(--top) - var(--bar) - var(--dock) - var(--bottom) - 100vw); min-height:0; padding:6px 8px; }
+  .td-sheet__stats { font-size:11px; margin:3px 0; }
+  .td-abilities { font-size:11px; }
+  .td-portrait { width:44px; height:44px; }
+  .td-hud.is-out { --dock:120px; }
+  .td-hud.is-out .td-side--players { display:none; }
+}
+
+/* Phone landscape: quests left (compact), dock + sheet right, board in the middle. */
+@media(max-height:500px) {
+  .td-hud { --bar:44px; --left:200px; --right:236px; --dock:0px; font-size:12px; }
+  .td-bar { padding:3px 8px; gap:2px 10px; }
+  .td-bar b { font-size:14px; }
+  .td-bar__phase small,.td-bar__score { display:none; }
+  .td-side--quests { width:var(--left); padding:5px; }
+  .td-quests li { grid-template-columns:32px minmax(0,1fr); padding:3px 4px; font-size:11px; }
+  .td-quests li small { display:none; }
+  .td-quests__mark { width:32px; height:24px; font-size:12px; }
+  .td-side--players { display:none; }
+  .td-side--players.is-open { display:block; z-index:2; top:calc(var(--top) + 250px); left:auto; right:var(--r); width:var(--right); max-height:calc(100% - var(--top) - var(--bottom) - 250px); }
+  /* The dock sits under the host's pause button; the sheet covers the quest column while a square is selected. */
+  .td-dock { top:calc(var(--top) + 62px); bottom:auto; left:auto; right:var(--r); width:var(--right); padding:4px; }
+  .td-dock__row { grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px; }
+  .td-dock__row.td-only-phone { display:grid !important; grid-template-columns:repeat(2,minmax(0,1fr)); margin-top:4px; }
+  .td-dock__row.td-only-phone [data-testid=td-quests-open],.td-dock__level { display:none !important; }
+  .td-only-phone { display:revert !important; }
+  .td-side--quests .td-only-phone { display:none !important; }
+  .td-hud .td-dock button { font-size:12px; padding:3px; }
+  .td-hud .td-dock button small { font-size:10px; }
+  .td-sheet { z-index:2; top:var(--top); bottom:var(--bottom); left:var(--l); right:auto; width:calc(var(--left) + 30px); max-height:none; padding:5px 6px; }
+  .td-sheet__stats,.td-abilities { font-size:10.5px; margin:2px 0; }
+  .td-sheet__dealt { display:none; }
+  .td-portrait { width:40px; height:40px; }
+  .td-toasts { top:calc(var(--top) + var(--bar) + 6px); width:min(340px,calc(100% - 24px)); }
+  .td-toast { font-size:11px; padding:3px 8px; }
+  .td-toast:nth-last-child(n+3) { display:none; }
+  .td-spectate { width:min(420px,calc(100% - 24px)); padding:4px; }
+  .td-hud.is-out { --left:0px; --right:0px; --dock:70px; }
+  .td-hud.is-out .td-board-slot { bottom:calc(var(--bottom) + 76px); }
+}

@@ -429,6 +429,35 @@ scene on both pages, except for 15 differences. See `src/minigames/spotdiff/READ
 picture units and the two pages provably differ in exactly the 15 slots (unit-tested). Generated raster art is not
 used for anything you can tap. All values above are first-pass and untuned with real players.
 
+### 13 · Toy Tower Tumble (Strategy / Tower defence · 1–8)
+**Implemented (owner brief, 19 Nov 2026):** a 5–10 minute random-merge tower defence. Every player
+defends their own 8×8 board (23-square winding path, 41 felt squares) against **20 shared waves**:
+walkers, armoured beetles, fast racers, marble swarms, flying paper gliders, and **bosses on waves
+5, 10, 15 and 20**.
+- **Build** pays 20 gold for a *random* tower, usually tier 1. Tier 1 has five toy lines with one
+  role each: tin soldiers (single target), paper & craft (splash), clockwork (chain), rubber &
+  string (slow) and plush (support aura).
+- **Two identical towers merge into a random tower one tier up**, to **tier 7** (the cap). Higher
+  tiers add Toy Squad's status vocabulary: fury, burn, pierce, multishot, shred, stun, mark, execute.
+- **Builder levels** 1–6 shift the build odds towards tiers 2–3 and add a lucky-merge chance (a
+  merge jumps two tiers, never past tier 5). The odds table is in the HUD.
+- **Quick quests:** all five tier-1 towers; three of one tier-2 tower; three each of a seed-picked
+  tier-1, tier-2 and tier-3 tower; five clean waves; a tier-3+ tower of every family; and the
+  lobby-wide **first to own a tier 6**.
+- **Boss rewards:** a free random tier-4 (wave 5), tier-5 (wave 10), tier-5 plus a builder level
+  (wave 15), and a 500-point bounty (wave 20).
+- Leaks cost lives (20 to start). At 0 a player is knocked out and can watch the other boards;
+  once every human is out, the remaining bot boards can be fast-forwarded ×2 or ×4.
+- Placement: waves survived, then lives, then damage score. Clearing wave 20 wins.
+
+**Toybox:** a felt board in a wooden tray, a cardboard path over an open-book bridge, a toy box the
+enemies climb out of and a toy chest they fall into. Towers reuse Toy Squad's toy models.
+**Tech:** pure seeded, serialisable rules core (per-board RNG streams), bots, instanced and pooled
+rendering, tap-to-select with a 56 px action sheet on phones. Exact tables, decisions and the
+provisional balance (tuned on headless bot lobbies only) are in `src/minigames/towertumble/README.md`.
+Casual-only (too long for tournaments). Online lobbies are future work. The owner named Pumpkin TD
+(Warcraft III) as the reference; its details were not available, so its specifics are not reproduced.
+
 ---
 
 ## 5. Shared minigame framework

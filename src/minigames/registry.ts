@@ -343,6 +343,46 @@ export const MINIGAMES: MinigameDefinition[] = [
     status: 'playable',
     load: () => import('./spotdiff').then((m) => m.default),
   },
+  {
+    id: 'toy-tower-tumble',
+    title: 'Toy Tower Tumble',
+    tagline: 'Build random toy towers, merge twins, hold the line for 20 waves.',
+    description:
+      'Every player defends their own 8×8 board. Build pays for a random tower, and two identical towers merge into a random tower one tier up, all the way to tier 7. Level your builder for better odds, finish quick quests for gold, and beat the bosses on waves 5, 10, 15 and 20 for free towers. Leaks cost lives; knocked-out players watch the other boards. Survive the most waves to win.',
+    category: 'strategy',
+    accent: PALETTE.honey,
+    players: { min: 1, max: 8 },
+    durationSec: [300, 600],
+    inputs: ['keyboard', 'mouse', 'touch'],
+    bots: 'available',
+    eligibility: { tournament: false, ranked: false, casual: true },
+    scoring: 'progress',
+    tieBreak: 'Waves survived, then lives left, then damage score',
+    recordUnit: 'waves',
+    controls: [
+      { keys: 'Click / drag', action: 'Select a square; drag a tower onto its twin to merge' },
+      { keys: 'B / U', action: 'Build a random tower / level the builder' },
+      { keys: 'Arrows + Enter', action: 'Move the square cursor and select or merge' },
+      { keys: 'M / Q / N', action: 'Merge with a twin / sell / next wave' },
+    ],
+    touch: {
+      movement: 'none',
+      look: 'none',
+      buttons: [
+        { id: 'build', label: 'Build', colour: PALETTE.honey },
+        { id: 'builder', label: 'Builder level' },
+        { id: 'odds', label: 'Odds' },
+        { id: 'next', label: 'Next wave', colour: PALETTE.sage },
+        { id: 'merge', label: 'Merge with twin' },
+        { id: 'sell', label: 'Sell' },
+        { id: 'close', label: 'Close' },
+      ],
+      orientation: 'any',
+      notes: 'Tap a square to select it; a sheet opens with Build here, Merge with twin, Sell and Close (all large buttons). Twins glow gold: tap one, or drag a tower onto it, to merge. Quests and Players open from the dock.',
+    },
+    status: 'playable',
+    load: () => import('./towertumble').then((m) => m.default),
+  },
 ];
 
 export const gameById = (id: MinigameId) => MINIGAMES.find((g) => g.id === id)!;

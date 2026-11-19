@@ -57,7 +57,7 @@ const leave = async (page) => {
   if (want('gates')) {
     const { ctx, page, errors } = await open(browser, desktop);
     const gates = await page.evaluate(() => window.__toybox.hub.gates());
-    check('twelve gates in the hub', gates.length === 12, gates.map((g) => g.game).join(','));
+    check('thirteen gates in the hub', gates.length === 13, gates.map((g) => g.game).join(','));
     for (const g of gates) {
       await page.evaluate((v) => window.__toybox.teleport(v.standX, v.standZ, v.yaw), g);
       const prompt = await page.waitForFunction((t) => { const p = document.querySelector('.prompt'); return p && p.textContent.includes(t) ? p.textContent : null; }, g.title, { timeout: 120000 }).then((h) => h.jsonValue()).catch(() => null);
