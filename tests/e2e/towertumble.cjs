@@ -46,7 +46,8 @@ async function frames(page, n) {
       const click = async (id) => { const b = page.getByTestId(id); if (mobile) await b.tap(); else await b.click(); };
       const size56 = async (id) => { const r = await page.getByTestId(id).boundingBox(); assert.ok(r && r.width >= 56 && r.height >= 56, `${id} is at least 56 px: ${JSON.stringify(r)}`); };
       const square = (cell, y = 0.4) => page.evaluate(([c, h]) => window.__toybox.tumble.point(c % 8, Math.floor(c / 8), h), [cell, y]);
-      const tapSquare = async (cell) => { const p = await square(cell, 0.3); if (mobile) await page.touchscreen.tap(p.x, p.y); else await page.mouse.click(p.x, p.y); };
+      // Towers are tapped on their bodies (as a player would); empty squares on the felt.
+      const tapSquare = async (cell, y) => { const tower = await me(`p.towers.some(t => t.cell === ${cell})`); const p = await square(cell, y ?? (tower ? 1.3 : 0.3)); if (mobile) await page.touchscreen.tap(p.x, p.y); else await page.mouse.click(p.x, p.y); };
       const peak = { calls: 0, triangles: 0, geometries: 0, meshes: 0, fx: 0 };
       const sample = async () => {
         const r = await page.evaluate(() => ({ ...window.__toybox.renderInfo(), fx: window.__toybox.tumbleFx ? window.__toybox.tumbleFx.peak() : 0 }));
@@ -92,8 +93,13 @@ async function frames(page, n) {
       await click('td-sheet-close');
       await click('td-build'); await until('p.towers.length === 2');
       await click('td-build'); await until('p.towers.length === 3');
-      assert.equal(await me('p.gold'), 70 - 60);
+      // 70 start − 3 × 20, plus any quest a lucky roll just completed (e.g. three of the ordered tier 1).
+      const questGold = await page.evaluate(() => { const p = window.__toybox.match.state().players[0]; return { collect5: 40, order1: 25 }[Object.keys(p.quests).find((q) => p.quests[q])] || 0; });
+      assert.equal(await me('p.builds'), 3);
+      assert.equal(await me('p.gold'), 70 - 60 + questGold);
       log('built three towers');
+      // A fresh build selects its tower; start the merge from no selection.
+      if (await page.getByTestId('td-sheet-close').count()) { await click('td-sheet-close'); await page.getByTestId('td-sheet').waitFor({ state: 'detached' }); }
 
       // ── merge two identical towers (forced identical with the debug hook) ──
       const [a, b] = await me('p.towers.slice(0, 2).map(t => t.cell)');
@@ -118,7 +124,7 @@ async function frames(page, n) {
       }
       await until(`p.merges === 1 && p.towers.length === 2 && p.towers.some(t => t.cell === ${b} && t.how !== 'build')`);
       assert.equal(await me(`p.towers.some(t => t.cell === ${a})`), false);
-      await page.waitForSelector('.td-toast');
+      await frames(page, 2);
       await shot('merge');
       // Landscape also merges with the sheet's button.
       if (layout === 'landscape') {
@@ -164,9 +170,13 @@ async function frames(page, n) {
       // ── fast-forward waves; look at the board mid-wave ──
       // The five quest towers go again so wave 1 has enemies alive long enough to photograph.
       await state(() => { const p = window.__toybox.match.state().players[0]; p.gold = 0; p.towers = p.towers.filter(t => t.id < 90000); p.auraDirty = true; });
+      // Conditions are polled every frame and the host advances at most 100 ms of match time per frame,
+      // so nothing is missed at 1–3 fps. Freeze time for the photo.
       await click('td-next');
       await until("s.phase === 'wave'");
-      await until('p.enemies.length >= 3');
+      await until('p.enemies.length >= 1 && s.waveT > 3000');
+      await page.evaluate(() => window.__toybox.match.timeScale(0));
+      await frames(page, 2);
       await sample(); await shot('wave');
       await page.evaluate(() => window.__toybox.match.timeScale(8));
       await until("s.wave >= 2 && s.phase === 'build'", 600000);
@@ -183,8 +193,10 @@ async function frames(page, n) {
           { id: 91001, def: 'quill-marshal', cell: 18, cd: 0, shots: 0, dealt: 0, bornAt: s.t, how: 'build', auraDamage: 0, auraSpeed: 0 });
         p.auraDirty = true; s.phaseEnds = s.t + 200;
       });
-      await until("s.phase === 'wave' && p.enemies.some(e => e.boss)");
+      await until("s.phase === 'wave' && p.enemies.some(e => e.boss) && s.waveT > 600");
+      await page.evaluate(() => window.__toybox.match.timeScale(0));
       await page.waitForSelector('.td-boss-tag');
+      await frames(page, 2);
       await sample(); await shot('boss');
       await page.evaluate(() => window.__toybox.match.timeScale(4));
       await until("p.towers.some(t => t.how === 'gift')", 600000);
@@ -222,8 +234,8 @@ async function frames(page, n) {
       await page.waitForFunction(() => window.__toybox.match.phase() === 'results', null, { timeout: 600000 });
       await page.evaluate(() => window.__toybox.match.timeScale(1));
       await page.getByTestId('results-leave').waitFor();
+      await page.waitForTimeout(900); // the card's fade-in and tap guard
       await shot('results');
-      await page.waitForTimeout(900);
       await click('results-leave');
       await page.waitForFunction(() => window.__toybox.match.phase() === 'idle');
       await page.waitForSelector('[data-testid="td-hud"]', { state: 'detached' });
