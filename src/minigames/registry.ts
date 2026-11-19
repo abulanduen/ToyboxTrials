@@ -310,6 +310,44 @@ export const MINIGAMES: MinigameDefinition[] = [
     status: 'playable',
     load: () => import('./jackbox').then((m) => m.default),
   },
+  {
+    id: 'toybox-siege',
+    title: 'Toybox Siege',
+    tagline: 'Five minutes. Endless dust bunnies. One wind-up hero per board.',
+    description:
+      'Pick a Tin Soldier, a Pop-Gun Ranger or a Clockwork Wizard and hold out on your own patch of the table. Your weapons fire on their own: you only move. Swarms of dust bunnies, wind-up mice, marbles and paper planes close in, an elite arrives every minute and the Boiler Baron at 4:00. Level up, max a weapon, crack an elite’s chest to evolve it, or skip the chest to send an elite to a rival. Beat the boss to win; otherwise the toy that lasts longest wins.',
+    category: 'survival',
+    accent: PALETTE.honey,
+    players: { min: 1, max: 8 },
+    durationSec: [240, 330],
+    inputs: ['keyboard', 'mouse', 'touch'],
+    bots: 'available',
+    // Provisional: a five-minute run is long for a tournament round (like Toy Squad), so practice only for now.
+    eligibility: { tournament: false, ranked: false, casual: true },
+    scoring: 'time',
+    tieBreak: 'Boss slain first (earlier is better), then survival time, then knockouts, then points',
+    recordUnit: 'points',
+    controls: [
+      { keys: 'WASD / arrows', action: 'Move (weapons fire on their own)' },
+      { keys: '1 – 4 / click', action: 'Pick a level-up or treasure card' },
+      { keys: 'Space', action: 'Rally Horn: send an elite (once you have it) · revive when down' },
+      { keys: 'Q / E', action: 'Ghost: previous / next board' },
+    ],
+    touch: {
+      movement: 'joystick',
+      look: 'none',
+      buttons: [
+        { id: 'skill', label: 'Rally Horn', colour: PALETTE.honey },
+        { id: 'card', label: 'Upgrade card' },
+        { id: 'revive', label: 'Revive' },
+        { id: 'watch', label: 'Prev / Next board' },
+      ],
+      orientation: 'any',
+      notes: 'Steer with the floating joystick (left thumb); weapons fire on their own. Tap a card to level up. The big Rally Horn button (right thumb) sends an elite once you own it. When down, tap Revive; as a ghost, tap Prev / Next to inspect other boards.',
+    },
+    status: 'playable',
+    load: () => import('./siege').then((m) => m.default),
+  },
 ];
 
 export const gameById = (id: MinigameId) => MINIGAMES.find((g) => g.id === id)!;

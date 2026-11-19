@@ -1,0 +1,1007 @@
+/**
+ * Toybox Siege rules core: a five-minute horde survival on one board per player.
+ *
+ * Deterministic and seeded (one mulberry32 stream in the state), stepped at a fixed 60 Hz by the
+ * shared host. No DOM, no three.js, no wall-clock time: the same code can run on a game server.
+ * The state is plain JSON (no Maps, no typed arrays, no class instances), so it serialises as is.
+ *
+ * Performance: every entity lives in a pool allocated once at init and recycled through an `on`
+ * flag, so a step allocates nothing except the occasional event or level-up card. Collisions use
+ * a uniform spatial hash rebuilt per board per step from scratch typed arrays that live outside
+ * the state (they are derived data, so determinism and serialisation are unaffected).
+ *
+ * Time: `t` counts the whole match, `runT` the run after every toy has picked a class (the
+ * clock players see). Each board also has its own clock `bt`, which stands still while that
+ * player is choosing a card or deciding whether to revive: the board freezes, the run clock
+ * (elites, the boss, the 5:00 end) does not.
+ */
+import type { Contestant, MatchEvent, Placement, RulesCore } from '../types';
+import {
+  ARENA_HALF, BASE_PICKUP, BIGS, BOSS_AT, BOSS_SUMMON_AT, BOSS_SUMMON_COUNT, CLASSES, CLASS_IDS, DEFAULT_CONFIG, ELITE_SCHEDULE, HORN, HORN_MAX,
+  MAX_LEVEL, MAX_PASSIVES, MAX_WEAPONS, MOBS, PASSIVE_IDS, PASSIVE_PER_LEVEL, PLAYER_RADIUS, POINTS, SENT_GEM_XP, SENT_HP, SNACK_CHANCE,
+  SNACK_HEAL, SPAWN_DIST, WAVE_MS, WEAPONS, WEAPON_IDS, dmgScale, hpScale, reviveCost, sentEliteFor, spawnRate, waveSize, xpToNext,
+  type BigId, type ClassId, type PassiveId, type SiegeConfig, type WeaponId, type WeaponStats,
+} from './config';
+
+export * from './config';
+
+// ---------------------------------------------------------------- state
+
+export interface Mob { on: boolean; serial: number; kind: number; x: number; z: number; vx: number; vz: number; kx: number; kz: number;
+  hp: number; maxHp: number; speed: number; dmg: number; r: number; xp: number; pts: number; hurt: number; yo: number; timer: number }
+export interface Big { on: boolean; serial: number; type: BigId; x: number; z: number; hp: number; maxHp: number; r: number; speed: number; dmg: number; xp: number; pts: number;
+  sent: boolean; from: string | null; mode: 0 | 1 | 2; modeT: number; dashT: number; ringT: number; summonT: number; aimX: number; aimZ: number; hurt: number; yo: number; summons: number }
+/** Player projectiles. kind 0 = cork, 1 = paper plane. */
+export interface Proj { on: boolean; kind: number; x: number; z: number; vx: number; vz: number; r: number; dmg: number; pierce: number; life: number;
+  ox: number; oz: number; range: number; back: boolean; hits: number[]; nh: number }
+/** Enemy bullets. */
+export interface Shot { on: boolean; x: number; z: number; vx: number; vz: number; r: number; dmg: number; life: number }
+/** kind 0 = experience gem, 1 = biscuit (heals). */
+export interface Gem { on: boolean; kind: number; x: number; z: number; v: number; pull: boolean }
+export interface Chest { on: boolean; x: number; z: number }
+/** Area hits. kind 0 sweep (instant), 1 chime (short fuse), 2 marble (falls), 3 revive shockwave. `age` counts up, damage lands at `delay`. */
+export interface Blast { on: boolean; kind: number; x: number; z: number; r: number; ang: number; arc: number; delay: number; age: number; life: number; dmg: number; knock: number; done: boolean }
+
+export interface Board {
+  bt: number;
+  mobs: Mob[]; bigs: Big[]; projs: Proj[]; shots: Shot[]; gems: Gem[]; chests: Chest[]; blasts: Blast[];
+  spawnAcc: number; waveT: number; nextElite: number; bossUp: boolean; bossDown: boolean; serial: number; gemCursor: number;
+}
+
+export interface WeaponSlot { id: WeaponId; level: number; evolved: boolean; cd: number; aux: number }
+export interface PassiveSlot { id: PassiveId; level: number }
+
+export type Option =
+  | { kind: 'weapon'; id: WeaponId; level: number }
+  | { kind: 'passive'; id: PassiveId; level: number }
+  | { kind: 'horn'; level: number }
+  | { kind: 'evolve'; id: WeaponId }
+  | { kind: 'bundle'; items: ({ kind: 'weapon'; id: WeaponId } | { kind: 'passive'; id: PassiveId })[] }
+  | { kind: 'heal' }
+  | { kind: 'send' };
+export interface Choice { kind: 'level' | 'treasure'; options: Option[]; at: number }
+
+export interface Stats { maxHp: number; armour: number; speed: number; dmg: number; cd: number; area: number; projSpeed: number; pickup: number; xp: number }
+export type Status = 'picking' | 'alive' | 'downed' | 'ghost' | 'victor';
+
+export interface SiegePlayer {
+  id: string;
+  cls: ClassId | null;
+  status: Status;
+  x: number; z: number; fx: number; fz: number;
+  /** Latched move input: ax right, ay forward (screen up). */
+  ax: number; ay: number;
+  hp: number; stat: Stats;
+  level: number; xp: number; xpNext: number;
+  kills: number; points: number; elites: number;
+  weapons: WeaponSlot[]; passives: PassiveSlot[];
+  horn: { level: number; readyAt: number } | null;
+  choice: Choice | null; pendingLevels: number; pendingChests: number;
+  /** Board time until which hits are ignored. */
+  invuln: number;
+  downedAt: number; revived: boolean;
+  /** Run time at which this toy finished (ghost or victory); -1 while still in. */
+  outAt: number; victoryAt: number;
+  /** Preferred target for sent elites (null = the leader). */
+  target: string | null;
+  sendReadyAt: number; protectedUntil: number;
+  /** Elites on their way to this board (from = sender id, at = run time of arrival). */
+  incoming: { from: string; at: number }[];
+  /** Spectating (ghost or finished): whose board, and the ghost's offset from that toy. */
+  watching: string | null; gx: number; gz: number;
+  board: Board;
+}
+
+export interface SiegeState {
+  kind: 'toybox-siege';
+  seed: number; rng: number;
+  phase: 'pick' | 'run' | 'over';
+  t: number; runT: number;
+  config: SiegeConfig;
+  players: SiegePlayer[];
+  events: MatchEvent[];
+}
+
+export type SiegeInput =
+  | { type: 'move'; x: number; y: number }
+  | { type: 'class'; cls: ClassId }
+  | { type: 'choose'; index: number; target?: string | null }
+  | { type: 'skill'; target?: string | null }
+  | { type: 'target'; id: string | null }
+  | { type: 'revive' }
+  | { type: 'giveup' }
+  | { type: 'watch'; dir: 1 | -1 };
+
+// ---------------------------------------------------------------- helpers
+
+/** mulberry32 on the state's own counter. */
+export function rand(s: SiegeState): number {
+  s.rng = (s.rng + 0x6d2b79f5) >>> 0;
+  let t = s.rng;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
+/** Math.hypot is slow in hot loops; every call here has two arguments. */
+export const len = (x: number, z: number) => Math.sqrt(x * x + z * z);
+const emit = (s: SiegeState, e: MatchEvent) => { if (s.events.length < 256) s.events.push(e); };
+
+const blankStats = (): Stats => ({ maxHp: 100, armour: 0, speed: 10, dmg: 1, cd: 1, area: 1, projSpeed: 1, pickup: BASE_PICKUP, xp: 1 });
+
+function newBoard(c: SiegeConfig): Board {
+  const n = <T>(k: number, f: () => T) => Array.from({ length: k }, f);
+  return {
+    bt: 0,
+    mobs: n(c.mobCap, () => ({ on: false, serial: 0, kind: 0, x: 0, z: 0, vx: 0, vz: 0, kx: 0, kz: 0, hp: 0, maxHp: 0, speed: 0, dmg: 0, r: 0, xp: 0, pts: 0, hurt: -1e9, yo: -1e9, timer: 0 })),
+    bigs: n(c.bigCap, () => ({ on: false, serial: 0, type: 'bear' as BigId, x: 0, z: 0, hp: 0, maxHp: 0, r: 0, speed: 0, dmg: 0, xp: 0, pts: 0, sent: false, from: null as string | null,
+      mode: 0 as 0 | 1 | 2, modeT: 0, dashT: 0, ringT: 0, summonT: 0, aimX: 0, aimZ: 1, hurt: -1e9, yo: -1e9, summons: 0 })),
+    projs: n(c.projectileCap, () => ({ on: false, kind: 0, x: 0, z: 0, vx: 0, vz: 0, r: 0, dmg: 0, pierce: 0, life: 0, ox: 0, oz: 0, range: 0, back: false, hits: [0, 0, 0, 0, 0, 0, 0, 0], nh: 0 })),
+    shots: n(c.shotCap, () => ({ on: false, x: 0, z: 0, vx: 0, vz: 0, r: 0, dmg: 0, life: 0 })),
+    gems: n(c.gemCap, () => ({ on: false, kind: 0, x: 0, z: 0, v: 0, pull: false })),
+    chests: n(c.chestCap, () => ({ on: false, x: 0, z: 0 })),
+    blasts: n(c.blastCap, () => ({ on: false, kind: 0, x: 0, z: 0, r: 0, ang: 0, arc: 0, delay: 0, age: 0, life: 0, dmg: 0, knock: 0, done: false })),
+    spawnAcc: 0, waveT: WAVE_MS, nextElite: 0, bossUp: false, bossDown: false, serial: 0, gemCursor: 0,
+  };
+}
+
+export const weaponStats = (slot: WeaponSlot): WeaponStats => (slot.evolved ? WEAPONS[slot.id].evolved : WEAPONS[slot.id].levels[slot.level - 1]);
+export const passiveLevel = (p: SiegePlayer, id: PassiveId) => p.passives.find((x) => x.id === id)?.level ?? 0;
+/** The evolution a player qualifies for (weapon at level 5, not yet evolved, partner passive owned). */
+export function evolutionReady(p: SiegePlayer): WeaponId | null {
+  for (const w of p.weapons) if (!w.evolved && w.level >= MAX_LEVEL && passiveLevel(p, WEAPONS[w.id].partner) > 0) return w.id;
+  return null;
+}
+
+export function recomputeStats(p: SiegePlayer) {
+  if (!p.cls) return;
+  const c = CLASSES[p.cls], L = (id: PassiveId) => passiveLevel(p, id), k = PASSIVE_PER_LEVEL, st = p.stat;
+  const before = st.maxHp;
+  st.maxHp = c.hp + k.hp * L('plating');
+  st.armour = c.armour + k.armour * L('plating');
+  st.speed = c.speed * (1 + k.speed * L('gears'));
+  st.projSpeed = 1 + k.projSpeed * L('gears');
+  st.dmg = 1 + k.dmg * L('crayon');
+  st.cd = c.cdMul * (1 - k.cd * L('mainspring'));
+  st.area = c.areaMul * (1 + k.area * L('magnifier'));
+  st.pickup = BASE_PICKUP * c.pickupMul * (1 + k.pickup * L('magnet'));
+  st.xp = 1 + k.xp * L('magnet');
+  if (st.maxHp > before && p.hp > 0) p.hp += st.maxHp - before;
+  p.hp = Math.min(p.hp, st.maxHp);
+}
+
+const playerById = (s: SiegeState, id: string | null | undefined) => (id ? s.players.find((p) => p.id === id) : undefined);
+
+// ---------------------------------------------------------------- sending elites
+
+/** Why `from` cannot send an elite to `to` right now (null = it can). */
+export function sendBlock(s: SiegeState, from: SiegePlayer, to: SiegePlayer | undefined): 'self' | 'out' | 'cooldown' | 'protected' | 'full' | null {
+  if (!to || to === from) return 'self';
+  if (to.status !== 'alive' && to.status !== 'downed') return 'out';
+  if (s.runT < from.sendReadyAt) return 'cooldown';
+  if (s.runT < to.protectedUntil) return 'protected';
+  const alive = to.board.bigs.reduce((n, b) => n + (b.on && b.sent ? 1 : 0), 0);
+  if (alive + to.incoming.length >= s.config.maxSentAlive) return 'full';
+  return null;
+}
+/** Rivals still in, best first: most points, then level, then id. */
+export function standings(s: SiegeState, except?: SiegePlayer): SiegePlayer[] {
+  return s.players.filter((p) => p !== except && (p.status === 'alive' || p.status === 'downed')).sort((a, b) => b.points - a.points || b.level - a.level || (a.id < b.id ? -1 : 1));
+}
+/** Where an elite from `from` would go: their chosen target if it can take one, else the best-placed rival that can. */
+export function sendTarget(s: SiegeState, from: SiegePlayer, wanted?: string | null): SiegePlayer | undefined {
+  const pick = playerById(s, wanted ?? from.target);
+  if (pick && !sendBlock(s, from, pick)) return pick;
+  return standings(s, from).find((p) => !sendBlock(s, from, p));
+}
+function trySend(s: SiegeState, from: SiegePlayer, wanted: string | null | undefined): boolean {
+  const to = sendTarget(s, from, wanted);
+  if (!to) {
+    const reason = s.runT < from.sendReadyAt ? 'cooldown' : 'no-target';
+    emit(s, { type: 'siege-send-blocked', id: from.id, reason });
+    return false;
+  }
+  to.incoming.push({ from: from.id, at: s.runT + s.config.sendWarnMs });
+  to.protectedUntil = s.runT + s.config.receiveCooldownMs;
+  from.sendReadyAt = s.runT + s.config.sendCooldownMs;
+  emit(s, { type: 'siege-sent', id: from.id, to: to.id, at: s.runT + s.config.sendWarnMs });
+  return true;
+}
+
+// ---------------------------------------------------------------- init
+
+function makePlayer(c: Contestant, config: SiegeConfig): SiegePlayer {
+  return {
+    id: c.id, cls: null, status: 'picking', x: 0, z: 0, fx: 0, fz: 1, ax: 0, ay: 0,
+    hp: 100, stat: blankStats(), level: 1, xp: 0, xpNext: xpToNext(1), kills: 0, points: 0, elites: 0,
+    weapons: [], passives: [], horn: null, choice: null, pendingLevels: 0, pendingChests: 0, invuln: 0,
+    downedAt: -1, revived: false, outAt: -1, victoryAt: -1, target: null, sendReadyAt: 0, protectedUntil: 0, incoming: [],
+    watching: null, gx: 0, gz: 0, board: newBoard(config),
+  };
+}
+
+function pickClass(s: SiegeState, p: SiegePlayer, cls: ClassId) {
+  if (p.cls || s.phase !== 'pick' || !CLASSES[cls]) return;
+  p.cls = cls; p.status = 'alive';
+  p.weapons.push({ id: CLASSES[cls].weapon, level: 1, evolved: false, cd: 400, aux: 0 });
+  p.stat = blankStats(); p.hp = 1; recomputeStats(p); p.hp = p.stat.maxHp;
+  emit(s, { type: 'siege-class', id: p.id, cls });
+  if (s.players.every((q) => q.cls)) { s.phase = 'run'; s.runT = 0; emit(s, { type: 'siege-start' }); }
+}
+
+// ---------------------------------------------------------------- spatial hash (scratch, not state)
+
+const CELL = 4;
+const GRID = Math.ceil((ARENA_HALF * 2 + 8) / CELL);
+const ORIGIN = ARENA_HALF + 4;
+const head = new Int32Array(GRID * GRID);
+let next = new Int32Array(256);
+let near = new Int32Array(1024);
+const cellOf = (v: number) => clamp(Math.floor((v + ORIGIN) / CELL), 0, GRID - 1);
+function buildHash(mobs: Mob[]) {
+  if (next.length < mobs.length) next = new Int32Array(mobs.length);
+  head.fill(-1);
+  for (let i = 0; i < mobs.length; i++) {
+    const m = mobs[i];
+    if (!m.on) continue;
+    const c = cellOf(m.z) * GRID + cellOf(m.x);
+    next[i] = head[c]; head[c] = i;
+  }
+}
+/** Live mobs whose centre may be within `r` of (x, z): fills `near`, returns the count. */
+function query(mobs: Mob[], x: number, z: number, r: number): number {
+  const x0 = cellOf(x - r), x1 = cellOf(x + r), z0 = cellOf(z - r), z1 = cellOf(z + r);
+  let n = 0;
+  for (let cz = z0; cz <= z1; cz++) for (let cx = x0; cx <= x1; cx++) {
+    for (let i = head[cz * GRID + cx]; i >= 0; i = next[i]) {
+      if (!mobs[i].on) continue;
+      if (n >= near.length) { const grown = new Int32Array(near.length * 2); grown.set(near); near = grown; }
+      near[n++] = i;
+    }
+  }
+  return n;
+}
+/** The hash dimensions, so a unit test can check the grid covers the board. */
+export const HASH = { CELL, GRID, ORIGIN };
+
+// ---------------------------------------------------------------- spawning
+
+function spawnPoint(s: SiegeState, p: SiegePlayer, out: { x: number; z: number }) {
+  for (let tries = 0; tries < 3; tries++) {
+    const a = rand(s) * Math.PI * 2, d = SPAWN_DIST[0] + rand(s) * (SPAWN_DIST[1] - SPAWN_DIST[0]);
+    const x = clamp(p.x + Math.cos(a) * d, -ARENA_HALF + 1, ARENA_HALF - 1), z = clamp(p.z + Math.sin(a) * d, -ARENA_HALF + 1, ARENA_HALF - 1);
+    out.x = x; out.z = z;
+    if (len(x - p.x, z - p.z) >= 16) return;
+  }
+}
+const spot = { x: 0, z: 0 };
+
+function freeMob(b: Board): Mob | null {
+  for (const m of b.mobs) if (!m.on) return m;
+  return null;
+}
+export function spawnMob(s: SiegeState, p: SiegePlayer, kind: number, x: number, z: number): Mob | null {
+  const b = p.board, m = freeMob(b);
+  if (!m) return null;
+  const d = MOBS[kind], k = hpScale(s.runT);
+  m.on = true; m.serial = ++b.serial; m.kind = kind; m.x = x; m.z = z; m.vx = 0; m.vz = 0; m.kx = 0; m.kz = 0;
+  m.hp = m.maxHp = d.hp * k; m.speed = d.speed * (0.92 + rand(s) * 0.16); m.dmg = d.dmg * dmgScale(s.runT); m.r = d.r; m.xp = d.xp; m.pts = d.pts;
+  m.hurt = -1e9; m.yo = -1e9; m.timer = rand(s) * 600;
+  return m;
+}
+function rollKind(s: SiegeState): number {
+  let total = 0;
+  for (const d of MOBS) if (s.runT >= d.from) total += d.weight(s.runT);
+  let r = rand(s) * total;
+  for (let i = 0; i < MOBS.length; i++) {
+    if (s.runT < MOBS[i].from) continue;
+    r -= MOBS[i].weight(s.runT);
+    if (r <= 0) return i;
+  }
+  return 0;
+}
+export function spawnBig(s: SiegeState, p: SiegePlayer, type: BigId, sent: boolean, from: string | null): Big | null {
+  const b = p.board, g = b.bigs.find((x) => !x.on);
+  if (!g) return null;
+  const d = BIGS[type];
+  spawnPoint(s, p, spot);
+  g.on = true; g.serial = ++b.serial; g.type = type; g.x = spot.x; g.z = spot.z;
+  g.hp = g.maxHp = d.hp * (sent ? SENT_HP : 1); g.r = d.r; g.speed = d.speed; g.dmg = d.dmg; g.xp = sent ? SENT_GEM_XP : d.xp; g.pts = d.pts;
+  g.sent = sent; g.from = from; g.mode = 0; g.modeT = 0; g.dashT = d.dashEvery * 0.6; g.ringT = d.ringEvery * 0.5; g.summonT = d.summonEvery;
+  g.aimX = 0; g.aimZ = 1; g.hurt = -1e9; g.yo = -1e9; g.summons = 0;
+  emit(s, type === 'baron' ? { type: 'siege-boss', id: p.id } : { type: 'siege-elite', id: p.id, elite: type, sent, from });
+  return g;
+}
+
+// ---------------------------------------------------------------- damage
+
+function dropGem(b: Board, cap: number, kind: number, x: number, z: number, v: number) {
+  for (const g of b.gems) if (!g.on) { g.on = true; g.kind = kind; g.x = x; g.z = z; g.v = v; g.pull = false; return; }
+  // Full: fold the value into an existing gem (round robin), so experience is never lost.
+  b.gemCursor = (b.gemCursor + 1) % cap;
+  const g = b.gems[b.gemCursor];
+  if (g.kind === 0 && kind === 0) g.v += v;
+}
+
+function killMob(s: SiegeState, p: SiegePlayer, m: Mob) {
+  m.on = false;
+  p.kills++; p.points += m.pts;
+  const b = p.board;
+  if (rand(s) < SNACK_CHANCE) dropGem(b, s.config.gemCap, 1, m.x, m.z, 0);
+  else dropGem(b, s.config.gemCap, 0, m.x, m.z, m.xp);
+}
+function hitMob(s: SiegeState, p: SiegePlayer, m: Mob, dmg: number, kx: number, kz: number, knock: number) {
+  if (!m.on) return;
+  m.hp -= dmg; m.hurt = p.board.bt;
+  if (knock > 0) { m.kx += kx * knock; m.kz += kz * knock; }
+  if (m.hp <= 0) killMob(s, p, m);
+}
+function hitBig(s: SiegeState, p: SiegePlayer, g: Big, dmg: number) {
+  if (!g.on) return;
+  g.hp -= dmg; g.hurt = p.board.bt;
+  if (g.type === 'baron') {
+    while (g.summons < BOSS_SUMMON_AT.length && g.hp > 0 && g.hp <= g.maxHp * BOSS_SUMMON_AT[g.summons]) {
+      g.summons++;
+      for (let i = 0; i < BOSS_SUMMON_COUNT; i++) { const a = (i / BOSS_SUMMON_COUNT) * Math.PI * 2; spawnMob(s, p, 1, clamp(g.x + Math.cos(a) * 5, -ARENA_HALF, ARENA_HALF), clamp(g.z + Math.sin(a) * 5, -ARENA_HALF, ARENA_HALF)); }
+      emit(s, { type: 'siege-boss-summon', id: p.id });
+    }
+  }
+  if (g.hp > 0) return;
+  g.on = false;
+  p.points += g.pts;
+  const b = p.board;
+  if (g.type === 'baron') {
+    b.bossDown = true;
+    p.status = 'victor'; p.victoryAt = s.runT; p.outAt = s.runT; p.points += POINTS.victory; p.choice = null;
+    p.watching = defaultWatch(s, p);
+    emit(s, { type: 'siege-victory', id: p.id });
+    return;
+  }
+  p.elites++;
+  if (g.sent) dropGem(b, s.config.gemCap, 0, g.x, g.z, g.xp);
+  else {
+    const c = b.chests.find((x) => !x.on);
+    if (c) { c.on = true; c.x = g.x; c.z = g.z; } else p.pendingChests++;
+    dropGem(b, s.config.gemCap, 0, g.x, g.z, g.xp);
+  }
+  emit(s, { type: 'siege-elite-down', id: p.id, elite: g.type, sent: g.sent });
+}
+
+function hurtPlayer(s: SiegeState, p: SiegePlayer, dmg: number) {
+  const b = p.board;
+  if (p.status !== 'alive' || b.bt < p.invuln) return;
+  p.hp -= Math.max(1, dmg - p.stat.armour);
+  p.invuln = b.bt + 400;
+  emit(s, { type: 'siege-hurt', id: p.id });
+  if (p.hp > 0) return;
+  p.hp = 0; p.choice = null;
+  if (!p.revived && p.points >= reviveCost(s.runT)) {
+    p.status = 'downed'; p.downedAt = s.runT;
+    emit(s, { type: 'siege-downed', id: p.id, cost: reviveCost(s.runT) });
+  } else becomeGhost(s, p);
+}
+
+function becomeGhost(s: SiegeState, p: SiegePlayer) {
+  p.status = 'ghost'; p.outAt = s.runT; p.choice = null; p.incoming.length = 0; p.gx = 0; p.gz = 0;
+  p.watching = defaultWatch(s, p);
+  emit(s, { type: 'siege-ghost', id: p.id });
+}
+/** Spectators start on the leader's board (or anyone's, once nobody is left in). */
+function defaultWatch(s: SiegeState, p: SiegePlayer): string | null {
+  return standings(s, p)[0]?.id ?? s.players.find((q) => q !== p)?.id ?? null;
+}
+
+function revive(s: SiegeState, p: SiegePlayer) {
+  const cost = reviveCost(s.runT);
+  if (p.status !== 'downed' || p.revived || p.points < cost) return;
+  p.points -= cost; p.revived = true; p.status = 'alive'; p.hp = Math.round(p.stat.maxHp * 0.6);
+  p.invuln = p.board.bt + 2500;
+  addBlast(p.board, 3, p.x, p.z, 10, 0, 360, 0, 500, 40, 18);
+  emit(s, { type: 'siege-revive', id: p.id, cost });
+}
+
+// ---------------------------------------------------------------- level-ups and treasure
+
+function owned(p: SiegePlayer, id: WeaponId) { return p.weapons.find((w) => w.id === id); }
+
+/** Up to three upgrade cards (plus the Rally Horn as a fourth, sometimes). Never empty. */
+export function levelOptions(s: SiegeState, p: SiegePlayer): Option[] {
+  const pool: { o: Option; w: number }[] = [];
+  for (const id of WEAPON_IDS) {
+    const have = owned(p, id);
+    if (have) { if (!have.evolved && have.level < MAX_LEVEL) pool.push({ o: { kind: 'weapon', id, level: have.level + 1 }, w: 3 }); }
+    else if (p.weapons.length < MAX_WEAPONS) pool.push({ o: { kind: 'weapon', id, level: 1 }, w: 2 });
+  }
+  for (const id of PASSIVE_IDS) {
+    const lv = passiveLevel(p, id);
+    if (lv) { if (lv < MAX_LEVEL) pool.push({ o: { kind: 'passive', id, level: lv + 1 }, w: 2.5 }); }
+    else if (p.passives.length < MAX_PASSIVES) pool.push({ o: { kind: 'passive', id, level: 1 }, w: 2 });
+  }
+  const out: Option[] = [];
+  while (out.length < 3 && pool.length) {
+    let total = 0;
+    for (const e of pool) total += e.w;
+    let r = rand(s) * total, i = 0;
+    for (; i < pool.length - 1; i++) { r -= pool[i].w; if (r <= 0) break; }
+    out.push(pool.splice(i, 1)[0].o);
+  }
+  if (!out.length) out.push({ kind: 'heal' });
+  const hornLevel = p.horn?.level ?? 0;
+  if (hornLevel < HORN_MAX && p.level >= HORN.offerFromLevel && s.players.length > 1 && rand(s) < HORN.offerChance) out.push({ kind: 'horn', level: hornLevel + 1 });
+  return out;
+}
+
+/** A treasure chest: the evolution if one is ready, otherwise +1 level to up to two owned items. */
+export function treasureOptions(s: SiegeState, p: SiegePlayer): Option[] {
+  const evo = evolutionReady(p);
+  let first: Option;
+  if (evo) first = { kind: 'evolve', id: evo };
+  else {
+    const can: ({ kind: 'weapon'; id: WeaponId } | { kind: 'passive'; id: PassiveId })[] = [
+      ...p.weapons.filter((w) => !w.evolved && w.level < MAX_LEVEL).map((w) => ({ kind: 'weapon' as const, id: w.id })),
+      ...p.passives.filter((x) => x.level < MAX_LEVEL).map((x) => ({ kind: 'passive' as const, id: x.id })),
+    ];
+    const items: typeof can = [];
+    while (items.length < 2 && can.length) items.push(can.splice(Math.floor(rand(s) * can.length), 1)[0]);
+    first = items.length ? { kind: 'bundle', items } : { kind: 'heal' };
+  }
+  return s.players.length > 1 ? [first, { kind: 'send' }] : [first];
+}
+
+function addWeapon(p: SiegePlayer, id: WeaponId) {
+  const have = owned(p, id);
+  if (have) { if (!have.evolved && have.level < MAX_LEVEL) have.level++; }
+  else if (p.weapons.length < MAX_WEAPONS) p.weapons.push({ id, level: 1, evolved: false, cd: 200, aux: 0 });
+}
+function addPassive(p: SiegePlayer, id: PassiveId) {
+  const have = p.passives.find((x) => x.id === id);
+  if (have) { if (have.level < MAX_LEVEL) have.level++; }
+  else if (p.passives.length < MAX_PASSIVES) p.passives.push({ id, level: 1 });
+  recomputeStats(p);
+}
+
+function applyOption(s: SiegeState, p: SiegePlayer, o: Option, target: string | null | undefined): boolean {
+  switch (o.kind) {
+    case 'weapon': addWeapon(p, o.id); emit(s, { type: 'siege-upgrade', id: p.id, item: o.id }); return true;
+    case 'passive': addPassive(p, o.id); emit(s, { type: 'siege-upgrade', id: p.id, item: o.id }); return true;
+    case 'horn':
+      if (!p.horn) p.horn = { level: 1, readyAt: s.runT + HORN.firstReadyMs };
+      else if (p.horn.level < HORN_MAX) p.horn.level++;
+      emit(s, { type: 'siege-upgrade', id: p.id, item: 'horn' }); return true;
+    case 'evolve': { const w = owned(p, o.id); if (w && w.level >= MAX_LEVEL) { w.evolved = true; emit(s, { type: 'siege-evolve', id: p.id, weapon: o.id }); } return true; }
+    case 'bundle': for (const it of o.items) it.kind === 'weapon' ? addWeapon(p, it.id) : addPassive(p, it.id); emit(s, { type: 'siege-treasure', id: p.id }); return true;
+    case 'heal': p.hp = p.stat.maxHp; p.points += 50; return true;
+    case 'send': return trySend(s, p, target);
+  }
+}
+
+function choose(s: SiegeState, p: SiegePlayer, index: number, target: string | null | undefined) {
+  const c = p.choice;
+  if (!c || p.status !== 'alive') return;
+  const o = c.options[index];
+  if (!o) return;
+  if (!applyOption(s, p, o, target)) return; // a blocked send keeps the card open
+  if (c.kind === 'level') p.pendingLevels = Math.max(0, p.pendingLevels - 1);
+  else p.pendingChests = Math.max(0, p.pendingChests - 1);
+  p.choice = null;
+  openChoice(s, p);
+}
+function openChoice(s: SiegeState, p: SiegePlayer) {
+  if (p.choice || p.status !== 'alive') return;
+  if (p.pendingLevels > 0) p.choice = { kind: 'level', options: levelOptions(s, p), at: s.t };
+  else if (p.pendingChests > 0) { p.choice = { kind: 'treasure', options: treasureOptions(s, p), at: s.t }; emit(s, { type: 'siege-chest', id: p.id }); }
+  if (p.choice) emit(s, { type: 'siege-choice', id: p.id, kind: p.choice.kind });
+}
+
+function gainXp(s: SiegeState, p: SiegePlayer, v: number) {
+  p.xp += v * p.stat.xp;
+  while (p.xp >= p.xpNext) {
+    p.xp -= p.xpNext; p.level++; p.xpNext = xpToNext(p.level); p.pendingLevels++; p.points += POINTS.levelUp;
+    emit(s, { type: 'siege-level', id: p.id, level: p.level });
+  }
+}
+
+// ---------------------------------------------------------------- weapons
+
+function addBlast(b: Board, kind: number, x: number, z: number, r: number, ang: number, arc: number, delay: number, life: number, dmg: number, knock: number) {
+  for (const k of b.blasts) if (!k.on) {
+    k.on = true; k.kind = kind; k.x = x; k.z = z; k.r = r; k.ang = ang; k.arc = arc; k.delay = delay; k.age = 0; k.life = life; k.dmg = dmg; k.knock = knock; k.done = false;
+    return k;
+  }
+  return null;
+}
+function addProj(b: Board, kind: number, x: number, z: number, vx: number, vz: number, r: number, dmg: number, pierce: number, life: number, range: number) {
+  for (const q of b.projs) if (!q.on) {
+    q.on = true; q.kind = kind; q.x = x; q.z = z; q.vx = vx; q.vz = vz; q.r = r; q.dmg = dmg; q.pierce = pierce; q.life = life; q.ox = x; q.oz = z; q.range = range; q.back = false; q.nh = 0;
+    return q;
+  }
+  return null;
+}
+
+/** Nearest live enemy (mob or elite/boss) within `range`, as a direction; false if none. */
+const aim = { x: 0, z: 0, d: 0 };
+function nearestEnemy(p: SiegePlayer, range: number): boolean {
+  const b = p.board;
+  let best = range * range, found = false;
+  for (const g of b.bigs) if (g.on) { const d = (g.x - p.x) ** 2 + (g.z - p.z) ** 2; if (d < best) { best = d; aim.x = g.x; aim.z = g.z; found = true; } }
+  const n = query(b.mobs, p.x, p.z, range);
+  for (let k = 0; k < n; k++) { const m = b.mobs[near[k]]; const d = (m.x - p.x) ** 2 + (m.z - p.z) ** 2; if (d < best) { best = d; aim.x = m.x; aim.z = m.z; found = true; } }
+  aim.d = Math.sqrt(best);
+  return found;
+}
+/** A random enemy position within `range` (bigs count), or false. */
+function randomEnemy(s: SiegeState, p: SiegePlayer, range: number): boolean {
+  const b = p.board, n = query(b.mobs, p.x, p.z, range);
+  let live = 0;
+  for (const g of b.bigs) if (g.on && len(g.x - p.x, g.z - p.z) <= range) live++;
+  let inRange = 0;
+  for (let k = 0; k < n; k++) { const m = b.mobs[near[k]]; if ((m.x - p.x) ** 2 + (m.z - p.z) ** 2 <= range * range) near[inRange++] = near[k]; }
+  const total = inRange + live;
+  if (!total) return false;
+  let pick = Math.floor(rand(s) * total);
+  if (pick < inRange) { const m = b.mobs[near[pick]]; aim.x = m.x; aim.z = m.z; return true; }
+  pick -= inRange;
+  for (const g of b.bigs) if (g.on && len(g.x - p.x, g.z - p.z) <= range) { if (pick-- === 0) { aim.x = g.x; aim.z = g.z; return true; } }
+  return false;
+}
+
+function fire(s: SiegeState, p: SiegePlayer, w: WeaponSlot, st: WeaponStats) {
+  const b = p.board, area = st.area * p.stat.area, dmg = st.dmg * p.stat.dmg, face = Math.atan2(p.fx, p.fz);
+  switch (w.id) {
+    case 'sweep': {
+      // Swings at the nearest enemy in reach (auto-aim), else the way the toy faces.
+      const base = nearestEnemy(p, area + 3) ? Math.atan2(aim.x - p.x, aim.z - p.z) : face;
+      for (let k = 0; k < st.count; k++) {
+        const ang = base + k * Math.PI;
+        addBlast(b, 0, p.x, p.z, area, ang, st.arc, 0, 260, dmg, st.knock);
+      }
+      break;
+    }
+    case 'popgun': {
+      const target = nearestEnemy(p, 30);
+      const base = target ? Math.atan2(aim.x - p.x, aim.z - p.z) : face, sp = st.speed * p.stat.projSpeed;
+      for (let k = 0; k < st.count; k++) {
+        const a = base + (k - (st.count - 1) / 2) * 0.14;
+        addProj(b, 0, p.x, p.z, Math.sin(a) * sp, Math.cos(a) * sp, st.area, dmg, st.pierce, st.range, 0);
+      }
+      break;
+    }
+    case 'chime':
+      for (let k = 0; k < st.count; k++) {
+        if (!randomEnemy(s, p, st.range)) { const a = rand(s) * Math.PI * 2, d = 4 + rand(s) * 8; aim.x = p.x + Math.cos(a) * d; aim.z = p.z + Math.sin(a) * d; }
+        addBlast(b, 1, aim.x, aim.z, area, 0, 360, 150, 420, dmg, 3);
+      }
+      break;
+    case 'marbles':
+      for (let k = 0; k < st.count; k++) {
+        if (!randomEnemy(s, p, st.range)) { const a = rand(s) * Math.PI * 2, d = 3 + rand(s) * 10; aim.x = p.x + Math.cos(a) * d; aim.z = p.z + Math.sin(a) * d; }
+        addBlast(b, 2, aim.x + (rand(s) - 0.5), aim.z + (rand(s) - 0.5), area, 0, 360, 450, 700, dmg, 2);
+      }
+      break;
+    case 'planes': {
+      const sp = st.speed * p.stat.projSpeed, spread = w.evolved ? (Math.PI * 2) / st.count : 0.45;
+      for (let k = 0; k < st.count; k++) {
+        const a = w.evolved ? face + k * spread : face + (k - (st.count - 1) / 2) * spread;
+        addProj(b, 1, p.x, p.z, Math.sin(a) * sp, Math.cos(a) * sp, st.area * p.stat.area, dmg, -1, 6000, st.range * p.stat.area);
+      }
+      break;
+    }
+    case 'yoyo': break;
+  }
+}
+
+/** Where a player's yo-yos are this instant (index k of `count`). Shared with the renderer. */
+export function yoyoAt(p: SiegePlayer, w: WeaponSlot, k: number, out: { x: number; z: number }) {
+  const st = weaponStats(w), a = w.aux + (k / st.count) * Math.PI * 2, r = st.area * p.stat.area;
+  out.x = p.x + Math.cos(a) * r; out.z = p.z + Math.sin(a) * r;
+  return out;
+}
+const yo = { x: 0, z: 0 };
+
+function weapons(s: SiegeState, p: SiegePlayer, dt: number) {
+  const b = p.board;
+  for (const w of p.weapons) {
+    const st = weaponStats(w);
+    if (w.id === 'yoyo') {
+      w.aux = (w.aux + st.speed * (dt / 1000)) % (Math.PI * 2);
+      const dmg = st.dmg * p.stat.dmg, gap = st.cd * p.stat.cd;
+      for (let k = 0; k < st.count; k++) {
+        yoyoAt(p, w, k, yo);
+        const n = query(b.mobs, yo.x, yo.z, 2.2);
+        for (let i = 0; i < n; i++) {
+          const m = b.mobs[near[i]];
+          if (!m.on || b.bt - m.yo < gap) continue;
+          const dx = m.x - yo.x, dz = m.z - yo.z;
+          if (dx * dx + dz * dz > (m.r + 0.9) ** 2) continue;
+          m.yo = b.bt;
+          const d = len(m.x - p.x, m.z - p.z) || 1;
+          hitMob(s, p, m, dmg, (m.x - p.x) / d, (m.z - p.z) / d, 4);
+        }
+        for (const g of b.bigs) if (g.on && b.bt - g.yo >= gap && len(g.x - yo.x, g.z - yo.z) < g.r + 0.9) { g.yo = b.bt; hitBig(s, p, g, dmg); }
+      }
+      continue;
+    }
+    w.cd -= dt;
+    if (w.cd > 0) continue;
+    w.cd += Math.max(120, st.cd * p.stat.cd);
+    if (w.cd < 0) w.cd = 0;
+    fire(s, p, w, st);
+  }
+}
+
+// ---------------------------------------------------------------- board step
+
+function stepBoard(s: SiegeState, p: SiegePlayer, dt: number) {
+  const b = p.board, c = s.config, sec = dt / 1000;
+  b.bt += dt;
+  // Player movement (the latched stick / keys).
+  const m2 = len(p.ax, p.ay), mag = Math.min(1, m2);
+  if (mag > 0.05) {
+    const nx = p.ax / m2, nz = -p.ay / m2;
+    p.x = clamp(p.x + nx * mag * p.stat.speed * sec, -ARENA_HALF + PLAYER_RADIUS, ARENA_HALF - PLAYER_RADIUS);
+    p.z = clamp(p.z + nz * mag * p.stat.speed * sec, -ARENA_HALF + PLAYER_RADIUS, ARENA_HALF - PLAYER_RADIUS);
+    p.fx = nx; p.fz = nz;
+  }
+
+  // The run's schedule: one elite a minute, the boss at 4:00, and elites sent by rivals.
+  if (b.nextElite < ELITE_SCHEDULE.length && s.runT >= ELITE_SCHEDULE[b.nextElite].at) { spawnBig(s, p, ELITE_SCHEDULE[b.nextElite].elite, false, null); b.nextElite++; }
+  if (!b.bossUp && s.runT >= BOSS_AT) { b.bossUp = true; spawnBig(s, p, 'baron', false, null); }
+  for (let i = p.incoming.length - 1; i >= 0; i--) {
+    const inc = p.incoming[i];
+    if (s.runT < inc.at) continue;
+    p.incoming.splice(i, 1);
+    spawnBig(s, p, sentEliteFor(s.runT), true, inc.from);
+  }
+
+  // The swarm grows.
+  let alive = 0;
+  for (const m of b.mobs) if (m.on) alive++;
+  b.spawnAcc += spawnRate(s.runT) * sec * (b.bossUp && !b.bossDown ? 0.5 : 1);
+  while (b.spawnAcc >= 1) {
+    b.spawnAcc -= 1;
+    if (alive >= c.mobCap) continue;
+    spawnPoint(s, p, spot);
+    if (spawnMob(s, p, rollKind(s), spot.x, spot.z)) alive++;
+  }
+  b.waveT -= dt;
+  if (b.waveT <= 0) {
+    b.waveT += WAVE_MS;
+    const n = waveSize(s.runT), kind = rollKind(s), r = SPAWN_DIST[0] - 2, a0 = rand(s) * Math.PI;
+    for (let i = 0; i < n && alive < c.mobCap; i++) {
+      const a = a0 + (i / n) * Math.PI * 2;
+      if (spawnMob(s, p, kind, clamp(p.x + Math.cos(a) * r, -ARENA_HALF + 1, ARENA_HALF - 1), clamp(p.z + Math.sin(a) * r, -ARENA_HALF + 1, ARENA_HALF - 1))) alive++;
+    }
+  }
+
+  // Mobs: steer, separate (own hash cell only, a few neighbours), shove off the player, bite.
+  buildHash(b.mobs);
+  const reach = PLAYER_RADIUS;
+  for (let i = 0; i < b.mobs.length; i++) {
+    const m = b.mobs[i];
+    if (!m.on) continue;
+    let dx = p.x - m.x, dz = p.z - m.z;
+    const d = len(dx, dz) || 1;
+    dx /= d; dz /= d;
+    m.timer -= dt;
+    let sp = m.speed;
+    switch (m.kind) {
+      case 1: { // wind-up mouse: dash, pause, dash
+        if (m.timer < 0) m.timer += 950;
+        sp = m.timer > 250 ? m.speed * 1.35 : 0;
+        m.vx = dx; m.vz = dz;
+        break;
+      }
+      case 2: // marble: rolls in a straight line, re-aims every so often (so it overshoots)
+        if (m.timer < 0) { m.timer += 2200; m.vx = dx; m.vz = dz; }
+        break;
+      case 3: { // paper plane: swoops side to side on the way in
+        const wob = Math.sin(b.bt / 300 + m.serial) * 0.8;
+        m.vx = dx - dz * wob; m.vz = dz + dx * wob;
+        const l = len(m.vx, m.vz) || 1; m.vx /= l; m.vz /= l;
+        break;
+      }
+      default: m.vx = dx; m.vz = dz;
+    }
+    m.x += (m.vx * sp + m.kx) * sec; m.z += (m.vz * sp + m.kz) * sec;
+    const decay = Math.max(0, 1 - 6 * sec); m.kx *= decay; m.kz *= decay;
+    // separation: a few neighbours in the same cell
+    const cellIdx = cellOf(m.z) * GRID + cellOf(m.x);
+    let seen = 0;
+    for (let j = head[cellIdx]; j >= 0 && seen < 6; j = next[j]) {
+      if (j === i) continue;
+      const o = b.mobs[j];
+      if (!o.on) continue;
+      seen++;
+      const ox = m.x - o.x, oz = m.z - o.z, rr = m.r + o.r, dd = ox * ox + oz * oz;
+      if (dd >= rr * rr || dd < 1e-6) continue;
+      const dl = Math.sqrt(dd), push = (rr - dl) * 0.5;
+      m.x += (ox / dl) * push; m.z += (oz / dl) * push;
+    }
+    m.x = clamp(m.x, -ARENA_HALF, ARENA_HALF); m.z = clamp(m.z, -ARENA_HALF, ARENA_HALF);
+    const px = m.x - p.x, pz = m.z - p.z, pd = len(px, pz), touch = m.r + reach;
+    if (pd < touch) {
+      if (pd > 1e-6) { m.x = p.x + (px / pd) * touch; m.z = p.z + (pz / pd) * touch; }
+      hurtPlayer(s, p, m.dmg);
+      if (p.status !== 'alive') return;
+    }
+  }
+
+  // Elites and the boss: chase, telegraph and charge, fire rings of bullets, summon.
+  for (const g of b.bigs) {
+    if (!g.on) continue;
+    const d = BIGS[g.type];
+    let dx = p.x - g.x, dz = p.z - g.z;
+    const dist = len(dx, dz) || 1;
+    dx /= dist; dz /= dist;
+    if (g.mode === 0) {
+      g.x += dx * g.speed * sec; g.z += dz * g.speed * sec;
+      if (d.dashEvery) { g.dashT -= dt; if (g.dashT <= 0 && dist < 26) { g.mode = 1; g.modeT = d.windup; g.aimX = dx; g.aimZ = dz; } }
+    } else if (g.mode === 1) {
+      g.modeT -= dt;
+      if (g.modeT <= 0) { g.mode = 2; g.modeT = d.dashMs; }
+    } else {
+      g.x += g.aimX * d.dashSpeed * sec; g.z += g.aimZ * d.dashSpeed * sec;
+      g.modeT -= dt;
+      if (g.modeT <= 0) { g.mode = 0; g.dashT = d.dashEvery; }
+    }
+    g.x = clamp(g.x, -ARENA_HALF, ARENA_HALF); g.z = clamp(g.z, -ARENA_HALF, ARENA_HALF);
+    if (d.ringEvery) {
+      g.ringT -= dt;
+      if (g.ringT <= 0) {
+        g.ringT += d.ringEvery;
+        const off = rand(s) * Math.PI;
+        for (let k = 0; k < d.ringCount; k++) {
+          const a = off + (k / d.ringCount) * Math.PI * 2;
+          const shot = b.shots.find((x) => !x.on);
+          if (!shot) break;
+          shot.on = true; shot.x = g.x; shot.z = g.z; shot.vx = Math.cos(a) * d.ringSpeed; shot.vz = Math.sin(a) * d.ringSpeed; shot.r = 0.7; shot.dmg = d.ringDmg; shot.life = 4000;
+        }
+      }
+    }
+    if (d.summonEvery) {
+      g.summonT -= dt;
+      if (g.summonT <= 0) {
+        g.summonT += d.summonEvery;
+        for (let k = 0; k < d.summonCount; k++) { const a = (k / d.summonCount) * Math.PI * 2; spawnMob(s, p, 1, clamp(g.x + Math.cos(a) * 4, -ARENA_HALF, ARENA_HALF), clamp(g.z + Math.sin(a) * 4, -ARENA_HALF, ARENA_HALF)); }
+      }
+    }
+    if (len(p.x - g.x, p.z - g.z) < g.r + reach) {
+      hurtPlayer(s, p, g.dmg);
+      if (p.status !== 'alive') return;
+    }
+  }
+
+  // Enemy bullets.
+  for (const sh of b.shots) {
+    if (!sh.on) continue;
+    sh.x += sh.vx * sec; sh.z += sh.vz * sec; sh.life -= dt;
+    if (sh.life <= 0 || Math.abs(sh.x) > ARENA_HALF + 2 || Math.abs(sh.z) > ARENA_HALF + 2) { sh.on = false; continue; }
+    if ((sh.x - p.x) ** 2 + (sh.z - p.z) ** 2 < (sh.r + reach) ** 2) {
+      sh.on = false; hurtPlayer(s, p, sh.dmg);
+      if (p.status !== 'alive') return;
+    }
+  }
+
+  // The hash again: positions changed above.
+  buildHash(b.mobs);
+  weapons(s, p, dt);
+
+  // Projectiles.
+  for (const q of b.projs) {
+    if (!q.on) continue;
+    q.life -= dt;
+    if (q.kind === 1) { // paper plane: out to its range, then home back to the toy
+      if (!q.back && (q.x - q.ox) ** 2 + (q.z - q.oz) ** 2 >= q.range * q.range) { q.back = true; q.nh = 0; }
+      if (q.back) {
+        const dx = p.x - q.x, dz = p.z - q.z, dl = len(dx, dz) || 1, sp = len(q.vx, q.vz);
+        q.vx = (dx / dl) * sp; q.vz = (dz / dl) * sp;
+        if (dl < 1.5) { q.on = false; continue; }
+      }
+    }
+    q.x += q.vx * sec; q.z += q.vz * sec;
+    if (q.life <= 0 || Math.abs(q.x) > ARENA_HALF + 4 || Math.abs(q.z) > ARENA_HALF + 4) { q.on = false; continue; }
+    const n = query(b.mobs, q.x, q.z, q.r + 1.2);
+    for (let k = 0; k < n && q.on; k++) {
+      const m = b.mobs[near[k]];
+      if (!m.on || (m.x - q.x) ** 2 + (m.z - q.z) ** 2 > (m.r + q.r) ** 2) continue;
+      let seen = false;
+      for (let h = 0; h < q.nh; h++) if (q.hits[h] === m.serial) { seen = true; break; }
+      if (seen) continue;
+      if (q.nh < q.hits.length) q.hits[q.nh++] = m.serial;
+      else { q.hits[0] = m.serial; } // planes pierce forever: keep the newest hits only
+      const sp = len(q.vx, q.vz) || 1;
+      hitMob(s, p, m, q.dmg, q.vx / sp, q.vz / sp, q.kind === 0 ? 3 : 1.5);
+      if (q.pierce >= 0) { if (q.pierce === 0) q.on = false; else q.pierce--; }
+    }
+    for (const g of b.bigs) {
+      if (!q.on || !g.on || (g.x - q.x) ** 2 + (g.z - q.z) ** 2 > (g.r + q.r) ** 2) continue;
+      let seen = false;
+      for (let h = 0; h < q.nh; h++) if (q.hits[h] === g.serial) { seen = true; break; }
+      if (seen) continue;
+      if (q.nh < q.hits.length) q.hits[q.nh++] = g.serial;
+      hitBig(s, p, g, q.dmg);
+      if (q.pierce >= 0) { if (q.pierce === 0) q.on = false; else q.pierce--; }
+    }
+  }
+
+  // Area hits (sweeps, chimes, marbles, the revive shockwave).
+  for (const k of b.blasts) {
+    if (!k.on) continue;
+    k.age += dt;
+    if (!k.done && k.age >= k.delay) {
+      k.done = true;
+      const n = query(b.mobs, k.x, k.z, k.r + 1.2), half = (k.arc / 2) * (Math.PI / 180);
+      for (let i = 0; i < n; i++) {
+        const m = b.mobs[near[i]];
+        const dx = m.x - k.x, dz = m.z - k.z, dd = len(dx, dz);
+        if (dd > k.r + m.r) continue;
+        if (k.arc < 360 && dd > 0.5) { let da = Math.atan2(dx, dz) - k.ang; da = Math.atan2(Math.sin(da), Math.cos(da)); if (Math.abs(da) > half) continue; }
+        hitMob(s, p, m, k.dmg, dd ? dx / dd : 0, dd ? dz / dd : 0, k.knock);
+      }
+      for (const g of b.bigs) {
+        if (!g.on) continue;
+        const dx = g.x - k.x, dz = g.z - k.z, dd = len(dx, dz);
+        if (dd > k.r + g.r) continue;
+        if (k.arc < 360 && dd > 0.5) { let da = Math.atan2(dx, dz) - k.ang; da = Math.atan2(Math.sin(da), Math.cos(da)); if (Math.abs(da) > half + 0.3) continue; }
+        hitBig(s, p, g, k.dmg);
+        if (p.status !== 'alive') break;
+      }
+      if (k.kind === 3) for (const sh of b.shots) if (sh.on && len(sh.x - k.x, sh.z - k.z) < k.r) sh.on = false;
+    }
+    if (k.age >= k.life) k.on = false;
+  }
+  if (p.status !== 'alive') return; // the boss fell: the run is won
+
+  // Gems, biscuits and chests.
+  const pick2 = p.stat.pickup * p.stat.pickup;
+  for (const g of b.gems) {
+    if (!g.on) continue;
+    const dx = p.x - g.x, dz = p.z - g.z, dd = dx * dx + dz * dz;
+    if (!g.pull && dd < pick2) g.pull = true;
+    if (!g.pull) continue;
+    const dl = Math.sqrt(dd);
+    if (dl < 1.3) {
+      g.on = false;
+      if (g.kind === 1) p.hp = Math.min(p.stat.maxHp, p.hp + p.stat.maxHp * SNACK_HEAL);
+      else gainXp(s, p, g.v);
+      continue;
+    }
+    const step = Math.min(dl, 34 * sec);
+    g.x += (dx / dl) * step; g.z += (dz / dl) * step;
+  }
+  for (const ch of b.chests) if (ch.on && len(ch.x - p.x, ch.z - p.z) < 2.6) { ch.on = false; p.pendingChests++; emit(s, { type: 'siege-chest-pick', id: p.id }); }
+  openChoice(s, p);
+}
+
+// ---------------------------------------------------------------- the rules
+
+export const siegeRules: RulesCore<SiegeState, SiegeInput, Partial<SiegeConfig>> = {
+  init(contestants, seed, config) {
+    const cfg = { ...DEFAULT_CONFIG, ...(config ?? {}) };
+    return { kind: 'toybox-siege', seed, rng: seed >>> 0, phase: 'pick', t: 0, runT: 0, config: cfg, players: contestants.map((c) => makePlayer(c, cfg)), events: [] };
+  },
+
+  step(s, inputs, dtMs) {
+    if (s.phase === 'over') return s;
+    s.t += dtMs;
+    for (const p of s.players) {
+      const list = inputs[p.id];
+      if (!list) continue;
+      for (const i of list) applyInput(s, p, i);
+    }
+    if (s.phase === 'pick') {
+      if (s.config.pickTimeoutMs > 0 && s.t >= s.config.pickTimeoutMs) for (const p of s.players) if (!p.cls) pickClass(s, p, CLASS_IDS[0]);
+      return s;
+    }
+    s.runT += dtMs;
+    for (const p of s.players) {
+      if (p.status === 'alive') {
+        if (p.choice) {
+          if (s.config.choiceTimeoutMs > 0 && s.t - p.choice.at >= s.config.choiceTimeoutMs) choose(s, p, 0, null);
+          continue; // the board waits while you choose
+        }
+        stepBoard(s, p, dtMs);
+      } else if (p.status === 'downed') {
+        if (s.runT - p.downedAt >= s.config.reviveWindowMs) becomeGhost(s, p);
+      }
+    }
+    moveGhosts(s, dtMs);
+    // Spectators keep watching someone who is still worth watching.
+    for (const p of s.players) if ((p.status === 'ghost' || p.status === 'victor') && !playerById(s, p.watching)) p.watching = defaultWatch(s, p);
+    const live = s.players.some((p) => p.status === 'alive' || p.status === 'downed');
+    if (s.runT >= s.config.durationMs || !live) {
+      s.phase = 'over';
+      emit(s, { type: 'siege-over' });
+    }
+    return s;
+  },
+
+  isOver: (s) => s.phase === 'over',
+
+  result(s) {
+    const ranked = ranking(s);
+    const placements: Placement[] = [];
+    ranked.forEach((p, i) => {
+      const prev = ranked[i - 1];
+      const tie = prev && sameRank(s, prev, p);
+      placements.push({ contestantId: p.id, place: tie ? placements[i - 1].place : i + 1, score: Math.round(p.points), eliminated: p.status === 'ghost' });
+    });
+    const me = s.players[0];
+    return { placements, durationMs: s.t, stats: { kills: me?.kills ?? 0, level: me?.level ?? 1, survivedSec: Math.round(survival(s, me) / 1000), bossDefeated: me?.status === 'victor' ? 1 : 0 } };
+  },
+
+  drainEvents(s) {
+    if (!s.events.length) return [];
+    const out = s.events;
+    s.events = [];
+    return out;
+  },
+};
+
+function applyInput(s: SiegeState, p: SiegePlayer, i: SiegeInput) {
+  switch (i.type) {
+    case 'move':
+      p.ax = clamp(Number(i.x) || 0, -1, 1); p.ay = clamp(Number(i.y) || 0, -1, 1);
+      break;
+    case 'class': pickClass(s, p, i.cls); break;
+    case 'choose': if (s.phase === 'run') choose(s, p, i.index, i.target); break;
+    case 'skill':
+      if (s.phase === 'run' && p.status === 'alive' && p.horn && !p.choice && s.runT >= p.horn.readyAt) {
+        if (trySend(s, p, i.target)) p.horn.readyAt = s.runT + HORN.cooldowns[p.horn.level - 1];
+      }
+      break;
+    case 'target': p.target = i.id && playerById(s, i.id) && i.id !== p.id ? i.id : null; break;
+    case 'revive': if (s.phase === 'run') revive(s, p); break;
+    case 'giveup': if (s.phase === 'run' && p.status === 'downed') becomeGhost(s, p); break;
+    case 'watch': {
+      if (p.status !== 'ghost' && p.status !== 'victor') break;
+      const others = s.players.filter((q) => q !== p);
+      if (!others.length) break;
+      const at = others.findIndex((q) => q.id === p.watching);
+      p.watching = others[(at + i.dir + others.length * 2) % others.length].id;
+      break;
+    }
+  }
+}
+
+/** Ghosts drift with the stick around the toy they are watching (render-side helper uses the same clamp). */
+export const GHOST_RADIUS = 9;
+export function moveGhosts(s: SiegeState, dtMs: number) {
+  for (const p of s.players) {
+    if (p.status !== 'ghost') continue;
+    p.gx = clamp(p.gx + p.ax * 12 * dtMs / 1000, -GHOST_RADIUS, GHOST_RADIUS);
+    p.gz = clamp(p.gz - p.ay * 12 * dtMs / 1000, -GHOST_RADIUS, GHOST_RADIUS);
+  }
+}
+
+// ---------------------------------------------------------------- placement
+
+/** How long a toy lasted in the run (victors count to their win, survivors to the end). */
+export function survival(s: SiegeState, p: SiegePlayer | undefined): number {
+  if (!p) return 0;
+  if (p.status === 'victor') return p.victoryAt;
+  if (p.status === 'ghost') return p.outAt;
+  return s.runT;
+}
+/** Victory first (earlier boss kill first), then survival time, then kills, then points. */
+export function compare(s: SiegeState, a: SiegePlayer, b: SiegePlayer): number {
+  const va = a.status === 'victor', vb = b.status === 'victor';
+  if (va !== vb) return va ? -1 : 1;
+  if (va && vb && a.victoryAt !== b.victoryAt) return a.victoryAt - b.victoryAt;
+  return survival(s, b) - survival(s, a) || b.kills - a.kills || b.points - a.points;
+}
+const sameRank = (s: SiegeState, a: SiegePlayer, b: SiegePlayer) => compare(s, a, b) === 0;
+export const ranking = (s: SiegeState) => s.players.slice().sort((a, b) => compare(s, a, b) || (a.id < b.id ? -1 : 1));
+
+/** The board on screen for the local player: their own, or the one they are watching. */
+export function viewedPlayer(s: SiegeState, localId: string): SiegePlayer | undefined {
+  const me = s.players.find((p) => p.id === localId);
+  if (me && (me.status === 'ghost' || me.status === 'victor') && me.watching) return s.players.find((p) => p.id === me.watching) ?? me;
+  return me;
+}
+
+/** Debug/test helper: total live entities on a board. */
+export function boardCounts(b: Board) {
+  const n = (list: { on: boolean }[]) => list.reduce((k, x) => k + (x.on ? 1 : 0), 0);
+  return { mobs: n(b.mobs), bigs: n(b.bigs), projs: n(b.projs), shots: n(b.shots), gems: n(b.gems), chests: n(b.chests), blasts: n(b.blasts) };
+}

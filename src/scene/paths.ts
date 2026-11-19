@@ -131,6 +131,7 @@ export function hubPathLines(): PathLine[] {
     roadPoint(gate('spellbox-showdown')),
     roadPoint(gate('red-light-green-light')),
     roadPoint(gate('blink-duel')),
+    roadPoint(gate('toybox-siege')),
     landing,
   ];
   lines.push({ id: 'loop', pts: loop });

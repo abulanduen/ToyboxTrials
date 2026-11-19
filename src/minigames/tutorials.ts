@@ -72,6 +72,12 @@ export const TUTORIALS: Partial<Record<MinigameId, TutorialStep[]>> = {
     { title: 'Set your formation', text: 'Drag toys onto the board or keep them in reserve. Toys sharing a trait symbol earn bonuses, listed at the side. Then press Ready and your squad battles on its own.', touch: 'Drag toys onto the board or keep them in reserve. Toys sharing a trait symbol earn bonuses, listed at the side. Then tap Ready and your squad battles on its own.' },
     { title: 'Ten rounds', text: 'A win scores 3 points and a draw 1. Most points after ten rounds wins. On rounds 3, 6 and 9, you must pick one of three passive bonuses before you can carry on.' },
   ],
+  'toybox-siege': [
+    { title: 'Pick a toy and keep moving', text: 'Choose the Tin Soldier, the Pop-Gun Ranger or the Clockwork Wizard. Your weapons fire on their own: move with W A S D or the arrows to dodge the swarm.', touch: 'Choose the Tin Soldier, the Pop-Gun Ranger or the Clockwork Wizard. Your weapons fire on their own: steer with the joystick to dodge the swarm.' },
+    { title: 'Grab gems, level up', text: 'Defeated toys drop gems. Collect them to level up and pick one card: a new weapon, a weapon upgrade or a passive. Everything goes up to level 5.' },
+    { title: 'Elites, treasure and rivals', text: 'An elite arrives every minute and drops a chest. A maxed weapon plus its partner passive evolves when you open one. Or skip the chest to send an elite to a rival’s board.' },
+    { title: 'Beat the Boiler Baron', text: 'The boss arrives at 4:00: defeat it to win. If you fall, you can spend points to revive once; after that you become a ghost and can inspect the other boards.' },
+  ],
 };
 
 export function tutorialFor(id: MinigameId): TutorialStep[] | undefined {

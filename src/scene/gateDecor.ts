@@ -465,7 +465,40 @@ const spellbox: Theme = (k) => {
   k.pop();
 };
 
+const siege: Theme = (k) => {
+  // hero: a cardboard toy-fort tower with battlements and a pennant
+  k.push(H.lx, 0, H.lz);
+  k.cyl(1.35, 1.5, 4.6, 0, 2.3, 0, P.cardboard, 14);
+  k.cyl(1.55, 1.55, 0.35, 0, 4.75, 0, P.cardboardDark, 14);
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    k.box(0.55, 0.6, 0.4, Math.cos(a) * 1.3, 5.2, Math.sin(a) * 1.3, P.cardboard, { ry: -a });
+  }
+  k.with('detail', () => {
+    k.box(0.7, 1.1, 0.08, 0, 1.0, 1.5, P.woodDark); // door
+    k.box(0.36, 0.5, 0.08, 0, 3.2, 1.45, P.ink); // arrow slit
+  });
+  k.cyl(0.07, 0.07, 1.8, 0, 5.9, 0, P.woodDark, 6);
+  k.box(0.9, 0.5, 0.05, 0.45, 6.5, 0, P.coral);
+  k.pop();
+  // side: an open treasure chest guarded by three dust bunnies
+  k.push(S.lx, 0, S.lz, -0.25);
+  k.block(1.5, 0.9, 1.0, 0, 0.45, 0, P.woodMid);
+  k.box(1.56, 0.14, 1.06, 0, 0.62, 0, P.brass);
+  k.box(1.5, 0.12, 0.95, 0, 1.25, -0.62, P.woodLight, { rx: -1.1 });
+  k.with('glow', () => k.ball(0.32, 0, 0.95, 0.05, P.honey, 8));
+  for (const [x, z, s] of [[-1.2, 0.6, 0.5], [1.15, 0.7, 0.42], [0.1, 1.25, 0.36]] as const) {
+    k.ball(s, x, s, z, P.roomFabric, 8);
+    k.ball(s * 0.32, x - s * 0.4, s * 1.75, z, P.roomFabric, 6, { s: [0.8, 1.8, 0.7] });
+    k.ball(s * 0.32, x + s * 0.4, s * 1.75, z, P.roomFabric, 6, { s: [0.8, 1.8, 0.7] });
+  }
+  k.pop();
+  // a little patchwork play mat on the felt
+  for (let i = 0; i < 4; i++) k.box(1.05, 0.04, 1.05, -5.7 + (i % 2) * 1.1, DECAL_Y, 2.0 + Math.floor(i / 2) * 1.1, [P.sage, P.honey, P.coral, P.toyBlue][i]);
+};
+
 export const GATE_THEMES: Record<MinigameId, Theme> = {
+  'toybox-siege': siege,
   'copycat-conductor': copycat,
   'jack-in-the-box': jack,
   'find-the-original': findOriginal,
