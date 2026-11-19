@@ -136,7 +136,7 @@ async function run(name) {
     assert.ok(level >= 2, 'levelled up');
     // Choose until no card is left (12 xp can be two levels).
     for (let i = 0; i < 4 && (await page.getByTestId('siege-levelup').count()); i++) {
-      if (v.touch) await page.getByTestId('siege-option-0').tap(); else await page.keyboard.press('Digit1');
+      if (v.touch) await tap(page.getByTestId('siege-option-0')); else await page.keyboard.press('Digit1');
       await page.waitForFunction(new Function('n', `return ${me}.pendingLevels < n || !${me}.choice`), await state(new Function(`return ${me}.pendingLevels`)));
     }
     await page.waitForFunction(new Function(`return !${me}.choice`));
@@ -218,7 +218,7 @@ async function run(name) {
     await step('6-downed');
     await shot('6-downed');
     const before = await state(new Function(`return ${me}.points`));
-    if (v.touch) await page.getByTestId('siege-revive').tap(); else await page.keyboard.press('Space');
+    if (v.touch) await tap(page.getByTestId('siege-revive')); else await page.keyboard.press('Space');
     await page.waitForFunction(new Function(`return ${me}.status === 'alive' && ${me}.revived`));
     assert.ok((await state(new Function(`return ${me}.points`))) < before, 'revive cost points');
 
@@ -226,13 +226,16 @@ async function run(name) {
     await skipTo(232000);
     await state(() => { const p = window.__toybox.match.state().players.find((q) => q.id === 'you'); p.invuln = 1e12; });
     await page.evaluate(() => window.__toybox.match.timeScale(60));
+    const bossState = () => state(() => { const st = window.__toybox.match.state(); const p = st.players.find((q) => q.id === 'you');
+      return { runT: Math.round(st.runT), boss: p.board.bigs.some((g) => g.on && g.type === 'baron'), card: p.choice?.kind ?? null, status: p.status, bt: Math.round(p.board.bt) }; });
     for (let i = 0; i < 600; i++) {
-      const s = await state(() => { const p = window.__toybox.match.state().players.find((q) => q.id === 'you'); return { boss: p.board.bigs.some((g) => g.on && g.type === 'baron'), card: p.choice?.kind ?? null, status: p.status }; });
+      const s = await bossState();
       if (s.boss || s.status !== 'alive') break;
       if (s.card) await tap(page.getByTestId('siege-option-0')).catch(() => {});
       await page.waitForTimeout(250);
     }
     await freezeClear();
+    console.log(`  [${name}] before the boss shot: ${JSON.stringify(await bossState())}`);
     await state(() => { const p = window.__toybox.match.state().players.find((q) => q.id === 'you'); const g = p.board.bigs.find((b) => b.on && b.type === 'baron'); if (g) { g.x = p.x + 7; g.z = p.z - 6; } });
     await page.getByTestId('siege-boss').waitFor();
     await page.waitForTimeout(1500);

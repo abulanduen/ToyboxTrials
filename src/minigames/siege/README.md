@@ -184,7 +184,15 @@ revive). The game counts as medium length (`durationSec` [240, 330]).
   7–10 s of CPU, about 0.4–0.5 ms per 60 Hz step for all eight boards and their bots.
 
 No frame-rate claims: the development container renders with software GL. Renderer counts
-measured with `__toybox.renderInfo()` are reported with the change.
+measured with `__toybox.renderInfo()` in `tests/e2e/siege.cjs` (desktop 1280×800, Low tier, whole
+frame including the room):
+
+| Moment | Board entities | Draw calls | Triangles |
+| --- | --- | --- | --- |
+| Mid-swarm (~2:44) | 149–150 mobs, 1 elite | 48–51 | 79–82k |
+| Boss fight (4:04) | 150 mobs, boss + 2 elites, 29–30 bullets | 55–58 | 59–60k |
+
+The scene holds 137 meshes in total, whatever the entity count.
 
 ## Decisions and open questions (provisional)
 

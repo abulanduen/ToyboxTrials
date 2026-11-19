@@ -403,9 +403,9 @@ export function SiegeScene({ getState, localId }: MinigameSceneProps<SiegeState>
     view.frame(s, localId, dt);
     if (s && !useMatch.getState().paused) for (const cue of view.sounds) if (limiter.allow(cue, s.t)) PLAY[cue]();
     const persp = camera as THREE.PerspectiveCamera;
-    // About 50 cm across in landscape and 25 cm across in portrait, centred on the toy:
-    // enemies arrive (25–29 cm out) just beyond the edge of the view.
-    const distance = Math.max(34, 26 / persp.aspect);
+    // About 50 cm across in landscape and 20 cm across (40 cm tall) in portrait, centred on the toy,
+    // so a 3.5 cm toy still reads on a phone; enemies arrive (25–29 cm out) beyond the edge of the view.
+    const distance = Math.max(34, 21 / persp.aspect);
     camera.position.set(view.cam.x, distance, view.cam.z + distance * 0.42);
     camera.lookAt(view.cam.x, 0, view.cam.z - 1.5);
   });
