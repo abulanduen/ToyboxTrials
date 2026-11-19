@@ -8,6 +8,8 @@
  * - Otherwise the footprint is something you can stand on (blocks, books, the fountain rim).
  * This gives satisfying hop-up-onto-things platforming without a physics engine.
  */
+import { HUB_WALK, clampToWalkable } from './hubBounds';
+
 export interface CircleCollider {
   kind: 'circle';
   id?: string;
@@ -35,8 +37,11 @@ export type Collider = CircleCollider | BoxCollider;
 
 export const STEP_HEIGHT = 0.45;
 
-/** Playable area on the table top: an axis-aligned rounded rectangle. */
-export const PLAY_BOUNDS = { minX: -48, maxX: 46, minZ: -43, maxZ: 33, corner: 8 };
+/**
+ * The spawn table's play mat (an axis-aligned rounded rectangle). The whole walkable hub is a union
+ * of rectangles: this mat, the domino bridge and the gates table (hubBounds.ts WALK_AREAS).
+ */
+export const PLAY_BOUNDS = HUB_WALK;
 
 const staticColliders: Collider[] = [];
 const dynamicColliders: Collider[] = [];
@@ -161,26 +166,10 @@ export function resolve(pos: { x: number; z: number }, r: number, feetY: number)
   return hit;
 }
 
-/** Keep the player inside the rounded-rectangle play area (the "you can't fall off" rule). */
+/**
+ * Keep the player on walkable ground (the "you can't fall off" rule): inside the union of the two
+ * play mats and the bridge between them (hubBounds.ts). The online server uses the same function.
+ */
 export function clampToBounds(pos: { x: number; z: number }, r: number) {
-  const b = PLAY_BOUNDS;
-  const minX = b.minX + r;
-  const maxX = b.maxX - r;
-  const minZ = b.minZ + r;
-  const maxZ = b.maxZ - r;
-  pos.x = Math.max(minX, Math.min(maxX, pos.x));
-  pos.z = Math.max(minZ, Math.min(maxZ, pos.z));
-  // Rounded corners
-  const k = b.corner;
-  const ccx = pos.x < minX + k ? minX + k : pos.x > maxX - k ? maxX - k : null;
-  const ccz = pos.z < minZ + k ? minZ + k : pos.z > maxZ - k ? maxZ - k : null;
-  if (ccx !== null && ccz !== null) {
-    const dx = pos.x - ccx;
-    const dz = pos.z - ccz;
-    const d = Math.hypot(dx, dz);
-    if (d > k) {
-      pos.x = ccx + (dx / d) * k;
-      pos.z = ccz + (dz / d) * k;
-    }
-  }
+  clampToWalkable(pos, r);
 }

@@ -44,7 +44,7 @@ Never pull the camera up to human eye level in gameplay.
 | Sage green | `#89B78A` | Felt ground, trees, calm |
 | Ink purple | `#574D69` | Shadows, outlines in UI, night |
 | *Supporting* | wood `#C8925A`, cardboard `#C9A57A`, felt `#7FA878`, brass `#C8973A`, ink `#2B2433` | Materials |
-| *Room* | `ROOM` in `src/game/palette.ts`: wall `#DCCBB4`, panelling `#86A39C`, floor `#8A6A4E`, sofa `#7C8FA6` … | Deliberately desaturated |
+| *Room* | `ROOM` in `src/game/palette.ts`: wall `#DCCBB4`, panelling `#86A39C`, floor `#8A6A4E`, quilt `#7D93B0` … | Deliberately desaturated |
 
 Rules: at most **two** palette accents per object. Characters use the most saturated values in
 frame. The room stays below 60 % saturation.

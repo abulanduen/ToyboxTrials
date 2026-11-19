@@ -218,7 +218,7 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   await page.waitForTimeout(1200);
 
   // --- Tournament (Blitz, 1 easy bot): lose each trial on purpose to exercise the flow
-  await page.evaluate(() => window.__toybox.teleport(0, -12.6, Math.PI));
+  await page.evaluate(() => window.__toybox.hub.goTo('pavilion'));
   await page.waitForTimeout(2500);
   await page.keyboard.press('KeyE');
   await page.waitForSelector('.formats', { timeout: 30000 });

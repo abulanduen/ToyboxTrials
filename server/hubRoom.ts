@@ -367,8 +367,13 @@ export class HubRoom {
       if (!respawn) p.budget -= d;
     } else {
       const k = p.budget / d;
-      p.x += dx * k;
-      p.z += dz * k;
+      const partial = { x: p.x + dx * k, z: p.z + dz * k };
+      // The hub is two tables joined by a bridge (not one convex area): a straight crawl towards a
+      // far target can cross the gap between the tables, so the partial step is kept on walkable
+      // ground too.
+      clampToBounds(partial, HUB_MOTION.radius);
+      p.x = partial.x;
+      p.z = partial.z;
       p.budget = 0;
       clamped = true;
     }

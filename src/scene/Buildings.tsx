@@ -107,6 +107,7 @@ export function Fountain() {
 }
 
 // ---------------- Tournament Pavilion: a striped cardboard gift box with a bottle-cap finial ----------------
+const ROOF_H = 6.4;
 export function Pavilion() {
   const stripes = useMemo(() => {
     const t = stripeTexture(PALETTE.coral, PALETTE.cream, 10).clone();
@@ -129,7 +130,7 @@ export function Pavilion() {
   }, []);
   const { w, d, h } = PAVILION;
   return (
-    <group position={[PAVILION.x, 0, PAVILION.z]}>
+    <group position={[PAVILION.x, 0, PAVILION.z]} rotation={[0, PAVILION.rot, 0]}>
       {/* walls */}
       <mesh position={[0, h / 2, 0]} castShadow receiveShadow material={stripes} ref={camBlock}>
         <boxGeometry args={[w, h, d]} />
@@ -138,12 +139,17 @@ export function Pavilion() {
       <mesh position={[0, h + 0.3, 0]} castShadow material={cardboardMat()}>
         <boxGeometry args={[w + 0.6, 0.6, d + 0.6]} />
       </mesh>
-      {/* pyramid tent roof */}
-      <mesh position={[0, h + 0.6 + 3.2, 0]} rotation={[0, Math.PI / 4, 0]} scale={[1, 1, d / w]} castShadow material={roofStripes}>
-        <coneGeometry args={[w * 0.74, 6.4, 4, 1, true]} />
-      </mesh>
+      {/* pyramid tent roof. A four-sided cone has its corners on the axes, so it is turned 45° first
+          and only then squashed to the box's proportions (outer group): scaling the turned cone
+          itself gave a skewed rhombus that overhung one side and left the lip bare on the other.
+          The eaves overhang the cardboard lip by about half a centimetre all round. */}
+      <group position={[0, h + 0.6 + ROOF_H / 2, 0]} scale={[1, 1, d / w]}>
+        <mesh rotation={[0, Math.PI / 4, 0]} castShadow material={roofStripes}>
+          <coneGeometry args={[(w / 2 + 0.8) * Math.SQRT2, ROOF_H, 4, 1, true]} />
+        </mesh>
+      </group>
       {/* bottle cap finial + flag */}
-      <mesh position={[0, h + 7.1, 0]} castShadow material={paintMat(PALETTE.honey, 0.3, 0.8)}>
+      <mesh position={[0, h + 0.6 + ROOF_H + 0.1, 0]} castShadow material={paintMat(PALETTE.honey, 0.3, 0.8)}>
         <cylinderGeometry args={[1.2, 1.2, 0.6, 21]} />
       </mesh>
       <mesh position={[0, h + 9, 0]} material={woodMat(PALETTE.woodDark)}>
@@ -224,15 +230,23 @@ export function Workshop() {
     <group position={[WORKSHOP.x, 0, WORKSHOP.z]} rotation={[0, WORKSHOP.rot, 0]}>
       <RoundedBox args={[w, h, d]} radius={0.5} smoothness={2} position={[0, h / 2, 0]} castShadow receiveShadow material={woodMat('#C98E57')} ref={camBlock} />
       {/* open lid propped at the back */}
+      {/* hinged on the box's top back edge: the lid's inner face sits on the hinge line (centred on
+          it, half the lid used to sink into the box) */}
       <group position={[0, h, -d / 2]} rotation={[-0.35, 0, 0]}>
-        <RoundedBox args={[w, 0.8, d]} radius={0.35} smoothness={2} position={[0, d / 2, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow material={woodMat('#B87D48')} />
+        <RoundedBox args={[w, 0.8, d]} radius={0.35} smoothness={2} position={[0, d / 2, -0.4]} rotation={[Math.PI / 2, 0, 0]} castShadow material={woodMat('#B87D48')} />
+        {/* brass hinges */}
+        {[-1, 1].map((sx) => (
+          <mesh key={sx} position={[sx * (w / 2 - 2.2), 0.1, -0.2]} rotation={[0, 0, Math.PI / 2]} material={paintMat(PALETTE.brass, 0.35, 0.7)}>
+            <cylinderGeometry args={[0.28, 0.28, 1.6, 10]} />
+          </mesh>
+        ))}
       </group>
       {/* brass clasp */}
       <mesh position={[0, h - 1, d / 2 + 0.05]} material={paintMat(PALETTE.brass, 0.3, 0.85)}>
         <boxGeometry args={[1.6, 1.2, 0.2]} />
       </mesh>
-      {/* gear sign */}
-      <group position={[-w / 2 + 3, h * 0.55, d / 2 + 0.15]}>
+      {/* gear sign, flat on the front wall (turned upright: it used to stick out like a shelf) */}
+      <group position={[-w / 2 + 3, h * 0.55, d / 2 + 0.2]} rotation={[Math.PI / 2, 0, 0]}>
         <mesh material={paintMat(PALETTE.coral, 0.5)}>
           <cylinderGeometry args={[1.5, 1.5, 0.3, 12]} />
         </mesh>
@@ -277,6 +291,10 @@ export function Workshop() {
 }
 
 // ---------------- Odds & Ends shop: a matchbox on its side with the drawer pulled out ----------------
+/** Awning: length of the striped sheet and its slope below horizontal (radians). */
+const AWNING = { len: 4.4, slope: 0.42, strutY: 4.4, edgeY: 0, edgeZ: 0 };
+AWNING.edgeY = SHOP.h - 0.4 - AWNING.len * Math.sin(AWNING.slope); // front edge height
+AWNING.edgeZ = AWNING.len * Math.cos(AWNING.slope); // front edge, out from the wall
 export function Shop() {
   const awning = useMemo(() => {
     const t = stripeTexture(PALETTE.coral, PALETTE.cream, 8).clone();
@@ -313,11 +331,28 @@ export function Shop() {
           </mesh>
         ))}
       </group>
-      {/* awning: a camera blocker too. As a thin double-sided sheet the camera could pass through
-          it while turning near the shop, flashing the stripes across the whole view. */}
-      <mesh position={[0, h - 0.6, d / 2 + 2]} rotation={[0.5, 0, 0]} castShadow material={awning} ref={camBlock}>
-        <planeGeometry args={[w + 0.6, 4.4]} />
+      {/* awning: fixed along the top of the front wall, sloping down and out over the counter
+          (it used to float a centimetre off the wall and tip the wrong way, high edge outermost).
+          A camera blocker too: as a thin double-sided sheet the camera could pass through it while
+          turning near the shop, flashing the stripes across the whole view. */}
+      <mesh
+        position={[0, h - 0.4 - (AWNING.len / 2) * Math.sin(AWNING.slope), d / 2 + 0.06 + (AWNING.len / 2) * Math.cos(AWNING.slope)]}
+        rotation={[AWNING.slope - Math.PI / 2, 0, 0]}
+        castShadow
+        material={awning}
+        ref={camBlock}
+      >
+        <planeGeometry args={[w + 0.6, AWNING.len]} />
       </mesh>
+      {/* the rail it hangs from, and two struts holding up its front edge */}
+      <mesh position={[0, h - 0.4, d / 2 + 0.15]} rotation={[0, 0, Math.PI / 2]} material={paintMat(PALETTE.brass, 0.35, 0.7)}>
+        <cylinderGeometry args={[0.18, 0.18, w + 0.8, 8]} />
+      </mesh>
+      {[-1, 1].map((sx) => (
+        <mesh key={sx} position={[sx * (w / 2 - 0.3), (AWNING.strutY + AWNING.edgeY) / 2, d / 2 + AWNING.edgeZ / 2]} rotation={[Math.atan2(AWNING.edgeZ, AWNING.edgeY - AWNING.strutY), 0, 0]} material={woodMat(PALETTE.woodDark)}>
+          <cylinderGeometry args={[0.1, 0.1, Math.hypot(AWNING.edgeZ, AWNING.edgeY - AWNING.strutY), 6]} />
+        </mesh>
+      ))}
     </group>
   );
 }

@@ -7,6 +7,7 @@ import { RateLimiter, isOriginAllowed, parseAllowedOrigins } from '../../server/
 import { seededRng } from '../../src/minigames/rng';
 import { HUB_MAX_SPEED, HUB_MAX_Y, HUB_SPAWN } from '../../src/game/hubMotion';
 import { PLAY_BOUNDS } from '../../src/game/collision';
+import { BRIDGE_X, GATES_WALK, isWalkable } from '../../src/game/hubBounds';
 import {
   PRIVATE_ROOM_CAP,
   PRIVATE_ROOM_IDLE_MS,
@@ -417,6 +418,33 @@ describe('movement validation', () => {
     expect(Math.hypot(p.x - -40, p.z - -30)).toBeGreaterThan(20);
   });
 
+  it('accepts walking over the domino bridge onto the gates table, and nowhere in the gap beside it', () => {
+    const { room, send, advance, start } = joined();
+    // spawn → the foot of the bridge → over it → onto the gates table, at walking speed
+    const route: [number, number][] = [[start.x, start.z], [BRIDGE_X, -30], [BRIDGE_X, -120], [60, -125]];
+    let p = { x: start.x, z: start.z };
+    for (let leg = 1; leg < route.length; leg++) {
+      const [tx, tz] = route[leg];
+      for (;;) {
+        const d = Math.hypot(tx - p.x, tz - p.z);
+        const k = Math.min(1, (9 * 0.066) / d);
+        p = { x: p.x + (tx - p.x) * k, z: p.z + (tz - p.z) * k };
+        advance(66);
+        send('a', move(p.x, p.z, { y: p.z < -42 && p.z > -104 ? 1.5 : 0 }));
+        if (k === 1) break;
+      }
+    }
+    const me = room.playerOf('a')!;
+    expect(me.clamped).toBe(0);
+    expect(me.x).toBeCloseTo(60, 5);
+    expect(me.z).toBeCloseTo(-125, 5);
+    // a position in the gap off the side of the bridge is pulled back onto walkable ground
+    advance(5000);
+    send('a', move(me.x, -73));
+    const q = room.playerOf('a')!;
+    expect(isWalkable(q.x, q.z, 0.84)).toBe(true); // positions are rounded to 0.01 cm
+  });
+
   it('keeps players inside the hub bounds and the height limit', () => {
     const { room, send, advance } = joined();
     for (let i = 0; i < 400; i++) {
@@ -424,8 +452,10 @@ describe('movement validation', () => {
       send('a', move(500, 500, { y: 900 }));
     }
     const p = room.playerOf('a')!;
-    expect(p.x).toBeLessThanOrEqual(PLAY_BOUNDS.maxX);
+    // the walkable hub is the two play mats and the bridge: the far corner of the gates table is as far as it goes
+    expect(p.x).toBeLessThanOrEqual(Math.max(PLAY_BOUNDS.maxX, GATES_WALK.maxX));
     expect(p.z).toBeLessThanOrEqual(PLAY_BOUNDS.maxZ);
+    expect(isWalkable(p.x, p.z, 0.84), JSON.stringify([p.x, p.z])).toBe(true); // positions are rounded to 0.01 cm
     expect(p.y).toBeLessThanOrEqual(HUB_MAX_Y);
     send('a', move(0, 0, { y: -50 }));
     expect(room.playerOf('a')!.y).toBe(0);

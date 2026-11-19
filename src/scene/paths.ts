@@ -1,12 +1,32 @@
 /**
- * The hub's streets, as data: wooden tile paths (spokes from the fountain, the Trials Ring road
- * past the outer gates) and the domino fence around the playmat. Pure maths, no rendering, so the
- * layout can be unit tested.
+ * The hub's streets, as data: wooden tile paths (spokes from the fountain plaza, the road to the
+ * domino bridge, and on the gates table the loop road past every gate) and the domino fences
+ * round both play mats. Pure maths, no rendering, so the layout can be unit tested.
  */
-import { PLAY_BOUNDS, overlaps, type Collider } from '../game/collision';
+import { overlaps, type Collider } from '../game/collision';
+import { GATES_WALK, HUB_WALK, type WalkRect } from '../game/hubBounds';
 import { PALETTE } from '../game/palette';
 import type { DominoSpec } from './domino';
-import { BOOKS, FOUNTAIN, GATES, GATE_ROAD, MUG, PAVILION, SCOREBOARD, SHOP, WORKSHOP, frontOf, gateLocal, hubColliders, type HubGate } from './layout';
+import {
+  BOOKS,
+  BRIDGE,
+  BRIDGE_RAIL_X,
+  DESK,
+  FOUNTAIN,
+  GATES,
+  GATE_LOOP,
+  GATE_ROAD,
+  MUG,
+  PAVILION,
+  SCOREBOARD,
+  SHOP,
+  TV,
+  WORKSHOP,
+  frontOf,
+  gateLocal,
+  hubColliders,
+  type HubGate,
+} from './layout';
 
 /** Height step between overlapping path tiles: big enough to survive a 16-bit depth buffer on phones. */
 export const TILE_STEP = 0.05;
@@ -45,9 +65,11 @@ export function withTileHeights<T extends { x: number; z: number; rot: number }>
 
 type Pt = [number, number];
 export interface PathLine {
-  /** What the street is for (`spoke:<gate id>`, `ring`, `stub:<gate id>`, …). */
+  /** What the street is for (`spoke:<building>`, `to-bridge`, `loop`, `stub:<gate id>`, …). */
   id: string;
   pts: Pt[];
+  /** The street ends at a building's doorstep (its last centimetre may touch the building). */
+  toBuilding?: boolean;
 }
 
 const RING_R = 8;
@@ -62,56 +84,60 @@ const roadPoint = (g: HubGate): Pt => {
 };
 const gate = (id: string) => GATES.find((g) => g.game === id)!;
 
+/** Where the road to the bridge bends, between the Scoreboard and the Pavilion. */
+export const BRIDGE_ROAD_BEND: Pt = [19, -20];
+
 /**
  * Every street in the hub.
- *  - the approach from spawn and the avenue to the Pavilion;
- *  - spokes from the plaza to the Workshop, Shop, Scoreboard and to the gates that have a clear
- *    line of sight from the fountain;
- *  - the Trials Ring: a road around the west, north and east of the village passing in front of
- *    every outer gate (Blink Duel stands inside the ring at the end of its own street), with a
- *    short stub up to each arch.
+ * Spawn table: the approach from spawn; the avenue to the Scoreboard; spokes to the Pavilion,
+ * Workshop, shop and TV; and the road from the plaza past the Scoreboard to the bridge.
+ * Gates table: from the bridge landing onto the loop road, which passes in front of every gate
+ * (south lane, the two ends, north lane), the avenue straight on to Copycat, and a short stub up
+ * to each arch.
  */
 export function hubPathLines(): PathLine[] {
-  const lines: PathLine[] = [
-    { id: 'approach', pts: [[0, 30], [0, FOUNTAIN.z + RING_R]] },
-    { id: 'avenue', pts: [[0, FOUNTAIN.z - RING_R], [0, PAVILION.z + PAVILION.d / 2 + 0.5]] },
-  ];
   const toFront = (x: number, z: number, rot: number, d: number): Pt => {
     const p = frontOf(x, z, rot, d);
     return [p.x, p.z];
   };
+  const lines: PathLine[] = [
+    { id: 'approach', pts: [[0, 30], [0, FOUNTAIN.z + RING_R]] },
+    { id: 'avenue', pts: [[0, FOUNTAIN.z - RING_R], toFront(SCOREBOARD.x, SCOREBOARD.z, SCOREBOARD.rot, 2.5)], toBuilding: true },
+  ];
   const dests: [string, Pt][] = [
+    ['pavilion', toFront(PAVILION.x, PAVILION.z, PAVILION.rot, PAVILION.d / 2 + 0.8)],
     ['workshop', toFront(WORKSHOP.x, WORKSHOP.z, WORKSHOP.rot, WORKSHOP.d / 2 + 1.5)],
     ['shop', toFront(SHOP.x, SHOP.z, SHOP.rot, SHOP.d / 2 + 6)],
-    ['scoreboard', toFront(SCOREBOARD.x, SCOREBOARD.z, SCOREBOARD.rot, 2.5)],
+    ['tv', toFront(TV.x, TV.z, TV.rot, TV.d / 2 + 2)],
   ];
-  for (const [id, d] of dests) lines.push({ id: `spoke:${id}`, pts: [plazaEdge(d[0], d[1]), d] });
-  for (const g of GATES) {
-    const road = roadPoint(g);
-    if (g.spoke) lines.push({ id: `spoke:${g.id}`, pts: [plazaEdge(road[0], road[1]), road] });
-    const mat = gateLocal(g, 0, 1.5);
-    lines.push({ id: `stub:${g.id}`, pts: [road, [mat.x, mat.z]] });
-  }
-  // The ring road, south-west round to south-east. The Jack gate sits in the north-west corner at
-  // the end of its own street; the road cuts the corner past the suspicious box instead.
-  const jr = roadPoint(gate('jack-in-the-box'));
-  const jd = Math.hypot(FOUNTAIN.x - jr[0], FOUNTAIN.z - jr[1]);
-  const jackCorner: Pt = [jr[0] + ((FOUNTAIN.x - jr[0]) / jd) * GATE_ROAD, jr[1] + ((FOUNTAIN.z - jr[1]) / jd) * GATE_ROAD];
-  const ring: Pt[] = [
-    roadPoint(gate('spellbox-showdown')),
+  for (const [id, d] of dests) lines.push({ id: `spoke:${id}`, pts: [plazaEdge(d[0], d[1]), d], toBuilding: true });
+  // to the bridge: past the Scoreboard's east end, then north to the foot of the ramp
+  lines.push({ id: 'to-bridge', pts: [plazaEdge(...BRIDGE_ROAD_BEND), BRIDGE_ROAD_BEND, [BRIDGE.x, BRIDGE.deckA + BRIDGE.ramp + 0.6]] });
+
+  // gates table
+  const landing: Pt = [BRIDGE.x, GATE_LOOP.south];
+  lines.push({ id: 'landing', pts: [[BRIDGE.x, BRIDGE.deckB - BRIDGE.ramp - 0.6], landing] });
+  lines.push({ id: 'avenue-gates', pts: [landing, [BRIDGE.x, GATE_LOOP.north]] });
+  const loop: Pt[] = [
+    landing,
+    roadPoint(gate('midnight-hunger')),
     roadPoint(gate('find-the-original')),
     roadPoint(gate('inferno-escape')),
-    [-35, -15.5],
-    jackCorner,
     roadPoint(gate('toy-squad')),
-    roadPoint(gate('midnight-hunger')),
+    roadPoint(gate('jack-in-the-box')),
     roadPoint(gate('copycat-conductor')),
     roadPoint(gate('music-box-rhythm')),
     roadPoint(gate('wind-up-dash')),
-    [38.5, 7], // behind the Scoreboard's braces
+    roadPoint(gate('spellbox-showdown')),
     roadPoint(gate('red-light-green-light')),
+    roadPoint(gate('blink-duel')),
+    landing,
   ];
-  lines.push({ id: 'ring', pts: ring });
+  lines.push({ id: 'loop', pts: loop });
+  for (const g of GATES) {
+    const mat = gateLocal(g, 0, 1.5);
+    lines.push({ id: `stub:${g.id}`, pts: [roadPoint(g), [mat.x, mat.z]] });
+  }
   return lines;
 }
 
@@ -149,8 +175,8 @@ export function hubPathTiles(): (PathTile & { y: number; level: number })[] {
     const a = (i / ringN) * Math.PI * 2;
     ringTiles.push({ x: FOUNTAIN.x + Math.cos(a) * 7, z: FOUNTAIN.z + Math.sin(a) * 7, rot: -a, c: colors[i % 3] });
   }
-  // Tiles never sit under something solid (a tree peg, a block, a gate pillar).
-  const solids = hubColliders().filter((c) => c.top > 0.5);
+  // Tiles never sit under something solid (a tree peg, a block, a gate pillar, the bridge ramp).
+  const solids = hubColliders().filter((c) => c.top > 0.5 || c.id === 'bridge-ramp');
   const clear = (t: PathTile) => !solids.some((c) => overlaps(c, t.x, t.z, TILE_HALF * 0.9));
   // Drop any path tile that would land on top of one already placed (e.g. where a spoke
   // meets the ring) — coplanar overlapping tops are what caused the flickering.
@@ -161,34 +187,43 @@ export function hubPathTiles(): (PathTile & { y: number; level: number })[] {
   return withTileHeights(kept);
 }
 
-/** Does a fence domino at (x, z) collide with one of the big household objects on the table edge? */
-function fenceBlocked(x: number, z: number) {
-  const big: Collider[] = [
+/** Things on the table margins the fences part round (fence dominoes are ~1.6 cm from their centre). */
+function fenceObstacles(): Collider[] {
+  const d = DESK;
+  return [
     { kind: 'box', x: BOOKS.x, z: BOOKS.z, hx: BOOKS.hx, hz: BOOKS.hz, rot: 0, top: BOOKS.top },
     { kind: 'circle', x: MUG.x, z: MUG.z, r: MUG.r, top: MUG.top },
     { kind: 'circle', x: MUG.x + MUG.handleX, z: MUG.z, r: MUG.handleR, top: MUG.top },
+    { kind: 'circle', x: d.lampBase.x, z: d.lampBase.z, r: d.lampBase.r, top: 3 },
+    { kind: 'circle', x: d.pencilPot.x, z: d.pencilPot.z, r: d.pencilPot.r, top: 10 },
+    { kind: 'circle', x: d.cactus.x, z: d.cactus.z, r: d.cactus.r, top: 10 },
+    { kind: 'circle', x: d.notes.x, z: d.notes.z, r: d.notes.r, top: 1 },
+    // the bridge: rails, ramps and deck
+    { kind: 'box', x: BRIDGE.x, z: BRIDGE.rail.z, hx: BRIDGE_RAIL_X + 0.4, hz: BRIDGE.rail.len / 2, rot: 0, top: 4 },
   ];
-  return big.some((c) => overlaps(c, x, z, 1.6));
 }
+const fenceBlocked = (x: number, z: number) => fenceObstacles().some((c) => overlaps(c, x, z, 1.6));
 
-/** The domino fence round the playmat. A few have toppled; it parts for the books and the mug. */
-export function hubFence(): DominoSpec[] {
-  const b = PLAY_BOUNDS;
-  const out: DominoSpec[] = [];
-  let k = 0;
+/** A domino fence round one play mat, 3.2 cm outside it. `fallen(x)` topples some on its south edge. */
+function fenceAround(b: WalkRect, fallen: (x: number) => boolean, out: DominoSpec[], seed: number) {
+  let k = seed;
   const jitter = () => ((k++ * 7919) % 11) / 11 - 0.5;
   const push = (d: DominoSpec) => {
     if (!fenceBlocked(d.x, d.z)) out.push(d);
   };
-  // front edge (the precipice side) — a few have toppled
-  for (let x = b.minX - 2; x <= b.maxX + 2; x += 3.1) {
-    const fallen = Math.abs(x - 12) < 4 || Math.abs(x + 30) < 2;
-    push({ x, z: b.maxZ + 3.2, rot: jitter() * 0.15, tilt: fallen ? Math.PI / 2 : 0 });
-  }
+  // south edge (the precipice side on the spawn table)
+  for (let x = b.minX - 2; x <= b.maxX + 2; x += 3.1) push({ x, z: b.maxZ + 3.2, rot: jitter() * 0.15, tilt: fallen(x) ? Math.PI / 2 : 0 });
   for (let z = b.minZ; z <= b.maxZ; z += 3.1) {
     push({ x: b.minX - 3.2, z, rot: Math.PI / 2 + jitter() * 0.15 });
     push({ x: b.maxX + 3.2, z, rot: Math.PI / 2 + jitter() * 0.15 });
   }
   for (let x = b.minX; x <= b.maxX; x += 3.1) push({ x, z: b.minZ - 3.2, rot: jitter() * 0.15 });
+}
+
+/** The domino fences round both play mats. A few have toppled; they part for the bridge and the big objects. */
+export function hubFence(): DominoSpec[] {
+  const out: DominoSpec[] = [];
+  fenceAround(HUB_WALK, (x) => Math.abs(x - 12) < 4 || Math.abs(x + 30) < 2, out, 0);
+  fenceAround(GATES_WALK, (x) => Math.abs(x - 80) < 2, out, 3);
   return out;
 }

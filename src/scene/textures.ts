@@ -3,6 +3,7 @@
  * Small (256–512 px), tileable, and cached — zero network cost, consistent toy look.
  */
 import * as THREE from 'three';
+import { PALETTE } from '../game/palette';
 
 const cache = new Map<string, THREE.Texture>();
 
@@ -557,6 +558,39 @@ export function roomAtlasTexture() {
     const t = new THREE.CanvasTexture(c);
     t.colorSpace = THREE.SRGBColorSpace;
     t.anisotropy = 4;
+    return t;
+  });
+}
+
+/**
+ * Wooden ruler face with centimetre ticks and numbers, `cm` long (the canvas maps onto the whole
+ * face, 0 at the left). Used for the 30 cm ruler on the gates table and the bridge's rails.
+ */
+export function rulerTexture(cm = 30) {
+  return memo(`ruler:${cm}`, () => {
+    const pxPerCm = cm > 40 ? 32 : 33;
+    const c = document.createElement('canvas');
+    c.width = Math.min(2048, Math.round((cm + 1) * pxPerCm));
+    c.height = 96;
+    const k = c.width / (cm + 1); // px per cm (half a centimetre of blank wood at each end)
+    const g = c.getContext('2d')!;
+    g.fillStyle = '#E9CF9A';
+    g.fillRect(0, 0, c.width, 96);
+    g.fillStyle = 'rgba(120,80,40,0.10)';
+    for (let i = 0; i < 40; i++) g.fillRect(0, (i * 37) % 96, c.width, 1);
+    g.fillStyle = PALETTE.ink;
+    g.font = `700 ${cm > 40 ? 19 : 26}px Nunito, "Trebuchet MS", sans-serif`;
+    g.textAlign = 'center';
+    const step = cm > 40 ? 5 : 1; // millimetre ticks would alias on the long rails: half-centimetres instead
+    for (let i = 0; i <= cm * 10; i += step) {
+      const x = k * 0.5 + (i / 10) * k;
+      const major = i % 10 === 0;
+      g.fillRect(x - (major ? 1.5 : 0.75), 0, major ? 3 : 1.5, major ? 34 : i % 5 === 0 ? 24 : 14);
+      if (major && i > 0 && i < cm * 10) g.fillText(String(i / 10), x, 66);
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = 8;
     return t;
   });
 }

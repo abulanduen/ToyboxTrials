@@ -141,7 +141,7 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
   check('back to the Playroom with touch controls', await page.isVisible('.touch-stick-zone'));
 
   // Tapping the prompt pill also interacts (workshop building → Workshop screen)
-  await page.evaluate(() => window.__toybox.teleport(-24.0, -2.6, 0.3 + Math.PI));
+  await page.evaluate(() => window.__toybox.hub.goTo('workshop'));
   await page.waitForTimeout(2500);
   await page.tap('.prompt--touch');
   await page.waitForTimeout(1800);

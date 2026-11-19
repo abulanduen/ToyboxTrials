@@ -5,7 +5,7 @@
 import { useMemo } from 'react';
 import * as THREE from 'three';
 import { Instance, Instances } from '@react-three/drei';
-import { RoundedBox } from './RoundedBox';
+import { RoundedBox, roundedBoxGeometry } from './RoundedBox';
 import { PALETTE } from '../game/palette';
 import { woodTexture, feltTexture } from './textures';
 import { dominoGeometry, dominoRestY, type DominoSpec } from './domino';
@@ -120,6 +120,58 @@ export function FeltTree({ x, z, s = 1 }: { x: number; z: number; s?: number }) 
       <mesh position={[0, 8.2, 0]} castShadow material={paintMat(PALETTE.honey, 0.4)}>
         <sphereGeometry args={[0.35, 10, 8]} />
       </mesh>
+    </group>
+  );
+}
+
+/**
+ * Every felt tree of a list in six instanced draws (one per part) instead of six meshes per tree.
+ * Same look as FeltTree.
+ */
+export function FeltTrees({ trees }: { trees: [number, number, number][] }) {
+  const parts = useMemo(
+    () => [
+      { geo: new THREE.CylinderGeometry(1.1, 1.25, 0.5, 14), mat: woodMat(PALETTE.woodMid), y: 0.25 },
+      { geo: new THREE.CylinderGeometry(0.35, 0.4, 2, 8), mat: woodMat(PALETTE.woodDark), y: 1.4 },
+      ...[0, 1, 2].map((i) => ({ geo: new THREE.ConeGeometry(2.3 - i * 0.55, 2.8, 9), mat: feltMat(i % 2 ? PALETTE.sage : PALETTE.feltDark), y: 3.2 + i * 1.7 })),
+      { geo: new THREE.SphereGeometry(0.35, 10, 8), mat: paintMat(PALETTE.honey, 0.4), y: 8.2 },
+    ],
+    [],
+  );
+  return (
+    <group>
+      {parts.map((p, k) => (
+        <Instances key={k} limit={trees.length} geometry={p.geo} material={p.mat} castShadow receiveShadow={k < 5}>
+          {trees.map(([x, z, s], i) => (
+            <Instance key={i} position={[x, p.y * s, z]} scale={s} />
+          ))}
+        </Instances>
+      ))}
+    </group>
+  );
+}
+
+/** Many painted blocks (as Block) in two instanced draws: the bevelled cubes and their emblems. */
+export function Blocks({ items }: { items: { x: number; y?: number; z: number; rot?: number; color: string; size: number }[] }) {
+  const cube = useMemo(() => roundedBoxGeometry(1, 1, 1, 0.08, 2), []);
+  const emblem = useMemo(() => new THREE.CircleGeometry(0.28, 5), []);
+  const white = woodMat('#ffffff');
+  return (
+    <group>
+      <Instances limit={items.length} geometry={cube} material={white} castShadow receiveShadow>
+        {items.map((b, i) => (
+          <Instance key={i} position={[b.x, (b.y ?? 0) + b.size / 2, b.z]} rotation={[0, b.rot ?? 0, 0]} scale={b.size} color={b.color} />
+        ))}
+      </Instances>
+      <Instances limit={items.length * 4} geometry={emblem} material={paintMat(PALETTE.cream, 0.6)}>
+        {items.flatMap((b, i) =>
+          [0, Math.PI / 2, Math.PI, -Math.PI / 2].map((r) => {
+            const a = (b.rot ?? 0) + r;
+            const d = b.size / 2 + 0.01;
+            return <Instance key={`${i}-${r}`} position={[b.x + Math.sin(a) * d, (b.y ?? 0) + b.size / 2, b.z + Math.cos(a) * d]} rotation={[0, a, 0]} scale={b.size} />;
+          }),
+        )}
+      </Instances>
     </group>
   );
 }

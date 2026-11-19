@@ -21,6 +21,8 @@ export type GameEvents = {
   'prop:musicbox-play': void;
   'prop:key-collected': void;
   'gate:open': { id: string };
+  /** The hub TV beside the Scoreboard changes channel. */
+  'tv:next': void;
   /** Workshop asks the turntable to show the front (paint/hats) or back (wind-up key). */
   'workshop:view': { back: boolean };
 };

@@ -9,7 +9,7 @@ import { useGame } from './store';
 import { PALETTE } from './palette';
 import { rewardForSecret } from './cosmetics';
 import { openPractice } from '../minigames/session';
-import { GATES, GATE_STAND, JACK, MUSICBOX, PAVILION, SCOREBOARD, SHOP, TOWER, WORKSHOP, frontOf } from '../scene/layout';
+import { GATES, GATE_STAND, JACK, MUSICBOX, PAVILION, SCOREBOARD, SHOP, TOWER, TV, WORKSHOP, frontOf } from '../scene/layout';
 
 export interface Interactable {
   id: string;
@@ -34,10 +34,11 @@ export const keyAvailable = () => performance.now() > keyCooldownUntil;
 export const INTERACTABLES: Interactable[] = [
   // one gate per playable trial: E / Interact opens that trial's lobby (the practice intro card)
   ...GATES.map((g) => ({ id: g.id, ...frontOf(g.x, g.z, g.rot, GATE_STAND), radius: 4.5, verb: 'Play', label: g.title })),
-  { id: 'pavilion', ...frontOf(PAVILION.x, PAVILION.z, 0, PAVILION.d / 2 + 3), radius: 4.5, verb: 'Enter', label: 'the Tournament Pavilion' },
+  { id: 'pavilion', ...frontOf(PAVILION.x, PAVILION.z, PAVILION.rot, PAVILION.d / 2 + 3), radius: 4.5, verb: 'Enter', label: 'the Tournament Pavilion' },
   { id: 'workshop', ...frontOf(WORKSHOP.x, WORKSHOP.z, WORKSHOP.rot, WORKSHOP.d / 2 + 2.5), radius: 5, verb: 'Tinker at', label: 'the Workshop' },
   { id: 'shop', ...frontOf(SHOP.x, SHOP.z, SHOP.rot, SHOP.d / 2 + 6), radius: 5, verb: 'Browse', label: 'Odds & Ends Shop' },
   { id: 'scoreboard', ...frontOf(SCOREBOARD.x, SCOREBOARD.z, SCOREBOARD.rot, 3.5), radius: 5, verb: 'Read', label: 'the Scoreboard' },
+  { id: 'tv', ...frontOf(TV.x, TV.z, TV.rot, TV.d / 2 + 2.6), radius: 3.2, verb: 'Change channel on', label: 'the TV' },
   // hidden
   { id: 'musicbox', x: MUSICBOX.x, z: MUSICBOX.z + 3, radius: 3.4, verb: 'Crank', label: 'a forgotten music box', secret: true },
   { id: 'marble', x: -9, z: -6, radius: 3.6, verb: 'Push', label: 'the giant marble', secret: true },
@@ -96,6 +97,10 @@ export function interact(id: string, facing: { x: number; z: number }) {
         body: 'Thimble helmets, bottle-cap crowns and button badges will be sold here once cosmetics are unlocked.',
         accent: PALETTE.sage,
       });
+      break;
+    case 'tv':
+      sfx.click();
+      events.emit('tv:next');
       break;
     case 'scoreboard':
       sfx.click();

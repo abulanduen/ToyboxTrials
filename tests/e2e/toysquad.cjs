@@ -62,7 +62,7 @@ const out = path.join(__dirname,'output'); fs.mkdirSync(out,{recursive:true});
       const FITS={cards:5,shop:true,dock:true,page:true,inside:true,big:true};
       const size56 = async id => {const r=await page.getByTestId(id).boundingBox(); assert.ok(r.width>=56&&r.height>=56,`${id} is at least 56 px: ${r.width}x${r.height}`);};
       await page.goto((process.env.BASE_URL||'http://localhost:4173/')+'?debug#play');
-      await page.waitForSelector('.loading',{state:'detached'}); await page.evaluate(()=>window.__toybox.teleport(0,-12.6,Math.PI));
+      await page.waitForSelector('.loading',{state:'detached'}); await page.evaluate(()=>window.__toybox.hub.goTo('pavilion'));
       await page.waitForSelector('.prompt'); if(mobile) await page.locator('.prompt').tap(); else await page.keyboard.press('KeyE');
       await click('practice-toy-squad');
       // Lazy module load + 0.7 s tap guard on match buttons; then fast-forward the countdown (slow software GL).

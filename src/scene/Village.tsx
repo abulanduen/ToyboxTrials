@@ -5,15 +5,19 @@ import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { Instance, Instances } from '@react-three/drei';
 import { PALETTE } from '../game/palette';
-import { PLAY_BOUNDS } from '../game/collision';
+import { GATES_WALK, HUB_WALK, WALK_AREAS, type WalkRect } from '../game/hubBounds';
+import { events } from '../game/events';
+import { INTERACTABLES } from '../game/interactables';
 import { feltTexture } from './textures';
-import { Block, Bunting, Dominoes, FeltTree, woodMat } from './props';
+import { Blocks, Bunting, Dominoes, FeltTrees, woodMat } from './props';
 import { Fountain, Pavilion, Scoreboard, Shop, Workshop } from './Buildings';
+import { Bridge } from './Bridge';
+import { HubTV, TV_AERIAL_TIP } from './HubTV';
 import { Gates } from './Gates';
 import { DustMotes, Fingerpost } from './Ambience';
 import { hubFence, hubPathTiles, TILE_SIZE } from './paths';
 import { JackInTheBox, KeyTower, Marble, MusicBox, PencilLog, Train, TrainTrack } from './Interactive';
-import { BLOCKS, BLOCK_SIZE, GATES, GATE_STAND, PAVILION, TREES, WORKSHOP, frontOf, gateFor, registerHubColliders } from './layout';
+import { BLOCKS, BLOCK_SIZE, BRIDGE, GATES, GATE_STAND, PAVILION, SCOREBOARD, SHOP, TREES, TV, WORKSHOP, frontOf, gateLocal, registerHubColliders } from './layout';
 import { exposeDebug } from '../game/debug';
 
 function roundedRectShape(minX: number, minZ: number, maxX: number, maxZ: number, r: number) {
@@ -30,8 +34,8 @@ function roundedRectShape(minX: number, minZ: number, maxX: number, maxZ: number
   return s;
 }
 
-function Playmat() {
-  const b = PLAY_BOUNDS;
+/** The felt play mat on one table, with a honey-coloured border, a little larger than its walkable area. */
+function Playmat({ b }: { b: WalkRect }) {
   const geo = useMemo(() => {
     // Shape is in XY; we rotate -90° about X so shape Y becomes world -Z.
     const g = new THREE.ShapeGeometry(roundedRectShape(b.minX - 4, -(b.maxZ + 4), b.maxX + 4, -(b.minZ - 4), 9), 6);
@@ -81,10 +85,26 @@ function DominoFence() {
   return <Dominoes items={items} />;
 }
 
+/** What an interactable belongs to, so a test hook can face it (gates, buildings). */
+function facingTarget(id: string): { x: number; z: number } | null {
+  const g = GATES.find((x) => x.id === id);
+  if (g) return g;
+  const b: Record<string, { x: number; z: number }> = { pavilion: PAVILION, workshop: WORKSHOP, shop: SHOP, scoreboard: SCOREBOARD, tv: TV };
+  return b[id] ?? null;
+}
+
 export function Village() {
   useEffect(() => {
     registerHubColliders();
-    // ?debug only: where each gate is and where to stand to open its lobby (facing the arch)
+    // ?debug only (tests): where each gate is and where to stand to open its lobby (facing the
+    // arch); where to stand for any interactable; the walkable rectangles and the bridge.
+    const spot = (id: string) => {
+      const it = INTERACTABLES.find((x) => x.id === id);
+      if (!it) return null;
+      const t = facingTarget(id);
+      const yaw = t ? Math.atan2(t.x - it.x, t.z - it.z) : Math.PI;
+      return { id, x: it.x, z: it.z, yaw };
+    };
     exposeDebug({
       hub: {
         gates: () =>
@@ -92,21 +112,35 @@ export function Village() {
             const stand = frontOf(g.x, g.z, g.rot, GATE_STAND + 1.2);
             return { id: g.id, game: g.game, title: g.title, x: g.x, z: g.z, rot: g.rot, standX: stand.x, standZ: stand.z, yaw: g.rot + Math.PI };
           }),
+        spot,
+        /** Teleport in front of an interactable (e.g. 'pavilion'), facing it. */
+        goTo: (id: string) => {
+          const s = spot(id);
+          if (s) events.emit('player:teleport', { x: s.x, z: s.z, yaw: s.yaw });
+          return s;
+        },
+        walkAreas: () => WALK_AREAS.map((a) => ({ ...a })),
+        bridge: () => ({ x: BRIDGE.x, deckA: BRIDGE.deckA, deckB: BRIDGE.deckB, top: BRIDGE.top, ramp: BRIDGE.ramp, start: BRIDGE.deckA + BRIDGE.ramp + 1.5, end: BRIDGE.deckB - BRIDGE.ramp - 1.5 }),
       },
     });
   }, []);
 
-  const copycat = gateFor('copycat-conductor');
+  // bunting: from the Scoreboard's top corners to the Pavilion's front corner and the TV's aerial
+  const pav = gateLocal(PAVILION, -PAVILION.w / 2, PAVILION.d / 2);
+  const aerial = gateLocal(TV, TV_AERIAL_TIP[0], TV_AERIAL_TIP[2]);
   return (
     <group>
-      <Playmat />
+      <Playmat b={HUB_WALK} />
+      <Playmat b={GATES_WALK} />
       <Paths />
       <DominoFence />
+      <Bridge />
       <Fountain />
       <Pavilion />
       <Workshop />
       <Shop />
       <Scoreboard />
+      <HubTV />
       <Gates />
       <Fingerpost />
       <DustMotes />
@@ -117,15 +151,11 @@ export function Village() {
       <JackInTheBox />
       <KeyTower />
       <PencilLog />
-      {TREES.map(([x, z, s], i) => (
-        <FeltTree key={i} x={x} z={z} s={s} />
-      ))}
-      {BLOCKS.map((b, i) => (
-        <Block key={i} x={b.x} y={b.y} z={b.z} rot={b.rot} color={b.color} size={(b.s ?? 1) * BLOCK_SIZE} />
-      ))}
-      {/* bunting strung from the pavilion */}
-      <Bunting from={[-PAVILION.w / 2, PAVILION.h + 0.6, PAVILION.z + PAVILION.d / 2]} to={[WORKSHOP.x + 5, WORKSHOP.h + 1, WORKSHOP.z]} sag={2} count={10} />
-      {copycat && <Bunting from={[PAVILION.w / 2, PAVILION.h + 0.6, PAVILION.z + PAVILION.d / 2]} to={[copycat.x - 3, 8.6, copycat.z + 1]} sag={2.5} count={12} />}
+      {/* trees and blocks are instanced: a handful of draws for all of them */}
+      <FeltTrees trees={TREES} />
+      <Blocks items={BLOCKS.map((b) => ({ ...b, size: (b.s ?? 1) * BLOCK_SIZE }))} />
+      <Bunting from={[SCOREBOARD.x + SCOREBOARD.w / 2 - 0.4, SCOREBOARD.h + 0.2, SCOREBOARD.z]} to={[pav.x, PAVILION.h + 0.6, pav.z]} sag={2.5} count={13} />
+      <Bunting from={[SCOREBOARD.x - SCOREBOARD.w / 2 + 0.4, SCOREBOARD.h + 0.2, SCOREBOARD.z]} to={[aerial.x, TV_AERIAL_TIP[1], aerial.z]} sag={1.6} count={6} />
     </group>
   );
 }
