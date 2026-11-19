@@ -9,6 +9,7 @@ import * as THREE from 'three';
 import { PALETTE } from '../game/palette';
 import { useGame } from '../game/store';
 import { woodMat } from './props';
+import { camBlock } from '../game/player';
 import { POST_BOARD, signpostTop, signposts } from './gateDecor';
 import { LAMP_AIM, LAMP_HEAD } from './Room';
 
@@ -58,7 +59,9 @@ export function Fingerpost() {
   }, [boardGeo, plain, posts]);
   return (
     <group>
-      <primitive object={mesh} />
+      {/* Posts and boards stop the camera: without that, turning beside a signpost (the bridge ends)
+          swung the camera inside the post, filling the view with dark wood. */}
+      <primitive object={mesh} ref={camBlock} />
       {posts.map((post) => {
         const top = signpostTop(post.boards.length);
         return (
@@ -66,10 +69,10 @@ export function Fingerpost() {
             <mesh position={[0, 0.3, 0]} castShadow receiveShadow material={woodMat(PALETTE.woodMid)}>
               <cylinderGeometry args={[1.0, 1.15, 0.6, 12]} />
             </mesh>
-            <mesh position={[0, top / 2, 0]} castShadow material={woodMat(PALETTE.woodDark)}>
+            <mesh position={[0, top / 2, 0]} castShadow material={woodMat(PALETTE.woodDark)} ref={camBlock}>
               <cylinderGeometry args={[0.32, 0.36, top, 8]} />
             </mesh>
-            <mesh position={[0, top + 0.1, 0]} castShadow material={woodMat(PALETTE.coral)}>
+            <mesh position={[0, top + 0.1, 0]} castShadow material={woodMat(PALETTE.coral)} ref={camBlock}>
               <sphereGeometry args={[0.55, 12, 10]} />
             </mesh>
           </group>
