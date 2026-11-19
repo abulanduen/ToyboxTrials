@@ -527,6 +527,30 @@ export const sfx = {
     noise(t + 0.11, 0.24, 0.035, 1100, 2);
   },
 
+  // ---- Odd Page Out ----
+
+  /** A storybook page turning: a soft paper swish that rises and settles. */
+  pageTurn() {
+    const t = now();
+    noise(t, 0.09, 0.22, 1800, 0.7);
+    noise(t + 0.12, 0.07, 0.18, 2600, 0.8);
+    noise(t + 0.26, 0.05, 0.08, 900, 1.2, 'lowpass');
+  },
+  /** A difference circled: a quick crayon scribble and a bright two-note pluck. */
+  inkRing(count = 1) {
+    const t = now();
+    noise(t, 0.06, 0.06, 3800, 2);
+    const up = Math.min(count, 15) * 0.012;
+    tine(880 * (1 + up), t + 0.02, 0.1, 0.25, 4.0);
+    tine(1318.5 * (1 + up), t + 0.09, 0.09, 0.35, 4.0);
+  },
+  /** A wrong tap: a short, flat buzz. */
+  buzz() {
+    const t = now();
+    tone(110, t, 0.1, 0.22, 'sawtooth', 0.004);
+    tone(116, t, 0.07, 0.22, 'square', 0.004);
+  },
+
   // ---- Movement minigames (Red Light Green Light, Wind-Up Dash) ----
 
   /** Green light: two bright bell dings, rising. */

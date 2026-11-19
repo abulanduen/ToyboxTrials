@@ -3331,7 +3331,39 @@ canvas {
   margin: 0;
 }
 .shop-panel {
-  width: min(500px, 46vw);
+  /* Two columns: the catalogue scrolls on the left; the chosen item, Buy and Done stay put on the right. */
+  width: min(720px, 54vw);
+  height: min(680px, calc(100vh - 32px));
+  height: min(680px, calc(100dvh - 32px));
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(170px, 34%);
+  gap: 16px;
+  overflow: hidden;
+  padding: 1.6rem 1.4rem 1.2rem;
+}
+.shop-main {
+  min-height: 0;
+  overflow: auto;
+  padding: 0 4px 6px 0;
+  overscroll-behavior: contain;
+}
+.shop-side {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: auto;
+}
+.shop-side .shop-detail {
+  margin: 0;
+  align-content: start;
+}
+.shop-side .pause__actions {
+  margin-top: auto;
+  flex-wrap: wrap;
+}
+.shop-side .pause__actions .toy-btn {
+  flex: 1 1 auto;
 }
 .shop-featured {
   margin: 0 0 12px;
@@ -3501,6 +3533,56 @@ canvas {
   font-weight: 700;
 }
 
+@media (orientation: portrait) {
+  .shop-panel {
+    width: calc(100vw - 20px);
+    height: 70vh;
+    height: 70dvh;
+    max-height: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 1rem 0.9rem 0.8rem;
+  }
+  .shop-main {
+    flex: 1 1 auto;
+  }
+  /* The side column becomes a bar pinned to the bottom of the sheet: never squeezed, so Buy and
+     Done always show; the catalogue above takes what is left and scrolls. */
+  .shop-side {
+    flex: 0 0 auto;
+    overflow: visible;
+    gap: 6px;
+    padding-top: 8px;
+    border-top: 2.5px dashed rgba(110, 82, 54, 0.55);
+  }
+  .shop-side .shop-detail {
+    padding: 6px 10px 8px;
+    font-size: 0.84rem;
+  }
+  .shop-side .shop-detail__blurb {
+    display: none;
+  }
+  .workshop-panel.shop-panel .pause__actions {
+    position: static;
+    margin: 0;
+    padding: 0;
+    background: none;
+    flex-wrap: nowrap;
+  }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  .shop-panel {
+    height: calc(100vh - 16px);
+    height: calc(100dvh - 16px);
+    padding: 0.9rem 0.9rem 0.7rem;
+    gap: 10px;
+  }
+  .shop-side .shop-detail__blurb {
+    display: none;
+  }
+}
+
 /* The four equipped gestures (keys 1–4). */
 .gesture-slots {
   display: grid;
@@ -3585,10 +3667,6 @@ canvas {
 
 /* Phones: the shop panel is a bottom sheet in portrait (toy above), a right-hand column in landscape. */
 @media (orientation: portrait) {
-  .shop-panel {
-    width: calc(100vw - 20px);
-    max-height: 58vh;
-  }
   /* Five tabs in two tidy rows: three, then two. */
   .workshop-tabs {
     display: grid;
@@ -3611,7 +3689,7 @@ canvas {
 }
 @media (max-height: 500px) and (orientation: landscape) {
   .shop-panel {
-    width: min(460px, 52vw);
+    width: min(640px, 68vw);
   }
   .shop-grid {
     grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
@@ -3644,8 +3722,8 @@ canvas {
   }
 }
 @media (max-height: 500px) and (orientation: landscape) {
-  /* Keep Done reachable without scrolling the shop/Workshop column. */
-  .workshop-panel .pause__actions {
+  /* Keep Done reachable without scrolling the Workshop column (the shop has its own side column). */
+  .workshop-panel:not(.shop-panel) .pause__actions {
     position: sticky;
     bottom: -1rem;
     z-index: 1;
