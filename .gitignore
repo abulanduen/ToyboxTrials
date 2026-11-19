@@ -9,3 +9,4 @@ release
 tests/e2e/output
 .claude/worktrees
 .local-tools/
+*.tsbuildinfo
