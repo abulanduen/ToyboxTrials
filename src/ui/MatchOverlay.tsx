@@ -26,6 +26,7 @@ import { pointsForPlace, rankStandings } from '../minigames/scoring';
 import type { BotDifficulty, Contestant } from '../minigames/types';
 import { tutorialFor, type TutorialStep } from '../minigames/tutorials';
 import { CardboardSheet, KeyCap, ToyButton } from './common';
+import { TutorialPicture, preloadTutorialArt } from './TutorialPicture';
 import { GearIcon, StarSticker, WindKeyIcon } from './icons';
 import { CogIcon } from './itemIcons';
 import type { Reward } from '../game/economy';
@@ -88,6 +89,10 @@ export function MatchOverlay() {
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
   }, []);
+  // The intro card's pictures load in their own chunk: fetch it while the game itself loads.
+  useEffect(() => {
+    if (m.phase === 'loading' || m.phase === 'reveal' || m.phase === 'intro') preloadTutorialArt();
+  }, [m.phase]);
 
   const def = m.gameId ? gameById(m.gameId) : null;
   const Hud = m.module?.Hud;
@@ -166,6 +171,13 @@ function Intro({ touch }: { touch: boolean }) {
             <Tutorial steps={steps} touch={touch} accent={def.accent} onClose={() => setShowTutorial(false)} onNever={() => (useGame.getState().set({ tutorials: false }), setShowTutorial(false), setTurnedOff(true))} />
           ) : (
             <>
+              {steps && (
+                <div className="intro-art-row" data-testid="intro-art-row" aria-hidden>
+                  {steps.map((st, k) => (
+                    <TutorialPicture key={k} id={(touch && st.touchArt) || st.art} className="intro-art-row__item" testId="intro-art" />
+                  ))}
+                </div>
+              )}
               <p className="panel__lead">{def.description}</p>
               <div className="intro-controls">
                 {touch ? (
@@ -250,8 +262,13 @@ function Tutorial({ steps, touch, accent, onClose, onNever }: { steps: TutorialS
           {i + 1} / {steps.length}
         </span>
       </div>
-      <h3 className="tutorial__title">{step.title}</h3>
-      <p className="tutorial__text">{(touch && step.touch) || step.text}</p>
+      <div className="tutorial__body">
+        <TutorialPicture key={i} id={(touch && step.touchArt) || step.art} className="tutorial__art" />
+        <div className="tutorial__words">
+          <h3 className="tutorial__title">{step.title}</h3>
+          <p className="tutorial__text">{(touch && step.touch) || step.text}</p>
+        </div>
+      </div>
       <div className="tutorial__dots" aria-hidden>
         {steps.map((_, k) => (
           <span key={k} className={k === i ? 'on' : ''} />
