@@ -35,3 +35,11 @@ Use case: stylized-concept. Asset: ONE square transparent spell ability icon for
 ## button-mine
 
 Use case: stylized-concept. Asset: ONE square transparent spell ability icon for Toybox Trials. The supplied image is ONLY a style/material reference from the same icon set; create an entirely new subject, do not include its rocket. Subject: Button Mine — one chunky honey/brass coat button with four dark holes, mounted on a short coiled toy spring and a coral painted wooden base; a harmless pop-up playroom trap, bold round silhouette, no weapon realism. Match the reference's warm handcrafted painted wood, tin, felt and brass collectible-toy style, soft bevels, simple chunky proportions, crisp 3D storybook rendering, three-quarter front view and warm studio illumination. Same palette: cream #F4E8CE, honey #EFAE45, coral #E76B62, toy blue #6BA7C8, sage #89B78A, ink purple #574D69, brass #C8973A. Center one readable object, fill about 76% of square with equal transparent padding, readable at 48 px. Transparent background, no floor, no environment, no card/frame, no lettering, no watermark, no extra icons.
+
+## blink
+
+Not generated. `public/assets/ui/spellbox/blink.webp` is an original hand-authored vector drawing,
+`docs/assets/spellbox-blink-icon.svg`, rasterised to 512×512 WebP (alpha preserved) with Chromium.
+Subject: a toy-blue painted wooden spinning top with a cream riveted band, coral star and brass
+wind-up key, zipping in on cream speed puffs and landing in a honey/coral shockwave ring. Drawn to
+match the generated set's palette and materials; flatter shading than the generated icons.

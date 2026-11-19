@@ -130,6 +130,114 @@ export function playToyCue(cue: ToyCue, volume = 1) {
   }
 }
 
+/**
+ * Arena spell cues (Spellbox Showdown). Fuller and punchier than the soft ToyCue set, at levels
+ * comparable to Copycat's instruments and Blink Duel's spring sounds, but still rounded (low-passed
+ * noise, sine/triangle bodies, no harsh clicks). `volume` is the mix gain (0–1, the caller attenuates
+ * distant opponents); `intensity` (0–1) makes impacts heavier for bigger knockback.
+ */
+export type SpellCue =
+  | 'rocket' | 'gust' | 'marbleShot' | 'ward' | 'tether' | 'whirl' | 'mend' | 'mineSet' | 'zip'
+  | 'thump' | 'impact' | 'burst' | 'ringout' | 'charge' | 'alarm' | 'tick' | 'rumble' | 'go';
+/** Calls received by the bus (counted even while audio is locked or unavailable): a ?debug test aid. */
+export const spellCueStats = { calls: 0, audible: 0, byCue: {} as Record<string, number>, loudest: {} as Record<string, number> };
+export function playSpellCue(cue: SpellCue, volume = 1, intensity = 0.5) {
+  const k = Math.max(0, Math.min(1, volume)), i = Math.max(0, Math.min(1, intensity));
+  spellCueStats.calls++;
+  spellCueStats.byCue[cue] = (spellCueStats.byCue[cue] ?? 0) + 1;
+  spellCueStats.loudest[cue] = Math.max(spellCueStats.loudest[cue] ?? 0, k);
+  if (!live() || k < 0.01) return;
+  spellCueStats.audible++;
+  const t = now();
+  switch (cue) {
+    case 'rocket': // pop and a rising whoosh
+      tone(900, t, 0.1 * k, 0.04, 'sine', 0.002, 320);
+      tone(170, t, 0.17 * k, 0.15, 'triangle', 0.004, 560);
+      noise(t, 0.2 * k, 0.11, 1500, 0.7, 'lowpass');
+      break;
+    case 'gust': // spring boing pushing a broad puff of air
+      tone(210, t, 0.15 * k, 0.17, 'triangle', 0.004, 470);
+      noise(t, 0.22 * k, 0.19, 1150, 0.6, 'lowpass');
+      break;
+    case 'marbleShot': // glassy clink, then the marble rolling away
+      tone(1180, t, 0.12 * k, 0.12, 'sine', 0.002);
+      tone(2950, t, 0.05 * k, 0.05, 'sine', 0.001);
+      tone(320, t + 0.02, 0.12 * k, 0.12, 'triangle', 0.004, 210);
+      noise(t, 0.1 * k, 0.05, 1300, 0.7, 'lowpass');
+      break;
+    case 'ward': // a bubble blooming open with a soft shimmer
+      tone(320, t, 0.17 * k, 0.2, 'sine', 0.01, 780);
+      tone(660, t + 0.03, 0.07 * k, 0.22, 'sine', 0.01, 1500);
+      break;
+    case 'tether': // ribbon whip
+      noise(t, 0.16 * k, 0.08, 2200, 1, 'bandpass');
+      tone(720, t, 0.11 * k, 0.13, 'triangle', 0.003, 250);
+      break;
+    case 'whirl': // big pinwheel whoosh with a low body
+      noise(t, 0.26 * k, 0.32, 900, 0.6, 'lowpass');
+      tone(150, t, 0.2 * k, 0.26, 'sine', 0.006, 85);
+      noise(t + 0.08, 0.12 * k, 0.16, 1700, 0.6, 'lowpass');
+      break;
+    case 'mend': // three warm rising tines
+      tine(660, t, 0.13 * k, 0.32);
+      tine(880, t + 0.08, 0.12 * k, 0.36);
+      tine(1108.7, t + 0.16, 0.1 * k, 0.42);
+      break;
+    case 'mineSet': // a button clacked down, then a little arming tick
+      noise(t, 0.18 * k, 0.03, 1500, 1.2, 'bandpass');
+      tone(330, t, 0.14 * k, 0.07, 'triangle', 0.002, 200);
+      tone(900, t + 0.12, 0.05 * k, 0.1, 'sine', 0.003);
+      break;
+    case 'zip': // blink departure: a fast rising whistle with air
+      tone(480, t, 0.13 * k, 0.1, 'sine', 0.004, 2300);
+      noise(t, 0.12 * k, 0.07, 3000, 1.5, 'bandpass');
+      break;
+    case 'thump': // blink arrival shockwave: a deep felt thump with a dusty push
+      tone(125, t, 0.32 * k, 0.22, 'sine', 0.003, 52);
+      tone(250, t, 0.1 * k, 0.1, 'triangle', 0.002, 120);
+      noise(t, 0.26 * k, 0.13, 520, 0.7, 'lowpass');
+      break;
+    case 'impact': { // a spell connecting: heavier and lower for bigger knockback
+      const f = jitter(200 - 70 * i, 0.04);
+      tone(f, t, (0.2 + 0.12 * i) * k, 0.09 + 0.08 * i, 'sine', 0.002, f * 0.45);
+      noise(t, (0.15 + 0.11 * i) * k, 0.04 + 0.04 * i, 900 + 700 * i, 0.7, 'lowpass');
+      tone(540, t, 0.06 * k, 0.03, 'triangle', 0.001);
+      break;
+    }
+    case 'burst': // marble or mine popping
+      noise(t, 0.24 * k, 0.15, 1100, 0.7, 'lowpass');
+      tone(165, t, 0.2 * k, 0.17, 'sine', 0.003, 70);
+      break;
+    case 'ringout': // falling whistle off the edge, then a thud on the table below
+      tone(880, t, 0.17 * k, 0.45, 'triangle', 0.006, 180);
+      tone(100, t + 0.42, 0.3 * k, 0.25, 'sine', 0.003, 48);
+      noise(t + 0.42, 0.2 * k, 0.13, 700, 0.7, 'lowpass');
+      break;
+    case 'charge': // own wind-up
+      noise(t, 0.08 * k, 0.06, 1200, 0.6, 'lowpass');
+      tone(300, t, 0.05 * k, 0.08, 'sine', 0.006, 430);
+      break;
+    case 'alarm': // shrink warning: two soft two-tone calls
+      for (let n = 0; n < 2; n++) {
+        tone(660, t + n * 0.4, 0.16 * k, 0.15, 'triangle', 0.008);
+        tone(495, t + n * 0.4 + 0.2, 0.16 * k, 0.15, 'triangle', 0.008);
+      }
+      break;
+    case 'tick': // countdown tick (fight count-in, last shrink seconds)
+      noise(t, 0.2 * k, 0.03, 1800, 2, 'bandpass');
+      tone(880, t, 0.1 * k, 0.06, 'triangle', 0.002);
+      break;
+    case 'rumble': // the ring starts contracting
+      tone(72, t, 0.22 * k, 0.6, 'sine', 0.02, 45);
+      noise(t, 0.14 * k, 0.5, 320, 0.7, 'lowpass');
+      break;
+    case 'go': // fight!
+      tine(784, t, 0.14 * k, 0.3);
+      tine(1174.7, t + 0.08, 0.15 * k, 0.45);
+      break;
+  }
+}
+
 // ---------- the sound palette ----------
 
 export const sfx = {
