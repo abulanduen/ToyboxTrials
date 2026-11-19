@@ -33,7 +33,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(OUT, name), timeo
   for (let i = 0; i < 100; i++) { try { if ((await fetch(`${HTTP}/health`)).ok) break; } catch {} await sleep(100); }
   const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   const errors = [];
-  const open = async (name, ctxOpts = { viewport: { width: 1100, height: 680 } }) => {
+  const open = async (name, ctxOpts = { viewport: { width: 800, height: 500 } }) => {
     const ctx = await browser.newContext(ctxOpts);
     await ctx.addInitScript((n) => { if (!sessionStorage.getItem('s')) { sessionStorage.setItem('s', '1'); localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { quality: 'low', tutorials: false, contenderName: n }, version: 1 })); } }, name);
     const page = await ctx.newPage();
@@ -137,7 +137,8 @@ const shot = (page, name) => page.screenshot({ path: path.join(OUT, name), timeo
     await A.click('[data-testid=pick-copycat-conductor]');
     await waitLobby(B, () => window.__toybox.lobby.current()?.settings.mode === 'single' && window.__toybox.lobby.current()?.settings.game === 'copycat-conductor');
     check('B sees the host switch to one trial (Copycat Conductor)', true);
-    await A.evaluate(() => window.__toybox.lobby.timeScale(3));
+    // Half speed: Copycat's input window must outlast a slow software-rendered page's polling.
+    await A.evaluate(() => window.__toybox.lobby.timeScale(0.5));
     await A.click('[data-testid=lobby-start]');
     await Promise.all([waitPhase(A, 'playing'), waitPhase(B, 'playing')]);
     check('both clients enter the server-run match', true);
@@ -200,7 +201,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(OUT, name), timeo
     await B.ctx.close();
 
     // 7. A phone in portrait joins A's lobby, then hosts one of its own.
-    const D = await open('Dottie', { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+    const D = await open('Dottie', { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 1 });
     await D.waitForSelector('[data-testid=lobbies-button]');
     await D.tap('[data-testid=lobbies-button]');
     await D.tap(`[data-testid=lobby-join-${L.id}]`);

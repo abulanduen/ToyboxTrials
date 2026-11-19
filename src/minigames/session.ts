@@ -387,7 +387,7 @@ export function setMatchTimeScale(k: number) {
 
 exposeDebug({
   match: {
-    state: () => runtime.state,
+    state: () => getMatchState(), // the server's state during online matches
     phase: () => useMatch.getState().phase,
     timeScale: setMatchTimeScale,
     /** Open a game's practice card directly (for games without a hub entrance yet). */
