@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { pressVirtual, releaseVirtual, tapVirtual, type Action } from '../../game/input';
+import { releaseVirtual, tapVirtual, type Action } from '../../game/input';
 import { unlockAudio } from '../../game/audio';
 import { useMatch } from '../session';
 import type { MinigameSceneProps } from '../types';
@@ -7,12 +7,9 @@ import { clearSpellboxInput, queueSpellboxInput } from './local';
 import { SLOT_OPTIONS, SPELLS, spellStats } from './spells';
 import type { SpellboxState } from './rules';
 import { SpellIcon } from './SpellIcon';
+import { MoveTouch } from '../shared/MoveTouch';
 import './spellbox.css';
 const directions:Action[]=['forward','back','left','right'];
-function MoveButton({action,label}:{action:Action;label:string}){
-  useEffect(()=>()=>releaseVirtual(action),[action]);
-  return<button aria-label={label} onPointerDown={e=>{e.preventDefault();unlockAudio();e.currentTarget.setPointerCapture(e.pointerId);pressVirtual(action);}} onPointerUp={()=>releaseVirtual(action)} onPointerCancel={()=>releaseVirtual(action)} onLostPointerCapture={()=>releaseVirtual(action)} onBlur={()=>releaseVirtual(action)} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();if(!e.repeat)pressVirtual(action);}}} onKeyUp={()=>releaseVirtual(action)}>{label}</button>;
-}
 export function SpellboxHud({getState,localId,contestants}:MinigameSceneProps<SpellboxState>){
   const[,refresh]=useState(0),[slot,select]=useState(0);const paused=useMatch(s=>s.paused),hostPhase=useMatch(s=>s.phase);
   useEffect(()=>{const timer=window.setInterval(()=>refresh(n=>n+1),80);return()=>{window.clearInterval(timer);clearSpellboxInput();directions.forEach(releaseVirtual);};},[]);
@@ -45,7 +42,7 @@ export function SpellboxHud({getState,localId,contestants}:MinigameSceneProps<Sp
       </div>
     </section></div>:<>
       <div className="spellbox-roster" aria-label="Contender damage">{s.players.map(p=><span key={p.id} className={p.alive?'':'out'}>{p.id===localId?'You':contestants.find(c=>c.id===p.id)?.name} · {p.alive?`${Math.round(p.damage)}%`:'Out'}</span>)}</div>
-      {playing&&<div className="spellbox-move" aria-label="Movement"><MoveButton action="forward" label="Up"/><div><MoveButton action="left" label="Left"/><MoveButton action="back" label="Down"/><MoveButton action="right" label="Right"/></div></div>}
+      {playing&&<div className="spellbox-stick"><MoveTouch jump={false}/></div>}
       {playing&&<div className="spellbox-casts" onKeyDown={e=>{if(e.key==='Enter'||e.key===' ')e.stopPropagation();}}>{me.build.map((id,i)=>{const d=SPELLS[id],left=Math.max(0,me.cooldowns[i]-s.t);return<button key={i} data-testid={`spellbox-cast-${i}`} disabled={left>0||!!me.cast||s.t<me.stunnedUntil||s.t<me.nextAction} onClick={()=>{unlockAudio();tapVirtual((`slot${i+1}`) as Action);}} style={{borderColor:d.colour}}><SpellIcon spell={id}/><span className="spellbox-cast-copy"><strong>{['Q','E','R'][i]} · {d.name}</strong><small>{left>0?`${(left/1000).toFixed(1)}s`:'Ready'}</small></span></button>;})}</div>}
       <div className="spellbox-hint">WASD / arrows · Mouse or tap to aim · Q / E / R cast · Click casts slot Q</div>
     </>}

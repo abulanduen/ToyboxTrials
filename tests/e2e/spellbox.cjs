@@ -1,6 +1,11 @@
 /* Build selection (no host countdown before the draft), Blink, real keyboard/mouse/touch casting, damage knockback, audio cues, ring-out and host lifecycle. */
 const{chromium}=require('playwright');const assert=require('node:assert/strict');const fs=require('node:fs');const path=require('node:path');
 const out=path.join(__dirname,'output');fs.mkdirSync(out,{recursive:true});
+/** Push the touch joystick (CDP touch events) in a direction until `until(arg)` holds, then let go. */
+async function stickUntil(page,[dx,dy],until,arg){const cdp=await page.context().newCDPSession(page);const zone=await page.locator('.touch-stick-zone').boundingBox();const x=zone.x+zone.width*0.4,y=zone.y+zone.height*0.55;
+  const send=(type,pts)=>cdp.send('Input.dispatchTouchEvent',{type,touchPoints:pts.map(([px,py])=>({x:px,y:py,id:1}))});
+  await send('touchStart',[[x,y]]);await send('touchMove',[[x+dx*20,y+dy*20]]);await send('touchMove',[[x+dx*60,y+dy*60]]);
+  try{await page.waitForFunction(until,arg);}finally{await send('touchEnd',[]);await cdp.detach();}}
 (async()=>{const browser=await chromium.launch({args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 try{for(const layout of(process.env.SPELLBOX_LAYOUTS||'desktop,portrait,landscape').split(',')){
   const mobile=layout!=='desktop',viewport=layout==='portrait'?{width:390,height:844}:layout==='landscape'?{width:844,height:390}:{width:1280,height:800};
@@ -52,7 +57,7 @@ try{for(const layout of(process.env.SPELLBOX_LAYOUTS||'desktop,portrait,landscap
   await page.evaluate(()=>window.__toybox.match.timeScale(1));await page.waitForFunction(()=>window.__toybox.match.state().phase==='arena');await page.waitForSelector('[data-testid=spellbox-draft-backdrop]',{state:'detached'});
   // Keep a visible target stationary while real input adapters launch and resolve a rocket.
   await page.evaluate(()=>{const s=window.__toybox.match.state();Object.assign(s.players[0],{x:-4,z:0,vx:0,vz:0,moveX:0,moveZ:0,angle:Math.PI/2});s.players.slice(1).forEach((p,i)=>Object.assign(p,{x:i===0?4:-10,z:i===0?0:i*5-8,vx:0,vz:0,moveX:0,moveZ:0,cast:null,stunnedUntil:1e9,nextAction:1e9,cooldowns:[1e9,1e9,1e9]}));});
-  const x=(await state()).players[0].x;if(mobile)await page.getByRole('button',{name:'Right',exact:true}).tap();else await page.keyboard.press('KeyD');await page.waitForFunction(x=>window.__toybox.match.state().players[0].x>x,x);
+  const x=(await state()).players[0].x;if(mobile){assert.equal(await page.getByRole('button',{name:'Up',exact:true}).count(),0,'no direction pads');await stickUntil(page,[1,0],x=>window.__toybox.match.state().players[0].x>x,x);}else await page.keyboard.press('KeyD');await page.waitForFunction(x=>window.__toybox.match.state().players[0].x>x,x);
   await aim(11,0);await cast(0);await page.waitForFunction(()=>{const s=window.__toybox.match.state();if(s.players[1].damage>0){window.__toybox.match.timeScale(0);return true;}return false;});
   let s=await state();assert.equal(s.players[1].damage,14);assert.ok(s.players[1].vx>0);assert.equal(s.players[0].casts,1);assert.equal(await page.getByTestId('spellbox-cast-0').isDisabled(),true);
   const sizes=await page.locator('.spellbox-casts button').evaluateAll(buttons=>buttons.map(b=>b.getBoundingClientRect().height));assert.ok(sizes.every(h=>h>=56));
