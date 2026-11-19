@@ -437,7 +437,7 @@ Railway pushes a new server on every commit to the branch it watches. The client
 - Every trial runs headless on the server path with bots in the unit tests
   (`tests/unit/lobby-match.test.ts`). In real browsers, online play was exercised with Copycat
   Conductor (one trial) and Blitz tournaments whose seeds drew Find the Original, Midnight Hunger,
-  Wind-Up Dash, Music Box Rhythm, Copycat Conductor and Inferno Escape, with the players idle. The
+  Wind-Up Dash, Music Box Rhythm, Copycat Conductor, Inferno Escape and Odd Page Out, with the players idle. The
   other trials' Scenes and Huds have not been watched on server state in a browser yet, and
   nobody has played a trial online by hand.
 - No client-side prediction or position interpolation in online matches (see above); no
