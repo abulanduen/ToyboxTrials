@@ -437,7 +437,7 @@ walkers, armoured beetles, fast racers, marble swarms, flying paper gliders, and
 - **Build** pays 20 gold for a *random* tower, usually tier 1. Tier 1 has five toy lines with one
   role each: tin soldiers (single target), paper & craft (splash), clockwork (chain), rubber &
   string (slow) and plush (support aura).
-- **Two identical towers merge into a random tower one tier up**, to **tier 7** (the cap). Higher
+- **Any two towers of the same tier merge into a random tower one tier up**, to **tier 7** (the cap). Press **M** to merge an available pair without selecting a tower; the destination is automatic. Higher
   tiers add Toy Squad's status vocabulary: fury, burn, pierce, multishot, shred, stun, mark, execute.
 - **Builder levels** 1–6 shift the build odds towards tiers 2–3 and add a lucky-merge chance (a
   merge jumps two tiers, never past tier 5). The odds table is in the HUD.

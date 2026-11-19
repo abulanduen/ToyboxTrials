@@ -137,10 +137,10 @@ describe('Toy Tower Tumble rules', () => {
     expect([...seen].sort()).toEqual([...TIER_POOLS[0]].sort());
   });
 
-  it('merges two identical towers into a random next-tier tower on the target square; tier 7 is the cap', () => {
+  it('merges different same-tier towers into a random next-tier tower; rejects unequal tiers and tier 7', () => {
     const s = tumbleRules.init(field(1), 2), me = p(s), [a, b, c] = BUILDABLE;
-    put(s, me, 'tin-sentry', a); put(s, me, 'tin-sentry', b); put(s, me, 'spark-bot', c);
-    step(s, { you: [{ type: 'merge', from: a, to: c }] }); // not identical
+    put(s, me, 'tin-sentry', a); put(s, me, 'spark-bot', b); put(s, me, TIER_POOLS[1][0], c);
+    step(s, { you: [{ type: 'merge', from: a, to: c }] }); // different tiers
     expect(me.towers.length).toBe(3);
     step(s, { you: [{ type: 'merge', from: a, to: b }] });
     expect(me.towers.length).toBe(2);
@@ -155,14 +155,53 @@ describe('Toy Tower Tumble rules', () => {
     expect(results.size).toBe(TIER_POOLS[2].length);
     // Two tier 6s make a tier 7; tier 7s never merge.
     const s2 = tumbleRules.init(field(1), 3), m2 = p(s2);
-    put(s2, m2, 'rocking-regent', BUILDABLE[0]); put(s2, m2, 'rocking-regent', BUILDABLE[1]);
+    put(s2, m2, TIER_POOLS[5][0], BUILDABLE[0]); put(s2, m2, TIER_POOLS[5][1], BUILDABLE[1]);
     step(s2, { you: [{ type: 'merge', from: BUILDABLE[0], to: BUILDABLE[1] }] });
     const top = m2.towers.find((t) => t.cell === BUILDABLE[1])!;
     expect(tier(top.def)).toBe(MAX_TIER);
-    put(s2, m2, top.def, BUILDABLE[2]);
+    put(s2, m2, TIER_POOLS[6].find(def => def !== top.def)!, BUILDABLE[2]);
     step(s2, { you: [{ type: 'merge', from: BUILDABLE[2], to: BUILDABLE[1] }] });
     expect(m2.towers.length).toBe(2);
     expect(m2.towers.every((t) => tier(t.def) === MAX_TIER)).toBe(true);
+  });
+
+  it('automatically merges without a selection, preferring a selected eligible destination', () => {
+    const s = tumbleRules.init(field(1), 22), me = p(s), [a,b,c,d] = BUILDABLE.slice(0,4).sort((x,y)=>x-y);
+    put(s,me,TIER_POOLS[1][0],d); put(s,me,'spark-bot',b);
+    put(s,me,TIER_POOLS[1][1],c); put(s,me,'tin-sentry',a);
+    step(s,{you:[{type:'auto-merge'}]});
+    expect(me.towers.length).toBe(3);
+    expect(tier(me.towers.find(t=>t.cell===a)!.def)).toBe(2);
+    expect(me.towers.some(t=>t.cell===b)).toBe(false);
+    step(s,{you:[{type:'auto-merge',preferredCell:d}]});
+    expect(tier(me.towers.find(t=>t.cell===d)!.def)).toBe(3);
+    expect(me.towers.some(t=>t.cell===a)).toBe(false);
+    expect(me.towers.some(t=>t.cell===c)).toBe(true);
+  });
+
+  it('falls back from a capped selection, and a missing pair costs nothing or consumes no random roll', () => {
+    const s=tumbleRules.init(field(1),23),me=p(s),[a,b,c]=BUILDABLE.slice(0,3).sort((x,y)=>x-y);
+    put(s,me,TIER_POOLS[6][0],c);put(s,me,'tin-sentry',a);put(s,me,'spark-bot',b);
+    step(s,{you:[{type:'auto-merge',preferredCell:c}]});
+    expect(me.merges).toBe(1);expect(tier(me.towers.find(t=>t.cell===c)!.def)).toBe(7);
+    const before=JSON.stringify(me.towers),rng=me.rng,gold=me.gold;
+    step(s,{you:[{type:'auto-merge'}]});
+    expect(JSON.stringify(me.towers)).toBe(before);expect(me.rng).toBe(rng);expect(me.gold).toBe(gold);
+  });
+
+  it('resolves successive automatic merge inputs against the updated board', () => {
+    const s=tumbleRules.init(field(1),24),me=p(s);
+    TIER_POOLS[0].slice(0,4).forEach((def,i)=>put(s,me,def,BUILDABLE[i]));
+    step(s,{you:[{type:'auto-merge'},{type:'auto-merge'},{type:'auto-merge'}]});
+    expect(me.towers.length).toBe(1);expect(tier(me.towers[0].def)).toBe(3);expect(me.merges).toBe(3);
+  });
+
+  it('bots can merge different tower families of the same tier', () => {
+    const s=tumbleRules.init(field(1),25),me=p(s);me.gold=0;
+    put(s,me,'tin-sentry',BUILDABLE[0]);put(s,me,'spark-bot',BUILDABLE[1]);
+    const inputs=createTumbleBot().decide(s,who('you','easy'),STEP,()=>0.5);
+    expect(inputs[0]?.type).toBe('merge');step(s,{you:inputs});
+    expect(me.towers.length).toBe(1);expect(tier(me.towers[0].def)).toBe(2);
   });
 
   it('moves, swaps and sells towers', () => {

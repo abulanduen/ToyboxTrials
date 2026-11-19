@@ -156,7 +156,7 @@ export const BUILDER: readonly BuilderLevel[] = [
   { level: 6, cost: 280, build: [36, 42, 22], lucky: 12 },
 ];
 export const MAX_BUILDER = BUILDER.length;
-/** Lucky merges top out at tier 5: tiers 6 and 7 only ever come from two identical towers. */
+/** Lucky merges top out at tier 5: tiers 6 and 7 require a same-tier pair from the preceding tier. */
 export const LUCKY_CAP = 5;
 
 // ─────────────────────────────────────────────── enemies ───────────────────────────────────────────────

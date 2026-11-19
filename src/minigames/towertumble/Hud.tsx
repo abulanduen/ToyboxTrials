@@ -67,9 +67,9 @@ function TowerSheet({ me, cell, send }: { me: TdPlayer; cell: number; send: (i: 
     <small className="td-sheet__dealt">Dealt {Math.round(t.dealt)} damage · square {cellName(cell)}</small>
     <div className="td-sheet__actions">
       {d.tier >= MAX_TIER ? <span className="td-note">Tier 7: the top.</span>
-        : twins.length === 0 ? <span className="td-note">No twin yet: build or merge another {d.name} to merge.</span>
+        : twins.length === 0 ? <span className="td-note">No partner yet: any other tier {d.tier} tower can merge.</span>
           : twins.slice(0, 3).map((o) => <button key={o.id} className="td-primary" data-testid={`td-merge-${o.cell}`} onClick={() => send({ type: 'merge', from: o.cell, to: cell })}>
-            Merge with twin {cellName(o.cell)}<small>→ random tier {d.tier + 1}</small></button>)}
+            Merge tier {d.tier} at {cellName(o.cell)}<small>→ random tier {d.tier + 1} · shortcut M</small></button>)}
       <button className="td-sell" data-testid="td-sell" onClick={() => { send({ type: 'sell', cell }); close(); }}>Sell +{sellValue(d.tier)}<span className="td-sr"> gold</span><Coin /></button>
       <button data-testid="td-sheet-close" onClick={close}>Close</button>
     </div>
@@ -130,7 +130,11 @@ export function TumbleHud({ getState, localId, contestants }: MinigameSceneProps
       const q = e.quest as QuestId;
       if (mine) push(`Quest done: ${questTitle(s, q)} · +${questReward(QUESTS[q])}`, 'good', 4200);
       else if (q === 'first6') push(`${name(id!)} built the lobby's first tier-6 tower`, 'info', 4200);
-    } else if (e.type === 'td-merge' && mine && def) push(`${(e as { lucky?: boolean }).lucky ? 'Lucky merge! ' : 'Merged: '}${def.name} · tier ${def.tier}`, (e as { lucky?: boolean }).lucky ? 'good' : 'info');
+    } else if (e.type === 'td-merge' && mine && def) {
+      push(`${(e as { lucky?: boolean }).lucky ? 'Lucky merge! ' : 'Merged: '}${def.name} · tier ${def.tier}`, (e as { lucky?: boolean }).lucky ? 'good' : 'info');
+      const cell = e.cell as number;
+      useTumbleUI.setState({ selected: cell, cursor: cell });
+    }
     else if (e.type === 'td-gift' && mine && def) push(`Boss reward: ${def.name} · tier ${def.tier}`, 'good', 4200);
     else if (e.type === 'td-build' && mine && def) {
       push(`Built: ${def.name} · tier ${def.tier}`, def.tier > 1 ? 'good' : 'info', 2200);

@@ -20,7 +20,7 @@ import { TOY_GLOW_MATERIAL, TOY_MATERIAL, UNLIT_VERTEX_MATERIAL, bakeParts, toyG
 import { BUILDABLE, GLIDE, PATH_CELLS, WALK, isBuildable, pointAt } from './board';
 import { BOSSES, MAX_TIER, TIER_COLOURS, TOWERS, type EnemyKind } from './catalogue';
 import { ENEMY_PARTS, ENEMY_SCALE, FLY_HEIGHT } from './models';
-import { towerAt, viewedBoard, type TdPlayer, type TdState } from './rules';
+import { canMergeTowers, towerAt, viewedBoard, type TdPlayer, type TdState } from './rules';
 import { canMergeCells, submitTumbleInput, tapCell, useTumbleUI } from './local';
 import { BRIDGE, CELL, bw, groundY, worldCell } from './space';
 import { TumbleFxLayer, tumbleFxRef } from './Fx';
@@ -249,7 +249,7 @@ function putRing(m: THREE.Mesh, cell: number | null, r: number, mine: boolean) {
 }
 function Markers({ drag }: { drag: RefObject<Drag | null> }) {
   const select = useRef<THREE.Mesh>(null!), cursor = useRef<THREE.Mesh>(null!), target = useRef<THREE.Mesh>(null!);
-  const twins = useMemo(() => { const m = new THREE.InstancedMesh(RING, TWIN_MAT, 16); m.count = 0; m.raycast = () => {}; m.frustumCulled = false; return m; }, []);
+  const twins = useMemo(() => { const m = new THREE.InstancedMesh(RING, TWIN_MAT, BUILDABLE.length); m.count = 0; m.raycast = () => {}; m.frustumCulled = false; return m; }, []);
   const o = useMemo(() => new THREE.Object3D(), []), reduced = useRef(reducedMotion());
   useEffect(() => () => { twins.dispose(); }, [twins]);
   useFrame(() => {
@@ -261,7 +261,7 @@ function Markers({ drag }: { drag: RefObject<Drag | null> }) {
     const from = drag.current?.moved ? drag.current.from : ui.selected;
     const picked = mine && from !== null && v.me ? towerAt(v.me, from) : undefined;
     if (picked && v.me) for (const t of v.me.towers) {
-      if (t === picked || t.def !== picked.def || TOWERS[t.def].tier >= MAX_TIER || n >= 16) continue;
+      if (!canMergeTowers(picked, t)) continue;
       o.position.set(bw(t.cell % 8), 0.32, bw(Math.floor(t.cell / 8))); o.scale.setScalar(CELL * 0.46 * (2 - pulse)); o.updateMatrix(); twins.setMatrixAt(n++, o.matrix);
     }
     twins.count = n; twins.visible = n > 0; if (n) twins.instanceMatrix.needsUpdate = true;
