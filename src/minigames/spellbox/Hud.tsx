@@ -4,7 +4,7 @@ import { unlockAudio } from '../../game/audio';
 import { useMatch } from '../session';
 import type { MinigameSceneProps } from '../types';
 import { clearSpellboxInput, queueSpellboxInput } from './local';
-import { SLOT_OPTIONS, SPELLS } from './spells';
+import { SLOT_OPTIONS, SPELLS, spellStats } from './spells';
 import type { SpellboxState } from './rules';
 import { SpellIcon } from './SpellIcon';
 import './spellbox.css';
@@ -37,8 +37,8 @@ export function SpellboxHud({getState,localId,contestants}:MinigameSceneProps<Sp
           :<span role="status" aria-live="polite">{me.ready?`Locked in · Waiting for ${waiting} more`:'No time limit · Locking in is final'}</span>}
       </header>
       <div className="spellbox-build">{me.build.map((id,i)=><button key={i} data-testid={`spellbox-slot-${i}`} disabled={!editable} aria-pressed={i===slot} onClick={()=>select(i)}><SpellIcon spell={id}/><span><small>{['Q / click','E','R'][i]}</small><strong>{SPELLS[id].name}</strong></span></button>)}</div>
-      <p className="spellbox-draft-label">Choose {['Q · Ranged','E · Area','R · Utility'][slot]}: one of these three</p>
-      <div className="spellbox-catalogue">{SLOT_OPTIONS[slot].map(id=>{const d=SPELLS[id],other=me.build.indexOf(id);return<button key={id} data-testid={`spellbox-equip-${id}`} disabled={!editable} aria-pressed={me.build[slot]===id} onClick={()=>send({type:'equip',slot,spell:id})} style={{borderColor:d.colour}}><SpellIcon spell={id}/><strong>{d.name}</strong><small>{d.description}</small><span>{d.damage>0?`${d.damage} damage · ${d.force} ${d.effect==='pull'?'pull':'push'} · `:''}{d.cooldown/1000}s cooldown · {d.windup/1000}s cast</span>{other>=0&&other!==slot&&<small>Move from {['Q','E','R'][other]}; that button returns to an available option.</small>}</button>;})}</div>
+      <p className="spellbox-draft-label">Choose {['Q · Ranged','E · Area','R · Utility and movement'][slot]}: one of these three</p>
+      <div className="spellbox-catalogue">{SLOT_OPTIONS[slot].map(id=>{const d=SPELLS[id],other=me.build.indexOf(id);return<button key={id} data-testid={`spellbox-equip-${id}`} disabled={!editable} aria-pressed={me.build[slot]===id} onClick={()=>send({type:'equip',slot,spell:id})} style={{borderColor:d.colour}}><SpellIcon spell={id}/><strong>{d.name}</strong><small>{d.description}</small><span data-testid={`spellbox-stats-${id}`}>{spellStats(id)}</span>{other>=0&&other!==slot&&<small>Move from {['Q','E','R'][other]}; that button returns to an available option.</small>}</button>;})}</div>
       <div className="spellbox-draft-footer">
         <ul className="spellbox-lockins" data-testid="spellbox-lockins" aria-label="Who has locked in">{s.players.map(p=><li key={p.id} data-testid={`spellbox-lockin-${p.id}`} className={p.ready?'ready':''}><span aria-hidden className="spellbox-lockin-dot"/>{name(p.id)}<small>{p.ready?'Locked in':'Choosing'}</small></li>)}</ul>
         <button data-testid="spellbox-ready" disabled={!editable} onClick={()=>send({type:'ready'})}>{me.ready?'Locked in':'Lock build'}</button>
