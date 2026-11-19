@@ -192,16 +192,18 @@ revive). The game counts as medium length (`durationSec` [240, 330]).
   the rules must agree across clients.
 - **Headless CPU:** see the unit test `runs a full five-minute match of eight bots headless`. Its
   timing is printed. On the development container, a full 8-board, 5-minute bot match takes about
-  7–10 s of CPU, about 0.4–0.5 ms per 60 Hz step for all eight boards and their bots.
+  5–10 s of CPU depending on machine load, about 0.3–0.5 ms per 60 Hz step for all eight boards and their bots.
 
 No frame-rate claims: the development container renders with software GL. Renderer counts
-measured with `__toybox.renderInfo()` in `tests/e2e/siege.cjs` (desktop 1280×800, Low tier, whole
-frame including the room):
+measured with `__toybox.renderInfo()` in `tests/e2e/siege.cjs` (Low tier, whole frame including
+the room; ranges over the final runs):
 
-| Moment | Board entities | Draw calls | Triangles |
-| --- | --- | --- | --- |
-| Mid-swarm (~2:44) | 149–150 mobs, 1 elite | 48–51 | 79–82k |
-| Boss fight (4:04) | 150 mobs, boss + 2 elites, 29–30 bullets | 55–58 | 59–60k |
+| Moment | View | Board entities | Draw calls | Triangles |
+| --- | --- | --- | --- | --- |
+| Mid-swarm (~2:44) | desktop 1280×800 | 149–150 mobs, 1 elite | 48–51 | 74–82k |
+| Boss fight (4:04) | desktop | 150 mobs, boss + 2 elites, 28–30 bullets | 55–60 | 59–71k |
+| Mid-swarm | phone portrait 390×844 / landscape 844×390 | 71–106 mobs | 50–54 | 48–50k |
+| Boss fight | phone portrait / landscape | 55–87 mobs, boss + elites, 13–28 bullets | 57–70 | 46–57k |
 
 The scene holds 137 meshes in total, whatever the entity count.
 
