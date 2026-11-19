@@ -10,7 +10,7 @@ import { createToyAnim, ELIM_DURATION, INTERACT_DURATION, RESPAWN_DURATION, star
 import { addMouseDelta, consumeMouseDelta, endFrame, getMoveAxis, isDown, stickRunning, wasPressed, clearInput, EMOTE_ACTIONS } from '../game/input';
 import { HUB_MOTION } from '../game/hubMotion';
 import { EMOTE_COOLDOWN, EMOTE_DURATION, type EmoteId } from '../game/emotes';
-import { groundHeightAt, resolve } from '../game/collision';
+import { cameraFloorAt, groundHeightAt, resolve } from '../game/collision';
 import { inputBlocked, useGame, useShownLoadout } from '../game/store';
 import { sfx } from '../game/audio';
 import { events } from '../game/events';
@@ -527,12 +527,13 @@ export function PlayerController() {
       s.camDist = damp(s.camDist, want, want < s.camDist ? 18 : 2.5, dt);
 
       tmp.desired.copy(s.camTarget).addScaledVector(tmp.dir, s.camDist);
-      tmp.desired.y = Math.max(tmp.desired.y, 0.8);
+      tmp.desired.y = Math.max(tmp.desired.y, cameraFloorAt(tmp.desired.x, tmp.desired.z));
       if (s.snapCam) {
         s.camPos.copy(tmp.desired);
         s.camDist = want;
         s.snapCam = false;
       } else s.camPos.lerp(tmp.desired, 1 - Math.exp(-(g.paused ? 3 : 14) * dt));
+      s.camPos.y = Math.max(s.camPos.y, cameraFloorAt(s.camPos.x, s.camPos.z));
       camera.position.copy(s.camPos);
       // look slightly ahead of the toy so the world opens up in front of it
       // Pitching down low turns into looking up at the giant room (worm's-eye view).

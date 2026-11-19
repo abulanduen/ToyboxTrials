@@ -102,6 +102,24 @@ export function groundHeightAt(x: number, z: number, r: number, feetY: number): 
   return g;
 }
 
+/** How high above the table top the camera stays, and above anything low it is over. */
+export const CAMERA_CLEARANCE = 0.8;
+/** Colliders up to this height lift the camera over them (bridge deck, ramps, books, the block
+ *  tower, passing train cars). Taller ones (buildings) stop the camera through camBlock instead. */
+const CAMERA_LOW_PROP = 6;
+/**
+ * Lowest height the hub camera may sit at (x, z). Without this the camera only stayed 0.8 cm above
+ * the table top and dipped inside raised props (the bridge deck, a passing train car), where the
+ * unlit inside faces showed as black flashes.
+ */
+export function cameraFloorAt(x: number, z: number): number {
+  let floor = CAMERA_CLEARANCE;
+  for (const c of allColliders()) {
+    if (c.top <= CAMERA_LOW_PROP && c.top + CAMERA_CLEARANCE > floor && overlaps(c, x, z, 0.7)) floor = c.top + CAMERA_CLEARANCE;
+  }
+  return floor;
+}
+
 /**
  * Push a circle (player) out of every collider it is not standing above.
  * Mutates and returns pos. Returns the id of the first collider hit (for bump sounds).
