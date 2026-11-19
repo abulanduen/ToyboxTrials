@@ -18,7 +18,7 @@ const OUT = process.env.OUT_DIR || path.join(__dirname, 'output');
 fs.mkdirSync(OUT, { recursive: true });
 const BASE = process.env.BASE_URL || 'http://localhost:4190/';
 const ORIGIN = new URL(BASE).origin;
-const PORT = 2567;
+const PORT = Number(process.env.SERVER_PORT) || 2567; // the client build must use the same port in VITE_SERVER_URL
 const HTTP = `http://localhost:${PORT}`;
 const WS = `ws://localhost:${PORT}`;
 const T = +process.env.E2E_TIMEOUT || 240000;
@@ -154,7 +154,7 @@ const shot = (p, file) => p.screenshot({ path: path.join(OUT, file), timeout: T 
 
     // ------------------------------------------------------------ desktop: private room
     const A = await openPage(browser, 'Alpha', { viewport: { width: 1280, height: 720 } });
-    check('this build points online play at VITE_SERVER_URL', (await net(A.page, 'serverUrl')) === 'ws://localhost:2567');
+    check('this build points online play at VITE_SERVER_URL', (await net(A.page, 'serverUrl')) === `ws://localhost:${PORT}`);
     await A.page.click('[data-testid=menu-online]');
     await A.page.waitForSelector('.online-sheet');
     check('Play online sheet: nickname, public, host and code options', (await A.page.inputValue('[data-testid=online-name]')) === 'Alpha' && (await A.page.isVisible('[data-testid=online-public]')) && (await A.page.isVisible('[data-testid=online-host]')) && (await A.page.isVisible('[data-testid=online-code]')));
