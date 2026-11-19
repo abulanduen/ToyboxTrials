@@ -4266,6 +4266,12 @@ canvas {
 .leaderboard__head strong {
   font: 700 1.05rem var(--font-display);
 }
+.leaderboard__head .lobby-seg button {
+  /* Size each tab to its word so "Treasure" is never clipped. */
+  flex: 0 0 auto;
+  padding-inline: 12px;
+  white-space: nowrap;
+}
 .leaderboard__list {
   list-style: none;
   margin: 0;
