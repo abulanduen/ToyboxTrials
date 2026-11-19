@@ -1,5 +1,6 @@
 /**
- * Message-rate limiting and allowed-origin checks for the socket layer. Pure (time is passed in).
+ * Rate limiting and allowed-origin checks for the socket layer and the accounts API
+ * (server/accounts/). Pure (time is passed in).
  */
 
 /**
@@ -21,11 +22,27 @@ export class RateLimiter {
     this.last = now;
   }
 
-  /** True if a message arriving at `now` (ms) is allowed. */
-  take(now: number): boolean {
+  private refill(now: number) {
     const dt = Math.max(0, now - this.last) / 1000;
     this.last = now;
     this.tokens = Math.min(this.capacity, this.tokens + dt * this.perSecond);
+  }
+
+  /** True if `take(now)` would succeed, without using a token. */
+  canTake(now: number): boolean {
+    this.refill(now);
+    return this.tokens >= 1;
+  }
+
+  /** True when the bucket is full again (an idle key that can be forgotten). */
+  isFull(now: number): boolean {
+    this.refill(now);
+    return this.tokens >= this.capacity;
+  }
+
+  /** True if a message arriving at `now` (ms) is allowed. */
+  take(now: number): boolean {
+    this.refill(now);
     if (this.tokens >= 1) {
       this.tokens -= 1;
       return true;

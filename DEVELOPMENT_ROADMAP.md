@@ -161,4 +161,5 @@ _Depends on:_ M8.
 | 19 Nov 2026 | Online host: **Railway**, an always-on Node server. The client stays a static Vercel build (`VITE_SERVER_URL`) |
 | 19 Nov 2026 | Online transport: plain **WebSockets with `ws`**, with a shared typed protocol (`src/net/protocol.ts`). Not Colyseus |
 | 19 Nov 2026 | Online Hub joining: a public Hub (24 per instance, overflowing to new instances) and private rooms (16, 5-character codes, share links). No login: players pick a nickname |
+| 19 Nov 2026 | Optional login: **username and password**, stored in a **Railway PostgreSQL** database on the existing server (`/api/*`). Playing never requires it. Guest toys merge into the account on first sign-in (items a union, the larger cog balance); saved wallets are soft-capped only (docs/ECONOMY.md, docs/ONLINE.md) |
 | _pending_ | Rating algorithm, ranked guest access, Base44 competition eligibility |

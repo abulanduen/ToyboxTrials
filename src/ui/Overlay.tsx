@@ -20,6 +20,8 @@ import { WorkshopScreen } from './WorkshopScreen';
 import { NameTags, OnlineChip, OnlineSheet, openOnlineSheet } from './OnlineUI';
 import { useNet } from '../net/store';
 import { leaveOnline } from '../net/client';
+import { closeAccountSheet, useAccount } from '../net/account';
+import { AccountSettingsRow, AccountSheet } from './AccountUI';
 
 // ---------------------------------------------------------------- HUD
 function Prompt() {
@@ -226,6 +228,7 @@ function PauseMenu() {
         </div>
         <PauseShop />
         <PauseOnline />
+        <AccountSettingsRow />
       </div>
     </div>
   );
@@ -372,6 +375,7 @@ export function Overlay() {
   const paused = useGame((s) => s.paused);
   const panel = useGame((s) => s.panel);
   const onlineSheet = useNet((s) => s.sheetOpen);
+  const accountSheet = useAccount((s) => s.sheetOpen);
 
   // Esc closes the top-most DOM layer (the canvas loop handles in-game Esc → pause).
   useEffect(() => {
@@ -379,7 +383,8 @@ export function Overlay() {
       if (e.code !== 'Escape') return;
       const g = useGame.getState();
       const net = useNet.getState();
-      if (net.sheetOpen) {
+      if (useAccount.getState().sheetOpen) closeAccountSheet();
+      else if (net.sheetOpen) {
         if (net.status === 'connecting') leaveOnline(true);
         net.set({ sheetOpen: false, error: null });
       } else if (g.panel) g.closePanel();
@@ -403,6 +408,7 @@ export function Overlay() {
       {screen === 'playing' && panel && <Panel />}
       {screen === 'playing' && paused && !panel && <PauseMenu />}
       {onlineSheet && screen !== 'minigame' && <OnlineSheet />}
+      {accountSheet && screen !== 'minigame' && <AccountSheet />}
       <LoadingCard />
     </div>
   );

@@ -8,6 +8,8 @@
  */
 import {
   ACCESSORY_SLOTS,
+  ACHIEVEMENT_IDS,
+  SECRET_IDS,
   STARTER_IDS,
   cleanAccessories,
   isHatId,
@@ -129,13 +131,19 @@ export function normalizeGestures(raw: unknown, canUse: (id: EmoteId) => boolean
   return out;
 }
 
-const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0);
-const strList = (v: unknown) => (Array.isArray(v) ? [...new Set(v.filter((x): x is string => typeof x === 'string'))] : []);
+/** Whole, non-negative and below 2^53 (JSON numbers beyond that lose precision). */
+const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.min(Number.MAX_SAFE_INTEGER, Math.floor(v)) : 0);
+/** Distinct strings from `v` that are in `known` (unknown ids are dropped). */
+const idList = (v: unknown, known: readonly string[]) => (Array.isArray(v) ? [...new Set(v.filter((x): x is string => typeof x === 'string' && known.includes(x)))] : []);
 const SOURCES: readonly UnlockSource[] = ['shop', 'secret', 'achievement', 'gift'];
 
 /**
- * Make any stored value a valid profile: unknown items are dropped, negative or missing numbers
- * become 0, and anything equipped that isn't owned goes back to the default. Never throws.
+ * Make any stored value a valid profile: unknown items, secrets and achievements are dropped,
+ * negative or missing numbers become 0, and anything equipped that isn't owned goes back to the
+ * default. Never throws.
+ *
+ * Shared by the client (every load of the saved store) and the accounts server (every profile an
+ * account saves, server/accounts/api.ts), so both sides clean a profile by exactly the same rules.
  */
 export function normalizeProfile(raw: unknown): Profile {
   const p = defaultProfile();
@@ -153,8 +161,8 @@ export function normalizeProfile(raw: unknown): Profile {
     }
   }
   p.firstWinDay = typeof r.firstWinDay === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.firstWinDay) ? r.firstWinDay : null;
-  p.secretsPaid = strList(r.secretsPaid);
-  p.achievements = strList(r.achievements);
+  p.secretsPaid = idList(r.secretsPaid, SECRET_IDS);
+  p.achievements = idList(r.achievements, ACHIEVEMENT_IDS);
   const l = (r.loadout && typeof r.loadout === 'object' ? r.loadout : {}) as Record<string, unknown>;
   const ok = (id: unknown) => typeof id === 'string' && owns(p, id);
   const acc = cleanAccessories(l as Partial<Record<AccessorySlot, unknown>>);

@@ -6,6 +6,7 @@ import { installInput } from './game/input';
 import { unlockAudio } from './game/audio';
 import { useGame, type Screen } from './game/store';
 import { installNet, joinOnline } from './net/client';
+import { installAccount } from './net/account';
 import { useNet } from './net/store';
 import { normalizeRoomCode } from './net/protocol';
 
@@ -49,6 +50,7 @@ function openWorkshopFromHash() {
 export function App() {
   useEffect(() => {
     installNet();
+    installAccount();
     const initial = screenFromHash();
     if (initial === 'workshop') openWorkshopFromHash();
     else if (initial && initial !== 'menu') useGame.getState().goTo(initial);

@@ -1,6 +1,6 @@
 /**
  * Bundles the online Hub server with esbuild into one self-contained file,
- * server-dist/index.cjs (ws included), so the host only needs Node to start it.
+ * server-dist/index.cjs (ws and pg included), so the host only needs Node to start it.
  *
  *   node server/build.mjs          one build (`npm run server:build` typechecks first)
  *   node server/build.mjs --watch  rebuild on change and restart the server (`npm run server:dev`)
@@ -17,7 +17,8 @@ const watch = process.argv.includes('--watch');
 let child = null;
 const restart = () => {
   const start = () => {
-    child = spawn(process.execPath, ['--enable-source-maps', outfile], { stdio: 'inherit' });
+    // Development keeps accounts in memory unless a DATABASE_URL is given.
+    child = spawn(process.execPath, ['--enable-source-maps', outfile], { stdio: 'inherit', env: { ACCOUNTS_STORE: 'memory', ...process.env } });
   };
   if (child && child.exitCode === null) {
     child.once('exit', start);
@@ -35,8 +36,9 @@ const options = {
   target: 'node18',
   outfile,
   sourcemap: true,
-  // ws's optional native speed-ups: loaded in a try/catch at runtime, so leave them out.
-  external: ['bufferutil', 'utf-8-validate'],
+  // ws's optional native speed-ups and pg's optional native driver: loaded in a try/catch (or
+  // only on request) at runtime, so leave them out.
+  external: ['bufferutil', 'utf-8-validate', 'pg-native'],
   logLevel: 'warning',
   plugins: watch
     ? [

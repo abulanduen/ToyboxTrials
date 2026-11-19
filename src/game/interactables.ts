@@ -7,7 +7,7 @@ import { events } from './events';
 import { sfx } from './audio';
 import { useGame } from './store';
 import { PALETTE } from './palette';
-import { rewardForSecret } from './cosmetics';
+import { SECRET_IDS, rewardForSecret } from './cosmetics';
 import { EARN } from './economy';
 import { exposeDebug } from './debug';
 import { openPractice } from '../minigames/session';
@@ -28,7 +28,7 @@ export interface Interactable {
   disabled?: () => boolean;
 }
 
-export const SECRET_IDS = ['musicbox', 'marble', 'jack', 'key'] as const;
+export { SECRET_IDS };
 
 let keyCooldownUntil = 0;
 export const keyAvailable = () => performance.now() > keyCooldownUntil;
