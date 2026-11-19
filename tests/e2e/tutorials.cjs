@@ -107,8 +107,9 @@ async function checkStartVisible(page, viewport, where) {
           const info = await checkArt(page, '[data-testid="tutorial"]', 'tutorial-art');
           if (info.id.endsWith('-touch')) touchPictures++;
           // The picture sits above (or beside, in short landscape) the step's title.
-          const title = await tut.locator('.tutorial__title').boundingBox();
-          assert.ok(info.top < title.y + title.height, `${id} step ${n}: picture is not above or beside the title`);
+          // Measured in one go: the card may still be sliding in.
+          const order = await tut.evaluate((el) => { const a = el.querySelector('[data-testid="tutorial-art"]').getBoundingClientRect(); const t = el.querySelector('.tutorial__title').getBoundingClientRect(); return { art: Math.round(a.top), title: Math.round(t.bottom) }; });
+          assert.ok(order.art < order.title, `${id} step ${n}: picture is not above or beside the title (${JSON.stringify(order)})`);
           await checkStartVisible(page, viewport, `${id} step ${n}`);
           // Clicking Next can scroll a short card; show the whole step in the screenshot.
           await tut.evaluate((el) => el.scrollIntoView({ block: 'start' }));
