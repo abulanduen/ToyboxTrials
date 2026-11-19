@@ -407,6 +407,28 @@ variants (grey/gray). Answer lists are curated per category with common, uncommo
 validation is needed in competitive play. Mechanic inspiration: Krillion's Puffer Party and classic
 hot-potato word games. Content and theme are original.
 
+### 12 · Odd Page Out (Observation / Speed · 1–8) — first pass built
+The owner's "spot the difference" game. A picture book lies open on the table with the same storybook
+scene on both pages, except for 15 differences. See `src/minigames/spotdiff/README.md`.
+- **Scenes:** four code-drawn scenes (The Toy Shop, The Garden Picnic, Pirate Bath-Time, Bedtime), each with
+  exactly **60 variable slots** of 2–4 variants: colour, pattern, swapped shape, count, a feature on or off,
+  rotation, a nudge, size, or missing altogether.
+- **Each round (seeded):** a new scene (no repeats in a match); the **reference page** gives every one of the 60
+  slots a random variant, so even the original is different each time; **15 of the 60** slots, spread over the
+  page, get a different variant on the second page. Everything else is identical on both pages.
+- Players tap or click either page (keyboard: arrows move a ring between the scene's things, Enter circles).
+  A find is ringed on both pages. A **wrong tap** shows a red X, buzzes and locks you out for **1 s**.
+- **Scoring:** 10 per difference. Finding all 15 adds a bonus by finishing order (**60 / 40 / 30 / 20**) plus up to
+  **40** for time left, so the first to find everything scores the most. Finishing in the same server step ties.
+- **Rounds:** four pages of **30 s** each (a page ends early once everyone has found all 15), about 2–2.5 minutes.
+  Everyone has the same pictures; each player's finds are their own. A mini leaderboard shows everyone's count.
+- Placement is by total points, then differences found, then quicker finds; ties share the place.
+- **Bots** find a difference every ~3 s (easy), ~2 s (normal) or ~1.4 s (hard), with occasional wrong taps.
+
+**Tech:** pictures are SVG drawn from data (prop library + scene backdrops), so hit areas are exact circles in
+picture units and the two pages provably differ in exactly the 15 slots (unit-tested). Generated raster art is not
+used for anything you can tap. All values above are first-pass and untuned with real players.
+
 ---
 
 ## 5. Shared minigame framework

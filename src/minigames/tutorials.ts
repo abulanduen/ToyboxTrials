@@ -72,6 +72,12 @@ export const TUTORIALS: Partial<Record<MinigameId, TutorialStep[]>> = {
     { title: 'Set your formation', text: 'Drag toys onto the board or keep them in reserve. Toys sharing a trait symbol earn bonuses, listed at the side. Then press Ready and your squad battles on its own.', touch: 'Drag toys onto the board or keep them in reserve. Toys sharing a trait symbol earn bonuses, listed at the side. Then tap Ready and your squad battles on its own.' },
     { title: 'Ten rounds', text: 'A win scores 3 points and a draw 1. Most points after ten rounds wins. On rounds 3, 6 and 9, you must pick one of three passive bonuses before you can carry on.' },
   ],
+  'odd-page-out': [
+    { title: 'Two pages, nearly the same', text: 'The book shows one picture on each page. Fifteen things on the second page are different: a colour, a pattern, something missing, turned or moved.' },
+    { title: 'Circle them', text: 'Click a difference on either page to circle it. Or move the ring with the arrows and press Enter.', touch: 'Tap a difference on either page to circle it.' },
+    { title: 'Careful, quick', text: 'Each find scores 10. A wrong tap holds you up for a second. Find all fifteen for a bonus: the first to finish gets the biggest.' },
+    { title: 'Four pages', text: 'Each page lasts 30 seconds, and every page is a new scene. Most points after four pages wins.' },
+  ],
 };
 
 export function tutorialFor(id: MinigameId): TutorialStep[] | undefined {

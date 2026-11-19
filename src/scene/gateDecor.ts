@@ -465,6 +465,44 @@ const spellbox: Theme = (k) => {
   k.pop();
 };
 
+const oddPageOut: Theme = (k) => {
+  // hero: a picture book open on a reading stand; the right page has one thing different, ringed
+  k.push(H.lx, 0, H.lz);
+  k.cyl(1.1, 1.25, 0.3, 0, 0.15, 0, P.woodDark, 16);
+  k.cyl(0.18, 0.22, 4.3, 0, 2.45, -0.2, P.woodDark, 8);
+  const a = 0.55; // the stand's tilt: front edge down
+  const at = (x: number, y: number, z: number): [number, number, number] => [x, 4.6 + y * Math.cos(a) - z * Math.sin(a), -0.2 + y * Math.sin(a) + z * Math.cos(a)];
+  k.box(3.6, 0.2, 2.0, ...at(0, 0, 0), P.woodMid, { rx: a });
+  k.box(3.6, 0.35, 0.15, ...at(0, 0.2, 1.0), P.woodMid, { rx: a });
+  k.box(3.9, 0.12, 2.3, ...at(0, 0.16, 0), '#4C7E9C', { rx: a });
+  for (const side of [-1, 1]) k.box(1.85, 0.18, 2.1, ...at(side * 0.95, 0.3, 0), P.white, { rx: a, rz: side * 0.06 });
+  k.with('detail', () => {
+    for (const side of [-1, 1]) {
+      const x0 = side * 0.95;
+      k.disc(0.24, ...at(x0 - 0.35, 0.41, -0.4), P.honey, { rx: a - Math.PI / 2 }, 12);
+      k.disc(0.3, ...at(x0 + 0.3, 0.41, 0.35), side < 0 ? P.sage : P.coral, { rx: a - Math.PI / 2 }, 12);
+    }
+    k.torus(0.48, 0.06, ...at(0.95 + 0.3, 0.44, 0.35), '#2F9A55', { rx: a - Math.PI / 2 }, Math.PI * 2, 20);
+  });
+  k.pop();
+  // side: a stack of storybooks with a pencil on top
+  k.push(S.lx, 0, S.lz);
+  const stack: [string, number][] = [[P.coral, 0.15], [P.honey, -0.2], [P.toyBlue, 0.3]];
+  stack.forEach(([col, ry], i) => k.block(2.3, 0.5, 1.6, 0, 0.25 + i * 0.52, 0, col, { ry }, 0.06));
+  k.rod([-0.9, 1.72, -0.35], [0.95, 1.72, 0.3], 0.13, P.honey, 6);
+  k.cone(0.13, 0.35, 1.09, 1.72, 0.35, P.woodLight, 6, { rz: -Math.PI / 2, ry: -0.34 });
+  k.pop();
+  // two picture cards on the felt, one with a difference circled
+  for (const [x, ringed] of [[-3.1, false], [-4.9, true]] as const) {
+    k.box(1.5, 0.04, 1.1, x, DECAL_Y + 0.02, 2.8, P.white);
+    k.with('detail', () => {
+      k.disc(0.22, x - 0.3, DECAL_Y + 0.06, 2.65, P.honey, { rx: -Math.PI / 2 }, 10);
+      k.disc(0.22, x + 0.3, DECAL_Y + 0.06, 2.95, ringed ? P.coral : P.toyBlue, { rx: -Math.PI / 2 }, 10);
+      if (ringed) k.ring(0.32, 0.42, x + 0.3, DECAL_Y + 0.07, 2.95, '#2F9A55', 18);
+    });
+  }
+};
+
 export const GATE_THEMES: Record<MinigameId, Theme> = {
   'copycat-conductor': copycat,
   'jack-in-the-box': jack,
@@ -477,6 +515,7 @@ export const GATE_THEMES: Record<MinigameId, Theme> = {
   'toy-squad': toySquad,
   'blink-duel': blink,
   'spellbox-showdown': spellbox,
+  'odd-page-out': oddPageOut,
 };
 
 /** Build every gate's surroundings into `k` (gate-local frames are pushed here). */
