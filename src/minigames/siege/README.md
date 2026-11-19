@@ -201,9 +201,9 @@ the room; ranges over the final runs):
 | Moment | View | Board entities | Draw calls | Triangles |
 | --- | --- | --- | --- | --- |
 | Mid-swarm (~2:44) | desktop 1280×800 | 149–150 mobs, 1 elite | 48–51 | 74–82k |
-| Boss fight (4:04) | desktop | 150 mobs, boss + 2 elites, 28–30 bullets | 55–60 | 59–71k |
-| Mid-swarm | phone portrait 390×844 / landscape 844×390 | 71–106 mobs | 50–54 | 48–50k |
-| Boss fight | phone portrait / landscape | 55–87 mobs, boss + elites, 13–28 bullets | 57–70 | 46–57k |
+| Boss fight (4:04) | desktop | 150 mobs, boss + 2 elites, 27–30 bullets | 54–60 | 56–71k |
+| Mid-swarm | phone portrait 390×844 / landscape 844×390 | 71–112 mobs | 50–55 | 48–63k |
+| Boss fight | phone portrait / landscape | 55–134 mobs, boss + elites, 13–28 bullets | 57–70 | 46–70k |
 
 The scene holds 137 meshes in total, whatever the entity count.
 

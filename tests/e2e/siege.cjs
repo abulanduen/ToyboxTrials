@@ -88,11 +88,14 @@ async function run(name) {
     await page.evaluate(() => window.__toybox.hub.goTo('pavilion'));
     await page.waitForSelector('.prompt');
     if (v.touch) await page.locator('.prompt').tap(); else await page.keyboard.press('KeyE');
-    await tap(page.getByTestId('practice-toybox-siege'));
+    // Menu cards are static, so these use Playwright's normal (scroll, wait-until-stable) clicks.
+    const ui = (locator) => (v.touch ? locator.tap() : locator.click());
+    await ui(page.getByTestId('practice-toybox-siege'));
     await page.getByTestId('match-start').waitFor({ state: 'visible' });
     await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after they appear
-    await tap(page.getByRole('button', { name: /^3 bots$/i }));
-    await tap(page.getByTestId('match-start'));
+    await ui(page.locator('.intro-options .segmented button', { hasText: /^3 bots$/i }));
+    await page.waitForFunction(() => document.querySelector('.intro-options .segmented button.on')?.textContent?.trim().toLowerCase() === '3 bots');
+    await ui(page.getByTestId('match-start'));
     await page.waitForFunction(() => window.__toybox.match.phase() === 'countdown');
     await page.evaluate(() => window.__toybox.match.timeScale(10));
     await page.waitForFunction(() => window.__toybox.match.phase() === 'playing');
