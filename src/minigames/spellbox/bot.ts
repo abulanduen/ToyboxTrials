@@ -13,6 +13,9 @@ export function createSpellboxBot():BotPolicy<SpellboxState,SpellboxInput>{
         equipped.add(p.id);
         const build:string[]=[];
         const choices=SLOT_OPTIONS.map((options,slot)=>{const spell=shuffle(rng,options.filter(id=>!build.includes(id)))[0];build.push(spell);return{type:'equip' as const,slot,spell};});
+        // The draft has no deadline: bots lock in after a short, seeded look at their build so
+        // their Ready markers appear one by one rather than all on the first tick.
+        next.set(c.id,s.t+Math.round(700+rng()*1500));
         return choices;
       }return[{type:'ready'}];
     }

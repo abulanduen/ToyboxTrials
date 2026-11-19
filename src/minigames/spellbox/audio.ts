@@ -30,6 +30,10 @@ export function createSpellboxAudio(localId: string, getState: () => SpellboxSta
     else if (event.type === 'spellbox-shrink-tick') {
       if (typeof event.seconds !== 'number' || event.seconds < 1 || event.seconds > 3) return;
       cue = 'count'; lane = 'warning';
+    } else if (event.type === 'spellbox-countdown') {
+      // "Fight in 3, 2, 1" after everyone has locked in their build.
+      if (typeof event.seconds !== 'number' || event.seconds < 1 || event.seconds > 3) return;
+      cue = 'count'; lane = 'warning';
     } else return;
 
     const now = clock(), windowMs = lane === 'warning' ? 600 : 250;

@@ -62,7 +62,7 @@ export const TUTORIALS: Partial<Record<MinigameId, TutorialStep[]>> = {
     { title: 'Read the wind-up', text: 'A swing (J or click) charges for almost a second, and a striped cone shows where it will land. Blink out of cones, and blinking cancels your own swing.', touch: 'Swing charges for almost a second, and a striped cone shows where it will land. Blink out of cones, and blinking cancels your own swing.' },
   ],
   'spellbox-showdown': [
-    { title: 'Pick your build', text: 'Before the fight, choose one spell for each of your three buttons, then press Ready.' },
+    { title: 'Pick your build', text: 'Take your time: choose one spell for each of your three buttons, then lock your build. The fight starts three seconds after everyone has locked in.' },
     { title: 'Push them out', text: 'Hits add damage, and the more damage a toy has, the further it flies. Cast with Q, E and R; aim with the mouse.', touch: 'Hits add damage, and the more damage a toy has, the further it flies. Tap your three spell buttons; tap the arena to aim.' },
     { title: 'Stay in the ring', text: 'Cross the edge and you are out. The ring shrinks as toys fall, with a warning first. Last toy inside wins.' },
   ],

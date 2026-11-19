@@ -1,4 +1,5 @@
-/* Actual effect mount checks at both blur-capable quality tiers, plus generated UI assets. */
+/* Actual effect mount checks at both blur-capable quality tiers, plus generated UI assets.
+   One bot keeps the duel-size ring, which the camera centres (bigger rings follow the local toy). */
 const{chromium}=require('playwright'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const out=path.join(__dirname,'output');fs.mkdirSync(out,{recursive:true});
 (async()=>{const browser=await chromium.launch({args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
@@ -6,7 +7,7 @@ try{for(const quality of (process.env.ART_QUALITIES||'balanced,high').split(',')
 await page.addInitScript(quality=>localStorage.setItem('toybox-trials:prototype:v1',JSON.stringify({state:{quality},version:0})),quality);
 const effects=()=>page.evaluate(()=>window.__toybox.postprocessing.state());
 await page.goto((process.env.BASE_URL||'http://localhost:4173/')+'?debug#play');await page.waitForSelector('.loading',{state:'detached'});await page.waitForFunction(()=>window.__toybox.postprocessing?.state().focusBlurMounted);assert.equal((await effects()).focusBlur,true);
-await page.evaluate(()=>window.__toybox.teleport(0,-12.6,Math.PI));await page.waitForSelector('.prompt');await page.keyboard.press('KeyE');await page.getByTestId('practice-spellbox-showdown').click();await page.waitForTimeout(800);await page.getByTestId('match-start').click();await page.waitForFunction(()=>window.__toybox.match.phase()==='playing');await page.evaluate(()=>window.__toybox.match.timeScale(0));
+await page.evaluate(()=>window.__toybox.teleport(0,-12.6,Math.PI));await page.waitForSelector('.prompt');await page.keyboard.press('KeyE');await page.getByTestId('practice-spellbox-showdown').click();await page.waitForTimeout(800);await page.getByRole('button',{name:'1 bot',exact:true}).click();await page.getByTestId('match-start').click();await page.waitForFunction(()=>window.__toybox.match.phase()==='playing');await page.evaluate(()=>window.__toybox.match.timeScale(0));
 assert.equal((await effects()).focusBlur,false);assert.equal((await effects()).focusBlurMounted,false);
 await page.waitForFunction(()=>Array.from(document.querySelectorAll('.spellbox-icon')).every(img=>img.complete&&img.naturalWidth===512));
 await page.screenshot({path:path.join(out,`spellbox-${quality}-icon-draft.png`)});

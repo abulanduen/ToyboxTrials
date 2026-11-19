@@ -3,8 +3,8 @@ import { seededRng, shuffle } from '../rng';
 import { rankByKey } from '../scoring';
 import { DEFAULT_BUILD, SLOT_OPTIONS, SPELLS, type SpellId } from './spells';
 
-export interface SpellboxConfig { radius:number; bodyRadius:number; speed:number; drag:number; damageScale:number; maxVelocity:number; draftMs:number; durationMs:number; endingMs:number; hitstunMs:number; shrinkWarningMs:number; shrinkMs:number }
-export const DEFAULT_CONFIG:SpellboxConfig={radius:15,bodyRadius:1.05,speed:8.5,drag:2.4,damageScale:70,maxVelocity:40,draftMs:20000,durationMs:90000,endingMs:1400,hitstunMs:180,shrinkWarningMs:10000,shrinkMs:3000};
+export interface SpellboxConfig { radius:number; bodyRadius:number; speed:number; drag:number; damageScale:number; maxVelocity:number; countdownMs:number; durationMs:number; endingMs:number; hitstunMs:number; shrinkWarningMs:number; shrinkMs:number }
+export const DEFAULT_CONFIG:SpellboxConfig={radius:15,bodyRadius:1.05,speed:8.5,drag:2.4,damageScale:70,maxVelocity:40,countdownMs:3000,durationMs:90000,endingMs:1400,hitstunMs:180,shrinkWarningMs:10000,shrinkMs:3000};
 /** The configured radius remains the two-player baseline; larger bands grow arena area. */
 export function arenaRadius(players:number,base=DEFAULT_CONFIG.radius){return base*(players>=8?2.6:players>=6?2.2:players>=4?1.8:players>=3?1.4:1);}
 export interface ArenaShrink { from:number;to:number;startsAt:number;endsAt:number;lastSecond:number }
@@ -17,7 +17,7 @@ export interface Mage {
 export interface Projectile {id:number;owner:string;spell:SpellId;x:number;z:number;dx:number;dz:number;remaining:number;sourceX:number;sourceZ:number}
 export interface Mine {id:number;owner:string;x:number;z:number;armAt:number;expireAt:number}
 export interface Effect {id:number;spell:SpellId;kind:'cast'|'hit'|'shield'|'repair'|'out';x:number;z:number;radius:number;at:number}
-export interface SpellboxState {kind:'spellbox-showdown';seed:number;config:SpellboxConfig;radius:number;shrink:ArenaShrink|null;phase:'draft'|'arena'|'ending'|'over';t:number;remainder:number;arenaAt:number;finishAt:number;nextId:number;players:Mage[];projectiles:Projectile[];mines:Mine[];effects:Effect[];pending:Record<string,SpellboxInput[]>;events:MatchEvent[]}
+export interface SpellboxState {kind:'spellbox-showdown';seed:number;config:SpellboxConfig;radius:number;shrink:ArenaShrink|null;phase:'draft'|'arena'|'ending'|'over';t:number;remainder:number;fightAt:number;arenaAt:number;finishAt:number;nextId:number;players:Mage[];projectiles:Projectile[];mines:Mine[];effects:Effect[];pending:Record<string,SpellboxInput[]>;events:MatchEvent[]}
 interface Hit {source:string;target:Mage;damage:number;force:number;dx:number;dz:number;spell:SpellId}
 const TICK=10,dt=TICK/1000;
 const normalize=(x:number,z:number)=>{const d=Math.hypot(x,z);return d>1?{x:x/d,z:z/d}:{x,z};};
@@ -36,6 +36,21 @@ export function coneHit(source:Pick<Mage,'x'|'z'>,angle:number,target:Pick<Mage,
 }
 function effect(s:SpellboxState,spell:SpellId,kind:Effect['kind'],x:number,z:number,radius:number) {
   s.effects.push({id:s.nextId++,spell,kind,x,z,radius,at:s.t});s.effects=s.effects.slice(-64);
+}
+/**
+ * The draft has no deadline. Ready is a one-way lock, so once every player has locked in nobody
+ * can change their build or cancel: a short countdown runs, then the arena begins.
+ */
+function updateDraft(s:SpellboxState){
+  if(s.fightAt<0){
+    if(!s.players.every(p=>p.ready))return;
+    s.fightAt=s.t+s.config.countdownMs;
+    s.events.push({type:'spellbox-countdown',seconds:Math.ceil(s.config.countdownMs/1000)});
+    return;
+  }
+  if(s.t>=s.fightAt){startArena(s);return;}
+  const second=Math.ceil((s.fightAt-s.t)/1000);
+  if(second!==Math.ceil((s.fightAt-s.t+TICK)/1000))s.events.push({type:'spellbox-countdown',seconds:second});
 }
 function startArena(s:SpellboxState) {
   s.phase='arena';s.arenaAt=s.t;for(const p of s.players){p.ready=true;p.moveX=p.moveZ=0;}
@@ -112,7 +127,7 @@ function tick(s:SpellboxState) {
   s.t+=TICK;s.effects=s.effects.filter(e=>s.t-e.at<550);
   if(s.phase==='ending'){if(s.t>=s.finishAt+s.config.endingMs)s.phase='over';return;}
   for(const p of s.players)commands(s,p);
-  if(s.phase==='draft'){if(s.players.every(p=>p.ready)||s.t>=s.config.draftMs)startArena(s);return;}
+  if(s.phase==='draft'){updateDraft(s);return;}
   scheduleShrink(s);updateArena(s);
   const hits:Hit[]=[];
   for(const p of s.players)if(p.alive&&p.cast&&p.cast.until<=s.t)release(s,p,hits);
@@ -162,10 +177,10 @@ function tick(s:SpellboxState) {
 }
 export const spellboxRules:RulesCore<SpellboxState,SpellboxInput,SpellboxConfig>={
   init(contestants,seed,config){
-    const cfg={...DEFAULT_CONFIG,...config};if(contestants.length<2||contestants.length>8||new Set(contestants.map(c=>c.id)).size!==contestants.length||Object.values(cfg).some(n=>!Number.isFinite(n)||n<=0)||cfg.bodyRadius>=cfg.radius/4||[cfg.draftMs,cfg.durationMs,cfg.endingMs,cfg.hitstunMs,cfg.shrinkWarningMs,cfg.shrinkMs].some(n=>n%TICK!==0)||cfg.maxVelocity*dt>cfg.bodyRadius)throw new Error('Invalid Spellbox configuration.');
+    const cfg={...DEFAULT_CONFIG,...config};if(contestants.length<2||contestants.length>8||new Set(contestants.map(c=>c.id)).size!==contestants.length||Object.values(cfg).some(n=>!Number.isFinite(n)||n<=0)||cfg.bodyRadius>=cfg.radius/4||[cfg.countdownMs,cfg.durationMs,cfg.endingMs,cfg.hitstunMs,cfg.shrinkWarningMs,cfg.shrinkMs].some(n=>n%TICK!==0)||cfg.maxVelocity*dt>cfg.bodyRadius)throw new Error('Invalid Spellbox configuration.');
     const rng=seededRng(seed),slots=shuffle(rng,contestants.map((_,i)=>i)),rotation=rng()*Math.PI*2;
     const radius=arenaRadius(contestants.length,cfg.radius);
-    return {kind:'spellbox-showdown',seed,config:cfg,radius,shrink:null,phase:'draft',t:0,remainder:0,arenaAt:-1,finishAt:-1,nextId:1,projectiles:[],mines:[],effects:[],pending:{},events:[],players:contestants.map((c,i)=>{
+    return {kind:'spellbox-showdown',seed,config:cfg,radius,shrink:null,phase:'draft',t:0,remainder:0,fightAt:-1,arenaAt:-1,finishAt:-1,nextId:1,projectiles:[],mines:[],effects:[],pending:{},events:[],players:contestants.map((c,i)=>{
       const a=rotation+slots[i]*Math.PI*2/contestants.length;return{id:c.id,x:Math.sin(a)*radius*.58,z:Math.cos(a)*radius*.58,vx:0,vz:0,angle:a+Math.PI,moveX:0,moveZ:0,alive:true,outAt:-1,damage:0,build:[...DEFAULT_BUILD],ready:false,cooldowns:[0,0,0],nextAction:0,cast:null,shieldUntil:0,stunnedUntil:0,casts:0,hits:0,lastHit:-1};
     })};
   },
