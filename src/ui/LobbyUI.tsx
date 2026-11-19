@@ -149,20 +149,14 @@ export function GameCardGrid({
 }
 
 // ---------------------------------------------------------------- Hub: alert, Lobbies button, sheet
-/** How long the Hub banner stays up (it also goes when dismissed, or when its lobby closes). */
-const ALERT_MS = 90_000;
-
-/** "Ticker is hosting a Blitz tournament · 3/8 · Join". Shows for a while in the Hub. */
+/**
+ * "Ticker is hosting a Blitz tournament · 3/8 · Join". Stays in the Hub until dismissed, until you
+ * join a lobby, or until that lobby closes (src/net/lobby.ts clears it then).
+ */
 export function HubLobbyAlert() {
   const alert = useLobby((s) => s.alert);
   const list = useLobby((s) => s.list);
-  const [, tick] = useState(0);
-  useEffect(() => {
-    if (!alert) return;
-    const id = window.setTimeout(() => tick((n) => n + 1), ALERT_MS + 500);
-    return () => window.clearTimeout(id);
-  }, [alert]);
-  if (!alert || Date.now() - alert.at > ALERT_MS) return null;
+  if (!alert) return null;
   const live = list.find((l) => l.id === alert.lobby.id) ?? alert.lobby;
   const full = live.players >= live.cap || live.locked;
   return (
