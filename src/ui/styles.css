@@ -1064,6 +1064,23 @@ canvas {
   gap: 14px;
   margin-bottom: 1.2rem;
 }
+.howto__pics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0.8rem 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+.howto__pics li {
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  font: 700 0.95rem var(--font-display);
+}
+.howto__pic {
+  width: 100%;
+}
 .howto__col {
   padding: 12px 14px;
   border-radius: 12px;
@@ -2903,9 +2920,68 @@ canvas {
   font-size: 0.92rem;
   color: var(--ink);
 }
+/* tutorial pictures (src/ui/tutorialArt): a framed 260×150 SVG per step */
+.tutorial-art {
+  aspect-ratio: 26 / 15;
+  border: 2px solid var(--ink-deep);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--cream);
+}
+.tutorial__art {
+  /* sized by the viewport height so the card's buttons stay in reach on short screens */
+  width: min(100%, 360px, calc((100vh - 400px) * 26 / 15));
+  min-width: min(100%, 200px);
+  margin: 8px auto 2px;
+}
+.intro-art-row {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin: 0.4rem 0 0.6rem;
+}
+.intro-art-row__item {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 120px;
+  border-width: 2px;
+  border-radius: 7px;
+}
+/* Start / Leave stay pinned to the bottom of the intro card while its middle scrolls */
+.match-intro > .pause__actions {
+  position: sticky;
+  bottom: -1.6rem; /* the card's bottom padding: sit flush with its edge */
+  z-index: 1;
+  margin: 0 -2.2rem -1.6rem;
+  padding: 12px 2.2rem 1.2rem;
+  border-top: 2px dashed rgba(110, 82, 54, 0.45);
+  background: var(--cardboard);
+  box-shadow: 0 -8px 10px -8px rgba(43, 36, 51, 0.35);
+}
+@media (max-width: 700px) {
+  .match-intro > .pause__actions {
+    bottom: -1.2rem;
+    margin: 0 -1.2rem -1.2rem;
+    padding: 12px 1.2rem 1rem;
+  }
+}
 @media (max-height: 500px) {
   .tutorial { padding: 8px 10px 6px; }
   .tutorial__text { min-height: 0; font-size: 0.92rem; }
+  /* short landscape phones: picture beside the words */
+  .tutorial__body {
+    display: grid;
+    grid-template-columns: minmax(150px, 42%) 1fr;
+    gap: 10px;
+    align-items: start;
+  }
+  .tutorial__art {
+    width: 100%;
+    min-width: 0;
+    margin: 6px 0 4px;
+  }
+  .tutorial__title { margin-top: 4px; }
+  .intro-art-row__item { max-width: 96px; }
 }
 
 /* ======================================================================
