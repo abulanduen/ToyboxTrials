@@ -14,6 +14,7 @@ export const MINIGAME_IDS = [
   'toy-squad',
   'spellbox-showdown',
   'jack-in-the-box',
+  'toy-tower-tumble',
 ] as const;
 
 export type MinigameId = (typeof MINIGAME_IDS)[number];

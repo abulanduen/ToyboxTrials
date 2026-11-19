@@ -31,7 +31,7 @@ const cue = (u: Fighter) => {
 const H = Math.PI / 2, W = '#FFFFFF';
 const part = (g: ToyPart['g'], p: ToyPart['p'], s: ToyPart['s'], r: ToyPart['r'] = [0, 0, 0]): ToyPart => ({ g, c: W, p, s, r, o: 'XYZ' });
 /** Unit-sized effect shapes. Pointed shapes aim along +z; flat ones lie in the XZ plane; icons face +z. */
-const SHAPE_PARTS: Record<Exclude<FxShape, 'ring'>, ToyPart[]> = {
+export const SHAPE_PARTS: Record<Exclude<FxShape, 'ring'>, ToyPart[]> = {
   orb: [part('ball', [0, 0, 0], [1, 1, 1])],
   shard: [part('gem', [0, 0, 0], [0.5, 0.5, 1.15])],
   bolt: [part('cyl', [0, 0, -0.15], [0.34, 0.7, 0.34], [H, 0, 0]), part('cone', [0, 0, 0.36], [0.34, 0.34, 0.34], [H, 0, 0])],

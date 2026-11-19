@@ -72,6 +72,12 @@ export const TUTORIALS: Partial<Record<MinigameId, TutorialStep[]>> = {
     { title: 'Set your formation', text: 'Drag toys onto the board or keep them in reserve. Toys sharing a trait symbol earn bonuses, listed at the side. Then press Ready and your squad battles on its own.', touch: 'Drag toys onto the board or keep them in reserve. Toys sharing a trait symbol earn bonuses, listed at the side. Then tap Ready and your squad battles on its own.' },
     { title: 'Ten rounds', text: 'A win scores 3 points and a draw 1. Most points after ten rounds wins. On rounds 3, 6 and 9, you must pick one of three passive bonuses before you can carry on.' },
   ],
+  'toy-tower-tumble': [
+    { title: 'Build random towers', text: 'Enemies walk the path on your 8×8 board. Build (B) pays 20 gold for a random tower on a felt square. Click a square first to choose where.', touch: 'Enemies walk the path on your 8×8 board. Tap a felt square, then Build here: 20 gold for a random tower.' },
+    { title: 'Merge twins', text: 'Two identical towers merge into a random tower one tier up, to tier 7. Select one and click its glowing twin, or drag it onto the twin.', touch: 'Two identical towers merge into a random tower one tier up, to tier 7. Tap one, then its glowing twin, or drag it onto the twin.' },
+    { title: 'Odds, quests and bosses', text: 'Level your builder for better odds. Quick quests pay gold. Bosses on waves 5, 10, 15 and 20 drop free high-tier towers.' },
+    { title: 'Hold the line', text: 'Leaks cost lives; at zero you are out and can watch the other boards. Survive the most waves, or clear all 20, to win.' },
+  ],
 };
 
 export function tutorialFor(id: MinigameId): TutorialStep[] | undefined {

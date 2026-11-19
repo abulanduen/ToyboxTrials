@@ -142,6 +142,8 @@ const GATE_SPOTS: Record<MinigameId, { x: number; z: number; rot: number; distri
   // the two ends, facing in
   'inferno-escape': { x: END_W, z: END_Z, rot: Math.PI / 2, district: 'west', short: 'Inferno' },
   'spellbox-showdown': { x: END_E, z: END_Z, rot: -Math.PI / 2, district: 'east', short: 'Spellbox' },
+  // south row, between the bridge landing and Blink Duel
+  'toy-tower-tumble': { x: 45, z: S_ROW, rot: Math.PI, district: 'east', short: 'Towers' },
 };
 
 const CATEGORY_LABEL: Record<string, string> = { pvp: 'Versus' };
