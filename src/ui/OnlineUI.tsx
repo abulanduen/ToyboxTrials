@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useGame } from '../game/store';
 import { useNet, roomLink } from '../net/store';
 import { nameTagEls } from '../net/remotes';
-import { joinOnline, leaveOnline, onlineAvailable } from '../net/client';
+import { joinOnline, leaveOnline, leaveOnlineByChoice, onlineAvailable } from '../net/client';
 import { OFFLINE_TEXT } from '../net/config';
 import { ROOM_CODE_LENGTH } from '../net/protocol';
 import { EMOTE_LABELS } from '../game/emotes';
@@ -160,7 +160,7 @@ export function OnlineChip() {
           Share
         </button>
       )}
-      <button className="online-chip__btn online-chip__btn--leave" data-testid="online-leave" onClick={() => leaveOnline()}>
+      <button className="online-chip__btn online-chip__btn--leave" data-testid="online-leave" onClick={() => leaveOnlineByChoice()}>
         Leave
       </button>
     </div>

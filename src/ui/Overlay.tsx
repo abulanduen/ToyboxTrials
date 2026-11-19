@@ -19,7 +19,7 @@ import { MainMenu } from './MainMenu';
 import { WorkshopScreen } from './WorkshopScreen';
 import { NameTags, OnlineChip, OnlineSheet, openOnlineSheet } from './OnlineUI';
 import { useNet } from '../net/store';
-import { leaveOnline } from '../net/client';
+import { leaveOnline, leaveOnlineByChoice } from '../net/client';
 import { closeAccountSheet, useAccount } from '../net/account';
 import { AccountSettingsRow, AccountSheet } from './AccountUI';
 
@@ -268,7 +268,7 @@ function PauseOnline() {
       <span>
         {room.kind === 'private' ? `Online in room ${room.code}` : `Online in Public Hub ${room.instance}`} · {count} {count === 1 ? 'toy' : 'toys'}
       </span>
-      <ToyButton tone="ink" onClick={() => leaveOnline()} testId="pause-leave-online">
+      <ToyButton tone="ink" onClick={() => leaveOnlineByChoice()} testId="pause-leave-online">
         Leave online
       </ToyButton>
     </div>

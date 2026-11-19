@@ -79,7 +79,9 @@ function send(msg: Parameters<TransportConn['send']>[0]) {
 
 // ---------------------------------------------------------------- joining and leaving
 /** Join a room. Errors land in the net store (and the online sheet shows them). */
-export function joinOnline(req: JoinRequest) {
+export function joinOnline(req: JoinRequest, auto = false) {
+  if (!auto) stayOffline = false; // any join the player picks lifts a Leave
+  autoJoining = auto;
   if (!transport) {
     useNet.getState().set({ error: OFFLINE_TEXT });
     return;
@@ -122,6 +124,34 @@ function closeSocket() {
   c?.close();
 }
 
+// ---------------------------------------------------------------- automatic public Hub
+/** The player pressed Leave this session: don't pull them back in until they choose to join. */
+let stayOffline = false;
+/** The join in flight was the automatic one (its failure is quiet and retried a few times). */
+let autoJoining = false;
+let autoRetries = 0;
+let autoRetryTimer = 0;
+const AUTO_RETRY_MS = [15_000, 45_000, 120_000];
+
+/**
+ * Everyone plays in the public online Hub by default: entering the Hub (from the menu, a deep link
+ * or a page load) joins it unless the player turned that off in Settings, pressed Leave this
+ * session, or is already joining a room (a #room= link).
+ */
+export function maybeAutoJoin() {
+  const g = useGame.getState();
+  if (!transport || stayOffline || !g.autoOnline || g.screen !== 'playing') return;
+  if (useNet.getState().status !== 'offline') return;
+  joinOnline({ kind: 'public' }, true);
+}
+
+/** Leave because the player asked to (Leave buttons): stay offline for the rest of the session. */
+export function leaveOnlineByChoice() {
+  stayOffline = true;
+  window.clearTimeout(autoRetryTimer);
+  leaveOnline();
+}
+
 /** Leave the room on purpose (Leave button, main menu). */
 export function leaveOnline(quiet = false) {
   const wasOnline = useNet.getState().status === 'online';
@@ -152,8 +182,15 @@ function fail(message: string) {
   gen++;
   closeSocket();
   reset();
-  s.set({ status: 'offline', joining: null, room: null, players: [], selfId: null, error: message });
+  const auto = autoJoining && !wasIn;
+  autoJoining = false;
+  // A failed automatic join stays quiet (no error on screen) and tries again a little later.
+  s.set({ status: 'offline', joining: null, room: null, players: [], selfId: null, error: auto ? null : message });
   if (wasIn && !s.sheetOpen) useGame.getState().pushTicket({ title: 'Offline', body: message, tone: 'warning' });
+  if (auto && autoRetries < AUTO_RETRY_MS.length) {
+    window.clearTimeout(autoRetryTimer);
+    autoRetryTimer = window.setTimeout(maybeAutoJoin, AUTO_RETRY_MS[autoRetries++]);
+  }
 }
 
 /** The socket died (or never answered). */
@@ -192,6 +229,8 @@ const handlers: { [K in ServerMsg['t']]: (m: Extract<ServerMsg, { t: K }>) => vo
     const s = useNet.getState();
     const fresh = s.status === 'connecting';
     session = { resume: m.resume };
+    autoJoining = false;
+    autoRetries = 0;
     // If the slot has expired by the time we reconnect, rejoin the same room by code, never re-host.
     if (m.room.kind === 'private' && m.room.code) joinReq = { kind: 'code', code: m.room.code };
     remotes.clear();
@@ -321,7 +360,11 @@ export function installNet() {
   // Going back to the main menu leaves the online room.
   useGame.subscribe((s, p) => {
     if (s.screen === 'menu' && p.screen !== 'menu' && useNet.getState().status !== 'offline') leaveOnline();
+    // Entering the Hub joins the public online Hub (see maybeAutoJoin); so does switching it on.
+    if ((s.screen === 'playing' && p.screen !== 'playing') || (s.autoOnline && !p.autoOnline)) maybeAutoJoin();
   });
+  // A page that opens straight into the Hub (#play): join once the start-up hash handling has run.
+  window.setTimeout(maybeAutoJoin, 400);
   window.addEventListener('pagehide', () => {
     if (useNet.getState().status !== 'offline') send({ t: 'leave' });
   });

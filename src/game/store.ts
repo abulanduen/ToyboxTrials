@@ -62,6 +62,8 @@ interface SettingsSlice {
   rhythmOffsetMs: number;
   /** Show the quick "how to play" tutorial on each minigame's intro card. */
   tutorials: boolean;
+  /** Join the public online Hub automatically on entering the Hub (when online play is available). */
+  autoOnline: boolean;
   /** Toy Squad: roster ids the player starred in the Toy Handbook (marked on shop cards). */
   squadFavourites: string[];
 }
@@ -134,6 +136,7 @@ export const useGame = create<GameState>()(
       tournamentHistory: [],
       rhythmOffsetMs: 0,
       tutorials: true,
+      autoOnline: true,
       squadFavourites: [],
 
       // session
@@ -220,6 +223,7 @@ export const useGame = create<GameState>()(
         tournamentHistory: s.tournamentHistory,
         rhythmOffsetMs: s.rhythmOffsetMs,
         tutorials: s.tutorials,
+        autoOnline: s.autoOnline,
         squadFavourites: s.squadFavourites,
       }),
     },

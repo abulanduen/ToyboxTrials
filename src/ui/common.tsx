@@ -1,4 +1,5 @@
 /** Shared toy-world UI building blocks used by every screen. */
+import { onlineAvailable } from '../net/client';
 import { useEffect, useRef } from 'react';
 import { useGame, type Quality } from '../game/store';
 import { sfx, unlockAudio } from '../game/audio';
@@ -117,6 +118,12 @@ export function SettingsForm() {
         <input type="checkbox" checked={s.tutorials} onChange={(e) => s.set({ tutorials: e.target.checked })} data-testid="setting-tutorials" />
         <span>Game tutorials</span>
       </label>
+      {onlineAvailable() && (
+        <label className="setting setting--check">
+          <input type="checkbox" checked={s.autoOnline} onChange={(e) => s.set({ autoOnline: e.target.checked })} data-testid="setting-auto-online" />
+          <span>Join the online Hub automatically</span>
+        </label>
+      )}
     </div>
   );
 }
