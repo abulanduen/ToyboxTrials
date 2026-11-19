@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react';
 import { useGame } from '../game/store';
 import { sfx } from '../game/audio';
-import { MINIGAMES, gameById, tournamentPool } from '../minigames/registry';
+import { MINIGAMES, gameById } from '../minigames/registry';
 import {
   LOCAL_ID,
   beginCountdown,
@@ -21,7 +21,7 @@ import {
   startTournament,
   useMatch,
 } from '../minigames/session';
-import { FORMATS, type TournamentFormat } from '../minigames/tournament';
+import { FORMATS, poolForFormat, type TournamentFormat } from '../minigames/tournament';
 import { pointsForPlace, rankStandings } from '../minigames/scoring';
 import type { BotDifficulty, Contestant } from '../minigames/types';
 import { tutorialFor, type TutorialStep } from '../minigames/tutorials';
@@ -30,6 +30,8 @@ import { TutorialPicture, preloadTutorialArt } from './TutorialPicture';
 import { GearIcon, StarSticker, WindKeyIcon } from './icons';
 import { CogIcon } from './itemIcons';
 import type { Reward } from '../game/economy';
+import { GameCardGrid, HostTrialRow, LengthChip, OnlineMatchOverlay, PavilionOnline, PavilionTabs, type PavilionTab } from './LobbyUI';
+import { durationLabel } from '../minigames/length';
 
 /** "+23 cogs" with the breakdown, and anything an achievement just unlocked. */
 function CogsEarned({ reward, unlocked, testId }: { reward: Reward; unlocked: string[]; testId: string }) {
@@ -56,12 +58,12 @@ function CogsEarned({ reward, unlocked, testId }: { reward: Reward; unlocked: st
 
 const ordinal = (n: number) => `${n}${n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd' : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th'}`;
 
-function Medal({ place }: { place: number }) {
+export function Medal({ place }: { place: number }) {
   const cls = place === 1 ? 'gold' : place === 2 ? 'silver' : place === 3 ? 'bronze' : 'plain';
   return <span className={`medal medal--${cls}`}>{place}</span>;
 }
 
-function Who({ c }: { c: Contestant }) {
+export function Who({ c }: { c: Contestant }) {
   return (
     <span className="who">
       <span className="who__dot" style={{ background: c.paint.body, borderColor: c.paint.trim }} />
@@ -97,6 +99,8 @@ export function MatchOverlay() {
   const def = m.gameId ? gameById(m.gameId) : null;
   const Hud = m.module?.Hud;
   const inPlay = m.phase === 'countdown' || m.phase === 'playing';
+  // Online lobby matches have their own cards (LobbyUI.tsx); the game's Hud is shared.
+  if (m.kind === 'online') return <OnlineMatchOverlay />;
 
   return (
     <div className="match-layer">
@@ -137,7 +141,7 @@ export function MatchOverlay() {
   );
 }
 
-function Countdown() {
+export function Countdown() {
   const [n, setN] = useState<number | null>(3);
   useEffect(() => matchBus.on('countdown', ({ n }) => setN(n)), []);
   if (n === null) return null;
@@ -161,7 +165,10 @@ function Intro({ touch }: { touch: boolean }) {
   return (
     <CardboardSheet title={def.title} className="match-intro" onBackdrop={undefined}>
       <div className="info-panel__sub" style={{ ['--accent' as string]: def.accent, background: def.accent }}>
-        {isTournament && t ? `${FORMATS[t.format].name} · Trial ${t.round + 1} of ${t.games.length}` : 'Practice'}
+        {isTournament && t ? `${FORMATS[t.format].name} · Trial ${t.round + 1} of ${t.games.length}` : 'Practice with bots'}
+      </div>
+      <div className="intro-length">
+        <LengthChip def={def} /> <span>{durationLabel(def)}</span>
       </div>
       {m.error ? (
         <p className="panel__lead">{m.error}</p>
@@ -212,11 +219,8 @@ function Intro({ touch }: { touch: boolean }) {
                 </div>
               </div>
               {m.opponents > 0 && <DifficultyPicker value={m.difficulty} onChange={(d) => setPracticeOpponents(m.opponents, d)} />}
-              {/* Online lobbies need the authoritative game server (planned): not faked here. */}
-              <div className="setting intro-online" aria-disabled="true" data-testid="online-lobby-note">
-                <span>Online lobby</span>
-                <button disabled>Coming with online play</button>
-              </div>
+              {/* The other choice at a gate: host this trial as an online lobby (server-run). */}
+              <HostTrialRow game={def.id} />
             </div>
           )}
           {m.module?.IntroExtras && <m.module.IntroExtras practice={!isTournament} />}
@@ -468,9 +472,11 @@ export function TournamentPicker({ onClose }: { onClose: () => void }) {
   const [format, setFormat] = useState<TournamentFormat>('blitz');
   const [opponents, setOpponents] = useState(3);
   const [difficulty, setDifficulty] = useState<BotDifficulty>('normal');
+  const [tab, setTab] = useState<PavilionTab>('practice');
   const history = useGame((s) => s.tournamentHistory);
   return (
     <>
+      <PavilionTabs tab={tab} onTab={setTab} />
       <div className="formats" role="radiogroup" aria-label="Tournament format">
         {(Object.keys(FORMATS) as TournamentFormat[]).map((f) => (
           <button
@@ -487,6 +493,10 @@ export function TournamentPicker({ onClose }: { onClose: () => void }) {
           </button>
         ))}
       </div>
+      {tab === 'online' ? (
+        <PavilionOnline format={format} onClose={onClose} />
+      ) : (
+        <>
       <div className="intro-options">
         <div className="setting">
           <span>Bot opponents</span>
@@ -501,9 +511,8 @@ export function TournamentPicker({ onClose }: { onClose: () => void }) {
         <DifficultyPicker value={difficulty} onChange={setDifficulty} />
       </div>
       <p className="panel__note">
-        Unranked for now. Online play and ranked tournaments come later. In the rotation so far:{' '}
-        {new Intl.ListFormat('en', { style: 'long', type: 'conjunction' }).format(tournamentPool().map((g) => g.title))}
-        . More trials join as they're built.
+        Practice against bots, unranked. In the {FORMATS[format].name} rotation:{' '}
+        {new Intl.ListFormat('en', { style: 'long', type: 'conjunction' }).format(poolForFormat(format, MINIGAMES).map((g) => g.title))}.
       </p>
       <PracticeList onClose={onClose} />
       {history[0] && (
@@ -526,6 +535,8 @@ export function TournamentPicker({ onClose }: { onClose: () => void }) {
           Not now
         </ToyButton>
       </div>
+        </>
+      )}
     </>
   );
 }
@@ -535,34 +546,23 @@ export function unit(plural: string, n: number) {
   return n === 1 && plural.endsWith('s') ? plural.slice(0, -1) : plural;
 }
 
-/** Every playable trial, for solo/bot practice (each also has its own gate in the hub). */
+/** Every playable trial as picture cards, for solo/bot practice (each also has its own gate in the hub). */
 function PracticeList({ onClose }: { onClose: () => void }) {
   const records = useGame((s) => s.records);
-  const games = MINIGAMES.filter((g) => g.status === 'playable');
   return (
     <div className="practice-list" aria-label="Practice a trial">
       <span className="practice-list__title">Or practise one trial</span>
-      <div className="practice-list__grid">
-        {games.map((g) => {
+      <GameCardGrid
+        testPrefix="practice"
+        onPick={(id) => {
+          onClose();
+          openPractice(id);
+        }}
+        sub={(g) => {
           const r = records[g.id];
-          return (
-            <button
-              key={g.id}
-              className="practice-card"
-              style={{ ['--accent' as string]: g.accent }}
-              data-testid={`practice-${g.id}`}
-              onClick={() => {
-                sfx.click();
-                onClose();
-                openPractice(g.id);
-              }}
-            >
-              <strong>{g.title}</strong>
-              <span>{r ? `Best ${r.best} ${unit(g.recordUnit, r.best)}` : g.tagline}</span>
-            </button>
-          );
-        })}
-      </div>
+          return r ? `Best ${r.best} ${unit(g.recordUnit, r.best)}` : null;
+        }}
+      />
     </div>
   );
 }

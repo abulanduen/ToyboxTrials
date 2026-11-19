@@ -32,7 +32,7 @@ const check = (n, ok, d = '') => {
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /** The protocol version this test expects (src/net/protocol.ts PROTOCOL_VERSION). */
-const PROTO = 2;
+const PROTO = 3; // v3: lobbies and server-run matches
 
 // ---------------------------------------------------------------- server
 async function startServer() {

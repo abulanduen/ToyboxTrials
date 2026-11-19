@@ -5,6 +5,9 @@
  */
 import pg from 'pg';
 import type { AccountStore, ProfileRecord, SessionRecord, UserRecord } from './store';
+import type { LeaderboardStore } from '../leaderboard';
+import { cleanResult } from '../leaderboard';
+import { rankEntries, type LeaderboardBoard, type LeaderboardResponse, type LeaderboardResult } from '../../src/net/leaderboardProtocol';
 
 /** Append-only: never edit a shipped step, add a new one. */
 export const MIGRATIONS: { version: number; sql: string }[] = [
@@ -33,6 +36,24 @@ export const MIGRATIONS: { version: number; sql: string }[] = [
         updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
       );`,
   },
+  {
+    // The online leaderboard (server/leaderboard.ts): one row per player per finished lobby match.
+    version: 2,
+    sql: `
+      CREATE TABLE IF NOT EXISTS leaderboard_results (
+        id        BIGSERIAL PRIMARY KEY,
+        board     TEXT NOT NULL,
+        name      TEXT NOT NULL,
+        name_key  TEXT NOT NULL,
+        account   BOOLEAN NOT NULL,
+        place     INTEGER NOT NULL,
+        field     INTEGER NOT NULL,
+        points    INTEGER NOT NULL,
+        at        TIMESTAMPTZ NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS leaderboard_board_idx ON leaderboard_results (board, at DESC);
+      CREATE INDEX IF NOT EXISTS leaderboard_name_idx ON leaderboard_results (board, account, name_key);`,
+  },
 ];
 /** Arbitrary constant for pg_advisory_lock: "toybox accounts". */
 const MIGRATION_LOCK = 7_461_202_611;
@@ -47,7 +68,7 @@ interface UserRow {
 }
 const toUser = (r: UserRow): UserRecord => ({ id: String(r.id), username: r.username, passwordHash: r.password_hash, createdAt: ms(r.created_at) });
 
-export class PgStore implements AccountStore {
+export class PgStore implements AccountStore, LeaderboardStore {
   readonly kind = 'postgres' as const;
   private pool: pg.Pool;
 
@@ -163,6 +184,45 @@ export class PgStore implements AccountStore {
     // Sessions and the profile go with it (ON DELETE CASCADE).
     const r = await this.pool.query('DELETE FROM users WHERE id = $1', [userId]);
     return (r.rowCount ?? 0) > 0;
+  }
+
+  // ---------------------------------------------------------------- leaderboard
+  async addResults(rows: LeaderboardResult[]) {
+    for (const raw of rows) {
+      const r = cleanResult(raw);
+      if (!r) continue;
+      await this.pool.query('INSERT INTO leaderboard_results (board, name, name_key, account, place, field, points, at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)', [
+        r.board,
+        r.name,
+        r.name.toLowerCase(),
+        r.account,
+        r.place,
+        r.of,
+        r.points,
+        new Date(r.at),
+      ]);
+    }
+  }
+
+  async leaderboard(board: LeaderboardBoard, limit: number): Promise<LeaderboardResponse> {
+    const agg = await this.pool.query<{ name: string; account: boolean; played: string; wins: string; points: string; best: number; last: Date }>(
+      `SELECT max(name) AS name, account, count(*) AS played, sum(CASE WHEN place = 1 THEN 1 ELSE 0 END) AS wins,
+              sum(points) AS points, max(points) AS best, max(at) AS last
+         FROM leaderboard_results WHERE board = $1
+        GROUP BY account, name_key
+        ORDER BY wins DESC, points DESC, best DESC, name ASC
+        LIMIT $2`,
+      [board, limit],
+    );
+    const recent = await this.pool.query<{ name: string; account: boolean; place: number; field: number; points: number; at: Date }>(
+      'SELECT name, account, place, field, points, at FROM leaderboard_results WHERE board = $1 ORDER BY at DESC, id DESC LIMIT $2',
+      [board, limit],
+    );
+    return {
+      board,
+      entries: rankEntries(agg.rows.map((r) => ({ name: r.name, account: r.account, played: Number(r.played), wins: Number(r.wins), points: Number(r.points), best: r.best, last: ms(r.last) }))),
+      recent: recent.rows.map((r) => ({ name: r.name, account: r.account, board, place: r.place, of: r.field, points: r.points, at: ms(r.at) })),
+    };
   }
 
   async close() {

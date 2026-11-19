@@ -98,6 +98,9 @@ let inFlight: Promise<void> | null = null;
 /** A change arrived while a save was in flight: save again afterwards. */
 let again = false;
 
+/** The signed-in session token (the online Hub links it so the leaderboard shows the username), or null. */
+export const accountToken = (): string | null => saved?.token ?? null;
+
 // ---------------------------------------------------------------- HTTP
 type Result<T> = { status: number; body: T | { error?: AccountErrorCode; message?: string } | null } | { status: 0; body: null };
 

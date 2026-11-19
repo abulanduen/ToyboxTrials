@@ -57,14 +57,24 @@ describe('TV cards', () => {
     }
   };
 
-  it('cycles through the four cards, a few seconds each, and a channel change skips ahead', () => {
-    expect(TV_CARDS).toEqual(['online', 'friends', 'shop', 'records']);
+  it('cycles through the five cards, a few seconds each, and a channel change skips ahead', () => {
+    expect(TV_CARDS).toEqual(['online', 'friends', 'leaders', 'shop', 'records']);
     expect(tvChannel(0).index).toBe(0);
     expect(tvChannel(TV_CARD_SECONDS - 0.01).index).toBe(0);
     expect(tvChannel(TV_CARD_SECONDS).index).toBe(1);
-    expect(tvChannel(TV_CARD_SECONDS * 5).index).toBe(1);
+    expect(tvChannel(TV_CARD_SECONDS * 6).index).toBe(1);
     expect(tvChannel(0, 3).index).toBe(3);
     expect(TV_CARD_SECONDS).toBeGreaterThanOrEqual(2);
+  });
+
+  it('the online leaderboard card: champions by wins, or a pointer to the Pavilion', () => {
+    expect(tvCard('leaders', base).lines.map((l) => l.text).join(' ')).toContain('NO ONLINE CHAMPIONS');
+    const withBoard: TvInputs = { ...online, lobbies: 2, leaders: { board: 'blitz', entries: Array.from({ length: 12 }, (_, i) => ({ name: `Player Number ${i}`, wins: 12 - i, points: 100 - i })) } };
+    const c = tvCard('leaders', withBoard);
+    expect(c.lines[0].text).toBe('BLITZ TOURNAMENTS');
+    expect(c.lines[1].text).toBe('1 Player Numb. W12 100');
+    expect(c.lines[c.lines.length - 1].text).toBe('2 LOBBIES OPEN NOW');
+    fits(withBoard);
   });
 
   it('offline: a friendly card pointing at Play online on the menu', () => {
