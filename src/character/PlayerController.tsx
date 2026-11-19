@@ -183,7 +183,10 @@ export function PlayerController() {
           sim0.vel.set(0, 0);
           sim0.wsYaw = Math.atan2(sim0.camPos.x - sim0.pos.x, sim0.camPos.z - sim0.pos.z);
           sim0.wsDist = Math.max(4, Math.hypot(sim0.camPos.x - sim0.pos.x, sim0.camPos.z - sim0.pos.z));
-          sim0.wsYawTarget = sim0.yaw + 0.55;
+          // Turn the toy to face the camera, so the turntable stays on the open side: walking up
+          // to a building (the Odds & Ends shop) leaves the toy facing its wall.
+          sim0.yawTarget = sim0.wsYaw;
+          sim0.wsYawTarget = sim0.wsYaw + 0.55;
         }
       }),
     [],
@@ -251,7 +254,7 @@ export function PlayerController() {
         sfx.emote(id);
       }),
       events.on('workshop:view', ({ back }) => {
-        sim.current.wsYawTarget = sim.current.yaw + (back ? Math.PI + 0.6 : 0.55);
+        sim.current.wsYawTarget = (sim.current.yawTarget ?? sim.current.yaw) + (back ? Math.PI + 0.6 : 0.55);
       }),
     ];
     return () => offs.forEach((o) => o());

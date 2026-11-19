@@ -155,7 +155,8 @@ export function BackItem({ id }: { id: BackId }) {
         return null;
     }
   }, [id]);
-  return content;
+  // Named so tests (and the debug scene view) can find what a toy is wearing.
+  return content ? <group name={`accessory:${id}`}>{content}</group> : null;
 }
 
 /** Face slot (head space: eye centre at (0, 1.02, 0.28), turret radius 0.42, grille top at y 0.51). */
@@ -251,7 +252,8 @@ export function FaceItem({ id }: { id: FaceId }) {
         return null;
     }
   }, [id]);
-  return content;
+  // Named so tests (and the debug scene view) can find what a toy is wearing.
+  return content ? <group name={`accessory:${id}`}>{content}</group> : null;
 }
 
 /** Neck slot (torso space: the top of the body is at y ≈ 1.95, the chest plate faces +z at 0.55). */
@@ -338,7 +340,7 @@ export function NeckItem({ id }: { id: NeckId }) {
               <boxGeometry args={[0.1, 0.3, 0.02]} />
             </mesh>
             <group position={[0, 1.58, 0.62]} rotation={[Math.PI / 2, 0, 0]}>
-              <mesh geometry={g} material={mat('#F2C14E', 0.2, 0.95, '#B98A1E')} castShadow />
+              <mesh geometry={g} material={mat('#F2C14E', 0.35, 0.55, '#B98A1E')} castShadow />
               <mesh position={[0, -0.035, 0]} rotation={[0, Math.PI / 4, 0]} material={mat(PALETTE.coral, 0.3, 0.1)}>
                 <octahedronGeometry args={[0.07]} />
               </mesh>
@@ -350,7 +352,8 @@ export function NeckItem({ id }: { id: NeckId }) {
         return null;
     }
   }, [id]);
-  return content;
+  // Named so tests (and the debug scene view) can find what a toy is wearing.
+  return content ? <group name={`accessory:${id}`}>{content}</group> : null;
 }
 
 export type { Accessories };

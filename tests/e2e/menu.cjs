@@ -94,7 +94,9 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
   await page.waitForSelector('.loading', { state: 'detached' });
   await page.waitForTimeout(1500);
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('toybox-trials:prototype:v1')).state);
-  check('name, hat and key persist across reload', saved.contenderName === 'Bolt' && saved.hat === 'thimble' && saved.keySkin === 'heart', JSON.stringify({ n: saved.contenderName, h: saved.hat, k: saved.keySkin }));
+  // Cosmetics live in the versioned profile since the shop (docs/ECONOMY.md).
+  const lo = saved.profile?.loadout ?? {};
+  check('name, hat and key persist across reload', saved.contenderName === 'Bolt' && lo.hat === 'thimble' && lo.keySkin === 'heart', JSON.stringify({ n: saved.contenderName, h: lo.hat, k: lo.keySkin }));
 
   // Deep link #play
   await page.goto(BASE + '?debug#play');

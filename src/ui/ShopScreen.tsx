@@ -148,7 +148,7 @@ export function ShopScreen() {
 
         <div className="pause__actions">
           <ToyButton onClick={done} autoFocus testId="shop-done">
-            {workshopReturn === 'playing' ? 'Back to the Playroom' : 'Done'}
+            Done
           </ToyButton>
           <ToyButton tone="blue" onClick={() => useGame.getState().openWorkshop()} testId="shop-to-workshop">
             Workshop

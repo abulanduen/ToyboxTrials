@@ -9,6 +9,7 @@ import { useGame } from './store';
 import { PALETTE } from './palette';
 import { rewardForSecret } from './cosmetics';
 import { EARN } from './economy';
+import { exposeDebug } from './debug';
 import { openPractice } from '../minigames/session';
 import { GATES, GATE_STAND, JACK, MUSICBOX, PAVILION, SCOREBOARD, SHOP, TOWER, WORKSHOP, frontOf } from '../scene/layout';
 
@@ -45,6 +46,9 @@ export const INTERACTABLES: Interactable[] = [
   { id: 'jack', x: JACK.x + 3.2, z: JACK.z + 0.5, radius: 3.4, verb: 'Open', label: 'a suspicious box', secret: true },
   { id: 'key', x: TOWER.block.x, z: TOWER.block.z, radius: 2.4, verb: 'Grab', label: 'the golden key', secret: true, minY: TOWER.block.top - 0.5, disabled: () => !keyAvailable() },
 ];
+
+// ?debug only: where each interactable is (e.g. tests teleport next to the shop's prompt).
+exposeDebug({ interactables: () => INTERACTABLES.map(({ id, x, z, radius, verb, label }) => ({ id, x, z, radius, verb, label })) });
 
 /** Live position overrides for movable interactables (the marble rolls). */
 export const livePositions = new Map<string, { x: number; z: number }>();

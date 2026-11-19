@@ -1,8 +1,10 @@
 # Online Hub
 
-Friends (or anyone) can enter the Playroom hub together, see one another, walk around and use four
-emotes. Trials (minigames) stay local and single-player: entering a gate or the Pavilion starts the
-usual practice game, and the other players see a "playing <game>" tag above you until you're back.
+Friends (or anyone) can enter the Playroom hub together, see one another (paint, hat, key and
+accessories), walk around and use their four equipped gestures (emotes). Trials (minigames) stay
+local and single-player: entering a gate or the Pavilion starts the usual practice game, and the
+other players see a "playing <game>" tag above you until you're back ("in the Workshop" and "at the
+Odds & Ends shop" work the same way).
 
 - **Server:** a small always-on Node server using plain WebSockets (`ws`), hosted on **Railway**.
 - **Client:** the same static Vite build as before (Vercel). It connects to `VITE_SERVER_URL`.
@@ -34,7 +36,8 @@ usual practice game, and the other players see a "playing <game>" tag above you 
 | `server/index.ts` | The socket layer only: HTTP `/health`, WebSocket upgrade on `/`, limits, heartbeats, the 15 Hz timer, logging. |
 | `server/build.mjs` | Bundles the server with esbuild into one file, `server-dist/index.cjs` (ws included). |
 | `src/net/client.ts`, `store.ts`, `remotes.ts`, `interp.ts`, `config.ts`, `transport.ts` | Client: connection manager, zustand store (status, room, roster), remote-player objects read by the frame loop, snapshot interpolation, server address, WebSocket transport. |
-| `src/character/RemotePlayers.tsx` | Remote toys: `WindupBot` with each player's paint/hat/key, DOM name tags. |
+| `src/character/RemotePlayers.tsx` | Remote toys: `WindupBot` with each player's paint, hat, key and accessories, DOM name tags. |
+| `src/game/cosmetics.ts`, `src/game/emotes.ts` | The shared cosmetics catalogue and gesture list. The server validates looks and emotes against them (docs/ECONOMY.md). |
 | `src/ui/OnlineUI.tsx` | Play online sheet, HUD chip, touch Emote menu. |
 
 ### Rooms
@@ -60,9 +63,17 @@ usual practice game, and the other players see a "playing <game>" tag above you 
   speed, grounded flag, emote, activity and connection state. Clients draw remote toys about
   100 ms behind the newest snapshot, blending between the two around that moment. The walk/idle
   animation follows the interpolated speed.
-- Emotes: `wave`, `cheer`, `spin`, `bow`, on keys 1–4 or the touch Emote button. The server
-  accepts at most one per player per 1.5 s, sends it to the others at once, and shows it in
-  snapshots for about 2 s. Each emote has a small synthesised sound.
+- Emotes (gestures): each player plays the four gestures equipped in their profile, on keys 1–4
+  or the touch Emote button. The free ones are `wave`, `cheer`, `spin` and `bow`; the shop sells
+  `dance`, `laugh`, `sit`, `salute`, `juggle` and `faint`. The server accepts any of these ten
+  ids (the shared list in `src/game/emotes.ts`) and at most one per player per 1.5 s. It sends the
+  emote to the others at once and shows it in snapshots for about 2 s. Each emote has a small
+  synthesised sound.
+- **Ownership is not checked by the server.** There are no accounts yet, so the server can't know
+  which gestures or cosmetics a player bought. It only accepts ids that exist in the shared
+  catalogue (each accessory in its own slot) and replaces anything else with the default. A
+  modified client could wear or play items it hasn't unlocked. Accounts (docs/ECONOMY.md) would fix
+  this.
 
 ### Reconnects and limits
 
@@ -76,7 +87,12 @@ usual practice game, and the other players see a "playing <game>" tag above you 
 - Only origins in `ALLOWED_ORIGINS` may connect. Logs contain counts only, never nicknames or IP
   addresses.
 
-## Protocol (version 1)
+## Protocol (version 2)
+
+Version 2 (the shop): looks gained the accessory slots `back`, `face` and `neck`; the emote list
+grew from 4 to 10 ids; and `shop` became an activity. Clients still on version 1 get the
+"refresh the page" message.
+
 
 JSON objects with a `t` field. Bump `PROTOCOL_VERSION` when a shape changes. The server turns away
 other versions with "This copy of the game is out of date. Refresh the page to play online."
@@ -85,10 +101,10 @@ Client → server:
 
 | `t` | Fields | Notes |
 | --- | --- | --- |
-| `hello` | `v`, `name`, `look {paint, hat, keySkin}`, `join {kind: public \| host \| code, code?}`, `resume?` | First message. The name is sanitised (2–16 printable characters, otherwise "Toy 123"); unknown cosmetics become the defaults. |
+| `hello` | `v`, `name`, `look {paint, hat, keySkin, back, face, neck}`, `join {kind: public \| host \| code, code?}`, `resume?` | First message. The name is sanitised (2–16 printable characters, otherwise "Toy 123"); unknown cosmetics become the defaults. An accessory slot may be omitted (read as `none`). |
 | `move` | `x, y, z, yaw, grounded, speed` | About every 66 ms while moving, every 1 s otherwise. |
-| `emote` | `id` | `wave`, `cheer`, `spin` or `bow`. |
-| `activity` | `a` | A minigame id, `workshop`, or null. |
+| `emote` | `id` | One of the ten gesture ids in `src/game/emotes.ts`. |
+| `activity` | `a` | A minigame id, `workshop`, `shop`, or null. |
 | `look` | `look` | Cosmetics changed (at most twice a second). |
 | `leave` | | Leaving on purpose (frees the slot at once). |
 
@@ -127,7 +143,7 @@ npm test                                   # includes online-hub and online-prot
 VITE_SERVER_URL=ws://localhost:2567 npx vite build --outDir /tmp/online-dist
 npx vite preview --outDir /tmp/online-dist --port 4190 --strictPort &
 npm run server:build
-BASE_URL=http://localhost:4190/ node tests/e2e/online.cjs   # starts the server itself on 2567
+BASE_URL=http://localhost:4190/ node tests/e2e/online.cjs   # starts the server itself on 2567 (SERVER_PORT changes it)
 ```
 
 ## Deploy on Railway (owner steps)
@@ -188,5 +204,5 @@ Railway pushes a new server on every commit to the branch it watches. The client
 - One server process holds all rooms in memory, so a restart or redeploy empties every room.
   Clients then reconnect into a fresh room; private room codes are lost.
 - No chat, moderation, reporting or blocking. Nickname filtering is a short word list.
-- Unlock state is client-side, so a modified client could wear a cosmetic it hasn't unlocked.
-  Only catalogue ids are accepted.
+- Unlock state and the cog wallet are client-side, so a modified client could wear a cosmetic or
+  play a gesture it hasn't bought. Only catalogue ids are accepted.

@@ -257,11 +257,13 @@ export function WindupBot({ anim, paint, hat = 'none', keySkin = 'classic', acce
           const snap = clamp(e / 0.14, 0, 1) * k;
           scaleY *= 1 + 0.05 * snap;
           rootY += Math.sin(Math.PI * clamp(e / 0.25, 0, 1)) * 0.18 * body;
-          armRZ = THREE.MathUtils.lerp(armRZ, 2.25, snap);
-          armRX = THREE.MathUtils.lerp(armRX, -0.75, snap);
+          // (The stubby arm can't reach the brow, so the head tips to meet the raised hand.)
+          armRZ = THREE.MathUtils.lerp(armRZ, 2.8, snap);
+          armRX = THREE.MathUtils.lerp(armRX, -0.5, snap);
           armLZ = THREE.MathUtils.lerp(armLZ, 0.04, snap);
           armLX = THREE.MathUtils.lerp(armLX, 0, snap);
-          headNod = -0.08 * snap;
+          headTilt = -0.14 * snap;
+          headNod = -0.06 * snap;
           break;
         }
         case 'juggle': {

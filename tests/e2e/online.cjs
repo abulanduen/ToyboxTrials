@@ -5,7 +5,8 @@
      npm run server:build
      BASE_URL=http://localhost:4190/ node tests/e2e/online.cjs
    Desktop: A hosts a private room, B joins with the code, C through a #room= link; name tags,
-   movement, emotes, reconnect, leave, errors, public Hub. Phones (portrait + landscape, touch):
+   movement, emotes, reconnect, leave, errors, public Hub. B's save owns shop items (a cape, a
+   monocle and the Dance gesture on key 4): A must see B's accessories and B's bought gesture. Phones (portrait + landscape, touch):
    join the public Hub and use the Emote menu. Raw-socket checks: health, origin, version, limits.
    Software rendering is slow: page loads wait up to LOAD_TIMEOUT (default 10 min). */
 const { chromium } = require('playwright');
@@ -30,6 +31,8 @@ const check = (n, ok, d = '') => {
   console.log(res[res.length - 1]);
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+/** The protocol version this test expects (src/net/protocol.ts PROTOCOL_VERSION). */
+const PROTO = 2;
 
 // ---------------------------------------------------------------- server
 async function startServer() {
@@ -79,15 +82,32 @@ function rawSession(url, opts, sends, waitMs = 1500) {
 const errors = [];
 /** Each test player wears different (free) cosmetics, so the screenshots show them carried across. */
 const LOOKS = { Alpha: [0, 'none', 'classic'], Bravo: [1, 'thimble', 'heart'], Charlie: [2, 'bottlecap', 'classic'], Delta: [3, 'thimble', 'heart'], Echo: [4, 'bottlecap', 'heart'] };
+/**
+ * Bravo's save is a current (version 1) profile that has bought a cape, a monocle and the Dance
+ * gesture at the shop and wears them (Dance on key 4). Everyone else starts from an old
+ * (version 0) save, which the game migrates.
+ */
+const BRAVO_PROFILE = {
+  schema: 1,
+  wallet: { cogs: 40, earned: 450, spent: 410 },
+  owned: { cape: { source: 'shop', at: 1 }, monocle: { source: 'shop', at: 1 }, dance: { source: 'shop', at: 1 } },
+  loadout: { paint: 'coral-clank', hat: 'thimble', keySkin: 'heart', back: 'cape', face: 'monocle', neck: 'none', gestures: ['wave', 'cheer', 'spin', 'dance'] },
+  firstWinDay: null,
+  secretsPaid: [],
+  achievements: [],
+};
 async function openPage(browser, name, ctxOpts, url = BASE + '?debug') {
   const ctx = await browser.newContext(ctxOpts);
-  await ctx.addInitScript(([n, look]) => {
+  await ctx.addInitScript(([n, look, profile]) => {
     if (!sessionStorage.getItem('seeded')) {
       sessionStorage.setItem('seeded', '1');
       const [paintIndex, hat, keySkin] = look;
-      localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { quality: 'low', tutorials: false, contenderName: n, paintIndex, hat, keySkin }, version: 0 }));
+      const save = profile
+        ? { state: { quality: 'low', tutorials: false, contenderName: n, profile }, version: 1 }
+        : { state: { quality: 'low', tutorials: false, contenderName: n, paintIndex, hat, keySkin }, version: 0 };
+      localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify(save));
     }
-  }, [name, LOOKS[name] ?? LOOKS.Alpha]);
+  }, [name, LOOKS[name] ?? LOOKS.Alpha, name === 'Bravo' ? BRAVO_PROFILE : null]);
   const page = await ctx.newPage();
   page.setDefaultTimeout(T);
   page.on('pageerror', (e) => errors.push(`${name}: ${e.message}`));
@@ -112,7 +132,7 @@ const shot = (p, file) => p.screenshot({ path: path.join(OUT, file), timeout: T 
   try {
     // ------------------------------------------------------------ raw socket checks
     const health = await (await fetch(`${HTTP}/health`)).json();
-    check('server GET /health answers ok', health.ok === true && health.protocol === 1, JSON.stringify(health));
+    check(`server GET /health answers ok (protocol ${PROTO})`, health.ok === true && health.protocol === PROTO, JSON.stringify(health));
     const evil = await rawSession(`${WS}/`, { origin: 'https://evil.example' }, []);
     check('origin not on the allow-list is refused (403)', evil.status === 403);
     const noPath = await rawSession(`${WS}/elsewhere`, { origin: ORIGIN }, []);
@@ -122,6 +142,11 @@ const shot = (p, file) => p.screenshot({ path: path.join(OUT, file), timeout: T 
     check('mismatched protocol version gets a clear error and is closed', old.msgs[0]?.code === 'version_mismatch' && /refresh/i.test(old.msgs[0]?.message) && old.code === 4001, JSON.stringify(old.msgs[0]));
     const junk = await rawSession(`${WS}/`, { origin: ORIGIN }, ['{"t":"move","x":1e999}', 'nonsense']);
     check('malformed messages are answered with bad_request', junk.msgs.filter((m) => m.code === 'bad_request').length === 2);
+    // Looks: unknown or misplaced accessory ids are cleaned by the server against the shared catalogue.
+    const dressed = await rawSession(`${WS}/`, { origin: ORIGIN }, [{ t: 'hello', v: PROTO, name: 'Dresser', look: { paint: 9, hat: 'propeller', keySkin: 'moon', back: 'scarf', face: 'goggles', neck: 'crown-jewels' }, join: { kind: 'public' } }, { t: 'leave' }]);
+    const dw = dressed.msgs.find((m) => m.t === 'welcome');
+    const dl = dw?.players.find((p) => p.id === dw.you)?.look;
+    check('server keeps catalogue accessories and blanks unknown or wrong-slot ids', dl && dl.paint === 9 && dl.hat === 'propeller' && dl.keySkin === 'moon' && dl.face === 'goggles' && dl.back === 'none' && dl.neck === 'none', JSON.stringify(dl));
     const big = await rawSession(`${WS}/`, { origin: ORIGIN }, ['x'.repeat(3000)]);
     check('messages over 2 KB close the socket (1009)', big.code === 1009, `close ${big.code}`);
     const flood = await rawSession(`${WS}/`, { origin: ORIGIN }, Array.from({ length: 400 }, () => '{"t":"leave"}'), 2500);
@@ -144,8 +169,8 @@ const shot = (p, file) => p.screenshot({ path: path.join(OUT, file), timeout: T 
           setTimeout(() => { x.send(JSON.stringify({ t: 'leave' })); y.send(JSON.stringify({ t: 'leave' })); x.close(); y.close(); resolve({ xId, seen }); }, 1000);
         }
       });
-      y.on('open', () => y.send(JSON.stringify({ t: 'hello', v: 1, name: 'Watcher', look, join: { kind: 'public' } })));
-      y.on('message', (d) => { if (JSON.parse(String(d)).t === 'welcome') x.send(JSON.stringify({ t: 'hello', v: 1, name: 'Spammer', look, join: { kind: 'public' } })); });
+      y.on('open', () => y.send(JSON.stringify({ t: 'hello', v: PROTO, name: 'Watcher', look, join: { kind: 'public' } })));
+      y.on('message', (d) => { if (JSON.parse(String(d)).t === 'welcome') x.send(JSON.stringify({ t: 'hello', v: PROTO, name: 'Spammer', look, join: { kind: 'public' } })); });
       x.on('error', () => {});
       y.on('error', () => {});
       setTimeout(() => resolve({ xId, seen }), 8000);
@@ -197,6 +222,9 @@ const shot = (p, file) => p.screenshot({ path: path.join(OUT, file), timeout: T 
     check('chip counts 3 toys online', (await A.page.textContent('[data-testid=online-count]')).includes('3'));
     const bLook = (await remoteBy(A.page, 'Bravo'))?.look;
     check("remote players carry their cosmetics (A sees B's paint, hat and key)", bLook && bLook.paint === 1 && bLook.hat === 'thimble' && bLook.keySkin === 'heart', JSON.stringify(bLook));
+    check("A sees B's shop accessories in B's look (cape on the back, monocle on the face)", bLook && bLook.back === 'cape' && bLook.face === 'monocle' && bLook.neck === 'none', JSON.stringify(bLook));
+    await A.page.waitForFunction(() => !!window.__toybox.three().scene.getObjectByName('accessory:cape') && !!window.__toybox.three().scene.getObjectByName('accessory:monocle'), null, { timeout: 60000, polling: 250 }).catch(() => null);
+    check("…and A's scene draws them on B's toy (A itself wears none)", await A.page.evaluate(() => { const sc = window.__toybox.three().scene; return !!sc.getObjectByName('accessory:cape') && !!sc.getObjectByName('accessory:monocle'); }));
 
     // Stage a group photo: A by the spawn tile facing the village, B and C in front, facing A.
     await A.page.evaluate(() => window.__toybox.teleport(0, 24, Math.PI));
@@ -234,6 +262,14 @@ const shot = (p, file) => p.screenshot({ path: path.join(OUT, file), timeout: T 
     const bOnA = await remoteBy(A.page, 'Bravo');
     check("A sees B's wave (remote anim state)", bOnA.lastEmote === 'wave' && (bOnA.anim.emote === 'wave' || bOnA.anim.emoteT >= 0), JSON.stringify(bOnA.anim));
     await shot(A.page, 'online-04-A-sees-B-wave.png');
+    // B's bought gesture: Dance is on B's key 4, and A must see it.
+    await sleep(1600);
+    await B.page.keyboard.press('Digit4');
+    await B.page.waitForFunction(() => window.__toybox.state().anim.emote === 'dance', null, { timeout: 30000, polling: 100 }).catch(() => null);
+    check('B plays the bought Dance gesture on key 4', (await B.page.evaluate(() => window.__toybox.state().anim.emote)) === 'dance');
+    await A.page.waitForFunction(() => window.__toybox.net.remotes().find((r) => r.name === 'Bravo')?.lastEmote === 'dance', null, { timeout: 20000, polling: 100 }).catch(() => null);
+    check("A sees B's bought gesture (dance)", (await remoteBy(A.page, 'Bravo'))?.lastEmote === 'dance');
+    await shot(A.page, 'online-04b-A-sees-B-dance-cape.png');
     // Client cooldown: two emote keys in quick succession play (and send) only one emote.
     await sleep(1600);
     const evBefore = (await remoteBy(A.page, 'Bravo')).emoteEvents;
@@ -243,7 +279,7 @@ const shot = (p, file) => p.screenshot({ path: path.join(OUT, file), timeout: T 
     await sleep(1200);
     const bAfter = await remoteBy(A.page, 'Bravo');
     const bLocal = await B.page.evaluate(() => window.__toybox.state().anim.emote);
-    check('keys 4 and 3 pressed together: exactly one emote is played and sent', bAfter.emoteEvents === evBefore + 1 && ['bow', 'spin'].includes(bAfter.lastEmote) && bLocal === bAfter.lastEmote, `events +${bAfter.emoteEvents - evBefore}, sent ${bAfter.lastEmote}, B plays ${bLocal}`);
+    check('keys 4 and 3 pressed together: exactly one emote is played and sent', bAfter.emoteEvents === evBefore + 1 && ['dance', 'spin'].includes(bAfter.lastEmote) && bLocal === bAfter.lastEmote, `events +${bAfter.emoteEvents - evBefore}, sent ${bAfter.lastEmote}, B plays ${bLocal}`);
 
     // Reconnect: C's socket drops without a leave; C resumes the same slot.
     const cId = await net(C.page, 'selfId');
