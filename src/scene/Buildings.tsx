@@ -52,7 +52,7 @@ export function Fountain() {
       drops.current.setMatrixAt(i, dummy.matrix);
     }
     drops.current.instanceMatrix.needsUpdate = true;
-    (water.current.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.25 + Math.sin(t * 2) * 0.05;
+    (water.current.material as THREE.MeshPhysicalMaterial).emissiveIntensity = 0.25 + Math.sin(t * 2) * 0.05;
   });
 
   return (
@@ -66,7 +66,10 @@ export function Fountain() {
             highlights above the bloom threshold that flashed on and off as the camera turned. */}
         <mesh ref={water} position={[0, FOUNTAIN.top - 0.25, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
           <circleGeometry args={[FOUNTAIN.r - 0.3, 32]} />
-          <meshStandardMaterial color={PALETTE.toyBlue} emissive={PALETTE.toyBlue} emissiveIntensity={0.25} roughness={0.32} metalness={0.05} />
+          {/* Low specular: seen towards the window, a normal-strength sun reflection turned the whole
+              pool from blue to near-white within a few degrees of camera turn (with bloom on top),
+              which read as the fountain flickering while panning. Painted toy water, not a mirror. */}
+          <meshPhysicalMaterial color={PALETTE.toyBlue} emissive={PALETTE.toyBlue} emissiveIntensity={0.25} roughness={0.5} metalness={0} specularIntensity={0.25} />
         </mesh>
         {/* thread spool pillar */}
         <mesh position={[0, 2.2, 0]} castShadow material={woodMat(PALETTE.woodLight)}>
@@ -79,7 +82,9 @@ export function Fountain() {
           <cylinderGeometry args={[0.9, 0.9, 0.35, 16]} />
         </mesh>
         {/* glass marble */}
-        <mesh position={[0, 4.75, 0]} castShadow ref={camBlock}>
+        {/* Not a camera blocker: a ball this small only grazes the camera ray, which then flicked
+            between hit and miss as the view turned and jolted the camera in and out. */}
+        <mesh position={[0, 4.75, 0]} castShadow>
           <sphereGeometry args={[1.05, 24, 18]} />
           {/* depthWrite off: as see-through glass it must not hide the droplets behind it. With it on,
               the droplets popped in and out as the camera turned and the transparent sort order flipped. */}
@@ -92,7 +97,10 @@ export function Fountain() {
       </group>
       <instancedMesh ref={drops} args={[undefined, undefined, N]}>
         <sphereGeometry args={[1, 8, 6]} />
-        <meshStandardMaterial color="#D8F0FF" emissive={PALETTE.toyBlue} emissiveIntensity={0.4} transparent opacity={0.85} />
+        {/* Opaque on purpose: as a transparent mesh the droplets and the glass marble swapped draw
+            order as the camera turned (their sort points cross), so drops behind the marble popped in
+            front of it and back. Opaque drops are drawn first and the marble blends over them. */}
+        <meshStandardMaterial color="#D8F0FF" emissive={PALETTE.toyBlue} emissiveIntensity={0.4} roughness={0.5} />
       </instancedMesh>
     </group>
   );
