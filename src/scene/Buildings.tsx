@@ -313,8 +313,9 @@ export function Shop() {
           </mesh>
         ))}
       </group>
-      {/* awning */}
-      <mesh position={[0, h - 0.6, d / 2 + 2]} rotation={[0.5, 0, 0]} castShadow material={awning}>
+      {/* awning: a camera blocker too. As a thin double-sided sheet the camera could pass through
+          it while turning near the shop, flashing the stripes across the whole view. */}
+      <mesh position={[0, h - 0.6, d / 2 + 2]} rotation={[0.5, 0, 0]} castShadow material={awning} ref={camBlock}>
         <planeGeometry args={[w + 0.6, 4.4]} />
       </mesh>
     </group>
