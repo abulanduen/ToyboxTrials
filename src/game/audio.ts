@@ -7,6 +7,7 @@
  * Volume: master × sfx from the persisted settings store, applied live.
  */
 import { useGame } from './store';
+import type { EmoteId } from './emotes';
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
@@ -228,7 +229,7 @@ export const sfx = {
    * Hub emotes: a tiny synthesised signature each. `gain` scales it (remote players' emotes play
    * quieter with distance).
    */
-  emote(id: 'wave' | 'cheer' | 'spin' | 'bow', gain = 1) {
+  emote(id: EmoteId, gain = 1) {
     const t = now();
     const k = Math.max(0, Math.min(1, gain));
     if (k < 0.02) return;
@@ -249,7 +250,51 @@ export const sfx = {
         tine(1046.5, t, 0.09 * k, 0.45, 2.0);
         tine(784, t + 0.18, 0.09 * k, 0.6, 2.0);
         break;
+      case 'dance': // a bouncy tick-tock bass line with tine accents on the off-beats
+        for (let i = 0; i < 8; i++) {
+          const at = t + i * 0.125;
+          if (i % 2 === 0) tone(i % 4 === 0 ? 196 : 247, at, 0.1 * k, 0.12, 'triangle', 0.003);
+          else tine(i % 4 === 1 ? 1318.5 : 1568, at, 0.06 * k, 0.15);
+          noise(at, 0.03 * k, 0.01, 5000, 6);
+        }
+        break;
+      case 'laugh': // "ha-ha-ha-ha": bright, wobbly blips falling in pitch, with ratchet clicks
+        for (let i = 0; i < 5; i++) {
+          const at = t + i * 0.13;
+          tone(880 - i * 70, at, 0.08 * k, 0.09, 'square', 0.004, 700 - i * 60);
+          noise(at + 0.05, 0.03 * k, 0.012, 2600, 4);
+        }
+        break;
+      case 'sit': // a springy settle: falling boing, then a soft wooden thump
+        tone(520, t, 0.08 * k, 0.32, 'sine', 0.004, 170);
+        tone(130, t + 0.3, 0.12 * k, 0.16, 'sine', 0.002, 70);
+        noise(t + 0.3, 0.05 * k, 0.05, 900, 1);
+        break;
+      case 'salute': // a crisp heel click and a little bugle-ish fanfare of tines
+        noise(t, 0.09 * k, 0.025, 3500, 3);
+        [784, 1046.5, 1318.5].forEach((f, i) => tine(f, t + 0.08 + i * 0.09, 0.08 * k, 0.3));
+        tine(1568, t + 0.4, 0.09 * k, 0.5);
+        break;
+      case 'juggle': // three bead tosses: soft rising pops, each with a tiny catch tick
+        for (let i = 0; i < 3; i++) {
+          const at = t + i * 0.26;
+          tone(420 + i * 90, at, 0.07 * k, 0.12, 'sine', 0.003, 900 + i * 120);
+          noise(at + 0.18, 0.04 * k, 0.012, 4200, 5);
+        }
+        break;
+      case 'faint': // a wilting slide down, then a tin clunk as it lands
+        tone(1046.5, t, 0.08 * k, 0.55, 'triangle', 0.01, 260);
+        tone(98, t + 0.55, 0.13 * k, 0.2, 'sine', 0.002, 60);
+        for (let i = 0; i < 3; i++) noise(t + 0.55 + i * 0.05, (0.08 - i * 0.02) * k, 0.03, 2200 + i * 600, 3);
+        break;
     }
+  },
+  /** Shop purchase: a little clockwork till: ratchet clicks, then a bright two-tine ding. */
+  purchase() {
+    const t = now();
+    for (let i = 0; i < 4; i++) noise(t + i * 0.035, 0.07, 0.012, 3000 + i * 300, 5);
+    tine(1568, t + 0.16, 0.11, 0.5);
+    tine(2093, t + 0.24, 0.1, 0.7);
   },
   /** Respawn pop. */
   pop() {

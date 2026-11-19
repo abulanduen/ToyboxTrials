@@ -9,14 +9,14 @@ import { WindupBot } from './WindupBot';
 import { createToyAnim, ELIM_DURATION, INTERACT_DURATION, RESPAWN_DURATION, startEmote, stepEmote, type ToyAnim } from './anim';
 import { addMouseDelta, consumeMouseDelta, endFrame, getMoveAxis, isDown, stickRunning, wasPressed, clearInput, EMOTE_ACTIONS } from '../game/input';
 import { HUB_MOTION } from '../game/hubMotion';
-import { EMOTE_COOLDOWN, EMOTE_DURATION, EMOTE_IDS } from '../game/emotes';
+import { EMOTE_COOLDOWN, EMOTE_DURATION, type EmoteId } from '../game/emotes';
 import { groundHeightAt, resolve } from '../game/collision';
-import { inputBlocked, useGame } from '../game/store';
+import { inputBlocked, useGame, useShownLoadout } from '../game/store';
 import { sfx } from '../game/audio';
 import { events } from '../game/events';
 import { INTERACTABLES, interact, interactablePos } from '../game/interactables';
 import { cameraBlockers, player, SPAWN } from '../game/player';
-import { PAINT_JOBS } from '../game/palette';
+import { paintJobFor } from '../game/cosmetics';
 import { blobShadowTexture } from '../scene/textures';
 import { exposeDebug } from '../game/debug';
 
@@ -37,10 +37,11 @@ const wrapAngle = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 
 export function PlayerController() {
   const { camera, gl } = useThree();
-  const paintIndex = useGame((s) => s.paintIndex);
-  const paint = PAINT_JOBS[paintIndex % PAINT_JOBS.length];
-  const hat = useGame((s) => s.hat);
-  const keySkin = useGame((s) => s.keySkin);
+  // Equipped loadout, with any shop try-on on top.
+  const look = useShownLoadout();
+  const paint = paintJobFor(look.paint);
+  const { back, face, neck } = look;
+  const accessories = useMemo(() => ({ back, face, neck }), [back, face, neck]);
 
   const root = useRef<THREE.Group>(null!);
   const shadow = useRef<THREE.Mesh>(null!);
@@ -66,9 +67,11 @@ export function PlayerController() {
     /** Turn the toy to face this yaw (menu → play turnaround), or null. */
     yawTarget: null as number | null,
     /** Workshop turntable camera: current angle/distance orbit toward their targets. */
-    wsYaw: 0,
-    wsYawTarget: 0,
+    wsYaw: startYaw + 0.55, // deep links straight into the Workshop or shop start on the 3/4 front view
+    wsYawTarget: startYaw + 0.55,
     wsDist: 10,
+    /** Debug only (?debug pose hook): hold the current gesture frame for screenshots. */
+    holdPose: false,
     /** Cut (rather than sweep) the camera on the next frame. */
     snapCam: !!ret,
     /** Next idle wave on the main menu. */
@@ -203,6 +206,14 @@ export function PlayerController() {
         sim.current.camYaw = camYaw;
         sim.current.camPitch = camPitch;
       },
+      /** Hold a gesture at time `t` (s) for screenshots; `pose(null)` lets it run again. */
+      pose: (id: EmoteId | null, t = 0.9) => {
+        if (id) {
+          startEmote(anim.current, id);
+          anim.current.emoteT = t;
+        }
+        sim.current.holdPose = !!id;
+      },
       state: () => ({ x: sim.current.pos.x, y: sim.current.pos.y, z: sim.current.pos.z, yaw: sim.current.yaw, camYaw: sim.current.camYaw, camPitch: sim.current.camPitch, fov: (camera as THREE.PerspectiveCamera).fov, anim: { ...anim.current } }),
     });
   }, []);
@@ -233,6 +244,11 @@ export function PlayerController() {
         s.snapCam = true;
         player.pos.copy(s.pos);
         player.yaw = yaw;
+      }),
+      events.on('toy:preview-gesture', ({ id }) => {
+        // Workshop/shop preview: play it on the turntable toy (never sent online).
+        startEmote(anim.current, id);
+        sfx.emote(id);
       }),
       events.on('workshop:view', ({ back }) => {
         sim.current.wsYawTarget = sim.current.yaw + (back ? Math.PI + 0.6 : 0.55);
@@ -277,14 +293,14 @@ export function PlayerController() {
     a.boosted = performance.now() < s.boostUntil;
 
     // ---------- emotes (keys 1–4 / touch Emote menu) ----------
-    stepEmote(a, dt, EMOTE_DURATION);
+    if (!s.holdPose) stepEmote(a, dt, EMOTE_DURATION);
     if (playing && !blocked && !eliminated) {
       for (let i = 0; i < EMOTE_ACTIONS.length; i++) {
         if (!wasPressed(EMOTE_ACTIONS[i])) continue;
         const t = performance.now();
         if (t - s.lastEmoteAt >= EMOTE_COOLDOWN * 1000) {
           s.lastEmoteAt = t;
-          const id = EMOTE_IDS[i];
+          const id = g.profile.loadout.gestures[i]; // the four equipped gestures
           startEmote(a, id);
           sfx.emote(id);
           events.emit('player:emote', { id });
@@ -486,7 +502,7 @@ export function PlayerController() {
       const rx = Math.cos(ang);
       const rz = -Math.sin(ang);
       const side = portrait ? 0 : 1.9; // shift look point right → toy appears left of the panel
-      tmp.look.set(s.pos.x + rx * side, s.pos.y + 1.9 - (portrait ? 2.3 : 0), s.pos.z + rz * side);
+      tmp.look.set(s.pos.x + rx * side, s.pos.y + 1.9 - (portrait ? 3.1 : 0), s.pos.z + rz * side); // portrait: toy above the bottom sheet
       camera.lookAt(tmp.look);
       s.camTarget.set(s.pos.x, s.pos.y + TARGET_H, s.pos.z);
     } else {
@@ -528,7 +544,7 @@ export function PlayerController() {
   return (
     <>
       <group ref={root}>
-        <WindupBot anim={anim} paint={paint} hat={hat} keySkin={keySkin} />
+        <WindupBot anim={anim} paint={paint} hat={look.hat} keySkin={look.keySkin} accessories={accessories} />
       </group>
       <mesh ref={shadow} rotation={[-Math.PI / 2, 0, 0]} renderOrder={1}>
         <planeGeometry args={[1, 1]} />

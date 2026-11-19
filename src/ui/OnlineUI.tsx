@@ -9,7 +9,8 @@ import { nameTagEls } from '../net/remotes';
 import { joinOnline, leaveOnline, onlineAvailable } from '../net/client';
 import { OFFLINE_TEXT } from '../net/config';
 import { ROOM_CODE_LENGTH } from '../net/protocol';
-import { EMOTE_IDS, EMOTE_LABELS, type EmoteId } from '../game/emotes';
+import { EMOTE_LABELS } from '../game/emotes';
+import { GestureGlyph } from './itemIcons';
 import { EMOTE_ACTIONS, tapVirtual } from '../game/input';
 import { unlockAudio } from '../game/audio';
 import { CardboardSheet, ToyButton } from './common';
@@ -198,49 +199,15 @@ export function NameTags() {
   );
 }
 
-/** Small drawn glyphs for the emote buttons (no emoji or icon packs). */
-function EmoteGlyph({ id }: { id: EmoteId }) {
-  const common = { width: 26, height: 26, viewBox: '0 0 24 24', fill: 'none', stroke: '#2B2433', strokeWidth: 2.2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true };
-  switch (id) {
-    case 'wave':
-      return (
-        <svg {...common}>
-          <path d="M8 13V6.5a1.5 1.5 0 0 1 3 0V12M11 11V5a1.5 1.5 0 0 1 3 0v6M14 11V6.5a1.5 1.5 0 0 1 3 0V14c0 4-2.5 6.5-6 6.5-2.6 0-4.2-1.4-5.4-3.6L4 13.6a1.4 1.4 0 0 1 2.4-1.4L8 14.5" />
-          <path d="M19.5 4.5c1 1 1.5 2.2 1.5 3.5M3 7.5c0-1.3.5-2.5 1.5-3.5" />
-        </svg>
-      );
-    case 'cheer':
-      return (
-        <svg {...common}>
-          <path d="M12 3l2.2 4.6 5 .7-3.6 3.5.9 5L12 14.4 7.5 16.8l.9-5L4.8 8.3l5-.7z" />
-          <path d="M5 20h14" />
-        </svg>
-      );
-    case 'spin':
-      return (
-        <svg {...common}>
-          <path d="M20 12a8 8 0 1 1-2.3-5.7" />
-          <path d="M20 4v4.5h-4.5" />
-        </svg>
-      );
-    case 'bow':
-      return (
-        <svg {...common}>
-          <circle cx="15.5" cy="6.5" r="2.3" />
-          <path d="M14 9.5L9 13l-1 8M9 13l6 1.5M8 21h4" />
-        </svg>
-      );
-  }
-}
-
-/** Touch: an Emote button that opens four emote buttons beside it. */
+/** Touch: an Emote button that opens the four equipped gestures beside it. */
 export function TouchEmotes() {
   const [open, setOpen] = useState(false);
+  const gestures = useGame((s) => s.profile.loadout.gestures);
   return (
     <div className="emote-touch">
       {open && (
         <div className="emote-menu" role="menu" aria-label="Emotes" data-testid="emote-menu">
-          {EMOTE_IDS.map((id, i) => (
+          {gestures.map((id, i) => (
             <button
               key={id}
               role="menuitem"
@@ -251,7 +218,7 @@ export function TouchEmotes() {
                 setOpen(false);
               }}
             >
-              <EmoteGlyph id={id} />
+              <GestureGlyph id={id} />
               <span>{EMOTE_LABELS[id]}</span>
             </button>
           ))}

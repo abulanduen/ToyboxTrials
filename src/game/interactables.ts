@@ -8,6 +8,7 @@ import { sfx } from './audio';
 import { useGame } from './store';
 import { PALETTE } from './palette';
 import { rewardForSecret } from './cosmetics';
+import { EARN } from './economy';
 import { openPractice } from '../minigames/session';
 import { GATES, GATE_STAND, JACK, MUSICBOX, PAVILION, SCOREBOARD, SHOP, TOWER, WORKSHOP, frontOf } from '../scene/layout';
 
@@ -60,7 +61,7 @@ function discover(id: string, name: string) {
     const reward = rewardForSecret(id);
     g.pushTicket({
       title: 'Secret found!',
-      body: `${name}: ${n}/${SECRET_IDS.length} playroom secrets${reward ? `. Unlocked: ${reward} (Workshop)` : ''}`,
+      body: `${name}: ${n}/${SECRET_IDS.length} playroom secrets${reward ? `. Unlocked: ${reward} (Workshop)` : ''}. +${EARN.secret} cogs`,
       tone: 'reward',
     });
   }
@@ -88,14 +89,8 @@ export function interact(id: string, facing: { x: number; z: number }) {
       g.openWorkshop();
       break;
     case 'shop':
-      sfx.click();
-      g.openPanel({
-        kind: 'shop',
-        title: 'Odds & Ends Shop',
-        subtitle: 'Closed for stock-take',
-        body: 'Thimble helmets, bottle-cap crowns and button badges will be sold here once cosmetics are unlocked.',
-        accent: PALETTE.sage,
-      });
+      sfx.purchase();
+      g.openShop();
       break;
     case 'scoreboard':
       sfx.click();

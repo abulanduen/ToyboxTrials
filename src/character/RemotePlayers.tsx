@@ -19,7 +19,7 @@ import type { NetSample } from '../net/interp';
 import type { PlayerInfo } from '../net/protocol';
 import { EMOTE_DURATION } from '../game/emotes';
 import { PAINT_JOBS } from '../game/palette';
-import { HATS, KEY_SKINS } from '../game/cosmetics';
+import { cleanAccessories, isHatId, isKeySkinId } from '../game/cosmetics';
 import { blobShadowTexture } from '../scene/textures';
 import { groundHeightAt } from '../game/collision';
 import { MINIGAMES } from '../minigames/registry';
@@ -33,6 +33,7 @@ function activityText(a: string | null, off: boolean): string {
   if (off) return 'reconnecting…';
   if (!a) return '';
   if (a === 'workshop') return 'in the Workshop';
+  if (a === 'shop') return 'at the Odds & Ends shop';
   const g = MINIGAMES.find((m) => m.id === a);
   return g ? `playing ${g.title}` : 'playing a trial';
 }
@@ -63,8 +64,10 @@ function RemoteToy({ info }: { info: PlayerInfo }) {
   const head = useMemo(() => new THREE.Vector3(), []);
 
   const paint = PAINT_JOBS[((info.look.paint % PAINT_JOBS.length) + PAINT_JOBS.length) % PAINT_JOBS.length];
-  const hat = HATS.find((h) => h.id === info.look.hat)?.id ?? 'none';
-  const keySkin = KEY_SKINS.find((k) => k.id === info.look.keySkin)?.id ?? 'classic';
+  const hat = isHatId(info.look.hat) ? info.look.hat : 'none';
+  const keySkin = isKeySkinId(info.look.keySkin) ? info.look.keySkin : 'classic';
+  const { back, face, neck } = info.look;
+  const accessories = useMemo(() => cleanAccessories({ back, face, neck }), [back, face, neck]);
 
   useFrame((state, rawDt) => {
     const dt = Math.min(rawDt, 1 / 20);
@@ -145,7 +148,7 @@ function RemoteToy({ info }: { info: PlayerInfo }) {
   return (
     <>
       <group ref={root} visible={false}>
-        <WindupBot anim={anim} paint={paint} hat={hat} keySkin={keySkin} />
+        <WindupBot anim={anim} paint={paint} hat={hat} keySkin={keySkin} accessories={accessories} />
       </group>
       <mesh ref={shadow} rotation={[-Math.PI / 2, 0, 0]} scale={3.2} renderOrder={1} visible={false}>
         <planeGeometry args={[1, 1]} />

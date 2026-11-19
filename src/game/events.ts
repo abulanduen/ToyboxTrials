@@ -21,6 +21,8 @@ export type GameEvents = {
   'prop:musicbox-play': void;
   'prop:key-collected': void;
   'gate:open': { id: string };
+  /** Workshop/shop: play a gesture on the local toy as a preview (not sent online). */
+  'toy:preview-gesture': { id: EmoteId };
   /** Workshop asks the turntable to show the front (paint/hats) or back (wind-up key). */
   'workshop:view': { back: boolean };
 };

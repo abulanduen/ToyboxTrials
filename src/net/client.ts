@@ -26,7 +26,7 @@ import { useGame } from '../game/store';
 import { useMatch } from '../minigames/session';
 import { events } from '../game/events';
 import { player } from '../game/player';
-import { PAINT_JOBS } from '../game/palette';
+import { paintIndexOf } from '../game/cosmetics';
 import { sfx } from '../game/audio';
 import { exposeDebug } from '../game/debug';
 
@@ -60,14 +60,15 @@ let sentLook = '';
 
 export const onlineAvailable = () => transport !== null;
 
+/** What others see: the equipped loadout (never a shop try-on). */
 function currentLook(): Look {
-  const g = useGame.getState();
-  return { paint: ((g.paintIndex % PAINT_JOBS.length) + PAINT_JOBS.length) % PAINT_JOBS.length, hat: g.hat, keySkin: g.keySkin };
+  const l = useGame.getState().profile.loadout;
+  return { paint: paintIndexOf(l.paint), hat: l.hat, keySkin: l.keySkin, back: l.back, face: l.face, neck: l.neck };
 }
 
 function currentActivity(): Activity | null {
   const g = useGame.getState();
-  if (g.screen === 'workshop') return 'workshop';
+  if (g.screen === 'workshop') return g.workshopMode === 'shop' ? 'shop' : 'workshop';
   if (g.screen === 'minigame') return useMatch.getState().gameId;
   return null;
 }

@@ -2,24 +2,28 @@
  * Server-side cleaning of everything a player chooses about themselves: nickname and cosmetics.
  * Pure functions (randomness is passed in) so they are unit-tested in tests/unit/online-hub.test.ts.
  */
-import { HATS, KEY_SKINS, type HatId, type KeySkinId } from '../src/game/cosmetics';
+import { cleanAccessories, isHatId, isKeySkinId, type Accessories, type HatId, type KeySkinId } from '../src/game/cosmetics';
 import { PAINT_JOBS } from '../src/game/palette';
 import { NICKNAME_MAX, NICKNAME_MIN, type Look } from '../src/net/protocol';
 
-export interface CleanLook {
+export interface CleanLook extends Accessories {
   paint: number;
   hat: HatId;
   keySkin: KeySkinId;
 }
 
-export const DEFAULT_LOOK: CleanLook = { paint: 0, hat: 'none', keySkin: 'classic' };
+export const DEFAULT_LOOK: CleanLook = { paint: 0, hat: 'none', keySkin: 'classic', back: 'none', face: 'none', neck: 'none' };
 
-/** Replace unknown cosmetic ids with the defaults. Unlock state lives on the client and is not checked. */
+/**
+ * Replace unknown cosmetic ids with the defaults, checking each against the shared catalogue
+ * (src/game/cosmetics.ts), and accessories against their own slot (a scarf can't be worn on the
+ * back). Ownership lives on the client and is not checked: there are no accounts yet.
+ */
 export function sanitizeLook(raw: Partial<Look> | null | undefined): CleanLook {
   const paint = typeof raw?.paint === 'number' && Number.isInteger(raw.paint) && raw.paint >= 0 && raw.paint < PAINT_JOBS.length ? raw.paint : DEFAULT_LOOK.paint;
-  const hat = HATS.find((h) => h.id === raw?.hat)?.id ?? DEFAULT_LOOK.hat;
-  const keySkin = KEY_SKINS.find((k) => k.id === raw?.keySkin)?.id ?? DEFAULT_LOOK.keySkin;
-  return { paint, hat, keySkin };
+  const hat = isHatId(raw?.hat) ? raw.hat : DEFAULT_LOOK.hat;
+  const keySkin = isKeySkinId(raw?.keySkin) ? raw.keySkin : DEFAULT_LOOK.keySkin;
+  return { paint, hat, keySkin, ...cleanAccessories(raw) };
 }
 
 /**

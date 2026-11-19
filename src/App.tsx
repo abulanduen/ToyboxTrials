@@ -29,11 +29,17 @@ function joinFromHash(): boolean {
 /** The address bar while in a private room: its share link, so a reload rejoins. */
 function hashFor(screen: Screen): string {
   const room = useNet.getState().room;
-  return room?.kind === 'private' && room.code && screen !== 'menu' ? `#room=${room.code}` : HASH[screen];
+  if (room?.kind === 'private' && room.code && screen !== 'menu') return `#room=${room.code}`;
+  return screen === 'workshop' && useGame.getState().workshopMode === 'shop' ? '#shop' : HASH[screen];
 }
 function screenFromHash(): Screen | null {
   const h = window.location.hash;
-  return h === '#play' ? 'playing' : h === '#workshop' ? 'workshop' : h === '' || h === '#' ? 'menu' : null;
+  return h === '#play' ? 'playing' : h === '#workshop' || h === '#shop' ? 'workshop' : h === '' || h === '#' ? 'menu' : null;
+}
+/** Open the Workshop screen in the panel the hash asks for (#shop is the Odds & Ends shop). */
+function openWorkshopFromHash() {
+  if (window.location.hash === '#shop') useGame.getState().openShop();
+  else useGame.getState().openWorkshop();
 }
 
 /**
@@ -44,7 +50,7 @@ export function App() {
   useEffect(() => {
     installNet();
     const initial = screenFromHash();
-    if (initial === 'workshop') useGame.getState().openWorkshop();
+    if (initial === 'workshop') openWorkshopFromHash();
     else if (initial && initial !== 'menu') useGame.getState().goTo(initial);
     else joinFromHash();
     const syncHash = (screen: Screen) => {
@@ -52,7 +58,7 @@ export function App() {
       if (url !== window.location.pathname + window.location.search + window.location.hash) window.history.replaceState(null, '', url);
     };
     const offStore = useGame.subscribe((s, p) => {
-      if (s.screen === p.screen) return;
+      if (s.screen === p.screen && s.workshopMode === p.workshopMode) return;
       syncHash(s.screen);
     });
     const offNet = useNet.subscribe((s, p) => {
@@ -61,7 +67,7 @@ export function App() {
     const onHash = () => {
       if (joinFromHash()) return;
       const sc = screenFromHash();
-      if (sc && sc !== useGame.getState().screen) (sc === 'workshop' ? useGame.getState().openWorkshop() : useGame.getState().goTo(sc));
+      if (sc && sc !== useGame.getState().screen) (sc === 'workshop' ? openWorkshopFromHash() : useGame.getState().goTo(sc));
     };
     window.addEventListener('hashchange', onHash);
     return () => {
