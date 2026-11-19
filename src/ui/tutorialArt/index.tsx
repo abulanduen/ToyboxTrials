@@ -18,6 +18,7 @@ import { JACKBOX_ART } from './jackbox';
 import { MIDNIGHT_ART } from './midnight';
 import { REDLIGHT_ART } from './redlight';
 import { RHYTHM_ART } from './rhythm';
+import { SIEGE_ART } from './siege';
 import { SPELLBOX_ART } from './spellbox';
 import { SPOTDIFF_ART } from './spotdiff';
 import { TOWERTUMBLE_ART } from './towertumble';
@@ -38,6 +39,7 @@ export const TUTORIAL_ART = {
   ...TOYSQUAD_ART,
   ...SPOTDIFF_ART,
   ...TOWERTUMBLE_ART,
+  ...SIEGE_ART,
   ...HUB_ART,
 } satisfies Record<string, () => JSX.Element>;
 

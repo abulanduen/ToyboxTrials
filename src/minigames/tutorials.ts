@@ -98,10 +98,10 @@ export const TUTORIALS: Partial<Record<MinigameId, TutorialStep[]>> = {
     { title: 'Hold the line', text: 'Leaks cost lives; at zero you are out and can watch the other boards. Survive the most waves, or clear all 20, to win.', art: 'towertumble-hold' },
   ],
   'toybox-siege': [
-    { title: 'Pick a toy and keep moving', text: 'Choose the Tin Soldier, the Pop-Gun Ranger or the Clockwork Wizard. Your weapons fire on their own: move with W A S D or the arrows to dodge the swarm.', touch: 'Choose the Tin Soldier, the Pop-Gun Ranger or the Clockwork Wizard. Your weapons fire on their own: steer with the joystick to dodge the swarm.' },
-    { title: 'Grab gems, level up', text: 'Defeated toys drop gems. Collect them to level up and pick one card: a new weapon, a weapon upgrade or a passive. Everything goes up to level 5.' },
-    { title: 'Elites, treasure and rivals', text: 'An elite arrives every minute and drops a chest. A maxed weapon plus its partner passive evolves when you open one. Or skip the chest to send an elite to a rival’s board.' },
-    { title: 'Beat the Boiler Baron', text: 'The boss arrives at 4:00: defeat it to win. If you fall, you can spend points to revive once; after that you become a ghost and can inspect the other boards.' },
+    { title: 'Pick a toy and keep moving', text: 'Choose the Tin Soldier, the Pop-Gun Ranger or the Clockwork Wizard. Your weapons fire on their own: move with W A S D or the arrows to dodge the swarm.', touch: 'Choose the Tin Soldier, the Pop-Gun Ranger or the Clockwork Wizard. Your weapons fire on their own: steer with the joystick to dodge the swarm.', art: 'siege-move', touchArt: 'siege-move-touch' },
+    { title: 'Grab gems, level up', text: 'Defeated toys drop gems. Collect them to level up and pick one card: a new weapon, a weapon upgrade or a passive. Everything goes up to level 5.', art: 'siege-level' },
+    { title: 'Elites, treasure and rivals', text: 'An elite arrives every minute and drops a chest. A maxed weapon plus its partner passive evolves when you open one. Or skip the chest to send an elite to a rival’s board.', art: 'siege-elite' },
+    { title: 'Beat the Boiler Baron', text: 'The boss arrives at 4:00: defeat it to win. If you fall, you can spend points to revive once; after that you become a ghost and can inspect the other boards.', art: 'siege-boss' },
   ],
 };
 
