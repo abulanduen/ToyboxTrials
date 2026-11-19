@@ -16,21 +16,28 @@ available to the judges).
 - One entry per person/team (up to 4). Judged on gameplay quality, creativity and technical
   execution, equally weighted.
 
-## Scope that fits the time (recommended)
+## Scope
 
-Build the **hub + three trials**, not eleven. A short, polished, replayable loop beats a wide,
-half-finished one, and the judges weight polish heavily.
+The full eleven-trial build prompt is in [`base44-build-brief.md`](base44-build-brief.md) — paste it
+into the new Base44 app. Build it in the order that file lists them, checking each trial end to end
+on a phone before starting the next; the judging criteria weight polish as heavily as breadth.
 
-| Screen | What it does |
-| --- | --- |
-| Playroom hub | One tabletop scene, three lit doors/gates, a scoreboard. Player moves a small toy with WASD/arrows or a thumb joystick. |
-| Copycat Conductor | Four instrument pads; growing sequence; one wrong note or timeout eliminates; 1 player + up to 7 bots. |
-| Jack-in-the-Box | Category prompts; type an answer nobody has said; correct answer cranks and passes the box; hidden fuse pops one player; last toy wins. |
-| Wind-Up Dash | Short side-on sprint with obstacles and a wind-up speed budget; best time + ghosts-free time trial against bots. |
-| Results | Placement, per-trial best, "play again" and "next trial". |
+The eleven trials, in the order the build brief specifies them:
+
+1. Copycat Conductor — repeat a growing instrument sequence.
+2. Inferno Escape — dig, build one wall, outlast the furnace.
+3. Midnight Hunger — scavenge batteries by night, shelter by day.
+4. Find the Original — spot the real Baldwyn in a crowd of look-alikes.
+5. Red Light, Green Light — run on green, freeze on red.
+6. Blink Duel — no-cooldown teleports and one-hit sword swings.
+7. Wind-Up Dash — a seeded sprint course with four or five random traps.
+8. Music Box Rhythm — four-lane rhythm on a giant music box.
+9. Toy Squad — ten-round toy auto-battler with merging and passives.
+10. Spellbox Showdown — ring-out arena with drafted spells.
+11. Jack-in-the-Box — hot-potato word game with a hidden fuse.
 
 Deliberately out of scope for the submission version: online multiplayer, accounts, ranked play,
-shop/economy, tournaments beyond a simple 3-trial run.
+profile progression beyond local records, and payouts of any kind.
 
 ## Build brief to paste into Base44
 
