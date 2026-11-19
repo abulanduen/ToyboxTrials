@@ -85,6 +85,8 @@ node tests/e2e/inferno.cjs      # Inferno Escape, desktop + phone portrait
 node tests/e2e/midnight.cjs     # Midnight Hunger, desktop + phone portrait/landscape
 node tests/e2e/toysquad.cjs     # Toy Squad, desktop + phone portrait/landscape
 node tests/e2e/rhythm.cjs       # Music Box Rhythm, desktop + phone portrait/landscape (slow: ONLY=desktop|portrait|landscape)
+node tests/e2e/spotdiff.cjs     # Odd Page Out (spot the difference), desktop + phone portrait/landscape (ONLY=desktop|portrait|landscape)
+node tests/e2e/towertumble.cjs  # Toy Tower Tumble, desktop + phone portrait/landscape (arg: desktop,portrait,landscape)
 npm test                        # vitest unit tests for rules cores, scoring, tournament selection
 npm run server:dev              # online Hub server on ws://localhost:2567, rebuilt on change (dev builds connect to it)
 npm run server:build            # typecheck + esbuild bundle → server-dist/index.cjs (Railway runs this)

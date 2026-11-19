@@ -196,6 +196,17 @@ describe('Red Light, Green Light rules', () => {
     expect(me(s).m.z).toBeLessThan(DEFAULT_CONFIG.finishZ);
   });
 
+  it('a toy that is home can still walk about, even under a red light', () => {
+    const s = rlglRules.init([human('you'), human('b')], 7);
+    run(s, (st, id) => (id === 'you' ? careful(st, id) : NO_INPUT), (s) => me(s).finished);
+    run(s, () => NO_INPUT, (s) => s.phase === 'stop' && s.phaseT > 500, 20_000);
+    const x0 = me(s).m.x, z0 = me(s).m.z;
+    run(s, (_st, id) => (id === 'you' ? { ax: 1, ay: -1, run: false, jump: false } : NO_INPUT), () => false, 400);
+    expect(Math.hypot(me(s).m.x - x0, me(s).m.z - z0)).toBeGreaterThan(1);
+    expect(me(s).held).toBe(false);
+    expect(me(s).finished).toBe(true);
+  });
+
   it('ignores garbage input', () => {
     const s = rlglRules.init([human('you'), human('b')], 8);
     for (let i = 0; i < 300; i++) rlglRules.step(s, { you: [{ ax: NaN, ay: 1e9, run: true, jump: false }], nobody: [FWD] }, DT);

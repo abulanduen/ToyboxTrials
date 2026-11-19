@@ -520,6 +520,18 @@
       "prompt": "docs/assets/spellbox-icon-prompts.md#button-mine"
     },
     {
+      "id": "spell-icon-blink",
+      "file": "ui/spellbox/blink.webp",
+      "status": "created",
+      "type": "ability-icon",
+      "width": 512,
+      "height": 512,
+      "transparency": true,
+      "intendedUse": "Spellbox draft, equipped build slots and cooldown buttons",
+      "source": "Hand-authored SVG in this repository (docs/assets/spellbox-blink-icon.svg), rasterised to 512x512 WebP with Chromium; drawn to match the generated set's palette and toy materials",
+      "license": "Original work for this project; no reference artwork or icon pack"
+    },
+    {
       "id": "concept-parallax-playroom-v1",
       "file": "concepts/concept-parallax-playroom-v1.png",
       "status": "reference-only",

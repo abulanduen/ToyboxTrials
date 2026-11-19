@@ -212,7 +212,7 @@ export function playRevealedGame() {
 
 // --------------------------------------------------------------------------------- lifecycle
 
-/** Intro → countdown. Builds the field (adds practice bots) and initialises the rules. */
+/** Intro → countdown (or straight to playing for `skipStartCountdown` games). Builds the field (adds practice bots) and initialises the rules. */
 export function beginCountdown() {
   const m = useMatch.getState();
   const mod = m.module;
@@ -231,9 +231,12 @@ export function beginCountdown() {
   runtime.botRngs = new Map(contestants.filter((c) => c.bot).map((c) => [c.id, seededRng(subSeed(seed, c.id))]));
   runtime.acc = 0;
   runtime.pendingLocal = [];
-  runtime.countdownLeft = COUNTDOWN_MS;
-  runtime.lastCount = 4;
-  m.set({ contestants, seed, phase: 'countdown', paused: false, lastResult: null, newBest: false, reward: NO_REWARD, unlocked: [] });
+  // Games that open with their own untimed pre-phase (Spellbox's draft) skip the 3-2-1.
+  const skip = !!m.gameId && !!gameById(m.gameId).skipStartCountdown;
+  runtime.countdownLeft = skip ? 0 : COUNTDOWN_MS;
+  runtime.lastCount = skip ? 0 : 4;
+  if (skip) runtime.startedAt = performance.now();
+  m.set({ contestants, seed, phase: skip ? 'playing' : 'countdown', paused: false, lastResult: null, newBest: false, reward: NO_REWARD, unlocked: [] });
   setBindings(mod.bindings);
   clearInput();
 }

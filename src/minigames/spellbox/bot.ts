@@ -32,6 +32,16 @@ export function createSpellboxBot():BotPolicy<SpellboxState,SpellboxInput>{
     const inputs:SpellboxInput[]=[{type:'move',x:mx,z:mz},{type:'aim',x:dx/d,z:dz/d}];
     if(p.cast||s.t<p.nextAction||s.t<p.stunnedUntil)return inputs;
     const slots=p.build.map((id,slot)=>({id,slot,d:SPELLS[id]})).filter(o=>s.t>=p.cooldowns[o.slot]);
+    // Blink: escape toward the centre when near the edge (or flying outward), otherwise jump next to
+    // an enemy that is near the edge or clustered with others, so the arrival shockwave shoves them.
+    const blink=slots.find(o=>o.d.effect==='blink');
+    if(blink){
+      const outward=(p.vx*p.x+p.vz*p.z)/r;
+      if(r>safeRadius-3.5||r>safeRadius-7&&outward>4){inputs.push({type:'aim',x:-p.x/r,z:-p.z/r},{type:'cast',slot:blink.slot});return inputs;}
+      const wave=blink.d.radius+s.config.bodyRadius,crowd=enemies.filter(e=>Math.hypot(e.x-target.x,e.z-target.z)<=wave*1.6).length;
+      const edgy=Math.hypot(target.x,target.z)>safeRadius-6;
+      if(d>4&&d<blink.d.range+2&&(crowd>=2||edgy)&&rng()<(c.bot==='easy'?.3:c.bot==='hard'?.9:.6)){inputs.push({type:'cast',slot:blink.slot});return inputs;}
+    }
     const pick=slots.find(o=>o.d.effect==='shield'&&(threatened||r>safeRadius-4&&Math.hypot(p.vx,p.vz)>3))
       ??slots.find(o=>o.d.effect==='repair'&&p.damage>=30&&d>7)
       ??slots.find(o=>['cone','nova'].includes(o.d.effect)&&d<o.d.range+.4)
