@@ -108,6 +108,9 @@ async function run(name) {
     assert.equal(await state(new Function(`return ${me}.cls`)), v.cls);
     const bots = await state(() => window.__toybox.match.state().players.filter((p) => p.id !== 'you').map((p) => p.id));
     assert.equal(bots.length, 3);
+    // Keep the bots in the run, so there are live boards to watch after our toy is out (if everyone
+    // is out the match simply ends, which is correct but leaves nothing to spectate).
+    await state(() => { for (const p of window.__toybox.match.state().players) if (p.id !== 'you') p.invuln = 1e12; });
 
     // ---- Movement: keys on desktop, the floating joystick on touch
     const x0 = await state(new Function(`return ${me}.x`));
@@ -138,8 +141,9 @@ async function run(name) {
     }
     await page.waitForFunction(new Function(`return !${me}.choice`));
 
-    // ---- Fast-forward to the first elite (keep our toy healthy and take any cards it earns)
-    await state(() => { const p = window.__toybox.match.state().players.find((q) => q.id === 'you'); p.invuln = 1e12; });
+    // ---- Fast-forward to the first elite. Keep our toy healthy, and stop further level-ups: at a frame
+    // every few seconds a tap meant for a level card could land on the treasure card that replaced it.
+    await state(() => { const p = window.__toybox.match.state().players.find((q) => q.id === 'you'); p.invuln = 1e12; p.xp = 0; p.xpNext = 1e9; });
     await skipTo(50000);
     await page.evaluate(() => window.__toybox.match.timeScale(60));
     for (let i = 0; i < 400; i++) {
@@ -159,7 +163,7 @@ async function run(name) {
     await state(() => {
       const p = window.__toybox.match.state().players.find((q) => q.id === 'you');
       const g = p.board.bigs.find((b) => b.on); g.hp = 1;
-      p.weapons.push({ id: 'popgun', level: 3, evolved: false, cd: 0, aux: 0 });
+      if (!p.weapons.some((w) => w.id === 'popgun')) p.weapons.push({ id: 'popgun', level: 3, evolved: false, cd: 0, aux: 0 }); // reach the elite from afar
     });
     await page.evaluate(() => window.__toybox.match.timeScale(1));
     for (let i = 0; i < 300; i++) {
