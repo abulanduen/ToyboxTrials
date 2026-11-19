@@ -14,7 +14,7 @@ describe('custom GLSL stays NaN-free (one NaN pixel turns into a black flash thr
   it('pow() bases are clamped non-negative', () => {
     const bad: string[] = [];
     for (const file of sources('src')) {
-      const text = readFileSync(file, 'utf8');
+      const text = readFileSync(file, 'utf8').replace(/\/\/[^\n]*/g, ''); // ignore // comments
       if (!text.includes('glsl')) continue;
       for (const m of text.matchAll(/\bpow\(\s*([^,]+),/g)) {
         const base = m[1].trim();
