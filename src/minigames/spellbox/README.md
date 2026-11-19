@@ -129,3 +129,9 @@ checks cover three offers per button, eight-player sizing, the full warning and 
 duel size, mouse/touch aim through zoom, casting, ring-outs, records and restart, without console
 or page errors. Copycat/Jack practice and a seeded Spellbox/Copycat/Blink Blitz also pass. Real-device
 performance, audio quality, online behaviour and competitive balance remain unverified.
+
+Untimed draft, 19 November 2026: unit tests (never-ending draft, countdown start, lock during the
+countdown, bot lock-in timing, countdown cues), production build, and `spellbox.cjs` on desktop
+(1280×800), phone portrait (390×844) and phone landscape (844×390) pass, including the centred,
+blurred draft card, lock-in markers and "Fight in 3…". `spellbox-art.cjs` now uses one bot so the
+duel-size ring is centred by the camera. Real-device blur cost and readability are unverified.
