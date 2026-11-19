@@ -163,15 +163,12 @@ async function run(name) {
     await state(() => {
       const p = window.__toybox.match.state().players.find((q) => q.id === 'you');
       const g = p.board.bigs.find((b) => b.on); g.hp = 1; g.x = p.x + 2.5; g.z = p.z; g.mode = 0; // the nearest enemy, so every weapon picks it
+      for (const m of p.board.mobs) m.on = false; // (our immortal toy is buried in bunnies that would soak up every cork)
       if (!p.weapons.some((w) => w.id === 'popgun')) p.weapons.push({ id: 'popgun', level: 3, evolved: false, cd: 0, aux: 0 }); // reach the elite from afar
     });
+    await page.evaluate(() => window.__toybox.match.timeScale(4));
+    await page.waitForFunction(() => { const p = window.__toybox.match.state().players.find((q) => q.id === 'you'); return p.board.chests.some((c) => c.on) || p.pendingChests > 0 || p.choice?.kind === 'treasure'; });
     await page.evaluate(() => window.__toybox.match.timeScale(1));
-    for (let i = 0; i < 300; i++) {
-      const s = await state(() => { const p = window.__toybox.match.state().players.find((q) => q.id === 'you'); return { chest: p.board.chests.some((c) => c.on) || p.pendingChests > 0 || p.choice?.kind === 'treasure', card: p.choice?.kind ?? null }; });
-      if (s.chest) break;
-      if (s.card === 'level') await tap(page.getByTestId('siege-option-0')).catch(() => {});
-      await page.waitForTimeout(200);
-    }
     await state(() => { const p = window.__toybox.match.state().players.find((q) => q.id === 'you'); const c = p.board.chests.find((x) => x.on); if (c) { p.x = c.x; p.z = c.z; } });
     for (let i = 0; i < 100; i++) {
       const card = await state(new Function(`return ${me}.choice?.kind ?? null`));
