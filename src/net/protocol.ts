@@ -457,11 +457,13 @@ export interface PlayEventsMsg {
   t: 'play';
   e: PlayEventWire[];
 }
-export const PLAY_EVENT_KINDS = ['goal', 'hoop', 'kick', 'grab', 'throw', 'drop', 'rim', 'board', 'bounce', 'wall', 'reset'] as const;
+export const PLAY_EVENT_KINDS = ['goal', 'hoop', 'kick', 'grab', 'snatch', 'steal', 'throw', 'drop', 'rim', 'board', 'bounce', 'wall', 'reset'] as const;
 export interface PlayEventWire {
   k: (typeof PLAY_EVENT_KINDS)[number];
   /** Who (player id): kicker, scorer, holder. */
   by?: string | null;
+  /** Steal: who had the ball. */
+  from?: string;
   /** Goal: the net it went in ('w' | 'e'). */
   net?: 'w' | 'e';
   /** Goal: the score after it. */
@@ -980,6 +982,7 @@ function parsePlayEvent(v: unknown): PlayEventWire | null {
   const e: PlayEventWire = { k: v.k };
   if (v.by === null) e.by = null;
   else if (isPlayerId(v.by)) e.by = v.by;
+  if (isPlayerId(v.from)) e.from = v.from;
   if (v.net === 'w' || v.net === 'e') e.net = v.net;
   if (numArray(v.score, 2)) e.score = v.score as [number, number];
   if (isNum(v.total)) e.total = v.total;

@@ -179,6 +179,8 @@ function Ball({ material }: { material: THREE.Material }) {
     last.current.z = b.z;
     mesh.current.position.set(b.x, b.y, b.z);
     livePositions.set('ball', b);
+    livePositions.set('ball-snatch', b);
+    livePositions.set('ball-steal', b);
     // "Hold to throw" is always in reach while you hold the ball, but anything nearer (a gate's
     // spot, the marble at your feet) comes first, so you can still walk into a trial carrying it.
     throwSpot.x = player.pos.x + Math.sin(player.yaw) * 2.9;

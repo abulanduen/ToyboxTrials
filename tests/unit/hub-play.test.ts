@@ -11,6 +11,8 @@ import { BALL, BRIDGE_DECK, HOOP, MARBLE, NET, NETS, PITCH_CENTRE, rollFloorAt }
 import {
   BALL_IDLE_RESET,
   GOAL_PAUSE,
+  STEAL_GUARD,
+  ballAirborne,
   KICK_REACH,
   STEP,
   createHubPlay,
@@ -304,4 +306,66 @@ describe('the basketball', () => {
     };
     expect(go()).toEqual(go());
   });
+
+  /** A low lob from (x, z) heading +x, stepped until it is coming down at about `atY`. */
+  function lobDownTo(atY: number) {
+    const s = createHubPlay();
+    s.ball.holder = 'p1';
+    throwBall(s, body('p1', 40, -120, Math.PI / 2), Math.PI / 2, 0);
+    for (let i = 0; i < 200 && !(s.ball.vy < 0 && s.ball.y <= atY); i++) stepHubPlay(s, [], []);
+    expect(ballAirborne(s.ball)).toBe(true);
+    return s;
+  }
+
+  it('is snatched in mid-air by a toy whose hands reach it, jumping helps, and one too far across or under too high a ball misses', () => {
+    const s = lobDownTo(4.5);
+    const { x, z } = s.ball;
+    expect(grabBall(createCopy(s), body('p2', x + 4, z))).toBe(false); // too far across
+    expect(grabBall(createCopy(s), body('p2', x, z))).toBe(true); // right under it
+    const high = lobDownTo(6.5);
+    expect(grabBall(createCopy(high), body('p2', high.ball.x, high.ball.z))).toBe(false); // over its head
+    expect(grabBall(createCopy(high), body('p2', high.ball.x, high.ball.z, 0, 2))).toBe(true); // mid-jump
+    const ev: PlayEvent[] = [];
+    expect(grabBall(s, body('p2', x + 1, z, -Math.PI / 2), 0, ev)).toBe(true);
+    expect(ev).toEqual([{ k: 'snatch', by: 'p2' }]);
+    expect(s.ball.holder).toBe('p2');
+    expect([s.ball.vx, s.ball.vy, s.ball.vz]).toEqual([0, 0, 0]);
+    // a ball lying on the floor is picked up, not snatched
+    const still = createHubPlay();
+    const ev2: PlayEvent[] = [];
+    grabBall(still, body('p1', BALL.spot.x + 2, BALL.spot.z), 0, ev2);
+    expect(ev2).toEqual([{ k: 'grab', by: 'p1' }]);
+  });
+
+  it('a snatch also counts where the ball just was (the server allowance for lag)', () => {
+    const s = lobDownTo(4.5);
+    const was = { x: s.ball.x, y: s.ball.y, z: s.ball.z };
+    run(s, 0.05);
+    const late = body('p2', was.x - 2.9, was.z);
+    expect(grabBall(createCopy(s), late)).toBe(false);
+    expect(grabBall(s, late, 0, [], { rewind: [was] })).toBe(true);
+  });
+
+  it('is stolen only off a holder who is dribbling, only close by, and not straight after it changed hands', () => {
+    const s = createHubPlay();
+    grabBall(s, body('p1', BALL.spot.x + 2, BALL.spot.z, -Math.PI / 2));
+    const holder = body('p1', 60, -120, 0);
+    run(s, 0.2, [holder]);
+    const thief = body('p2', s.ball.x + 1.5, s.ball.z);
+    expect(grabBall(s, thief, 0, [], { holderDribbling: true })).toBe(false); // too soon
+    run(s, STEAL_GUARD, [holder]);
+    expect(grabBall(s, thief, 0, [], { holderDribbling: false })).toBe(false); // standing still
+    expect(grabBall(s, body('p2', s.ball.x + 4, s.ball.z), 0, [], { holderDribbling: true })).toBe(false); // too far
+    expect(grabBall(s, holder, 0, [], { holderDribbling: true })).toBe(false); // from yourself
+    const ev: PlayEvent[] = [];
+    expect(grabBall(s, thief, 0, ev, { holderDribbling: true })).toBe(true);
+    expect(ev).toEqual([{ k: 'steal', by: 'p2', from: 'p1' }]);
+    expect(s.ball.holder).toBe('p2');
+    // and p1 can't take it straight back
+    expect(grabBall(s, holder, 0, [], { holderDribbling: true })).toBe(false);
+  });
 });
+
+function createCopy(s: HubPlayState): HubPlayState {
+  return { ...s, marble: { ...s.marble }, ball: { ...s.ball }, score: [s.score[0], s.score[1]] };
+}

@@ -113,17 +113,33 @@ the browser runs the very same code with your toy as the only body, so single-pl
   checks the player is in the hub (not in a trial), within reach of the marble where the **server**
   has them (3.6 cm centre to centre, plus 1.5 cm for move lag), not kicking it backwards through
   themselves, and not kicking again within 120 ms (extras are dropped).
-- **The ball** (`ball {a: grab}` / `ball {a: throw, yaw, p}`): a pick-up needs the ball within
-  3.2 cm (+1.5) of where the server has you and nobody holding it; only the holder can throw, from
-  where the server has them. A holder who disconnects, leaves or goes into a trial or the Workshop
-  drops it. At most one ball action per player per 150 ms.
+- **The ball** (`ball {a: grab}` / `ball {a: throw, yaw, p}`): `grab` takes the ball one of three
+  ways, decided by the server (`grabBall`):
+  - **Pick up:** a ball lying still needs to be within 3.2 cm (+1.5) of where the server has you,
+    with nobody holding it.
+  - **Snatch:** a ball in mid-air (moving, more than 0.4 cm off the floor) needs to be within 3.2 cm
+    across and between 1 cm under and 5.4 cm over your feet (a jump adds about 2.4 cm). Anyone can
+    catch a throw or a rebound like this.
+    - The press is also checked against where the ball was in the last 400 ms (`SNATCH_REWIND_MS`),
+      because a player sees the ball 100 ms behind the server plus their press's trip.
+  - **Steal:** a held ball can be taken only from a holder who is **dribbling**, meaning the server
+    has them moving at 2 cm/s or more on the ground. The thief must be within 2.6 cm (+1.5) of the
+    ball, and not within 1.5 s of the ball last changing hands, so it can't ping-pong.
+    - Standing still protects the ball.
+  - Only the holder can throw, from where the server has them. A holder who disconnects, leaves or
+    goes into a trial or the Workshop drops it. At most one ball action per player per 150 ms.
+- **Dribbling** is drawn by every client: a holder on the move bounces the ball between hand and
+  floor (in front, a little to the side), with a soft bounce sound. The server keeps a held ball at
+  the hands; dribbling only matters to it for steals. The prompt reads **Snatch** or **Steal** when
+  one is possible.
 - **Scoring:** a marble wholly over a goal line scores for the other team (Coral attacks the east
   net, Blue the west), sits in the net 1.6 s, then goes back to the centre spot. Baskets are counted
   for the room; the browser also counts your own this session. The room's score lives as long as
   the room (a server restart resets it).
 - **Snapshots** carry `hp` (marble position and velocity, in-net flag, ball position and velocity,
   holder, goals, baskets); **`play`** messages carry the events since the last snapshot (kicks, goals,
-  baskets, rim/board/floor bounces, pick-ups, throws, drops; at most 12 per tick). Clients draw the
+  baskets, rim/board/floor bounces, pick-ups, snatches, steals (with `from`), throws, drops; at most 12
+  per tick). Older clients drop the snatch and steal kinds and still see the holder change in snapshots. Clients draw the
   marble and ball 100 ms behind the newest snapshot like remote toys, but blend with **cubic Hermite**
   interpolation using the velocities, so a thrown ball follows its arc between 15 Hz snapshots; a
   jump the velocities can't explain (back to the centre after a goal) is drawn as a jump. Events

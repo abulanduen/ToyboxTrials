@@ -12,7 +12,7 @@ import { EARN } from './economy';
 import { exposeDebug } from './debug';
 import { openPractice } from '../minigames/session';
 import { BALL, MARBLE } from './hubPlay';
-import { ballFree, grab, iHold, kick, startCharge } from '../hubplay/runtime';
+import { ballFree, ballInAir, canSnatch, canSteal, grab, iHold, kick, startCharge } from '../hubplay/runtime';
 import { JACK_SPOT } from './whoAmI';
 import { useNet } from '../net/store';
 import { requestCard, wearingCard } from '../net/chat';
@@ -54,7 +54,10 @@ export const INTERACTABLES: Interactable[] = [
   { id: 'musicbox', x: MUSICBOX.x, z: MUSICBOX.z + 3, radius: 3.4, verb: 'Crank', label: 'a forgotten music box', secret: true },
   { id: 'marble', x: MARBLE.home.x, z: MARBLE.home.z, radius: 3.6, verb: 'Kick', label: 'the giant marble', secret: true },
   // the basketball by the hoop on the trials table: pick it up, then hold Interact to throw
-  { id: 'ball', x: BALL.spot.x, z: BALL.spot.z, radius: 3.0, verb: 'Pick up', label: 'the basketball', disabled: () => !ballFree() },
+  { id: 'ball', x: BALL.spot.x, z: BALL.spot.z, radius: 3.0, verb: 'Pick up', label: 'the basketball', disabled: () => !ballFree() || ballInAir() },
+  // ...catch it in mid-air (anyone's throw or rebound), or take it off a toy dribbling it (online)
+  { id: 'ball-snatch', x: BALL.spot.x, z: BALL.spot.z, radius: 3.5, verb: 'Snatch', label: 'the basketball', disabled: () => !canSnatch() },
+  { id: 'ball-steal', x: BALL.spot.x, z: BALL.spot.z, radius: 3.5, verb: 'Steal', label: 'the basketball', disabled: () => !canSteal() },
   // (while you hold it: its live spot sits 2.9 cm ahead of you, so a nearer prompt such as a gate wins)
   { id: 'ball-throw', x: BALL.spot.x, z: BALL.spot.z, radius: 3, verb: 'Hold to throw', label: 'the basketball', disabled: () => !iHold() },
   { id: 'jack', x: JACK_SPOT.x, z: JACK_SPOT.z, radius: JACK_SPOT.radius, verb: 'Open', label: 'a suspicious box', secret: true },
@@ -138,6 +141,8 @@ export function interact(id: string, facing: { x: number; z: number }) {
       discover('marble', 'The rolling marble');
       break;
     case 'ball':
+    case 'ball-snatch':
+    case 'ball-steal':
       grab();
       break;
     case 'ball-throw':
