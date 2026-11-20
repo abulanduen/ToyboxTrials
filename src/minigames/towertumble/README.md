@@ -367,17 +367,21 @@ reward). None of this has been played by a person.
 ## Measured (browser test)
 
 Peak `__toybox.renderInfo()` counts sampled by `tests/e2e/towertumble.cjs` (SwiftShader, Low
-quality, 1 human + 3 bots; samples at the mid-wave, boss-wave, boss-reward and spectator moments;
-whole frame including the room, shadows and post passes):
+quality, 1 human + 3 bots; samples at the mid-wave (with status badges), boss-wave, boss-reward,
+spectator and damage-check moments; whole frame including the room, shadows and post passes).
+Re-measured 20 November 2026 with the player rail, status badges and the damage check:
 
 | Layout | Draw calls | Triangles | Geometries | Meshes in scene | Live effect particles |
 |---|---|---|---|---|---|
-| Desktop 1280×800 | 69 | 31,076 | 150 | 179 | 54 |
-| Phone portrait 390×844 | 57 | 29,226 | 144 | 179 | 54 |
-| Phone landscape 844×390 | 70 | 32,634 | 153 | 179 | 60 |
+| Desktop 1280×800 | 69 | 33,288 | 160 | 186 | 60 |
+| Phone portrait 390×844 | 70 | 31,482 | 148 | 186 | 60 |
+| Phone landscape 844×390 | 76 | 34,644 | 159 | 186 | 60 |
 
 "Meshes" counts every mesh object, hidden pooled ones included (41 tower slots, the instanced
-layers and the effect shapes), so it is constant. No frame rates are claimed: there is no GPU here.
+layers, the effect shapes, eight status-badge layers (one per kind; hidden while empty) and the
+damage-check sign), so it is constant.
+The portrait figure rose from 57 draw calls. The cause has not been isolated: the badge layers and
+the sign add a few calls, and the centred, smaller board leaves more of the room in view. No frame rates are claimed: there is no GPU here.
 These boards held a handful of towers; a full 41-tower board at wave 20 has not been measured.
 
 ## Unverified

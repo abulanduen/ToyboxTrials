@@ -243,7 +243,7 @@ const out = path.join(__dirname,'output'); fs.mkdirSync(out,{recursive:true});
 
       // ── debuff badges over fighters (the shared status icons) ──
       await page.evaluate(()=>{window.__toybox.match.timeScale(0); const b=window.__toybox.match.state().battles.find(x=>x.owner==='you'); const [a,c]=b.fighters.filter(u=>u.side===1&&u.hp>0); a.poison=3; a.stunnedUntil=b.tick+3; if(c) c.magic.markedUntil=b.tick+3;});
-      await page.waitForFunction(()=>window.__toybox.squadStatus.shown()>=2);
+      await page.waitForFunction(()=>{const k=window.__toybox.squadStatus.byKind(); return k.poison>=1&&k.stun>=1;});
       const sq=await page.evaluate(()=>window.__toybox.squadStatus.byKind()); assert.ok(sq.poison>=1&&sq.stun>=1,`badges: ${JSON.stringify(sq)}`);
       await page.screenshot({path:path.join(out,`toysquad-${layout}-badges.png`)});
       // ── the player rail: standings order, compact on phones, tap a player to view their battle ──

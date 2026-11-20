@@ -463,7 +463,7 @@ export function TumbleScene({ getState, localId }: MinigameSceneProps<TdState>) 
     const blur = () => { cancel(); press.current = null; tumbleView.cancelAll(); }; window.addEventListener('blur', blur);
     tumbleView.reset(); tumbleView.cancelAll();
     exposeDebug({ tumbleView: {
-      get: () => ({ zoom: tumbleView.zoom, panX: tumbleView.panX, panZ: tumbleView.panZ }),
+      get: () => ({ zoom: tumbleView.zoom, panX: tumbleView.panX, panZ: tumbleView.panZ, pointers: tumbleView.pointerCount, pinching: tumbleView.pinching }),
       reset: () => tumbleView.reset(),
       /** Zoom by `k` about a screen point (what the wheel and pinch do). */
       zoomAt: (k: number, x: number, y: number) => tumbleView.zoomAt(k, x, y, ground, apply),
@@ -509,6 +509,14 @@ export function TumbleScene({ getState, localId }: MinigameSceneProps<TdState>) 
         return { x: r.left + ((p.x + 1) / 2) * r.width, y: r.top + ((1 - p.y) / 2) * r.height };
       },
       watching: () => { const s = getState(); return s ? viewedBoard(s, localId, useTumbleUI.getState().watching) : null; },
+      /** What a press at a screen point would pick on the viewed board: a square, and whether it is one of the towers. */
+      pick: (x: number, y: number) => {
+        const r = gl.domElement.getBoundingClientRect(), v = readView(getState, localId);
+        ndc.set(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1);
+        raycaster.setFromCamera(ndc, camera);
+        const cell = pickCell(raycaster.ray, v.board);
+        return { cell, tower: cell !== null && !!v.board && !!towerAt(v.board, cell) };
+      },
       /** True once the camera has been fitted to the HUD's board slot. */
       fitted: () => fit.current.key !== '',
     } });

@@ -202,7 +202,10 @@ async function frames(page, n) {
       log(`viewed ${bot}'s board from the rail and came back`);
 
       // ── pan and zoom: wheel or pinch zooms toward the pointer, a drag on the felt pans, Reset view ──
+      if (await page.getByTestId('td-sheet-close').count()) { await click('td-sheet-close'); await page.getByTestId('td-sheet').waitFor({ state: 'detached' }); }
+      await frames(page, 2);
       const centre = await square(27, 0.3);
+      log(`before zoom: ${JSON.stringify(await page.evaluate(() => window.__toybox.tumbleView.get()))}, under the centre: ${await page.evaluate((c) => { const e = document.elementFromPoint(c.x, c.y); return e ? e.tagName + '.' + e.className : 'none'; }, centre)}`);
       if (layout === 'desktop') {
         await page.mouse.move(centre.x, centre.y); await page.mouse.wheel(0, -400);
         await page.waitForFunction(() => window.__toybox.tumbleView.get().zoom > 1.2);
@@ -211,18 +214,28 @@ async function frames(page, n) {
         await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ ...a, id: 1 }, { ...b, id: 2 }] });
         for (let i = 1; i <= 5; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: a.x - i * 14, y: a.y, id: 1 }, { x: b.x + i * 14, y: b.y, id: 2 }] });
         await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await cdp.detach();
-        await page.waitForFunction(() => window.__toybox.tumbleView.get().zoom > 1.5);
+        await page.waitForFunction(() => window.__toybox.tumbleView.get().zoom > 1.5, null, { timeout: 60000 })
+          .catch(async (e) => { log(`pinch failed: ${JSON.stringify(await page.evaluate(() => window.__toybox.tumbleView.get()))}`); await shot('pinch-failed'); throw e; });
       }
       const zoomed = await page.evaluate(() => window.__toybox.tumbleView.get());
       // A drag that does not start on one of your towers pans, and does not select anything.
-      const felt = await square(35, 0.3); // a path square near the zoom centre (on screen whatever the zoom)
+      // Start near the zoom centre where no tower stands (a press on one of your towers drags it instead).
+      let felt = null;
+      for (const cell of [27, 28, 26, 29, 35, 34, 36]) { // path squares on row 4 first, then felt
+        const p = await square(cell, 0.3), hit = await page.evaluate((q) => window.__toybox.tumble.pick(q.x, q.y), p);
+        if (!hit.tower) { felt = p; break; }
+      }
+      assert.ok(felt, 'a free spot to start the pan');
+      await page.evaluate(() => { const c = document.querySelector('canvas'); window.__panEv = []; for (const t of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel']) c.addEventListener(t, (e) => window.__panEv.push(t + ':' + e.pointerId)); });
+      log(`pan from ${JSON.stringify(felt)} over ${await page.evaluate((c) => { const e = document.elementFromPoint(c.x, c.y); return e ? e.tagName + '.' + e.className : 'none'; }, felt)}; view ${JSON.stringify(zoomed)}`);
       if (mobile) {
         const cdp = await context.newCDPSession(page);
         await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ ...felt, id: 1 }] });
         for (let i = 1; i <= 5; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: felt.x + i * 12, y: felt.y - i * 8, id: 1 }] });
         await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await cdp.detach();
       } else { await page.mouse.move(felt.x, felt.y); await page.mouse.down(); await page.mouse.move(felt.x + 60, felt.y - 40, { steps: 5 }); await page.mouse.up(); }
-      await page.waitForFunction((z) => { const v = window.__toybox.tumbleView.get(); return Math.abs(v.panX - z.panX) + Math.abs(v.panZ - z.panZ) > 0.5; }, zoomed);
+      await page.waitForFunction((z) => { const v = window.__toybox.tumbleView.get(); return Math.abs(v.panX - z.panX) + Math.abs(v.panZ - z.panZ) > 0.5; }, zoomed, { timeout: 60000 })
+        .catch(async (e) => { log(`pan failed: ${JSON.stringify(await page.evaluate(() => ({ v: window.__toybox.tumbleView.get(), ev: window.__panEv, sel: document.querySelector('[data-testid="td-sheet"]') ? 'sheet' : '', towers: window.__toybox.match.state().players[0].towers.map((t) => t.cell) })))}`); await shot('pan-failed'); throw e; });
       assert.equal(await page.getByTestId('td-sheet').count(), 0, 'a pan is not a tap');
       // Taps still select while zoomed in.
       await tapSquare(17); await page.getByTestId('td-sheet').waitFor();

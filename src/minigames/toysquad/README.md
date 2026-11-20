@@ -205,6 +205,12 @@ It checks the damage overview in battle, then plays all ten rounds, where the pa
 block Q/R/E until a choice is made. Real-device performance, audio quality and strategic balance
 still need human playtesting.
 
+Verification, 20 November 2026 (player rail, debuff badges, board viewing): 828 unit tests (whole
+suite), the production build and the server build pass; `tests/e2e/toysquad.cjs` passes on desktop,
+portrait-touch and landscape-touch, now with three bot squads, the rail (standings order, compact on
+phones, keyboard and touch switching, the viewed battle in the damage overview, last-match marks) and
+the badges.
+
 Verification, 18 November 2026 (HUD update): 284 unit tests and the production build pass. The
 desktop, portrait-touch and landscape-touch ten-round checks above pass without console/page errors.
 
