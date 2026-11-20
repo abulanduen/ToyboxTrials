@@ -469,6 +469,7 @@ function OnlineIntro({ lobby, you }: { lobby: LobbyState; you: string }) {
   const t = match.tournament;
   const touch = useGame((s) => s.touchUI);
   const left = useSecondsLeft(match.endsAt);
+  const Extras = useMatch((s) => (s.gameId === match.game ? s.module?.IntroExtras : undefined));
   useEffect(() => sfx.windUp(8), [match.seq]);
   const me = lobby.members.find((x) => x.id === you);
   const seated = !!me && !me.spectating && match.seats.some((s) => s.id === you);
@@ -483,6 +484,8 @@ function OnlineIntro({ lobby, you }: { lobby: LobbyState; you: string }) {
         <LengthChip def={def} /> <span>{durationLabel(def)}</span>
       </div>
       <IntroGuide key={match.seq} def={def} touch={touch} />
+      {/* Game options that are the player's own (Music Box Rhythm's timing offset), as in local tournaments. */}
+      {Extras && <Extras practice={false} />}
       <div className="intro-field">
         {match.seats.map((s) => {
           const m = lobby.members.find((x) => x.id === s.id);
