@@ -9,6 +9,7 @@ import { MiniContender, createMiniAnim } from '../../character/MiniContender';
 import { matchBus } from '../session';
 import type { Contestant, MinigameSceneProps } from '../types';
 import { DIRECTIONS, SIZE, type InfernoState } from './rules';
+import { YouMarker } from '../shared/YouMarker';
 
 const CELL = 3.8;
 const coord = (n: number) => (n - 5) * CELL;
@@ -48,6 +49,7 @@ function Toy({ c, getState }: { c: Contestant; getState: () => InfernoState | nu
   });
   return <group ref={root}>
     {c.isLocal ? <WindupBot anim={full} paint={c.paint} hat={c.hat} keySkin={c.keySkin} /> : <MiniContender anim={mini} paint={c.paint} />}
+    {c.isLocal && <YouMarker />}
     <mesh ref={marker} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.04, 0]}><ringGeometry args={[1.3, 1.6, 24]} /><meshBasicMaterial color={PALETTE.honey} /></mesh>
   </group>;
 }

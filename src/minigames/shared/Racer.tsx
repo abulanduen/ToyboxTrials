@@ -19,6 +19,7 @@ import { blobShadowTexture } from '../../scene/textures';
 import { matchBus } from '../session';
 import type { Contestant } from '../types';
 import { moverSpeed, type Mover } from './movement';
+import { YouMarker } from './YouMarker';
 
 export interface RacerView {
   m: Mover;
@@ -133,6 +134,7 @@ export function Racer({ c, view }: { c: Contestant; view: () => RacerView | null
             {c.isLocal ? <WindupBot anim={toy} paint={c.paint} hat={c.hat} keySkin={c.keySkin} accessories={c.accessories} /> : <MiniContender paint={c.paint} anim={mini} scale={0.92} />}
           </group>
         </group>
+        {c.isLocal && <YouMarker height={4.6} />}
         {c.isLocal && (
           <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.16, 0]} renderOrder={2}>
             <ringGeometry args={[1.55, 1.95, 28]} />

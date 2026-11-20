@@ -18,6 +18,7 @@ import { paintMat, woodMat, feltMat, Bunting } from '../../scene/props';
 import { cardboardTexture } from '../../scene/textures';
 import type { MinigameSceneProps, Contestant } from '../types';
 import type { CopycatState, Slot } from './rules';
+import { YouMarker } from '../shared/YouMarker';
 
 export const INSTRUMENTS: { slot: Slot; key: string; name: string; color: string; voice: () => void }[] = [
   { slot: 0, key: 'A', name: 'Drum', color: PALETTE.coral, voice: () => sfx.drum() },
@@ -153,6 +154,7 @@ export function CopycatScene({ getState, contestants, localId }: MinigameScenePr
         c.isLocal ? (
           <group key={c.id} position={[x, 0, ROW_Z]} rotation={[0, Math.PI, 0]} scale={1.15}>
             <WindupBot anim={localAnim} paint={c.paint} hat={c.hat} keySkin={c.keySkin} />
+            <YouMarker />
           </group>
         ) : (
           <group key={c.id} position={[x, 0, ROW_Z + 1]} rotation={[0, Math.PI, 0]}>

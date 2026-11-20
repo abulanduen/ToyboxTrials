@@ -10,6 +10,7 @@ import { MiniContender, createMiniAnim } from '../../character/MiniContender';
 import { matchBus } from '../session';
 import type { Contestant, MinigameSceneProps } from '../types';
 import { SHELTERS, SIZE, type HungerState } from './rules';
+import { YouMarker } from '../shared/YouMarker';
 
 const CELL = 3.5;
 const coord = (n: number) => (n - 5) * CELL;
@@ -47,6 +48,7 @@ function Toy({ c, getState }: { c: Contestant; getState: () => HungerState | nul
   });
   return <group ref={root}>
     {c.isLocal ? <WindupBot anim={full} paint={c.paint} hat={c.hat} keySkin={c.keySkin} /> : <MiniContender anim={mini} paint={c.paint} />}
+    {c.isLocal && <YouMarker height={6.2} />}
     {c.isLocal && <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}><ringGeometry args={[1.2, 1.5, 24]} /><meshBasicMaterial color={PALETTE.honey} /></mesh>}
     <Billboard ref={health} position={[0, 5, 0]} renderOrder={10}>
       <mesh><planeGeometry args={[3.1, 0.6]} /><meshBasicMaterial color={c.isLocal ? PALETTE.honey : PALETTE.cream} depthTest={false} depthWrite={false} toneMapped={false} fog={false} /></mesh>

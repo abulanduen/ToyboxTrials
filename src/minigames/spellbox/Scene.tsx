@@ -14,6 +14,7 @@ import type { Contestant, MinigameSceneProps } from '../types';
 import { clearSpellboxInput, queueSpellboxInput, setSpellboxAim } from './local';
 import { SPELLS } from './spells';
 import type { SpellboxState } from './rules';
+import { YouMarker } from '../shared/YouMarker';
 
 function coneGeometry(){const shape=new THREE.Shape();shape.moveTo(0,0);for(let i=0;i<=24;i++){const a=-Math.PI/3+i/24*Math.PI*2/3;shape.lineTo(Math.sin(a)*6,Math.cos(a)*6);}shape.lineTo(0,0);return new THREE.ShapeGeometry(shape);}
 function MageToy({c,getState}:{c:Contestant;getState:()=>SpellboxState|null}){
@@ -40,6 +41,7 @@ function MageToy({c,getState}:{c:Contestant;getState:()=>SpellboxState|null}){
   return<>
     <group ref={root}>
       {c.isLocal?<WindupBot anim={full} paint={c.paint} hat={c.hat} keySkin={c.keySkin}/>:<MiniContender anim={mini} paint={c.paint}/>}
+      {c.isLocal&&<YouMarker height={5.6} waiting={()=>getState()?.phase==='draft'}/>}
       <group position={[1.15,1.4,.4]} rotation={[.25,0,-.2]}><mesh><cylinderGeometry args={[.1,.14,2.7,8]}/><meshStandardMaterial color={PALETTE.woodDark}/></mesh><mesh position={[0,1.6,0]}><octahedronGeometry args={[.5]}/><meshStandardMaterial color={PALETTE.honey} emissive={PALETTE.honey} emissiveIntensity={.25}/></mesh><mesh position={[0,1.3,0]}><torusGeometry args={[.38,.08,6,12]}/><meshStandardMaterial color={PALETTE.brass}/></mesh></group>
       <mesh ref={halo} position={[0,.02,0]} rotation={[-Math.PI/2,0,0]}><ringGeometry args={[1.1,1.35,24]}/><meshBasicMaterial/></mesh>
       <mesh ref={shield} position={[0,1.5,0]} raycast={()=>{}}><sphereGeometry args={[2,16,12]}/><meshBasicMaterial color={PALETTE.sage} transparent opacity={.24} depthWrite={false} wireframe/></mesh>

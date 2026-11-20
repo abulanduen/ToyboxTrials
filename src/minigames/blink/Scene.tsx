@@ -13,6 +13,7 @@ import { clearBlinkInput, queueBlinkInput, setBlinkAim } from './local';
 import { DEFAULT_CONFIG, type BlinkState } from './rules';
 import { BlinkFeedback } from './Feedback';
 import { ARENA_CAMERA_DIR, arenaFov, fitArenaDistance, squarePoints } from '../shared/arenaCamera';
+import { YouMarker } from '../shared/YouMarker';
 
 /** Ground half-extent the camera frames: the 32 cm arena plus its cardboard rails. */
 const ARENA_FRAME = 17.1;
@@ -70,6 +71,7 @@ function Toy({c,getState}:{c:Contestant;getState:()=>BlinkState|null}) {
         <mesh position={[0,0,-.3]}><cylinderGeometry args={[.18,.18,1,8]}/><meshStandardMaterial color={PALETTE.brass}/></mesh>
         <mesh><boxGeometry args={[1.15,.28,.28]}/><meshStandardMaterial color={PALETTE.coral}/></mesh>
       </group>
+      {c.isLocal&&<YouMarker/>}
       {c.isLocal&&<mesh rotation={[-Math.PI/2,0,0]} position={[0,.02,0]}><ringGeometry args={[1.2,1.45,24]}/><meshBasicMaterial color={PALETTE.honey}/></mesh>}
     </group>
     <group ref={warning}>

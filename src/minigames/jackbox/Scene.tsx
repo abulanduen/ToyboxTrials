@@ -17,6 +17,7 @@ import { matchBus } from '../session';
 import { paintMat, feltMat } from '../../scene/props';
 import type { Contestant, MinigameSceneProps } from '../types';
 import type { JackState } from './rules';
+import { YouMarker } from '../shared/YouMarker';
 
 const LID_Y = 1.2;
 
@@ -140,6 +141,7 @@ export function JackScene({ getState, contestants, localId }: MinigameSceneProps
             {s.c.isLocal ? (
               <group scale={1.1}>
                 <WindupBot anim={localAnim} paint={s.c.paint} hat={s.c.hat} keySkin={s.c.keySkin} />
+                <YouMarker />
               </group>
             ) : (
               <MiniContender paint={s.c.paint} anim={{ current: miniAnims.current.get(s.c.id)! }} />

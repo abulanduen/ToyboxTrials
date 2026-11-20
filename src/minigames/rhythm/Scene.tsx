@@ -27,6 +27,7 @@ import { syncSongClock } from './timing';
 import { songClock, songNow } from './live';
 import { driveMusic, stopMusic } from './music';
 import { LANES } from './lanes';
+import { YouMarker } from '../shared/YouMarker';
 
 /** How long a pin is on its way to the strike line. */
 export const APPROACH_MS = 1500;
@@ -145,6 +146,7 @@ export function RhythmScene({ getState, contestants, localId }: MinigameScenePro
           c.isLocal ? (
             <group key={c.id} position={[x, 0, 0.6]} scale={1.25}>
               <WindupBot anim={localAnim} paint={c.paint} hat={c.hat} keySkin={c.keySkin} />
+              <YouMarker />
             </group>
           ) : (
             <group key={c.id} position={[x, 0, 0]}>
