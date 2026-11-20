@@ -11,28 +11,43 @@ import { MoveTouch } from '../shared/MoveTouch';
 import { useMatch } from '../session';
 import type { Contestant, MinigameSceneProps } from '../types';
 import {
-  BIGS, BOSS_AT, CLASSES, CLASS_IDS, ELITE_SCHEDULE, HORN, MAX_LEVEL, PASSIVES, WEAPONS, evolutionHint, overtime, reviveCost, sendBlock, sendTarget,
-  viewedBoard, viewedPlayer, type ClassId, type EvoHint, type Option, type SiegePlayer, type SiegeState,
+  BIGS, BOILER, BOSS_AT, CLASSES, HORN_MAX, CLASS_IDS, ELITE_SCHEDULE, HORN, MAX_LEVEL, PASSIVES, WEAPONS, evolutionHint, overtime, reviveCost, sendBlock, sendTarget,
+  viewedBoard, viewedPlayer, type ClassId, type EvoHint, type EvoId, type Option, type SiegePlayer, type SiegeState,
 } from './rules';
 import { CLASS_COLOUR, PASSIVE_COLOUR, WEAPON_COLOUR } from './look';
-import { SiegeIcon, type SiegeIconId } from './icons';
+import { EVOLVED_ICON, SiegeIcon, type SiegeIconId } from './icons';
 import { clearSiegeInput, queueSiegeInput } from './local';
 import './siege.css';
 
+/**
+ * A bar's fill as a horizontal scale (0–1), not a width: the HUD refreshes ten times a second and the
+ * fill eases between values, and a scale animates on the compositor where a width would lay the page
+ * out again on every frame of the ease.
+ */
+const fill = (v: number, of: number): CSSProperties => ({ transform: `scaleX(${of > 0 ? Math.min(1, Math.max(0, v / of)).toFixed(3) : 0})` });
 const clock = (ms: number) => { const t = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
 const BLOCK_TEXT = { self: 'That is you', out: 'Already out', cooldown: 'You sent one recently', protected: 'Just received one', full: 'Has two already' } as const;
 const statusText = (p: SiegePlayer) => ({ picking: 'Choosing', alive: 'In', downed: 'Down!', ghost: p.inArena ? 'Knocked out' : 'Ghost', prep: p.victoryAt >= 0 ? 'Boss slain!' : 'Ready', arena: 'Fighting' })[p.status];
 
 /** Level pips: `level` filled; `next` (if given) is the pip this card adds, highlighted. */
-function Pips({ level, next, evolved }: { level: number; next?: number; evolved?: boolean }) {
+function Pips({ level, next, evolved, max = MAX_LEVEL }: { level: number; next?: number; evolved?: boolean; max?: number }) {
   return <span className={`siege-pips${evolved ? ' evolved' : ''}`} aria-hidden="true">
-    {Array.from({ length: MAX_LEVEL }, (_, i) => <i key={i} className={i < level ? 'on' : next !== undefined && i < next ? 'next' : ''} />)}
+    {Array.from({ length: max }, (_, i) => <i key={i} className={i < level ? 'on' : next !== undefined && i < next ? 'next' : ''} />)}
   </span>;
 }
-function Chip({ icon, colour, title, level, evolved }: { icon: SiegeIconId; colour: string; title: string; level: number; evolved?: boolean }) {
-  return <li className="siege-chip" title={title} aria-label={`${title}, ${evolved ? 'evolved' : `level ${level} of ${MAX_LEVEL}`}`}>
-    <b style={{ background: colour }}><SiegeIcon id={evolved ? 'evolve' : icon} size={18} /></b><Pips level={level} evolved={evolved} />
+function Chip({ icon, colour, title, level, evolved, max = MAX_LEVEL }: { icon: SiegeIconId; colour: string; title: string; level: number; evolved?: boolean; max?: number }) {
+  return <li className="siege-chip" title={title} aria-label={`${title}, ${evolved ? 'evolved' : `level ${level} of ${max}`}`}>
+    <b style={{ background: colour }}><SiegeIcon id={icon} size={18} /></b><Pips level={level} evolved={evolved} max={max} />
   </li>;
+}
+
+/** The Boiler Heart's colour on cards and chips (the horn's brass). */
+const HORN_COLOUR = '#C8973A';
+/** A weapon's (or the horn's) evolved name, blurb and icon. */
+function evolvedOf(id: EvoId): { from: string; name: string; blurb: string; icon: SiegeIconId; colour: string } {
+  if (id === 'horn') return { from: HORN.name, name: BOILER.name, blurb: BOILER.blurb, icon: EVOLVED_ICON.horn, colour: HORN_COLOUR };
+  const d = WEAPONS[id];
+  return { from: d.name, name: d.evolvedName, blurb: d.evolvedBlurb, icon: EVOLVED_ICON[id], colour: WEAPON_COLOUR[id] };
 }
 
 interface Card { title: string; body: string; tag: string; colour: string; icon: SiegeIconId; from?: number; to?: number }
@@ -44,8 +59,8 @@ function describe(o: Option, p: SiegePlayer): Card {
       return { title: d.name, tag: o.level === 1 ? 'New weapon' : 'Weapon upgrade', body: o.level === 1 ? d.blurb : d.levelText[o.level - 1], colour: WEAPON_COLOUR[o.id], icon: o.id, from: o.level - 1, to: o.level };
     }
     case 'passive': return { title: PASSIVES[o.id].name, tag: o.level === 1 ? 'New passive' : 'Passive upgrade', body: PASSIVES[o.id].perLevel, colour: PASSIVE_COLOUR[o.id], icon: o.id, from: o.level - 1, to: o.level };
-    case 'horn': return { title: HORN.name, tag: o.level === 1 ? 'Active skill' : 'Active skill upgrade', body: `${HORN.blurb} Cooldown ${HORN.cooldowns[o.level - 1] / 1000} s.`, colour: '#C8973A', icon: 'horn', from: o.level - 1, to: o.level };
-    case 'evolve': { const d = WEAPONS[o.id]; return { title: d.evolvedName, tag: `Evolution of ${d.name}`, body: d.evolvedBlurb, colour: WEAPON_COLOUR[o.id], icon: 'evolve' }; }
+    case 'horn': return { title: HORN.name, tag: o.level === 1 ? 'Active skill' : 'Active skill upgrade', body: `${HORN.blurb} Cooldown ${HORN.cooldowns[o.level - 1] / 1000} s.`, colour: HORN_COLOUR, icon: 'horn', from: o.level - 1, to: o.level };
+    case 'evolve': { const e = evolvedOf(o.id); return { title: e.name, tag: `Evolution of ${e.from}`, body: e.blurb, colour: e.colour, icon: e.icon }; }
     case 'bundle': return { title: 'Treasure', tag: 'Open the chest', body: o.items.map((it) => `${it.kind === 'weapon' ? WEAPONS[it.id].name : PASSIVES[it.id].name} +1`).join(' · '), colour: '#EFAE45', icon: 'chest' };
     case 'heal': return { title: 'Oil and polish', tag: 'Everything is maxed', body: `Full health and 50 points. (${Math.round(p.hp)} health now.)`, colour: '#89B78A', icon: 'heal' };
     case 'send': return { title: 'Send an elite', tag: 'Skip the treasure', body: 'Give up this chest and send an elite to a rival’s board instead.', colour: '#E76B62', icon: 'send' };
@@ -54,6 +69,13 @@ function describe(o: Option, p: SiegePlayer): Card {
 
 /** The "secret upgrade" badge: what this card does towards a weapon's evolution. */
 function hintText(h: EvoHint): { text: string; strong: boolean } {
+  if (h.weapon === 'horn') {
+    switch (h.kind) {
+      case 'evolve': return { text: `Secret upgrade: the ${HORN.name} becomes the ${BOILER.name}`, strong: true };
+      case 'ready': return { text: `Unlocks the secret upgrade: the next chest turns the ${HORN.name} into the ${BOILER.name}`, strong: true };
+      default: return { text: `Secret upgrade at level 3: the ${BOILER.name}. ${h.kind === 'pair' ? h.levelsLeft : 0} more level${h.kind === 'pair' && h.levelsLeft === 1 ? '' : 's'}`, strong: false };
+    }
+  }
   const w = WEAPONS[h.weapon];
   switch (h.kind) {
     case 'evolve': return { text: `Secret upgrade: ${w.name} becomes ${w.evolvedName}`, strong: true };
@@ -153,14 +175,15 @@ export function SiegeHud({ getState, localId, contestants }: MinigameSceneProps<
     <div className="siege-top" aria-live="off">
       <div className="siege-clock" aria-label={arena ? `Arena ${clock(s.arenaT)}` : `${clock(s.runT)} of ${clock(s.config.durationMs)}`}><strong data-testid="siege-clock">{arena ? clock(s.arenaT) : clock(Math.min(s.runT, s.config.durationMs))}</strong><small>{next}</small></div>
       <div className="siege-bars">
-        <div className="siege-bar siege-bar--hp" aria-label={`Health ${Math.ceil(viewed.hp)} of ${viewed.stat.maxHp}`}><i style={{ width: `${(100 * viewed.hp) / viewed.stat.maxHp}%` }} /><span>{Math.ceil(viewed.hp)} / {viewed.stat.maxHp}</span></div>
-        <div className="siege-bar siege-bar--xp" aria-label={`Level ${viewed.level}`}><i style={{ width: `${(100 * viewed.xp) / viewed.xpNext}%` }} /><span data-testid="siege-level">Lv {viewed.level}</span></div>
+        <div className="siege-bar siege-bar--hp" aria-label={`Health ${Math.ceil(viewed.hp)} of ${viewed.stat.maxHp}`}><i style={fill(viewed.hp, viewed.stat.maxHp)} /><span>{Math.ceil(viewed.hp)} / {viewed.stat.maxHp}</span></div>
+        <div className="siege-bar siege-bar--xp" aria-label={`Level ${viewed.level}`}><i style={fill(viewed.xp, viewed.xpNext)} /><span data-testid="siege-level">Lv {viewed.level}</span></div>
       </div>
       <div className="siege-score"><strong>{viewed.points}</strong><small>pts · {arena ? `${viewed.arenaKOs} arena KOs` : `${viewed.kills} KOs`}</small></div>
     </div>
 
     <ul className="siege-items" aria-label={watchingOthers ? `${names(viewed.id)}'s kit` : 'Your kit'} data-testid="siege-items">
-      {viewed.weapons.map((w) => <Chip key={w.id} icon={w.id} colour={WEAPON_COLOUR[w.id]} title={w.evolved ? WEAPONS[w.id].evolvedName : WEAPONS[w.id].name} level={w.level} evolved={w.evolved} />)}
+      {viewed.weapons.map((w) => <Chip key={w.id} icon={w.evolved ? EVOLVED_ICON[w.id] : w.id} colour={WEAPON_COLOUR[w.id]} title={w.evolved ? WEAPONS[w.id].evolvedName : WEAPONS[w.id].name} level={w.level} evolved={w.evolved} />)}
+      {viewed.horn && <Chip icon={viewed.horn.evolved ? EVOLVED_ICON.horn : 'horn'} colour={HORN_COLOUR} title={viewed.horn.evolved ? BOILER.name : HORN.name} level={viewed.horn.level} evolved={viewed.horn.evolved} max={HORN_MAX} />}
       {viewed.passives.map((x) => <Chip key={x.id} icon={x.id} colour={PASSIVE_COLOUR[x.id]} title={PASSIVES[x.id].name} level={x.level} />)}
     </ul>
 
@@ -173,14 +196,14 @@ export function SiegeHud({ getState, localId, contestants }: MinigameSceneProps<
             <i style={{ background: p.cls ? CLASS_COLOUR[p.cls] : '#A8998A' }} />
             <span className="siege-name">{names(p.id)}</span>
             <span className="siege-row-meta">{statusText(p)} · Lv {p.level}{p.incoming.length && !arena ? ' · elite incoming!' : ''}</span>
-            {p.status === 'arena' && <span className="siege-row-hp"><b style={{ width: `${(100 * p.hp) / p.stat.maxHp}%` }} /></span>}
+            {p.status === 'arena' && <span className="siege-row-hp"><b style={fill(p.hp, p.stat.maxHp)} /></span>}
           </button>
         </li>;
       })}
     </ol>
 
-    {boss && <div className="siege-boss" data-testid="siege-boss"><strong>{BIGS.baron.name}</strong><div className="siege-bar siege-bar--boss"><i style={{ width: `${(100 * boss.hp) / boss.maxHp}%` }} /></div></div>}
-    {ally && <div className="siege-boss siege-boss--ally" data-testid="siege-ally"><strong>Your {BIGS.baron.name.replace(/^The /, '')}</strong><div className="siege-bar siege-bar--boss"><i style={{ width: `${(100 * ally.hp) / ally.maxHp}%` }} /></div></div>}
+    {boss && <div className="siege-boss" data-testid="siege-boss"><strong>{BIGS.baron.name}</strong><div className="siege-bar siege-bar--boss"><i style={fill(boss.hp, boss.maxHp)} /></div></div>}
+    {ally && <div className="siege-boss siege-boss--ally" data-testid="siege-ally"><strong>Your {BIGS.baron.name.replace(/^The /, '')}</strong><div className="siege-bar siege-bar--boss"><i style={fill(ally.hp, ally.maxHp)} /></div></div>}
     {incoming && <div className="siege-alert" role="status" data-testid="siege-incoming"><strong>Elite incoming from {names(incoming.from)}!</strong><span>Arrives in {Math.max(0, Math.ceil((incoming.at - s.runT) / 1000))} s</span></div>}
 
     {/* The prep window: after the boss (three chests) or at 5:00. */}
@@ -238,7 +261,7 @@ export function SiegeHud({ getState, localId, contestants }: MinigameSceneProps<
               <i className="siege-mark"><SiegeIcon id={d.icon} size={28} /></i><em>{d.tag}</em><strong>{d.title}</strong>
               {d.to !== undefined && <span className="siege-level" data-testid={`siege-option-${i}-level`}>
                 {d.from ? <>Lv {d.from} <b aria-label="to">→</b> {d.to}</> : <>New · Lv 1</>}
-                {o.kind !== 'horn' ? <Pips level={d.from ?? 0} next={d.to} /> : <small> of {max}</small>}
+                {o.kind !== 'horn' ? <Pips level={d.from ?? 0} next={d.to} /> : <Pips level={d.from ?? 0} next={d.to} max={max} />}
               </span>}
               <small>{d.body}</small>
               {h && <span className={`siege-secret${h.strong ? ' siege-secret--ready' : ''}`} data-testid={`siege-option-${i}-secret`}><SiegeIcon id="evolve" size={16} />{h.text}</span>}

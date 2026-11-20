@@ -16,4 +16,6 @@ export const SHOT_COLOUR = C.wine;
 export const ARENA = { mat: P.felt, matDark: P.feltDark, rail: P.woodMid, railDark: P.woodDark, stitch: P.cream, patches: [P.felt, P.feltDark, P.sage, P.felt, C.leaf] } as const;
 /** The final arena's ring: a cream felt mat, a coral band, cotton-reel posts and elastic-band ropes. */
 export const RING = { mat: P.cream, band: P.coral, centre: P.honey, stitch: P.inkPurple, ropeLow: P.toyBlue, ropeHigh: P.coral, thread: [P.coral, P.toyBlue, P.honey, P.sage] } as const;
-export const FX = { sweep: P.white, chime: C.lilac, chimeCore: P.honey, marble: C.glass, revive: P.honey, telegraph: P.coral, pickup: P.cream, level: P.honey, ghost: P.white } as const;
+export const FX = { sweep: P.white, chime: C.lilac, chimeCore: P.honey, marble: C.glass, revive: P.honey, telegraph: P.coral, pickup: P.cream, level: P.honey, ghost: P.white,
+  /** Prism Ray beams, Firebell flame pools (outer and hot core), Boiler Heart rivets. */
+  laser: P.coral, flame: P.coral, flameCore: P.honey, rivet: P.brass } as const;

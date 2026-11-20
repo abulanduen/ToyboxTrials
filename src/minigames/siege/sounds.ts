@@ -7,23 +7,25 @@
 import type { MatchEvent } from '../types';
 
 export type SiegeCue = 'kill' | 'sweep' | 'pop' | 'chime' | 'marble' | 'plane' | 'hurt' | 'level' | 'card' | 'elite' | 'boss' | 'chest' | 'evolve'
-  | 'downed' | 'revive' | 'ghost' | 'victory' | 'sent' | 'incoming' | 'blocked' | 'start' | 'arena' | 'ally' | 'ko';
+  | 'downed' | 'revive' | 'ghost' | 'victory' | 'sent' | 'incoming' | 'blocked' | 'start' | 'arena' | 'ally' | 'ko' | 'laser' | 'rivets';
 
 /**
  * Minimum time between two plays of the same cue (ms of simulation time). The auto-fire weapons
- * repeat constantly (an evolved Grand Carillon rings four bursts every 1.15 s, a Cork Gatling
- * fires every 0.23 s), so their gaps are long enough that a volley is one sound, not a wall.
+ * repeat constantly (Firebell Meteors ring six meteors every 1.2 s, a Prism Ray zaps every 0.4 s, a Pop-Gun
+ * at full speed fires every 0.2 s or so), so their gaps are long enough that a volley is one sound, not a wall.
  */
 export const CUE_GAP: Record<SiegeCue, number> = {
   kill: 70, sweep: 220, pop: 180, chime: 450, marble: 260, plane: 300, hurt: 180, level: 300, card: 150, elite: 800, boss: 1500, chest: 300,
   evolve: 800, downed: 800, revive: 800, ghost: 800, victory: 1500, sent: 400, incoming: 400, blocked: 300, start: 1000, arena: 1500, ally: 800, ko: 400,
+  // a Prism Ray beam every 0.45 s at best: one zap per beam; a Boiler Heart ring is 16 rivets at once: one sound per ring
+  laser: 300, rivets: 700,
 };
 /** Mix level of each weapon cue (0–1), well below the event cues: they play all match long. */
-export const WEAPON_GAIN = { sweep: 0.4, pop: 0.4, chime: 0.5, marble: 0.42, plane: 0.32 } as const;
+export const WEAPON_GAIN = { sweep: 0.4, pop: 0.4, chime: 0.5, marble: 0.42, plane: 0.32, laser: 0.36, rivets: 0.38 } as const;
 /** At most this many voices in any VOICE_WINDOW ms. Important cues (not kills or weapons) always get through. */
 export const MAX_VOICES = 4;
 export const VOICE_WINDOW = 250;
-const BUSY: ReadonlySet<SiegeCue> = new Set(['kill', 'sweep', 'pop', 'chime', 'marble', 'plane']);
+const BUSY: ReadonlySet<SiegeCue> = new Set(['kill', 'sweep', 'pop', 'chime', 'marble', 'plane', 'laser', 'rivets']);
 
 export class CueLimiter {
   private last = new Map<SiegeCue, number>();

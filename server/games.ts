@@ -309,7 +309,7 @@ const GAMES: ServerGame[] = [
       const me = players.find((p) => p.id === viewer);
       const keep = new Set<unknown>(v.phase === 'arena' || v.phase === 'over' ? [] : [viewer, me?.watching ?? null]);
       if (!me && v.phase === 'run') keep.add(players.find((p) => p.status === 'alive')?.id ?? players[0]?.id);
-      const stub = (b: Obj): Obj => ({ ...b, mobs: [], projs: [], shots: [], gems: [], chests: [], blasts: [], bigs: (b.bigs as Obj[]).filter((g) => g.on) });
+      const stub = (b: Obj): Obj => ({ ...b, mobs: [], projs: [], shots: [], gems: [], chests: [], blasts: [], fires: [], bigs: (b.bigs as Obj[]).filter((g) => g.on) });
       return { ...v, players: players.map((p) => (keep.has(p.id) ? p : { ...p, board: stub(p.board as Obj) })) };
     },
     snapshotEvery: 2,

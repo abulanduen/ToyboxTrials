@@ -57,7 +57,7 @@ async function run(name) {
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
     // Phones keep the layout shots; desktop takes every moment.
-    const PHONE_SHOTS = ['1-class-pick', '2-levelup', '5-swarm', '7-boss', '8-prep', '9-arena', '10-ally', '11-out', '12-watching'];
+    const PHONE_SHOTS = ['1-class-pick', '2-levelup', '5-swarm', '5b-secrets', '7-boss', '8-prep', '9-arena', '10-ally', '11-out', '12-watching'];
     const missed = [];
     const shot = async (label) => {
       if (v.touch && !PHONE_SHOTS.includes(label)) return;
@@ -174,10 +174,12 @@ async function run(name) {
 
     // ---- Fast-forward to the first elite. Keep our toy healthy, and stop further level-ups: at a frame
     // every few seconds a tap meant for a level card could land on the treasure card that replaced it.
-    await state(() => { const p = window.__toybox.match.state().players.find((q) => q.id === 'you'); p.invuln = 1e12; p.xp = 0; p.xpNext = 1e9; });
+    // Our weapons hold fire until the elite is posed: a level-5 Pop-Gun (piercing, homing) can fell the Rag
+    // Bear inside one fast-forwarded frame, before the test sees it.
+    await state(() => { const p = window.__toybox.match.state().players.find((q) => q.id === 'you'); p.invuln = 1e12; p.xp = 0; p.xpNext = 1e9; for (const w of p.weapons) w.cd = 1e9; });
     await skipTo(50000);
     await page.evaluate(() => window.__toybox.match.timeScale(60));
-    for (let i = 0; i < 400; i++) {
+    for (let i = 0; i < 2000; i++) {
       const s = await state(() => { const p = window.__toybox.match.state().players.find((q) => q.id === 'you'); return { elite: p.board.bigs.some((g) => g.on), card: p.choice?.kind ?? null }; });
       if (s.elite) break;
       if (s.card) await tap(page.getByTestId('siege-option-0')).catch(() => {});
@@ -188,6 +190,7 @@ async function run(name) {
     await page.waitForTimeout(1500);
     await step('3-elite');
     await shot('3-elite');
+    await state(() => { for (const w of window.__toybox.match.state().players.find((q) => q.id === 'you').weapons) w.cd = 0; });
 
     // ---- The elite falls, drops a chest; walk onto it: treasure card; skip it to send an elite to a bot
     await state(() => {
@@ -235,8 +238,35 @@ async function run(name) {
     await step('5-swarm');
     await shot('5-swarm');
 
+    // ---- The secret upgrades the owner asked for (20 Nov 2026): Prism Ray (a laser through the line),
+    // Firebell Meteors (pools of flame) and the Boiler Heart (a ring of rivets), all at once on our board
+    await state(() => {
+      const p = window.__toybox.match.state().players.find((q) => q.id === 'you');
+      for (const id of ['popgun', 'chime']) {
+        const w = p.weapons.find((x) => x.id === id);
+        if (w) Object.assign(w, { level: 5, evolved: true, cd: 0 }); else if (p.weapons.length < 4) p.weapons.push({ id, level: 5, evolved: true, cd: 0, aux: 0 });
+        else Object.assign(p.weapons[p.weapons.length - 1], { id, level: 5, evolved: true, cd: 0, aux: 0 });
+      }
+      p.horn = { level: 3, readyAt: 0, evolved: true, cd: 0, aux: 0 };
+    });
+    await page.evaluate(() => window.__toybox.match.timeScale(1));
+    await page.waitForFunction(new Function(`const b = ${me}.board; return b.blasts.some(k => k.on && k.kind === 4) && b.fires.some(f => f.on) && b.projs.some(q => q.on && q.kind === 2)`));
+    await page.evaluate(() => window.__toybox.match.timeScale(0));
+    await page.waitForTimeout(1500);
+    const secrets = await state(() => window.__toybox.siege.counts());
+    assert.ok(secrets.fires > 0, 'flame pools on the board');
+    assert.ok((await page.locator('[data-testid="siege-items"] li[title="Boiler Heart"]').count()) === 1, 'the kit strip shows the Boiler Heart');
+    assert.ok((await page.locator('[data-testid="siege-items"] li[title="Prism Ray"] svg.siege-icon').count()) === 1, 'the kit strip shows the Prism Ray');
+    console.log(`  [${name}] secret upgrades on the board ${JSON.stringify(secrets)}`);
+    await step('5b-secrets');
+    await shot('5b-secrets');
+
     // ---- Knocked down → revive (paid in points)
-    await state(() => { const p = window.__toybox.match.state().players.find((q) => q.id === 'you'); p.points = Math.max(p.points, 900); p.invuln = 0; p.hp = 0.5; if (p.choice) p.choice = null; p.pendingLevels = 0; p.pendingChests = 0; });
+    await state(() => { const p = window.__toybox.match.state().players.find((q) => q.id === 'you'); p.points = Math.max(p.points, 900); p.invuln = 0; p.hp = 0.5; if (p.choice) p.choice = null; p.pendingLevels = 0; p.pendingChests = 0;
+      // A dust bunny right on the toy (it bites before the weapons fire; the revive shockwave clears it):
+      // the secret upgrades above clear the swarm before anything else can bite.
+      const m = p.board.mobs.find((x) => !x.on) ?? p.board.mobs[0];
+      Object.assign(m, { on: true, serial: ++p.board.serial, kind: 0, x: p.x + 0.4, z: p.z, vx: 0, vz: 0, kx: 0, kz: 0, hp: 30, maxHp: 30, speed: 4, dmg: 10, r: 0.85, xp: 1, pts: 1, timer: 0 }); });
     await page.evaluate(() => window.__toybox.match.timeScale(1));
     await page.getByTestId('siege-downed').waitFor();
     await step('6-downed');
@@ -274,10 +304,14 @@ async function run(name) {
         const p = window.__toybox.match.state().players.find((q) => q.id === 'you');
         const g = p.board.bigs.find((b) => b.on && b.type === 'baron'); g.hp = 1; g.x = p.x + 2.5; g.z = p.z; g.mode = 0;
         for (const m of p.board.mobs) m.on = false;
+        // Only the boss's chests count below: no elite (or its chest) left over from earlier.
+        for (const b of p.board.bigs) if (b !== g) b.on = false;
+        for (const c of p.board.chests) c.on = false;
+        p.pendingChests = 0; p.choice = null;
         p.xpNext = 30; p.xp = 0; // so the magnet's gems bring a level-up card or two
         // Gems scattered over the board, for the magnet to pull in.
         p.board.gems.slice(0, 24).forEach((gem, i) => Object.assign(gem, { on: true, kind: 0, v: 4, x: p.x - 18 + (i % 6) * 7, z: p.z - 14 + Math.floor(i / 6) * 8, pull: false }));
-        p.horn = { level: 2, readyAt: 0 }; // for the arena
+        p.horn = { level: 2, readyAt: 0, evolved: false, cd: 0, aux: 0 }; // for the arena
       });
       await page.evaluate(() => window.__toybox.match.timeScale(2));
       await page.waitForFunction(new Function(`return ${me}.status === 'prep'`));
@@ -350,7 +384,9 @@ async function run(name) {
       await page.evaluate(() => { for (const q of window.__toybox.match.state().players) if (q.status === 'arena') q.hp = Math.min(q.hp, q.stat.maxHp); window.__toybox.match.timeScale(20); });
     } else {
       // ---- Second knockout in the run: no revive left, so out for good. The popup; the toy stays on its own board.
-      await state(() => { const p = window.__toybox.match.state().players.find((q) => q.id === 'you'); p.invuln = 0; p.hp = 0.5; p.choice = null; p.pendingLevels = 0; p.pendingChests = 0; });
+      await state(() => { const p = window.__toybox.match.state().players.find((q) => q.id === 'you'); p.invuln = 0; p.hp = 0.5; p.choice = null; p.pendingLevels = 0; p.pendingChests = 0;
+        const m = p.board.mobs.find((x) => !x.on) ?? p.board.mobs[0]; // a sure bite (see the first knockout)
+        Object.assign(m, { on: true, serial: ++p.board.serial, kind: 0, x: p.x + 0.4, z: p.z, vx: 0, vz: 0, kx: 0, kz: 0, hp: 30, maxHp: 30, speed: 4, dmg: 10, r: 0.85, xp: 1, pts: 1, timer: 0 }); });
       await page.evaluate(() => window.__toybox.match.timeScale(1));
       await page.getByTestId('siege-out-popup').waitFor();
       assert.equal(await state(new Function(`return ${me}.status`)), 'ghost');

@@ -6,9 +6,9 @@
 import type { ReactElement } from 'react';
 import { PALETTE as P } from '../../game/palette';
 import { TOY_COLOURS as C } from '../toysquad/models';
-import type { PassiveId, WeaponId } from './config';
+import type { EvoId, PassiveId, WeaponId } from './config';
 
-export type SiegeIconId = WeaponId | PassiveId | 'horn' | 'evolve' | 'chest' | 'heal' | 'send' | 'arena';
+export type SiegeIconId = WeaponId | PassiveId | 'horn' | 'evolve' | 'chest' | 'heal' | 'send' | 'arena' | 'laser' | 'flame' | 'boiler';
 
 const S = { stroke: P.ink, strokeWidth: 1.4, strokeLinejoin: 'round' as const, strokeLinecap: 'round' as const };
 
@@ -81,6 +81,31 @@ const ICONS: Record<SiegeIconId, ReactElement> = {
     <circle cx={9.8} cy={9.8} r={1.3} fill={P.cream} /><circle cx={14.2} cy={9.8} r={1.3} fill={P.cream} />
     <circle cx={9.8} cy={14.2} r={1.3} fill={P.cream} /><circle cx={14.2} cy={14.2} r={1.3} fill={P.cream} />
   </g>,
+  // ---- secret upgrades with their own look
+  /** Prism Ray: a toy ray gun and its beam. */
+  laser: <g {...S}>
+    <path d="M2.5 12h19.5" stroke={P.coral} strokeWidth={4.2} />
+    <path d="M2.5 12h19.5" stroke={P.white} strokeWidth={1.4} />
+    <path d="M3 8.5h8.5l2 2v3l-2 2H3z" fill={C.lilac} />
+    <path d="M5 15.5l-1 4.5h3l1-4.5z" fill={P.woodMid} />
+    <circle cx={7} cy={12} r={1.4} fill={P.honey} />
+  </g>,
+  /** Firebell Meteors: a meteor and the pool of flame it leaves. */
+  flame: <g {...S}>
+    <ellipse cx={12} cy={19} rx={9} ry={3} fill={P.coral} />
+    <path d="M8 19c-1.5-3 1-5 2-7c.5 2 2 2.5 2 2.5c0-3 1.5-5 3-6.5c.5 3 3 5 1.5 11z" fill={P.honey} />
+    <circle cx={17.5} cy={5.5} r={2.6} fill={C.lilac} />
+    <path d="M15.6 7.4l-3 3M19.4 7.6l-1.6 2.2" fill="none" />
+  </g>,
+  /** Boiler Heart: a brass boiler with rivets flying out all round. */
+  boiler: <g {...S}>
+    <circle cx={12} cy={12} r={5.2} fill={P.brass} />
+    <circle cx={12} cy={12} r={2} fill={P.coral} />
+    <circle cx={12} cy={2.8} r={1.3} fill={P.honey} /><circle cx={12} cy={21.2} r={1.3} fill={P.honey} />
+    <circle cx={2.8} cy={12} r={1.3} fill={P.honey} /><circle cx={21.2} cy={12} r={1.3} fill={P.honey} />
+    <circle cx={5.5} cy={5.5} r={1.1} fill={P.honey} /><circle cx={18.5} cy={18.5} r={1.1} fill={P.honey} />
+    <circle cx={18.5} cy={5.5} r={1.1} fill={P.honey} /><circle cx={5.5} cy={18.5} r={1.1} fill={P.honey} />
+  </g>,
   // ---- card kinds
   horn: <g {...S}>
     <path d="M3 10.5h4l10-6v15l-10-6H3z" fill={P.honey} />
@@ -114,6 +139,9 @@ const ICONS: Record<SiegeIconId, ReactElement> = {
     <path d="M5 10l7-3.5l7 3.5" fill="none" stroke={P.cream} strokeWidth={1.4} />
   </g>,
 };
+
+/** The icon of an evolved weapon or horn: the three the owner asked for have their own; the rest share the star. */
+export const EVOLVED_ICON: Record<EvoId, SiegeIconId> = { sweep: 'evolve', popgun: 'laser', chime: 'flame', yoyo: 'evolve', planes: 'evolve', marbles: 'evolve', horn: 'boiler' };
 
 /** A siege item icon, `size` px square. Decorative: the card or chip carries the name. */
 export function SiegeIcon({ id, size = 24 }: { id: SiegeIconId; size?: number }) {

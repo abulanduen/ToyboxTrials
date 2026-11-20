@@ -23,6 +23,8 @@ export const MAX_WEAPONS = 4;
 export const MAX_PASSIVES = 4;
 /** The Rally Horn active skill (send an elite) has its own three levels. */
 export const HORN_MAX = 3;
+/** A homing cork looks this far (cm) for an enemy ahead of it to curve towards. */
+export const HOMING_SEEK = 12;
 
 export const ARENA_HALF = 44;
 export const PLAYER_RADIUS = 1.1;
@@ -49,40 +51,45 @@ export const CLASSES: Record<ClassId, ClassDef> = {
   warrior: { id: 'warrior', name: 'Tin Soldier', role: 'Warrior · tough', blurb: 'Sweeps its bayonet round in a wide arc. Most health, built-in armour, a little slow.',
     weapon: 'sweep', hp: 150, speed: 9.2, armour: 2, cdMul: 1, areaMul: 1, pickupMul: 1 },
   ranger: { id: 'ranger', name: 'Pop-Gun Ranger', role: 'Ranger · fast', blurb: 'Pops corks at the nearest enemy. Quickest on its feet and pulls in gems from further away.',
-    weapon: 'popgun', hp: 100, speed: 11.6, armour: 0, cdMul: 1, areaMul: 1, pickupMul: 1.35 },
-  mage: { id: 'mage', name: 'Clockwork Wizard', role: 'Mage · area', blurb: 'Rings chime bursts that blast a whole patch of the swarm. Bigger blasts, quicker spells, fragile.',
+    weapon: 'popgun', hp: 115, speed: 11.6, armour: 0, cdMul: 1, areaMul: 1, pickupMul: 1.35 },
+  mage: { id: 'mage', name: 'Clockwork Wizard', role: 'Mage · area', blurb: 'Rings chime meteors down on the swarm, a patch at a time. Bigger blasts, quicker spells, fragile.',
     weapon: 'chime', hp: 105, speed: 10, armour: 0, cdMul: 0.9, areaMul: 1.15, pickupMul: 1 },
 };
 
 /**
  * One row of a weapon table. Not every field matters to every weapon:
  *  sweep: area = reach, arc = degrees per swing, count = swings (1 front, 2 front + back)
- *  popgun: count = corks per volley, pierce = extra enemies a cork passes through, speed, range = lifetime ms
- *  chime: count = bursts, area = blast radius, range = how far it looks for a target
+ *  popgun: count = corks per volley, pierce = extra enemies a cork passes through, speed, range = lifetime ms,
+ *          homing = how fast a cork may turn towards an enemy (radians per second; 0 = flies straight).
+ *          Evolved (the Prism Ray laser): count = beams, area = beam half-width, range = beam length, pierce −1 = everything
+ *  chime: count = meteors, area = blast radius, range = how far it looks for a target (evolved: each leaves a FLAME pool)
  *  yoyo: count = yo-yos, area = orbit radius, speed = radians per second, cd = per-enemy hit gap
  *  planes: count = planes, range = how far out before they turn back, speed
  *  marbles: count = marbles per shower, area = splash radius, range = how far it looks for targets
  */
-export interface WeaponStats { cd: number; dmg: number; count: number; area: number; arc: number; speed: number; pierce: number; range: number; knock: number }
+export interface WeaponStats { cd: number; dmg: number; count: number; area: number; arc: number; speed: number; pierce: number; range: number; knock: number; homing: number }
 export interface WeaponDef { id: WeaponId; name: string; blurb: string; levels: WeaponStats[]; evolved: WeaponStats; evolvedName: string; evolvedBlurb: string; partner: PassiveId; levelText: string[] }
 
 const w = (cd: number, dmg: number, count: number, area: number, extra: Partial<WeaponStats> = {}): WeaponStats =>
-  ({ cd, dmg, count, area, arc: 0, speed: 0, pierce: 0, range: 0, knock: 0, ...extra });
+  ({ cd, dmg, count, area, arc: 0, speed: 0, pierce: 0, range: 0, knock: 0, homing: 0, ...extra });
 
 export const WEAPONS: Record<WeaponId, WeaponDef> = {
   sweep: { id: 'sweep', name: 'Bayonet Sweep', blurb: 'A wide swing in front of you that shoves enemies back.', partner: 'plating',
     levels: [w(1150, 14, 1, 6, { arc: 150, knock: 9 }), w(1150, 20, 1, 6, { arc: 150, knock: 9 }), w(1100, 20, 2, 6, { arc: 150, knock: 9 }), w(1100, 24, 2, 7.5, { arc: 150, knock: 10 }), w(950, 32, 2, 7.5, { arc: 150, knock: 10 })],
     levelText: ['', '+6 damage', 'Also swings behind you', '+25% reach', '+8 damage, swings faster'],
     evolved: w(850, 44, 1, 9.5, { arc: 360, knock: 14 }), evolvedName: 'Whirling Brigade', evolvedBlurb: 'A full circle of bayonets, every swing.' },
+  // Owner request (20 Nov 2026): the Ranger's corks gain piercing and a gentle homing as they level, and
+  // the secret upgrade is a laser that cuts through every enemy in a line.
   popgun: { id: 'popgun', name: 'Pop-Gun', blurb: 'Fires corks at the nearest enemy.', partner: 'gears',
-    levels: [w(750, 9, 1, 0.6, { speed: 42, range: 800 }), w(750, 9, 2, 0.6, { speed: 42, range: 800 }), w(720, 10, 2, 0.6, { speed: 42, range: 800, pierce: 1 }),
-      w(700, 15, 2, 0.6, { speed: 42, range: 800, pierce: 1 }), w(600, 15, 3, 0.6, { speed: 42, range: 850, pierce: 1 })],
-    levelText: ['', '+1 cork', 'Corks pass through one enemy', '+5 damage', '+1 cork, fires faster'],
-    evolved: w(230, 16, 2, 0.7, { speed: 56, range: 850, pierce: 3 }), evolvedName: 'Cork Gatling', evolvedBlurb: 'A rattling stream of corks that punch through three enemies.' },
-  chime: { id: 'chime', name: 'Chime Burst', blurb: 'A ringing blast lands on an enemy near you.', partner: 'magnifier',
-    levels: [w(1600, 16, 1, 4.5, { range: 20 }), w(1600, 18, 1, 5.5, { range: 20 }), w(1550, 18, 2, 5.5, { range: 20 }), w(1500, 26, 2, 5.5, { range: 22 }), w(1300, 26, 3, 6, { range: 22 })],
-    levelText: ['', 'Bigger blast', '+1 burst', '+8 damage', '+1 burst, rings faster'],
-    evolved: w(1150, 36, 4, 7.5, { range: 24 }), evolvedName: 'Grand Carillon', evolvedBlurb: 'Four great bells toll at once.' },
+    levels: [w(750, 10, 1, 0.6, { speed: 42, range: 800 }), w(750, 10, 2, 0.6, { speed: 42, range: 800, pierce: 1 }), w(720, 12, 2, 0.6, { speed: 42, range: 800, pierce: 1, homing: 1.6 }),
+      w(700, 17, 2, 0.6, { speed: 42, range: 800, pierce: 2, homing: 1.6 }), w(560, 18, 3, 0.6, { speed: 44, range: 850, pierce: 3, homing: 2.6 })],
+    levelText: ['', '+1 cork, corks pass through 1 enemy', 'Corks curve gently towards enemies, +2 damage', '+5 damage, pass through 2 enemies', '+1 cork, pass through 3, keener homing, fires faster'],
+    evolved: w(400, 52, 1, 0.9, { range: 34, pierce: -1 }), evolvedName: 'Prism Ray', evolvedBlurb: 'The pop-gun becomes a toy ray gun: a laser beam that cuts through every enemy in a line.' },
+  // Owner request (20 Nov 2026): more meteors with each level; the secret upgrade leaves pools of flame.
+  chime: { id: 'chime', name: 'Chime Meteors', blurb: 'Ringing meteors fall on enemies near you.', partner: 'magnifier',
+    levels: [w(1600, 18, 1, 4.5, { range: 20 }), w(1600, 18, 2, 4.5, { range: 20 }), w(1550, 20, 3, 5, { range: 20 }), w(1500, 26, 4, 5, { range: 22 }), w(1300, 26, 5, 5.5, { range: 22 })],
+    levelText: ['', '+1 meteor', '+1 meteor, bigger blast', '+1 meteor, +6 damage', '+1 meteor, rings faster'],
+    evolved: w(1200, 32, 6, 6.5, { range: 24 }), evolvedName: 'Firebell Meteors', evolvedBlurb: 'Six blazing meteors, and each leaves a pool of flame that burns anything standing in it.' },
   yoyo: { id: 'yoyo', name: 'Yo-Yo Orbit', blurb: 'Yo-yos circle you and clip anything they touch.', partner: 'mainspring',
     levels: [w(450, 8, 1, 5.5, { speed: 3.2 }), w(450, 8, 2, 5.5, { speed: 3.2 }), w(450, 13, 2, 5.5, { speed: 3.4 }), w(450, 13, 3, 6.5, { speed: 3.4 }), w(400, 18, 3, 6.5, { speed: 4.6 })],
     levelText: ['', '+1 yo-yo', '+5 damage', '+1 yo-yo, wider orbit', '+5 damage, spins faster'],
@@ -110,6 +117,25 @@ export const PASSIVES: Record<PassiveId, PassiveDef> = {
 export const PASSIVE_PER_LEVEL = { armour: 1, hp: 12, dmg: 0.1, cd: 0.08, area: 0.1, speed: 0.08, projSpeed: 0.1, pickup: 0.35, xp: 0.04 } as const;
 
 export const HORN = { name: 'Rally Horn', blurb: 'Active skill: send an elite to a rival’s board. In the final arena it summons a boss to fight for you.', cooldowns: [75000, 60000, 45000], firstReadyMs: 8000, offerChance: 0.4, offerFromLevel: 4 };
+
+/** Anything with a secret upgrade: the six weapons, and the Rally Horn. */
+export type EvoId = WeaponId | 'horn';
+
+/**
+ * The Chime Meteors' secret upgrade (Firebell Meteors): every meteor leaves a pool of flame where it
+ * lands. A pool burns every enemy in it once per `tickMs` (rival toys in the arena too, not its owner).
+ * Radius and damage scale with the toy's area and damage, like the blast itself. Owner request, 20 Nov 2026.
+ */
+export const FLAME = { radius: 3.2, lifeMs: 3000, tickMs: 400, dmg: 9 } as const;
+
+/**
+ * The Rally Horn's secret upgrade (owner request, 20 Nov 2026): a maxed horn (level 3) plus a chest turns
+ * it into the Boiler Heart. The toy then fires a ring of rivets all around itself, like the Boiler
+ * Baron's bullet rings, every `cd` ms, on top of its weapons (it takes no weapon slot), and the horn
+ * keeps its active skill. Each volley's ring turns by half a gap, so the gaps sweep. Pierce 1.
+ */
+export const BOILER = { name: 'Boiler Heart', blurb: 'Your toy vents a ring of rivets all around itself, like the Boiler Baron, and the horn still sends elites.',
+  cd: 1500, count: 16, dmg: 18, speed: 22, lifeMs: 1000, pierce: 1, r: 0.75 } as const;
 
 // ---------------------------------------------------------------- the swarm
 
@@ -245,6 +271,8 @@ export interface SiegeConfig {
   shotCap: number;
   gemCap: number;
   blastCap: number;
+  /** Flame pools (Firebell Meteors). */
+  fireCap: number;
   chestCap: number;
   bigCap: number;
 }
@@ -265,6 +293,7 @@ export const DEFAULT_CONFIG: SiegeConfig = {
   shotCap: 64,
   gemCap: 160,
   blastCap: 40,
+  fireCap: 24,
   chestCap: 4,
   bigCap: 4,
 };

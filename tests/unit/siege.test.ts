@@ -3,11 +3,11 @@ import { PAINT_JOBS } from '../../src/game/palette';
 import type { BotDifficulty, Contestant } from '../../src/minigames/types';
 import { seededRng, subSeed } from '../../src/minigames/rng';
 import {
-  ARENA_HALF, BOSS_AT, DEFAULT_CONFIG, ELITE_SCHEDULE, FINALE, HASH, MAX_LEVEL, PASSIVE_IDS, WEAPONS, WEAPON_IDS, boardCounts, evolutionHint, evolutionReady, len, levelOptions,
-  ranking, reviveCost, sendBlock, siegeRules, spawnMob, spawnRate, standings, treasureOptions, viewedPlayer, xpToNext,
+  ARENA_HALF, BOILER, BOSS_AT, DEFAULT_CONFIG, ELITE_SCHEDULE, FINALE, FLAME, HASH, MAX_LEVEL, PASSIVE_IDS, WEAPONS, WEAPON_IDS, boardCounts, evolutionHint, evolutionReady, laserHits, len, levelOptions,
+  ranking, reviveCost, sendBlock, siegeRules, spawnBig, spawnMob, spawnRate, standings, steerTowards, treasureOptions, viewedPlayer, xpToNext,
   type SiegeConfig, type SiegeInput, type SiegePlayer, type SiegeState,
 } from '../../src/minigames/siege/rules';
-import { createSiegeBot } from '../../src/minigames/siege/bot';
+import { createSiegeBot, rateOption } from '../../src/minigames/siege/bot';
 import { CUE_GAP, CueLimiter, MAX_VOICES, WEAPON_GAIN } from '../../src/minigames/siege/sounds';
 
 const STEP = 1000 / 60;
@@ -740,4 +740,211 @@ describe('Toybox Siege: performance guards', () => {
     expect(Math.max(...s.players.map((p) => p.level))).toBeGreaterThan(15);
     expect(ms).toBeLessThan(90000);
   }, 180000);
+});
+
+// ---------------------------------------------------------------- the ranged upgrades (owner request, 20 Nov 2026)
+
+describe('Toybox Siege: ranged upgrades and secret upgrades', () => {
+  /** One toy on a quiet board: no swarm spawning, only what the test places. */
+  function quiet(cls: 'warrior' | 'ranger' | 'mage' = 'ranger') {
+    const s = siegeRules.init([person('you')], 5);
+    siegeRules.step(s, { you: [{ type: 'class', cls }] }, STEP);
+    siegeRules.drainEvents(s);
+    const me = P(s, 'you');
+    immortal(me);
+    me.x = 0; me.z = 0; me.xpNext = 1e9;
+    me.board.spawnAcc = -1e9; me.board.waveT = 1e12; // no swarm, no waves
+    return { s, me };
+  }
+  /** A still mob with plenty of health at (x, z). */
+  function dummy(s: SiegeState, p: SiegePlayer, x: number, z: number, hp = 1e4) {
+    const m = spawnMob(s, p, 0, x, z)!;
+    m.hp = m.maxHp = hp; m.speed = 0;
+    return m;
+  }
+  /** Fire one cork by hand (the pop-gun's own aim is tested elsewhere). */
+  function cork(p: SiegePlayer, x: number, z: number, vx: number, vz: number, pierce: number, homing = 0) {
+    const q = p.board.projs.find((x) => !x.on)!;
+    Object.assign(q, { on: true, kind: 0, x, z, vx, vz, r: 0.6, dmg: 1, pierce, life: 3000, ox: x, oz: z, range: 0, back: false, nh: 0, own: -1, homing, ti: -1, ts: 0 });
+    return q;
+  }
+
+  it('the Pop-Gun gains piercing with its levels: a cork passes through exactly that many enemies', () => {
+    expect(WEAPONS.popgun.levels.map((l) => l.pierce)).toEqual([0, 1, 1, 2, 3]);
+    for (const pierce of [0, 1, 2, 3]) {
+      const { s, me } = quiet();
+      me.weapons = [];
+      const line = [4, 7, 10, 13, 16, 19].map((x) => dummy(s, me, x, 0));
+      cork(me, 1.5, 0, 42, 0, pierce);
+      run(s, 800);
+      expect(line.filter((m) => m.hp < m.maxHp).length).toBe(pierce + 1);
+      expect(line.slice(0, pierce + 1).every((m) => m.hp === m.maxHp - 1)).toBe(true); // the nearest ones, once each
+    }
+  });
+
+  it('homing corks curve gently: never more than the turn limit per step, and catch an enemy a straight cork misses', () => {
+    expect(WEAPONS.popgun.levels.map((l) => l.homing)).toEqual([0, 0, 1.6, 1.6, 2.6]);
+    // The turn itself is clamped and keeps the speed.
+    const q = { x: 0, z: 0, vx: 0, vz: 30 };
+    expect(steerTowards(q, 10, 0, 0.05)).toBeCloseTo(0.05);
+    expect(Math.hypot(q.vx, q.vz)).toBeCloseTo(30);
+    expect(steerTowards({ x: 0, z: 0, vx: 0, vz: 30 }, 0.01, 10, 0.05)).toBeCloseTo(0.001, 3); // nearly on course: turns only as far as needed
+    for (const homing of [0, 2.6]) {
+      const { s, me } = quiet();
+      me.weapons = [];
+      const m = dummy(s, me, 11, 2.2); // off the cork's straight line (it passes 2.2 cm away; contact needs 1.45)
+      const c = cork(me, 1, 0, 42, 0, 0, homing);
+      let heading = Math.atan2(c.vx, c.vz), maxTurn = 0;
+      for (let t = 0; t < 600 && c.on; t += STEP) {
+        siegeRules.step(s, {}, STEP);
+        const h = Math.atan2(c.vx, c.vz);
+        maxTurn = Math.max(maxTurn, Math.abs(Math.atan2(Math.sin(h - heading), Math.cos(h - heading))));
+        heading = h;
+      }
+      if (homing) { expect(m.hp).toBeLessThan(m.maxHp); expect(maxTurn).toBeLessThanOrEqual(homing / 60 + 1e-9); expect(maxTurn).toBeGreaterThan(0); }
+      else { expect(m.hp).toBe(m.maxHp); expect(maxTurn).toBe(0); }
+    }
+    // It only looks ahead: an enemy behind the cork is ignored.
+    const { s, me } = quiet();
+    me.weapons = [];
+    dummy(s, me, -6, 1);
+    const c = cork(me, 0, 0, 42, 0, 0, 2.6);
+    siegeRules.step(s, {}, STEP);
+    expect(c.vz).toBe(0);
+  });
+
+  it('Prism Ray (the evolved Pop-Gun) is a laser that hits every enemy in its line, and nothing beside or beyond it', () => {
+    expect(laserHits({ x: 0, z: 0, r: 10, ang: Math.PI / 2, w: 1 }, 5, 1.5, 0.6)).toBe(true); // along +x, 1.5 off the line
+    expect(laserHits({ x: 0, z: 0, r: 10, ang: Math.PI / 2, w: 1 }, 5, 1.7, 0.6)).toBe(false);
+    expect(laserHits({ x: 0, z: 0, r: 10, ang: Math.PI / 2, w: 1 }, 11.8, 0, 0.6)).toBe(false); // past its end
+    expect(laserHits({ x: 0, z: 0, r: 10, ang: Math.PI / 2, w: 1 }, -1.7, 0, 0.6)).toBe(false); // behind the toy
+    const { s, me } = quiet();
+    me.weapons = [{ id: 'popgun', level: 5, evolved: true, cd: 0, aux: 0 }];
+    const st = WEAPONS.popgun.evolved;
+    const inLine = [5, 9, 14, 20, 26, 32].map((x) => dummy(s, me, x, 0));
+    const beside = dummy(s, me, 12, 4), beyond = dummy(s, me, st.range + 4, 0);
+    siegeRules.step(s, {}, STEP);
+    siegeRules.step(s, {}, STEP);
+    expect(me.board.blasts.some((k) => k.on && k.kind === 4)).toBe(true);
+    for (const m of inLine) expect(m.maxHp - m.hp).toBeCloseTo(st.dmg * me.stat.dmg);
+    expect(beside.hp).toBe(beside.maxHp);
+    expect(beyond.hp).toBe(beyond.maxHp);
+    // One beam per cooldown.
+    run(s, st.cd - 100);
+    expect(inLine[0].maxHp - inLine[0].hp).toBeCloseTo(st.dmg * me.stat.dmg);
+    run(s, 200);
+    expect(inLine[0].maxHp - inLine[0].hp).toBeCloseTo(2 * st.dmg * me.stat.dmg);
+    // Elites in the line take it too.
+    const e = spawnBig(s, me, 'bear', false, null)!;
+    e.x = 8; e.z = -0.5; e.speed = 0; e.dashT = 1e9;
+    const hp = e.hp;
+    run(s, st.cd + 50);
+    expect(e.hp).toBeLessThan(hp);
+  });
+
+  it('Chime Meteors add a meteor every level; Firebell Meteors leave a pool of flame that burns over time, then goes out', () => {
+    expect(WEAPONS.chime.levels.map((l) => l.count)).toEqual([1, 2, 3, 4, 5]);
+    expect(WEAPONS.chime.evolved.count).toBe(6);
+    const { s, me } = quiet('mage');
+    me.weapons = [{ id: 'chime', level: 5, evolved: true, cd: 0, aux: 0 }];
+    const m = dummy(s, me, 6, 0, 1e5);
+    let t = 0;
+    while (!me.board.fires.some((f) => f.on) && t < 2000) { siegeRules.step(s, {}, STEP); t += STEP; }
+    const pool = me.board.fires.find((f) => f.on)!;
+    expect(pool).toBeTruthy();
+    expect(pool.r).toBeCloseTo(FLAME.radius * me.stat.area);
+    expect(len(pool.x - m.x, pool.z - m.z)).toBeLessThan(1);
+    me.weapons = []; // no more meteors: only the pools burn now
+    const burning = me.board.fires.filter((f) => f.on).length, hp0 = m.hp;
+    run(s, 1000); // two ticks per pool (every 400 ms after landing)
+    const per = FLAME.dmg * me.stat.dmg;
+    expect(hp0 - m.hp).toBeCloseTo(burning * 2 * per, 5);
+    run(s, FLAME.lifeMs);
+    expect(me.board.fires.some((f) => f.on)).toBe(false);
+    const after = m.hp;
+    run(s, 2000);
+    expect(m.hp).toBe(after); // out: no more damage
+    // The pools are pooled: a full pool replaces its oldest flame, never grows.
+    const { s: t2, me: m2 } = quiet('mage');
+    m2.weapons = [{ id: 'chime', level: 5, evolved: true, cd: 0, aux: 0 }];
+    for (let i = 0; i < 12; i++) dummy(t2, m2, -10 + i * 2, 6, 1e6);
+    m2.stat.cd = 0.05; // ring as fast as allowed
+    run(t2, 4000);
+    expect(m2.board.fires.length).toBe(DEFAULT_CONFIG.fireCap);
+    expect(boardCounts(m2.board).fires).toBe(DEFAULT_CONFIG.fireCap);
+  });
+
+  it('the Rally Horn has a secret upgrade at level 3: the Boiler Heart fires a ring of rivets all around, like the boss', () => {
+    const { s, me } = quiet('warrior');
+    me.weapons = [];
+    expect(evolutionHint(me, { kind: 'horn', level: 2 })).toEqual({ kind: 'pair', weapon: 'horn', levelsLeft: 1 });
+    expect(evolutionHint(me, { kind: 'horn', level: 3 })).toEqual({ kind: 'ready', weapon: 'horn' });
+    me.horn = { level: 2, readyAt: 0, evolved: false, cd: 0, aux: 0 };
+    expect(evolutionReady(me)).toBeNull();
+    me.horn.level = 3;
+    expect(evolutionReady(me)).toBe('horn');
+    // A weapon's evolution comes first; the horn waits for the next chest.
+    me.weapons = [{ id: 'sweep', level: 5, evolved: false, cd: 1e9, aux: 0 }]; me.passives = [{ id: 'plating', level: 1 }];
+    expect(evolutionReady(me)).toBe('sweep');
+    me.weapons = []; me.passives = [];
+    me.pendingChests = 1;
+    siegeRules.step(s, {}, STEP);
+    expect(me.choice?.options[0]).toEqual({ kind: 'evolve', id: 'horn' });
+    siegeRules.step(s, { you: [{ type: 'choose', index: 0 }] }, STEP);
+    expect(me.horn.evolved).toBe(true);
+    expect(evolutionReady(me)).toBeNull();
+    // Mobs all round the toy: one ring hits every one of them.
+    const ring = Array.from({ length: BOILER.count }, (_, k) => { const a = (k / BOILER.count) * Math.PI * 2; return dummy(s, me, Math.sin(a) * 6, Math.cos(a) * 6); });
+    me.horn.cd = 0; me.horn.aux = 0;
+    siegeRules.step(s, {}, STEP);
+    const rivets = me.board.projs.filter((q) => q.on && q.kind === 2);
+    expect(rivets.length).toBe(BOILER.count);
+    const angles = rivets.map((q) => Math.atan2(q.vx, q.vz)).sort((a, b) => a - b);
+    for (let i = 1; i < angles.length; i++) expect(angles[i] - angles[i - 1]).toBeCloseTo((Math.PI * 2) / BOILER.count, 5); // evenly spaced
+    run(s, 600);
+    expect(ring.every((m) => m.hp < m.maxHp)).toBe(true);
+    // The next ring is turned half a gap, and comes BOILER.cd later.
+    expect(me.horn.aux).toBeCloseTo(Math.PI / BOILER.count);
+    run(s, BOILER.cd);
+    expect(me.horn.aux).toBeCloseTo((2 * Math.PI) / BOILER.count); // a second ring, turned again
+  });
+
+  it('the Boiler Heart keeps the horn: it still sends elites, and in the arena its rings and the new weapons hurt rivals only', () => {
+    const s = started(['you', 'b1']);
+    const me = P(s, 'you');
+    me.horn = { level: 3, readyAt: 0, evolved: true, cd: 1e9, aux: 0 };
+    s.runT = 30000;
+    siegeRules.step(s, { you: [{ type: 'skill' }] }, STEP);
+    expect(P(s, 'b1').incoming.length).toBe(1);
+    // The arena.
+    const a = started(['you', 'b1'], 9);
+    for (const p of a.players) immortal(p);
+    a.runT = DEFAULT_CONFIG.durationMs - STEP;
+    siegeRules.step(a, {}, STEP);
+    for (const p of a.players) takeCards(a, p);
+    a.runT = DEFAULT_CONFIG.durationMs + DEFAULT_CONFIG.prepMs;
+    siegeRules.step(a, {}, STEP);
+    expect(a.phase).toBe('arena');
+    const [x, y] = [P(a, 'you'), P(a, 'b1')];
+    for (const p of [x, y]) { p.stat.maxHp = p.hp = 5000; p.weapons = []; p.horn = null; }
+    x.horn = { level: 3, readyAt: 1e9, evolved: true, cd: 0, aux: 0 };
+    x.weapons = [{ id: 'popgun', level: 5, evolved: true, cd: 0, aux: 0 }, { id: 'chime', level: 5, evolved: true, cd: 0, aux: 0 }];
+    x.x = 0; x.z = 0; y.x = 8; y.z = 0; x.ax = x.ay = y.ax = y.ay = 0;
+    run(a, 3000);
+    expect(y.hp).toBeLessThan(5000);
+    expect(x.hp).toBe(5000);
+    expect(a.arena!.fires.some((f) => f.on && f.own === 0)).toBe(true);
+    expect(a.arena!.projs.some((q) => q.on && q.kind === 2)).toBe(true);
+    const copy = JSON.parse(JSON.stringify(a)) as SiegeState;
+    run(a, 2000); run(copy, 2000);
+    expect(JSON.stringify(copy)).toBe(JSON.stringify(a)); // still plain, deterministic JSON
+  });
+
+  it('bots raise the horn towards its secret upgrade and always take a secret upgrade from a chest', () => {
+    const s = started(['you', 'b1']);
+    const b = P(s, 'b1');
+    b.horn = { level: 2, readyAt: 0, evolved: false, cd: 0, aux: 0 };
+    expect(rateOption(b, { kind: 'horn', level: 3 }, 'normal')).toBeGreaterThan(rateOption(b, { kind: 'passive', id: 'magnet', level: 1 }, 'normal'));
+    expect(rateOption(b, { kind: 'evolve', id: 'horn' }, 'normal')).toBe(100);
+  });
 });
