@@ -458,6 +458,47 @@ provisional balance (tuned on headless bot lobbies only) are in `src/minigames/t
 Casual-only (too long for tournaments). Online lobbies are future work. The owner named Pumpkin TD
 (Warcraft III) as the reference; its details were not available, so its specifics are not reproduced.
 
+### 14 · Toybox Siege (Survival / Horde / Builds · 1–8)
+**Status:** implemented locally (one local player plus bots); balance is provisional. This is the
+owner's five-minute horde-survival brief, in an original toy theme.
+
+- **One board each.** Every player holds out on their own quilted patch of the table, and the
+  camera follows their toy. Weapons fire on their own; the player only moves (joystick, WASD or
+  arrows).
+- **Classes.** The choice is untimed: a centred card over a blurred board.
+  - Warrior: Tin Soldier, Bayonet Sweep, tough.
+  - Ranger: Pop-Gun Ranger, Pop-Gun, fast.
+  - Mage: Clockwork Wizard, Chime Burst, area.
+- **The run.**
+  - Swarms of dust bunnies, wind-up mice, rolling marbles and paper planes ramp up over five
+    minutes. They drop experience gems, which a magnet reach pulls in.
+  - An elite arrives at 1:00, 2:00 and 3:00, each with an attack pattern: a charge, bullet rings
+    or summons. Each drops a treasure chest.
+  - The boss, the Boiler Baron, arrives at 4:00. Slaying it wins. Otherwise the match ends at 5:00.
+- **Builds.**
+  - Each level-up offers a card of three, sometimes four. A run holds at most four weapons and
+    four passives, from a pool of six weapons and six passives, each with a maximum of five levels.
+  - **Evolution:** a weapon at level 5, plus its partner passive, plus an opened elite chest.
+- **Rivals.**
+  - Skip a chest, or use the Rally Horn active skill, to send an elite to another board. The target
+    is the leader by default, or a rival you pick.
+  - The target gets a 3-second warning.
+  - Rate limits: 25 s between sends, 30 s of protection after receiving, and at most 2 sent elites
+    per board.
+- **Down and out.**
+  - Revive once by spending in-match points: 100 + 1 per second of run time.
+  - After that you are a ghost. Ghosts cycle through the other boards and can see each other.
+- **Placement:**
+  1. victory, with earlier boss kills ranked higher;
+  2. survival time;
+  3. knockouts;
+  4. points.
+- **Eligibility:** practice and casual only for now (not tournaments), like Toy Squad. The
+  medium-length band is `durationSec` [240, 330].
+- **Details:** exact tables, rate limits, caps and open questions are in
+  `src/minigames/siege/README.md`. Online play, real-player balance and real-device performance are
+  not verified.
+
 ---
 
 ## 5. Shared minigame framework

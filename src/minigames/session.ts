@@ -18,14 +18,15 @@ import { NO_REWARD, applyReward, dateKey, grantAchievements, rewardForGame, rewa
 import { sfx } from '../game/audio';
 import { Emitter } from '../game/events';
 import { player } from '../game/player';
-import { gameById, tournamentPool } from './registry';
+import { MINIGAMES, gameById } from './registry';
 import { makeBots } from './bots';
 import { newSeed, seededRng, subSeed } from './rng';
 import { addRound, rankStandings, type Standing } from './scoring';
-import { FORMATS, selectGames, type TournamentFormat } from './tournament';
+import { FORMATS, poolForFormat, selectGames, type TournamentFormat } from './tournament';
 import type { BotDifficulty, Contestant, MatchEvent, MinigameId, MinigameModule, MinigameResult } from './types';
 
-export type MatchPhase = 'idle' | 'picker' | 'reveal' | 'loading' | 'intro' | 'countdown' | 'playing' | 'results' | 'standings' | 'final';
+/** `lobby`: an online lobby's waiting room (src/minigames/remote.ts). */
+export type MatchPhase = 'idle' | 'picker' | 'reveal' | 'loading' | 'intro' | 'countdown' | 'playing' | 'results' | 'standings' | 'final' | 'lobby';
 
 export const LOCAL_ID = 'you';
 const STEP_MS = 1000 / 60;
@@ -43,7 +44,8 @@ export interface TournamentRun {
 
 interface MatchStore {
   phase: MatchPhase;
-  kind: 'practice' | 'tournament' | null;
+  /** `online`: a server-run lobby match (remote.ts); the rest are local. */
+  kind: 'practice' | 'tournament' | 'online' | null;
   gameId: MinigameId | null;
   module: MinigameModule | null;
   contestants: Contestant[];
@@ -62,6 +64,8 @@ interface MatchStore {
   unlocked: string[];
   paused: boolean;
   error: string | null;
+  /** The contestant id the Scene and Hud treat as "you": LOCAL_ID locally; the player's server id online. */
+  localId: string;
   set: (p: Partial<MatchStore>) => void;
 }
 
@@ -82,6 +86,7 @@ export const useMatch = create<MatchStore>()((set) => ({
   unlocked: [],
   paused: false,
   error: null,
+  localId: 'you',
   set: (p) => set(p),
 }));
 
@@ -100,7 +105,18 @@ const runtime = {
   startedAt: 0,
 };
 
-export const getMatchState = () => runtime.state;
+export const getMatchState = () => (remoteHost.active ? remoteHost.getState() : runtime.state);
+
+/**
+ * Online lobby matches (src/minigames/remote.ts) plug in here: while `active`, the host shows the
+ * server's state instead of running the local rules, and the frame tick goes to the remote host
+ * (which sends local input to the server). Local practice and tournaments never set it.
+ */
+export const remoteHost = {
+  active: false,
+  getState: (): unknown => null,
+  tick: (_dtRealMs: number): void => {},
+};
 
 function localContestant(): Contestant {
   const g = useGame.getState();
@@ -116,7 +132,7 @@ function localContestant(): Contestant {
   };
 }
 
-function enterMinigameScreen() {
+export function enterMinigameScreen() {
   const g = useGame.getState();
   if (g.screen !== 'minigame') {
     // Remember where to put the toy back in the hub.
@@ -169,7 +185,8 @@ export function openTournamentPicker() {
 
 export function startTournament(format: TournamentFormat, opponents: number, difficulty: BotDifficulty) {
   const field = opponents + 1;
-  const pool = tournamentPool().filter((g) => field >= g.players.min && field <= g.players.max);
+  // The format's rotation for this field size (Toy Squad: Normal and Treasure only).
+  const pool = poolForFormat(format, MINIGAMES, field);
   const seed = newSeed();
   const games = selectGames(seed, FORMATS[format].games, pool);
   const local = localContestant();
@@ -226,6 +243,7 @@ export function beginCountdown() {
 
 /** Called every rendered frame while the minigame screen is up (from MatchDriver). */
 export function tickMatch(dtRealMs: number) {
+  if (remoteHost.active) return remoteHost.tick(dtRealMs);
   const m = useMatch.getState();
   const mod = m.module;
   if (!mod || !runtime.state || m.paused) return;
@@ -372,7 +390,7 @@ export function setMatchTimeScale(k: number) {
 
 exposeDebug({
   match: {
-    state: () => runtime.state,
+    state: () => getMatchState(), // the server's state during online matches
     phase: () => useMatch.getState().phase,
     timeScale: setMatchTimeScale,
     /** Open a game's practice card directly (for games without a hub entrance yet). */

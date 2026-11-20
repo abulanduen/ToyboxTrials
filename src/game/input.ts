@@ -6,20 +6,9 @@
  * produced it. Bindings are data so a minigame can install its own map (e.g. ASJK for
  * Copycat Conductor) — and must provide a matching touch layout (see src/minigames/types.ts).
  */
-export type Action =
-  | 'forward'
-  | 'back'
-  | 'left'
-  | 'right'
-  | 'jump'
-  | 'interact'
-  | 'run'
-  | 'pause'
-  /** Four generic minigame slots (Copycat instruments, rhythm lanes, answer buttons…). */
-  | 'slot1'
-  | 'slot2'
-  | 'slot3'
-  | 'slot4';
+import type { Action } from './actions';
+/** The action type lives in actions.ts (pure, shared with the online server). */
+export type { Action };
 
 export const SLOT_ACTIONS = ['slot1', 'slot2', 'slot3', 'slot4'] as const;
 

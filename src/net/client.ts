@@ -29,11 +29,16 @@ import { player } from '../game/player';
 import { paintIndexOf } from '../game/cosmetics';
 import { sfx } from '../game/audio';
 import { exposeDebug } from '../game/debug';
+import { netLink } from './link';
+import { onLobbies, onLobbyAlert, onLobbyErr, onLobbyState, onMatchState, resetLobbies } from './lobby';
+import { accountToken } from './account';
 
 /** Give up on a room that hasn't welcomed us by then. */
 const WELCOME_TIMEOUT_MS = 12_000;
 /** Snapshots arrive 15 times a second; this long without any message means the link is dead. */
 const SILENCE_MS = 6_000;
+/** A gap this long between two runs of the 66 ms pump timer means the page itself was stalled. */
+const STALL_MS = 2_000;
 /** Without movement, still send the position this often. */
 const KEEPALIVE_MS = 1_000;
 
@@ -164,6 +169,7 @@ export function leaveOnline(quiet = false) {
 }
 
 function reset() {
+  resetLobbies('offline');
   window.clearTimeout(welcomeTimer);
   window.clearTimeout(retryTimer);
   session = null;
@@ -235,6 +241,11 @@ const handlers: { [K in ServerMsg['t']]: (m: Extract<ServerMsg, { t: K }>) => vo
     if (m.room.kind === 'private' && m.room.code) joinReq = { kind: 'code', code: m.room.code };
     remotes.clear();
     netClock.reset();
+    // A fresh slot (not a resume) has no lobby: leave any lobby screen we were on.
+    if (!m.resumed) resetLobbies('fresh');
+    // Signed in: link the account so finished lobby matches go on the leaderboard by username.
+    const token = accountToken();
+    if (token) send({ t: 'auth', token });
     for (const p of m.players) if (p.id !== m.you) upsertRemote(p);
     sentActivity = undefined;
     sentLook = JSON.stringify(m.players.find((p) => p.id === m.you)?.look ?? null);
@@ -304,12 +315,25 @@ const handlers: { [K in ServerMsg['t']]: (m: Extract<ServerMsg, { t: K }>) => vo
   error(m) {
     if (m.fatal) fail(m.message || ERROR_TEXT[m.code]);
   },
+  lobbies: onLobbies,
+  lobbyAlert: onLobbyAlert,
+  lobby: onLobbyState,
+  lobbyErr: onLobbyErr,
+  ms: onMatchState,
 };
 
 // ---------------------------------------------------------------- outgoing intent
+/** When pump last ran: a long gap means this page was stalled, not that the server went quiet. */
+let lastPumpAt = 0;
+
 function pump() {
-  if (useNet.getState().status !== 'online' || !conn) return;
   const now = performance.now();
+  const stalled = now - lastPumpAt > STALL_MS;
+  lastPumpAt = now;
+  if (useNet.getState().status !== 'online' || !conn) return;
+  // Our own thread was blocked (a long shader compile, a background tab): messages that arrived
+  // meanwhile are still queued behind this timer, so give them a moment before calling it silence.
+  if (stalled) lastMsgAt = Math.max(lastMsgAt, now - SILENCE_MS / 2);
   if (now - lastMsgAt > SILENCE_MS) return onDrop();
   const activity = currentActivity();
   if (activity !== sentActivity) {
@@ -353,6 +377,10 @@ let installed = false;
 export function installNet() {
   if (installed) return;
   installed = true;
+  netLink.send = (msg) => {
+    if (useNet.getState().status === 'online') send(msg);
+  };
+  netLink.serverTime = () => netClock.serverTime(performance.now());
   window.setInterval(pump, MOVE_INTERVAL_MS);
   events.on('player:emote', ({ id }) => {
     if (useNet.getState().status === 'online') send({ t: 'emote', id });

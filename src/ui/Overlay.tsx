@@ -22,6 +22,7 @@ import { useNet } from '../net/store';
 import { leaveOnline, leaveOnlineByChoice } from '../net/client';
 import { closeAccountSheet, useAccount } from '../net/account';
 import { AccountSettingsRow, AccountSheet } from './AccountUI';
+import { HubLobbyAlert, LobbiesButton, LobbyList, OnlineLeaderboard } from './LobbyUI';
 
 // ---------------------------------------------------------------- HUD
 function Prompt() {
@@ -194,6 +195,8 @@ function Hud() {
       <CogCount value={cogs} testId="hud-cogs" className="hud-cogs" />
       <Prompt />
       <OnlineChip />
+      <LobbiesButton />
+      <HubLobbyAlert />
       <Tickets />
       {touch ? <TouchControls /> : <Controls />}
       <BoostMeter />
@@ -314,8 +317,18 @@ function Panel() {
         {panel.subtitle && <div className="info-panel__sub">{panel.subtitle}</div>}
         {panel.kind === 'tournament' && <TournamentPicker onClose={close} />}
         {panel.kind === 'preview' && <p className="panel__lead">{panel.body}</p>}
+        {panel.kind === 'lobbies' && (
+          <>
+            <p className="panel__lead">Join a lobby to play trials with the other toys in this Hub. One that is already playing lets you watch, and you join in at the next trial.</p>
+            <LobbyList />
+          </>
+        )}
+        {panel.kind === 'scoreboard' && <OnlineLeaderboard />}
         {panel.kind === 'scoreboard' && (
           <div className="scoreboard">
+            <div className="scoreboard__row scoreboard__row--muted">
+              <strong>Your records (this device)</strong>
+            </div>
             <div className="scoreboard__row">
               <span>Playroom secrets</span>
               <strong>

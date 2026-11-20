@@ -22,7 +22,9 @@ fs.mkdirSync(OUT, { recursive: true });
     await page.waitForFunction(() => window.__toybox?.match && !document.querySelector('.loading'));
     const games = await page.evaluate(async () => {
       const { TUTORIALS } = await import('/src/minigames/tutorials.ts');
-      return Object.entries(TUTORIALS).map(([id, steps]) => ({ id, count: steps.length }));
+      // Diagram-only tutorials (e.g. newly added Siege) retain their existing visual provider.
+      return Object.entries(TUTORIALS).filter(([, steps]) => steps.every(step => step.image))
+        .map(([id, steps]) => ({ id, count: steps.length }));
     });
     const cdp = await page.context().newCDPSession(page);
     for (const { id, count } of games) {

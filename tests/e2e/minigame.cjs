@@ -249,6 +249,7 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
     // Midnight Hunger: drain our energy and let the night knock us out first.
     // Blink Duel / Spellbox Showdown: mark our toy out and let the rules finish the round.
     // Music Box Rhythm: never tap, and the bot outscores us.
+    // Odd Page Out: never tap, and the bot finds more differences.
     if (game.includes('Copycat')) await failRound();
     if (game.includes('Inferno')) {
       await page.evaluate(() => { const s = window.__toybox.match.state(); s.players[0].x = s.furnace.x; s.players[0].z = s.furnace.z; });
@@ -262,12 +263,18 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
       await page.waitForFunction(() => window.__toybox.match.phase() === 'playing', null, { timeout: 120000 });
       await page.evaluate(() => window.__toybox.match.timeScale(8));
     }
+    if (game.includes('Odd Page')) {
+      // Never tap: the bot finds more differences. Fast-forward the four 30 s pages (the SVG pages
+      // render slowly in software, so steps per frame are what limit it: push hard).
+      await page.waitForFunction(() => window.__toybox.match.phase() === 'playing', null, { timeout: 120000 });
+      await page.evaluate(() => window.__toybox.match.timeScale(40));
+    }
     if (game.includes('Blink') || game.includes('Spellbox')) {
       // Knock our toy out and let the real rules resolve the round (Spellbox: skip the build draft).
       await page.waitForFunction(() => window.__toybox.match.phase() === 'playing', null, { timeout: 120000 });
       await page.evaluate(() => { const s = window.__toybox.match.state(); if (s.kind === 'spellbox-showdown') s.players.forEach((p) => { p.ready = true; }); s.players[0].alive = false; s.players[0].outAt = s.t; });
     }
-    await page.waitForSelector('.results', { timeout: 300000 });
+    await page.waitForSelector('.results', { timeout: 600000 });
     await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
     const rows = await page.$$eval('.results-list li', (els) => els.map((e) => e.textContent));
     check(`trial ${round}: results list both contestants with points`, rows.length === 2 && rows.some((r) => r.includes('+10')) && rows.some((r) => r.includes('+8')), rows.join(' | '));

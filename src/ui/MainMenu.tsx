@@ -10,6 +10,7 @@ import { CogCount } from './Catalogue';
 import { SECRET_IDS } from '../game/interactables';
 import { CardboardSheet, KeyCap, SettingsForm, ToyButton } from './common';
 import { GearIcon, StarSticker, TickerBadge } from './icons';
+import { TutorialPicture } from './TutorialPicture';
 import { openOnlineSheet } from './OnlineUI';
 import { useNet } from '../net/store';
 import { useAccount } from '../net/account';
@@ -126,12 +127,28 @@ export function MainMenu() {
   );
 }
 
+/** The Hub controls as pictures: keyboard and mouse on the left of each, touch on the right. */
+const HUB_PICS = [
+  { id: 'hub-move', label: 'Move' },
+  { id: 'hub-look', label: 'Look around' },
+  { id: 'hub-jump', label: 'Jump' },
+  { id: 'hub-interact', label: 'Interact' },
+] as const;
+
 function HowToPlay({ onClose, touch }: { onClose: () => void; touch: boolean }) {
   return (
     <CardboardSheet title="How to play" className="howto" onBackdrop={onClose}>
       <p className="panel__lead">
         Explore the Playroom, step through the gates to enter trials, and hunt for the four hidden secrets. Each secret unlocks something new in the Workshop. Trials, tournaments and secrets pay cogs to spend at the Odds &amp; Ends shop.
       </p>
+      <ul className="howto__pics" data-testid="howto-pics" aria-label="Controls: keyboard and mouse on the left of each picture, touch on the right">
+        {HUB_PICS.map((p) => (
+          <li key={p.id}>
+            <TutorialPicture id={p.id} className="howto__pic" testId="howto-art" />
+            <span>{p.label}</span>
+          </li>
+        ))}
+      </ul>
       <div className="howto__cols">
         <div className={`howto__col${touch ? '' : ' howto__col--active'}`}>
           <h3>Keyboard &amp; mouse</h3>

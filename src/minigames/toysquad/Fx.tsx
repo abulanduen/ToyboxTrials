@@ -79,6 +79,12 @@ function shapeAssets() {
   ringMaterial ??= new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.62, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
   return { geometry: shapeGeometry, ringMaterial };
 }
+/**
+ * The shared, cached geometry of one effect shape (unit-sized, baked 'lit' vertex colours: draw it
+ * with UNLIT_VERTEX_MATERIAL). For other games' instanced projectiles and particles (Toybox Siege).
+ * Never dispose it: Toy Squad's effects draw the same geometry.
+ */
+export const fxShapeGeometry = (shape: FxShape) => shapeAssets().geometry[SHAPE_INDEX[shape]];
 
 /** The pooled effect engine. Plain object, driven from one `useFrame`. */
 class FxEngine {
