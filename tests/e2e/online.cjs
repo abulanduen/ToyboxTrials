@@ -262,7 +262,9 @@ async function voiceChecks(A, B) {
   await shot(B.page, 'voice-06-B-holds-V.png');
   await B.page.keyboard.up('KeyV');
   check('voice: B holds V: B sends and A hears B', (await gum(B.page)) === 1 && talking !== null && talking > LOUD, `peak ${talking}`);
-  await sleep(600);
+  // B's frame loop sees the release on its next frame (slow under software rendering); then the last packets drain
+  await B.page.waitForFunction(() => !window.__toybox.voice.state().transmitting, null, { timeout: 20000, polling: 50 }).catch(() => null);
+  await sleep(800);
   const after = await loudness(A, bId, 2000);
   check('voice: B lets go of V: silence again', !(await vstate(B.page)).transmitting && after !== null && after < QUIET, `peak ${after}`);
 
