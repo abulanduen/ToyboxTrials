@@ -11,6 +11,8 @@ fs.mkdirSync(OUT, { recursive: true });
 const BASE = process.env.BASE_URL || 'http://localhost:4173/';
 const res = [];
 const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? '  — ' + d : ''}`);
+// Waits for lazy-loaded cards: generous, since a shared machine's software GL can stall for a minute.
+const SLOW = +process.env.E2E_TIMEOUT || 240000;
 const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
 
 (async () => {
@@ -68,7 +70,7 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   await page.waitForFunction((t) => document.querySelector('.prompt')?.textContent.includes(t), 'Copycat', { timeout: 120000 }).catch(() => null);
   check('gate prompt says Play Copycat Conductor', (await page.textContent('.prompt'))?.includes('Play'));
   await page.keyboard.press('KeyE');
-  await page.waitForSelector('.match-intro', { timeout: 60000 });
+  await page.waitForSelector('.match-intro', { timeout: SLOW });
   await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
   check('gate opens the Copycat intro card (lazy-loaded module)', (await page.textContent('.match-intro h2')).includes('Copycat'));
   // Quick tutorial: opens by itself, pages through, and can be turned off.
@@ -132,7 +134,7 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   await page.waitForTimeout(800);
   check('Esc pauses the match', await page.isVisible('.pause'));
   await page.click('.pause__actions .toy-btn >> nth=1');
-  await page.waitForSelector('.hud-sign', { timeout: 60000 });
+  await page.waitForSelector('.hud-sign', { timeout: SLOW });
   await page.waitForTimeout(1500);
   const pos = await page.evaluate(() => window.__toybox.state());
   const cc = await page.evaluate(() => window.__toybox.hub.gates().find((g) => g.game === 'copycat-conductor'));
@@ -156,10 +158,10 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   const freshAnswer = (j) => j.tiers[0].split(',').map((e) => e.split('|')[0].trim()).find((a) => !j.said.includes(a));
   await page.evaluate((id) => { const g = window.__toybox.hub.gates().find((x) => x.game === id); window.__toybox.teleport(g.standX, g.standZ, g.yaw); }, 'jack-in-the-box');
   // The prompt updates on the next rendered frames: wait for it rather than a fixed delay (slow software GL).
-  await page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Jack-in-the-Box'), null, { timeout: 60000 }).catch(() => null);
+  await page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Jack-in-the-Box'), null, { timeout: SLOW }).catch(() => null);
   check('coral gate prompt says Play Jack-in-the-Box', (await page.textContent('.prompt'))?.includes('Jack-in-the-Box'), await page.textContent('.prompt'));
   await page.keyboard.press('KeyE');
-  await page.waitForSelector('.match-intro', { timeout: 60000 });
+  await page.waitForSelector('.match-intro', { timeout: SLOW });
   await page.waitForTimeout(900);
   check('gate opens the Jack-in-the-Box intro card', (await page.textContent('.match-intro h2')).includes('Jack'));
   check('with tutorials off the intro skips the tutorial but still offers How to play', !(await page.isVisible('[data-testid=tutorial]')) && (await page.isVisible('[data-testid=tutorial-open]')));
@@ -204,7 +206,7 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   const jrec = await page.evaluate(() => JSON.parse(localStorage.getItem('toybox-trials:prototype:v1')).state.records['jack-in-the-box']);
   check('Jack record saved (answers given)', jrec?.best >= 1 && jrec?.plays === 1, JSON.stringify(jrec));
   await page.click('[data-testid=results-leave]');
-  await page.waitForSelector('.hud-sign', { timeout: 60000 });
+  await page.waitForSelector('.hud-sign', { timeout: SLOW });
   await page.waitForTimeout(1200);
 
   // --- The blue gate opens Wind-Up Dash (the race itself is covered by tests/e2e/movement.cjs)
@@ -212,11 +214,11 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   await page.waitForFunction((t) => document.querySelector('.prompt')?.textContent.includes(t), 'Wind-Up Dash', { timeout: 120000 }).catch(() => null);
   check('blue gate prompt says Play Wind-Up Dash', (await page.textContent('.prompt'))?.includes('Wind-Up Dash'), await page.textContent('.prompt'));
   await page.keyboard.press('KeyE');
-  await page.waitForSelector('.match-intro', { timeout: 60000 });
+  await page.waitForSelector('.match-intro', { timeout: SLOW });
   await page.waitForTimeout(900);
   check('blue gate opens the Wind-Up Dash intro card', (await page.textContent('.match-intro h2')).includes('Dash'));
   await page.click('[data-testid=match-leave]');
-  await page.waitForSelector('.hud-sign', { timeout: 60000 });
+  await page.waitForSelector('.hud-sign', { timeout: SLOW });
   await page.waitForTimeout(1200);
 
   // --- Tournaments (1 easy bot): lose each party trial on purpose to exercise the flow.
@@ -294,12 +296,12 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
     await page.click('[data-testid=tournament-start]');
     const games = [];
     for (let round = 1; round <= trials; round++) {
-      await page.waitForSelector('.reveal-ticket', { timeout: 60000 });
+      await page.waitForSelector('.reveal-ticket', { timeout: SLOW });
       await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
       if (round === 1 && format === 'blitz') await page.screenshot({ path: `${OUT}/m4-06-reveal.png` });
       check(`${format} trial ${round}: reveal ticket`, (await page.textContent('.reveal-ticket__round')).includes(`Trial ${round} of ${trials}`));
       await page.click('[data-testid=reveal-go]');
-      await page.waitForSelector('[data-testid=match-start]', { timeout: 60000 });
+      await page.waitForSelector('[data-testid=match-start]', { timeout: SLOW });
       await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
       const game = (await page.textContent('.match-intro h2')).trim();
       games.push(game);
@@ -340,7 +342,7 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
     const hist = await page.evaluate(() => JSON.parse(localStorage.getItem('toybox-trials:prototype:v1')).state.tournamentHistory);
     check(`${format}: tournament history saved`, hist?.[0]?.format === format && hist[0].games.length === trials && (format !== 'blitz' || hist[0].place === 2));
     await page.click('[data-testid=final-leave]');
-    await page.waitForSelector('.hud-sign', { timeout: 60000 });
+    await page.waitForSelector('.hud-sign', { timeout: SLOW });
     check(`${format}: back to the Playroom after the tournament`, true);
     await page.waitForTimeout(1200);
   };
