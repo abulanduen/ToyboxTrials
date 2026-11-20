@@ -1,6 +1,6 @@
 /* The bedroom around the tables: furniture footprints and the family dog's route (room layer). */
 import { describe, expect, it } from 'vitest';
-import { DOG_CLEARANCE, DOG_PATH, DOG_SPOTS, FLOOR_OBSTACLES, GLB_SLOTS, ROOM_LAYOUT, distToRect, dogPose, dogRoute } from '../../src/scene/room/roomLayout';
+import { DOG_CLEARANCE, DOG_PATH, DOG_PERCH, DOG_SPOTS, FLOOR_OBSTACLES, GLB_SLOTS, ROOM_LAYOUT, distToRect, dogPose, dogRoute } from '../../src/scene/room/roomLayout';
 import { SHELL, WINDOW } from '../../src/scene/room/bake';
 import { DOG_SIZE } from '../../src/scene/room/RoomDog';
 import { FLOOR_Y, TABLE } from '../../src/scene/layout';
@@ -45,7 +45,12 @@ describe("the dog's route", () => {
       for (let d = 0; d <= len; d += 2) {
         const x = a.x + ((b.x - a.x) * d) / len;
         const z = a.z + ((b.z - a.z) * d) / len;
-        for (const r of FLOOR_OBSTACLES) expect(distToRect(x, z, r), `${a.id} → ${b.id} near ${r.id} at ${x.toFixed(0)}, ${z.toFixed(0)}`).toBeGreaterThanOrEqual(DOG_CLEARANCE);
+        // the last steps up to the perch stand against the spawn table on purpose
+        const nearPerch = (a.action === 'perch' || b.action === 'perch') && Math.hypot(x - DOG_PERCH.x, z - DOG_PERCH.z) < DOG_CLEARANCE + 6;
+        for (const r of FLOOR_OBSTACLES) {
+          if (nearPerch && r.id === 'spawn-table') continue;
+          expect(distToRect(x, z, r), `${a.id} → ${b.id} near ${r.id} at ${x.toFixed(0)}, ${z.toFixed(0)}`).toBeGreaterThanOrEqual(DOG_CLEARANCE);
+        }
         expect(x - SHELL.minX).toBeGreaterThan(DOG_CLEARANCE);
         expect(SHELL.maxX - x).toBeGreaterThan(DOG_CLEARANCE);
         expect(z - SHELL.minZ).toBeGreaterThan(DOG_CLEARANCE);

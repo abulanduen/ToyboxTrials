@@ -199,6 +199,17 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
   await page.waitForFunction(() => !window.__toybox.hubplay.state().holding, null, { timeout: 120000, polling: 100 }).catch(() => null);
   check('touch: holding the button charges (meter on screen), letting go throws', ch.charge > 0.3 && !!meterBox && meterBox.y > 0 && meterBox.y + meterBox.height < 412 && !(await hp()).holding, `charge ${ch.charge?.toFixed(2)} meter ${JSON.stringify(meterBox)}`);
 
+  // The dog stands up at the spawn table: the Interact button reads Pet, and a tap pets it (a heart).
+  await page.evaluate(() => window.__toybox.dog.perch(0.2));
+  await page.evaluate(() => window.__toybox.teleport(-20, 30, 0));
+  await page.waitForFunction(() => window.__toybox.dog.visit().perched, null, { timeout: 120000, polling: 200 }).catch(() => null);
+  await btnText('Pet');
+  await pressBtn(43, 200);
+  await touch('touchEnd', []);
+  await page.waitForFunction(() => window.__toybox.dog.visit().hearts > 0, null, { timeout: 60000, polling: 200 }).catch(() => null);
+  await page.screenshot({ path: `${OUT}/mobile-11-pet-the-dog.png` });
+  check('touch: by the perched dog the Interact button reads Pet, and a tap pets it', (await page.evaluate(() => window.__toybox.dog.visit().pets)) === 1);
+
   // Tapping the prompt pill also interacts (workshop building → Workshop screen)
   await page.evaluate(() => window.__toybox.hub.goTo('workshop'));
   await page.waitForTimeout(2500);

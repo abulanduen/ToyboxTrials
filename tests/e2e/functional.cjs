@@ -221,6 +221,31 @@ const check = (name, ok, detail = '') => { results.push(`${ok ? 'PASS' : 'FAIL'}
   await waitHp(() => { const m = window.__toybox.hubplay.state().marble; return !m.inNet && Math.abs(m.x - 26) < 0.5; }, null, 120000);
   check('after the goal the marble goes back to the centre spot', Math.abs((await hp()).marble.x - 26) < 0.5);
 
+  // The dog stands up at the spawn table now and then: Pet it (a heart each time); the tenth pet is a lick.
+  await T(() => window.__toybox.dog.perch(0.2));
+  await T(() => window.__toybox.teleport(-20, 30, 0));
+  await page.waitForFunction(() => window.__toybox.dog.visit().perched, null, { timeout: 120000, polling: 200 }).catch(() => null);
+  await page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Pet'), null, { timeout: 120000 }).catch(() => null);
+  check('when the dog stands up at the table the prompt says Pet (the dog)', await promptHas('Pet', 'the dog'));
+  const dogVisit = () => T(() => window.__toybox.dog.visit());
+  for (let i = 0; i < 9; i++) {
+    const before = (await dogVisit()).pets;
+    await page.keyboard.press('KeyE');
+    await page.waitForFunction((n) => window.__toybox.dog.visit().pets > n, before, { timeout: 60000, polling: 100 }).catch(() => null);
+  }
+  const nine = await dogVisit();
+  await page.screenshot({ path: `${OUT}/16b-dog-petted.png` });
+  check('each pet counts and pops a heart', nine.pets === 9 && nine.hearts > 0, JSON.stringify(nine));
+  await page.keyboard.press('KeyE');
+  await page.waitForFunction(() => window.__toybox.dog.visit().lickAt > 0, null, { timeout: 60000, polling: 100 }).catch(() => null);
+  const licked = await T(() => [...document.querySelectorAll('.ticket')].some((t) => t.textContent.includes('Slobbery lick!')));
+  check('the tenth pet: the dog licks you (Slobbery lick! ticket), and the count starts again', (await dogVisit()).lickAt > 0 && (await dogVisit()).pets === 0 && licked);
+  // nobody pets it for 10 s: it goes back to its stroll, and the prompt goes
+  await page.waitForFunction(() => !window.__toybox.dog.visit().perched, null, { timeout: 120000, polling: 250 }).catch(() => null);
+  await page.waitForFunction(() => !document.querySelector('.prompt')?.textContent.includes('Pet'), null, { timeout: 60000 }).catch(() => null);
+  const gone = await T(() => ({ perched: window.__toybox.dog.visit().perched, action: window.__toybox.dog.pose().action, prompt: document.querySelector('.prompt')?.textContent ?? '' }));
+  check('10 s after the last pet the dog strolls off; no more Pet prompt', !gone.perched && gone.action === 'walk' && !gone.prompt.includes('Pet'), JSON.stringify(gone));
+
   // Hold Alt: a free cursor for the HUD (no pause), with its hint; let go and it's gone.
   await page.keyboard.down('Alt');
   await page.waitForSelector('[data-testid=cursor-free]', { timeout: 30000 }).catch(() => null);

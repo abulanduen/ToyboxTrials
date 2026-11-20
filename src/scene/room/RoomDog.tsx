@@ -140,7 +140,7 @@ export function RoomDog() {
   }, []);
   const tongue = useRef<THREE.Mesh>(null!);
   const tongueGeo = useMemo(() => {
-    const g = new RoundedBoxGeometry(6, 1.6, 18, 2, 0.7);
+    const g = new RoundedBoxGeometry(7, 2.2, 18, 2, 0.9);
     g.translate(0, 0, 9); // grows out from the mouth along +z
     return g;
   }, []);
@@ -159,6 +159,10 @@ export function RoomDog() {
           st.current.offset = dogArrivalTime('perch')! - early - performance.now() / 1000;
         },
         visit: () => ({ ...dogVisit, hearts: dogVisit.hearts.length }),
+        /** Screenshots: show the lick `into` seconds in (it lasts LICK_S). */
+        lickAt: (into = LICK_S / 2) => {
+          dogVisit.lickAt = performance.now() / 1000 - into;
+        },
       },
     });
     return () => {
@@ -270,7 +274,7 @@ export function RoomDog() {
       const o = s.tmp;
       const f = age / HEART_LIFE;
       // in front of its face (towards the toys), drifting up
-      o.position.set(s.headAt.x + s.faceX * 14 + Math.sin(h * 13.7) * 7, s.headAt.y + 4 + f * 14, s.headAt.z + s.faceZ * 14 + Math.cos(h * 7.3) * 2);
+      o.position.set(s.headAt.x + s.faceX * 8 + Math.sin(h * 13.7) * 9, s.headAt.y + 4 + f * 12, s.headAt.z + s.faceZ * 8 + Math.cos(h * 7.3) * 2);
       o.rotation.set(0, Math.sin(age * 3) * 0.5, Math.sin(h * 5.1) * 0.25);
       o.scale.setScalar(Math.max(0.001, Math.min(1, age * 6) * (1 - f * f) * 1.2));
       o.updateMatrix();
@@ -288,7 +292,7 @@ export function RoomDog() {
           <group ref={head}>
             <mesh geometry={parts.head} material={mat} />
             {/* the tongue, out only for the lick */}
-            <mesh ref={tongue} geometry={tongueGeo} material={tongueMat} position={[0, -6.5, 20]} rotation={[0.25, 0, 0]} visible={false} />
+            <mesh ref={tongue} name="dog:tongue" geometry={tongueGeo} material={tongueMat} position={[0, -6.5, 20]} rotation={[0.25, 0, 0]} visible={false} />
           </group>
           <group ref={tail} position={[0, 7, -25]}>
             <mesh geometry={parts.tail} material={mat} />
