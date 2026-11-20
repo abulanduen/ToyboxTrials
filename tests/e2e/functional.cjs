@@ -239,7 +239,7 @@ const check = (name, ok, detail = '') => { results.push(`${ok ? 'PASS' : 'FAIL'}
   check('each pet counts and pops a heart', nine.pets === 9 && nine.hearts > 0, JSON.stringify(nine));
   await page.keyboard.press('KeyE');
   await page.waitForFunction(() => window.__toybox.dog.visit().lickAt > 0, null, { timeout: 60000, polling: 100 }).catch(() => null);
-  const licked = await T(() => [...document.querySelectorAll('.ticket')].some((t) => t.textContent.includes('Slobbery lick!')));
+  const licked = await page.waitForFunction(() => [...document.querySelectorAll('.ticket')].some((t) => t.textContent.includes('Slobbery lick!')), null, { timeout: 30000 }).then(() => true).catch(() => false);
   check('the tenth pet: the dog licks you (Slobbery lick! ticket), and the count starts again', (await dogVisit()).lickAt > 0 && (await dogVisit()).pets === 0 && licked);
   // nobody pets it for 10 s: it goes back to its stroll, and the prompt goes
   await T(() => window.__toybox.dog.patience(10));

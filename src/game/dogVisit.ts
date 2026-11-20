@@ -22,12 +22,15 @@ export const dogVisit = {
   pets: 0,
   lastPetAt: -1e9,
   lickAt: -1e9,
+  /** Pet attempts (tests: a press that reached the dog, perched or not). */
+  tries: 0,
   /** When each recent heart popped (s), for the scene to float them up. */
   hearts: [] as number[],
 };
 
 /** A toy pets the perched dog at time `now` (s). Returns what happened, or null if it isn't perched. */
 export function petDog(now: number): 'pet' | 'lick' | null {
+  dogVisit.tries++;
   if (!dogVisit.perched) return null;
   dogVisit.lastPetAt = now;
   dogVisit.hearts.push(now);
