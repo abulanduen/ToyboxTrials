@@ -158,6 +158,10 @@ Hub Scoreboard and TV). All thirteen trials run online (Odd Page Out and Toy Tow
 `tests/e2e/lobby.cjs` on localhost only; latency and capacity are unmeasured. Details: `docs/ONLINE.md`.
 Toy Squad is in tournaments again, Normal and Treasure only (owner decision). Trial choosers show
 a length chip (short ≤ 4 min, medium ≤ 6, long) and the practice/host pickers are picture-card grids.
+Owner decision (20 Nov 2026): Normal and Treasure tournaments end with one strategy finale (Toy
+Squad, Toybox Siege or Toy Tower Tumble, seeded) after party trials; Blitz stays party-only. The
+pickers fold into Party games and Strategy games sections, and online lobby trials open on the same
+intro card (How to play, then Ready) as practice and local tournaments.
 
 ## Current milestone and priorities
 

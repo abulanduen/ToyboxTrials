@@ -260,7 +260,12 @@ export const MINIGAMES: MinigameDefinition[] = [
     eligibility: { tournament: true, ranked: false, casual: true, formats: ['normal', 'treasure'] },
     scoring: 'score',
     tieBreak: 'Remaining unit health',
-    controls: [{ keys: 'Drag / Click / Tab + Enter', action: 'Buy or reroll; drag matching equal-star toys together to merge. Formation drawer manages reserves and keyboard placement.' }],
+    // One chip per way of playing, so no chip is long enough to break across lines on the intro card.
+    controls: [
+      { keys: 'Click', action: 'Buy or reroll' },
+      { keys: 'Drag', action: 'Drag matching equal-star toys together to merge' },
+      { keys: 'Tab + Enter', action: 'Keyboard play: the Formation drawer manages reserves and placement' },
+    ],
     inputs: ['keyboard', 'mouse', 'touch'], bots: 'available', recordUnit: 'points',
     touch: { movement: 'none', look: 'none', orientation: 'any',
       buttons: [{ id: 'buy', label: 'Shop offer' }, { id: 'reroll', label: 'Reroll' }, { id: 'place', label: 'Formation square' }, { id: 'merge', label: 'Merge pair' }, { id: 'bench', label: 'Reserve slot' }, { id: 'passive', label: 'Passive choice' }, { id: 'sell', label: 'Sell' }, { id: 'ready', label: 'Ready' }],
