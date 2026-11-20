@@ -465,7 +465,7 @@ owner's five-minute horde-survival brief, in an original toy theme.
 - **One board each.** Every player holds out on their own quilted patch of the table, and the
   camera follows their toy. Weapons fire on their own; the player only moves (joystick, WASD or
   arrows).
-- **Classes.** The choice is untimed: a centred card over a blurred board.
+- **Classes.** The choice is untimed: a centred card over a blurred board, with no 3-2-1 before it.
   - Warrior: Tin Soldier, Bayonet Sweep, tough.
   - Ranger: Pop-Gun Ranger, Pop-Gun, fast.
   - Mage: Clockwork Wizard, Chime Burst, area.
@@ -474,11 +474,19 @@ owner's five-minute horde-survival brief, in an original toy theme.
     minutes. They drop experience gems, which a magnet reach pulls in.
   - An elite arrives at 1:00, 2:00 and 3:00, each with an attack pattern: a charge, bullet rings
     or summons. Each drops a treasure chest.
-  - The boss, the Boiler Baron, arrives at 4:00. Slaying it wins. Otherwise the match ends at 5:00.
+  - The boss, the Boiler Baron, arrives at 4:00. Slaying it drops three chests, pulls every gem to
+    the toy and clears the board, then gives 15 s to take the upgrades. At 5:00 every toy still
+    fighting is pulled out the same way (no chests).
+- **The final arena** (owner request, 20 Nov 2026). Once every toy still in has had its 15 s (and
+  15 s after 5:00 at the latest), all of them meet on one shared board, with no countdown, and fight
+  with their builds (scaled-down weapon damage, overtime from 40 s, a 90 s limit). The Rally Horn
+  summons a Boiler Baron that fights for its owner. The last toy standing wins. Ghosts watch.
 - **Builds.**
   - Each level-up offers a card of three, sometimes four. A run holds at most four weapons and
     four passives, from a pool of six weapons and six passives, each with a maximum of five levels.
-  - **Evolution:** a weapon at level 5, plus its partner passive, plus an opened elite chest.
+    Each option shows a code-drawn icon, its level change and a badge when it makes or pairs a
+    weapon's evolution (the "secret upgrade").
+  - **Evolution:** a weapon at level 5, plus its partner passive, plus an opened elite (or boss) chest.
 - **Rivals.**
   - Skip a chest, or use the Rally Horn active skill, to send an elite to another board. The target
     is the leader by default, or a rival you pick.
@@ -487,14 +495,16 @@ owner's five-minute horde-survival brief, in an original toy theme.
     per board.
 - **Down and out.**
   - Revive once by spending in-match points: 100 + 1 per second of run time.
-  - After that you are a ghost. Ghosts cycle through the other boards and can see each other.
+  - After that you are out and stay on your own board; a popup offers to watch the others. Ghosts
+    who choose to cycle through the other boards and can see each other.
 - **Placement:**
-  1. victory, with earlier boss kills ranked higher;
-  2. survival time;
-  3. knockouts;
-  4. points.
-- **Eligibility:** practice and casual only for now (not tournaments), like Toy Squad. The
-  medium-length band is `durationSec` [240, 330].
+  1. the arena: last toy standing first, then later knockouts;
+  2. victory, with earlier boss kills ranked higher;
+  3. survival time;
+  4. knockouts;
+  5. points.
+- **Eligibility:** practice and casual only for now (not tournaments), like Toy Squad. With the
+  arena it is a long game: `durationSec` [300, 390].
 - **Details:** exact tables, rate limits, caps and open questions are in
   `src/minigames/siege/README.md`. Online play, real-player balance and real-device performance are
   not verified.

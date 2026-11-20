@@ -180,7 +180,7 @@ export function SiegeHud({ getState, localId, contestants }: MinigameSceneProps<
     </ol>
 
     {boss && <div className="siege-boss" data-testid="siege-boss"><strong>{BIGS.baron.name}</strong><div className="siege-bar siege-bar--boss"><i style={{ width: `${(100 * boss.hp) / boss.maxHp}%` }} /></div></div>}
-    {ally && <div className="siege-boss siege-boss--ally" data-testid="siege-ally"><strong>Your {BIGS.baron.name}</strong><div className="siege-bar siege-bar--boss"><i style={{ width: `${(100 * ally.hp) / ally.maxHp}%` }} /></div></div>}
+    {ally && <div className="siege-boss siege-boss--ally" data-testid="siege-ally"><strong>Your {BIGS.baron.name.replace(/^The /, '')}</strong><div className="siege-bar siege-bar--boss"><i style={{ width: `${(100 * ally.hp) / ally.maxHp}%` }} /></div></div>}
     {incoming && <div className="siege-alert" role="status" data-testid="siege-incoming"><strong>Elite incoming from {names(incoming.from)}!</strong><span>Arrives in {Math.max(0, Math.ceil((incoming.at - s.runT) / 1000))} s</span></div>}
 
     {/* The prep window: after the boss (three chests) or at 5:00. */}

@@ -179,6 +179,7 @@ class SiegeView {
     back.visible = fill.visible = on;
     if (!on) return;
     const top = 4.6, wide = 3;
+    k = Math.min(1, Math.max(0, k));
     back.position.set(x, top, z); back.scale.set(wide, 1, 1);
     fill.position.set(x - (wide * (1 - k)) / 2, top + 0.02, z + 0.02); fill.scale.set(Math.max(0.001, wide * k), 1.15, 1.15);
   }

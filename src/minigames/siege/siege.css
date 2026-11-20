@@ -107,6 +107,8 @@
 .siege-options span { font:600 11px Nunito,sans-serif; color:#574D69; margin-top:auto; }
 .siege-level { display:flex; align-items:center; gap:6px; font:700 12px Fredoka,sans-serif !important; color:#2B2433 !important; margin:0 !important; }
 .siege-level b { color:#C8973A; }
+.siege-level .siege-pips { gap:3px; }
+.siege-level .siege-pips i { width:9px; height:13px; }
 .siege-secret { display:flex !important; align-items:flex-start; gap:4px; margin-top:auto; padding:4px 6px; border-radius:7px; background:#E8DDF0; border:2px dashed #574D69; color:#2B2433 !important; font:700 11px/1.25 Nunito,sans-serif !important; }
 .siege-secret--ready { background:#FBE3B4; border:2px solid #C8973A; }
 .siege-mark { display:grid; place-items:center; width:36px; height:36px; border-radius:9px; background:var(--accent,#574D69); border:2px solid #2B2433; font:700 14px Fredoka,sans-serif; font-style:normal; color:#2B2433; margin-top:4px; }

@@ -1,9 +1,11 @@
 # Toybox Siege
 
-A five-minute horde survival trial. Every player holds out on their own board (a quilted patch
-of the table). Toys auto-attack with their weapons, and the player only moves. Swarms of toy
-mobs close in, an elite arrives every minute, and the Boiler Baron arrives at 4:00. Defeating
-the boss wins the run. Rivals can send elites onto each other's boards.
+A five-minute horde survival trial with a final arena. Every player holds out on their own board
+(a quilted patch of the table). Toys auto-attack with their weapons, and the player only moves.
+Swarms of toy mobs close in, an elite arrives every minute, and the Boiler Baron arrives at 4:00.
+Slaying it earns three chests and a moment to upgrade. Then every toy still standing is pulled
+into one shared arena to fight with its build: the last toy standing wins. Rivals can send elites
+onto each other's boards during the run.
 
 Status: **implemented, local only** (one local player plus bots, each on its own board). All
 balance numbers are **provisional**. They come from headless bot matches, not from play-testing
@@ -22,9 +24,10 @@ detour to its door between Toy Tower Tumble and the bridge landing (`paths.ts`).
 | --- | --- |
 | `config.ts` | Every balance table: classes, weapons, passives, evolutions, the swarm, elites, the boss, the experience curve, revive cost, the send-elite limits and the entity caps. Pure data. |
 | `rules.ts` | The deterministic rules core (`siegeRules`). It is seeded and uses no DOM, three.js or clock. The state is plain JSON, so it can run on the authoritative server unchanged. |
-| `bot.ts` | Bots that kite and pick upgrades. |
-| `Scene.tsx` | The renderer: one board on screen, with pooled instanced meshes. |
-| `Hud.tsx`, `siege.css` | The DOM HUD: clock, bars, kit, rivals panel, cards, the touch skill button and spectator controls. |
+| `bot.ts` | Bots that kite, pick upgrades, take their prep cards, fight in the arena and summon the Baron. |
+| `Scene.tsx` | The renderer: one board on screen (or the arena ring), with pooled instanced meshes. |
+| `Hud.tsx`, `siege.css` | The DOM HUD: clock, bars, kit, rivals panel, cards, the prep banner, the out-popup, the touch skill button and spectator controls. |
+| `icons.tsx` | Code-drawn SVG icons for every weapon, passive and card kind (cards and the kit strip). |
 | `models.ts` | Toy part specs, baked by Toy Squad's `bakeParts`. |
 | `look.ts` | Colours and labels, taken from the palette. |
 | `sounds.ts` | Event-to-cue mapping and a voice limiter, played through `game/audio.ts`. |
@@ -32,16 +35,66 @@ detour to its door between Toy Tower Tumble and the bridge landing (`paths.ts`).
 
 ## Flow
 
-1. **Class pick**: an untimed, centred card over a blurred board, like the Spellbox draft. The run
-   clock starts when everyone has picked. Bots pick after a short think.
+1. **Class pick**: an untimed, centred card over a blurred board, like the Spellbox draft. There is
+   no 3-2-1 before it (`skipStartCountdown` on the definition and the server facts). The run clock
+   starts when everyone has picked. Bots pick after a short think.
 2. **The run** lasts 5:00. Mobs spawn just outside the view and close in. Gems drop and are pulled
    in within the pickup reach. Each level up opens a card. **Your board freezes while a card is
    open, but the run clock does not**, so dawdling costs farming time, never health.
 3. **Elites** arrive at 1:00 (Rag Bear), 2:00 (Tin Drummer) and 3:00 (Ratchet Rhino). Each drops a
    **treasure chest**. Walking onto the chest opens the treasure card.
-4. **The boss**, the Boiler Baron, arrives at 4:00. Slaying it wins: the toy becomes a *victor* and
-   can then watch the other boards.
-5. **The match ends** at 5:00, or earlier once nobody is left in. Then placement decides.
+4. **The boss**, the Boiler Baron, arrives at 4:00. Slaying it starts that toy's **prep window**
+   (below): three chests, every gem pulled in, the board cleared, 15 s to upgrade.
+5. **5:00**: every toy still fighting is pulled out the same way (no chests).
+6. **The arena** opens for every toy still in, then the match ends with the last toy standing.
+   With fewer than two toys left, there is no arena, and the match ends after the prep window.
+   It also ends as soon as nobody is left in.
+
+## The finale (owner request, 20 November 2026)
+
+All numbers live in `FINALE` and `DEFAULT_CONFIG` (`prepMs`, `arenaMs`) in `config.ts`.
+
+- **Boss slain:** it drops **three treasure chests** where it fell. Every mob, elite and bullet on
+  the board is removed, and every gem and chest flies to the toy (the magnet, 60 cm/s). Level-up
+  and treasure cards open as they arrive. The boss's chests offer an evolution when one is ready,
+  otherwise +1 to two owned items. They never offer *Send an elite*.
+- **The prep window** lasts **15 s** from the kill. Nothing can hurt the toy. The board does not
+  freeze for cards here (there is nothing left to freeze), so the magnet keeps pulling while you
+  choose. When the 15 s are up, anything still on the floor is collected at once and every open
+  card is settled with its first option. The toy can then walk its quiet board, or press **Watch
+  rivals** to follow the toys still fighting.
+- **Toys that do not slay the boss:** at **5:00** (the end of the run) every toy still fighting is
+  pulled out the same way, with no chests, and gets its own 15 s. A toy that is **downed** at 5:00
+  keeps its revive window; if it revives, it joins the prep at once.
+- **When the arena opens:** as soon as every toy still in has finished its prep window, and **15 s
+  after 5:00 at the latest** (5:15). A toy still downed then misses the arena and becomes a ghost.
+  So an early boss slayer may wait (up to about 40 s, if it killed the boss right at 4:00 and a
+  rival fights on until 5:00), watching the others if it likes.
+- **Ghosts** (out during the run) do not fight. They watch the arena: a ghost that never reached
+  it follows a fighter and can cycle through the fighters.
+- **The arena** is one shared board (`s.arena`, square, 44 cm across), a felt ring with cotton-reel
+  posts. There is no 3-2-1: the toys appear on a ring 14 cm from the middle, at full health, and
+  fight at once. Every weapon works as on the board, but aims at **rival toys and their summoned
+  bosses**:
+  - weapon damage is the run damage × **0.013** (so it is not instant: a duel of two starting toys
+    lasts well over 15 s; arenas of 2 to 8 bots last 13 to 44 s);
+  - each point of armour takes 4% off, up to 40%;
+  - **overtime** from 40 s: all damage grows by +100% every 10 s, so the arena always ends, with a
+    hard limit of 90 s;
+  - no revives, no snacks, no knockback on toys.
+- **The Rally Horn in the arena** summons a **Boiler Baron that fights for its owner** (smaller,
+  ringed in the owner's colour). It chases the nearest rival, charges and fires bullet rings that
+  hurt only rivals. Health 70 / 100 / 135 by horn level; one at a time; ready 2 s into the arena,
+  then a 32 / 26 / 20 s cooldown from each summon. Rivals' weapons can destroy it. It vanishes if
+  its owner is knocked out. Space or the big touch button summons it.
+- **Knocked out** of the arena (0 health): the toy is out (a ghost with `inArena` set). The last
+  toy hit it is credited (+150 points); the last toy standing gets +300.
+- **Placement:** arena toys above everyone else, ordered by arena survival (still standing, then
+  later knockouts first); then the run's tiebreaks (below).
+- **Length:** the run is 5:00, then up to 15 s of prep and an arena that bot matches end in 13 to
+  44 s (90 s at most), plus the untimed class pick. Headless bot matches take 313 to 360 s of
+  match time in all (`durationSec` [300, 390], a *long* game; a match where everyone falls early
+  is shorter).
 
 ## Classes
 
@@ -89,6 +142,20 @@ slots are free) and upgrades to items you own. Owned upgrades weigh more. From l
 in a match with rivals, a fourth card, the **Rally Horn** active skill, appears 40% of the time.
 When nothing is left to raise, the card offers "Oil and polish" (full health and 50 points), so a
 card is never empty. Keys 1 to 4 pick a card; on touch, tap it.
+
+Each option shows the item's **icon** (code-drawn SVG, `icons.tsx`), its **level change**
+("New · Lv 1", or "Lv 2 → 3" with the new pip lit) and, when it matters, a **secret upgrade**
+badge (`evolutionHint` in `rules.ts`):
+
+- **Unlocks the secret upgrade** (gold): taking it completes a weapon's evolution pair (the weapon
+  reaches level 5 with its partner owned, or the partner of a level-5 weapon), so the next chest
+  evolves it;
+- **Secret upgrade pair** (dashed): a new partner passive for a weapon you hold, or a weapon whose
+  partner you hold, with the levels still needed;
+- **Max level, add the partner**: the weapon reaches level 5 without its partner;
+- the treasure card's evolution itself.
+
+The kit strip under the clock uses the same icons, with level pips (gold when evolved).
 
 Experience to the next level is `5 + 3(L−1) + ⌊0.3(L−1)²⌋`, giving 5, 8, 11 … 56 at level 10 and
 170 at level 20. In bot matches, toys reach about level 12 by 2:00, 20 by 4:00 and 25–32 by 5:00.
@@ -147,24 +214,29 @@ than being dropped, and the boss always arrives at 4:00.
   - **Revive** costs **100 + 1 point per second of run time**: 220 at 2:00, 340 at 4:00. You come
     back with 60% health, 2.5 s of invulnerability and a shockwave that hurts and shoves nearby
     enemies and clears bullets.
-  - **Become a ghost.** Waiting out the 12 s does the same.
+  - **Stay down.** Waiting out the 12 s does the same.
 
   Points are the in-match score: knockouts, elites, level-ups and the boss.
 - A toy that cannot pay, or has already revived, becomes a **ghost** at once.
-- **Ghosts** watch the leader's board first. They cycle through boards with Prev/Next, Q/E or
-  Space (or tap a rival's row to jump to that board), and drift around the watched toy with the stick or WASD. Every ghost watching a board is
-  drawn over it as a translucent toy, so ghosts can see each other.
-- A **victor** (boss slain) spectates the same way but is not drawn as a ghost.
+- **Out for good, a toy stays on its own board** (lying where it fell, its ghost above it). A popup
+  offers **Watch other players** (Space, or tap) and **Stay here**; staying leaves a small *Watch
+  other players* button. Watching is the player's choice (`spectate` input): the leader's board
+  first, then Prev/Next, Q/E or Space (or tap a rival's row to jump to that board), and the stick
+  or WASD drifts the ghost around the watched toy. **Mine** goes back to your own board. Every
+  ghost watching a board is drawn over it as a translucent toy, so ghosts can see each other.
+  A toy knocked out of the arena gets the same popup.
 
 ## Placement and scoring
 
-1. **Victory**: earlier boss kills place higher.
-2. **Survival time**: survivors at 5:00 count the full run.
-3. **Knockouts**.
-4. **Points**.
+1. **The arena**: toys that reached it place above everyone else; the last toy standing first,
+   then later knockouts above earlier ones (survivors of the 90 s limit tie here).
+2. **Victory**: earlier boss kills place higher.
+3. **Survival time**: toys that reached 5:00 (or the arena) count the full run.
+4. **Knockouts** (of mobs, during the run).
+5. **Points**.
 
-Toys equal on all four share a place. The record score is the toy's remaining points (after any
-revive). The game counts as medium length (`durationSec` [240, 330]).
+Toys equal on all of these share a place. The record score is the toy's remaining points (after any
+revive). The game counts as long (`durationSec` [300, 390], see the finale).
 
 ## Performance
 
@@ -215,10 +287,13 @@ The scene holds 137 meshes in total, whatever the entity count.
 - validates every input shape;
 - hides the seed and the match-wide random counter;
 - sends whole boards only for the viewer's own toy and the board it watches, cutting every other
-  board to its live elites;
+  board to its live elites; once the arena opens, every board is cut and the shared arena goes out
+  whole;
+- accepts the `spectate` input (watch the others, or go back to your own board);
 - snapshots every 2 ticks;
 - closes the class pick after 60 s and any card after 20 s, so an idle player cannot stall a
-  shared match (both untimed locally).
+  shared match (both untimed locally). The finale needs no extra timer: the prep window settles its
+  own cards after 15 s, the arena opens by 5:15 and ends by 90 s.
 
 Tested headless with a full bot field (`tests/unit/lobby-match.test.ts`). **Not yet played online
 in a browser.** A full board is still a sizeable snapshot (a few hundred pooled entities), so the
@@ -232,6 +307,11 @@ wire size needs measuring.
   fair locally. On a server, `choiceTimeoutMs` and `pickTimeoutMs` (both 0, meaning untimed, by
   default) can force a choice.
 - **Sent elites** carry no chest, so sending is pure pressure. An alternative is a smaller chest.
+- **Finale balance** (provisional): the arena weapon multiplier (0.013), overtime and the summoned
+  Baron's numbers come from headless bot arenas only. Whether 15 s of prep is enough to read three
+  chests and several level-ups needs people to try it. Early boss slayers wait for the arena (up to
+  about 40 s); a shorter shared deadline is an alternative if the wait feels long.
 - **Unverified:** balance and feel with real players, especially how strong the Ranger is, boss
-  kill rates and revive costs. Bot matches suggest 1 to 4 victories per 8-toy match and 2 to 3
-  ghosts. Touch feel, audio mix and real-device frame rates have not been measured.
+  kill rates, revive costs and the arena. Bot matches suggest 0 to 5 boss kills per 8-toy match
+  and 2 to 8 toys in the arena. Touch feel, audio mix (including the new, softer Chime Burst cue)
+  and real-device frame rates have not been measured.
