@@ -9,6 +9,10 @@
    basketball; a goal), reconnect, leave, errors, public Hub. B's save owns shop items (a cape, a
    monocle and the Dance gesture on key 4): A must see B's accessories and B's bought gesture. Phones (portrait + landscape, touch):
    join the public Hub and use the Emote menu. Raw-socket checks: health, origin, version, limits.
+   Voice chat (A and B, desktop, Chromium's fake microphone): no microphone request before the mic
+   button is pressed, a link that connects and carries sound when close, closes when apart, a mute
+   that silences, and push to talk on V. Phones: the mic button's size and place.
+   ONLY=voice runs just the raw-socket checks, A + B and the voice checks.
    Software rendering is slow: page loads wait up to LOAD_TIMEOUT (default 10 min). */
 const { chromium } = require('playwright');
 const { spawn } = require('child_process');
@@ -33,7 +37,8 @@ const check = (n, ok, d = '') => {
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /** The protocol version this test expects (src/net/protocol.ts PROTOCOL_VERSION). */
-const PROTO = 4; // v4: hub play (the shared marble and basketball)
+const PROTO = 5; // v5: proximity voice chat (v4: hub play)
+const VOICE_ONLY = process.env.ONLY === 'voice';
 
 // ---------------------------------------------------------------- server
 async function startServer() {
@@ -100,6 +105,18 @@ const BRAVO_PROFILE = {
 };
 async function openPage(browser, name, ctxOpts, url = BASE + '?debug') {
   const ctx = await browser.newContext(ctxOpts);
+  // Count microphone requests: voice chat must not ask before the player presses the mic button or V.
+  await ctx.addInitScript(() => {
+    window.__gum = 0;
+    const md = navigator.mediaDevices;
+    if (md && md.getUserMedia) {
+      const real = md.getUserMedia.bind(md);
+      md.getUserMedia = (c) => {
+        window.__gum++;
+        return real(c);
+      };
+    }
+  });
   await ctx.addInitScript(([n, look, profile]) => {
     if (!sessionStorage.getItem('seeded')) {
       sessionStorage.setItem('seeded', '1');
@@ -128,9 +145,151 @@ const waitTags = (p, names, timeout = T) =>
 const remoteBy = (p, name) => p.evaluate((n) => window.__toybox.net.remotes().find((r) => r.name === n) ?? null, name);
 const shot = (p, file) => p.screenshot({ path: path.join(OUT, file), timeout: T });
 
+// ---------------------------------------------------------------- voice chat (A speaks, B listens; then B speaks with V)
+const vstate = (p) => p.evaluate(() => window.__toybox.voice.state());
+const gum = (p) => p.evaluate(() => window.__gum);
+/** Loudest sound P's analyser measured from player `id` over `ms` (null when there is no link). */
+async function loudness(P, id, ms = 2500) {
+  await P.page.evaluate((i) => window.__toybox.voice.peak(i), id);
+  await sleep(ms);
+  return P.page.evaluate((i) => window.__toybox.voice.peak(i), id);
+}
+const inLink = (st, id) => st.inbound.find((l) => l.id === id) ?? null;
+/** Move a toy through waypoints, waiting until `watcher` draws it at each one (the server limits speed). */
+async function walk(P, watcher, pts, yaw) {
+  for (const [x, z] of pts) {
+    await P.page.evaluate(([x, z, y]) => window.__toybox.teleport(x, z, y), [x, z, yaw]);
+    await watcher.page.waitForFunction(([n, x, z]) => { const r = window.__toybox.net.remotes().find((q) => q.name === n); return r && r.x !== null && Math.hypot(r.x - x, r.z - z) < 0.5; }, [P.name, x, z], { timeout: 120000, polling: 250 }).catch(() => null);
+  }
+}
+/** Pick a mic mode in the pause menu's settings (Esc, the segmented control, Resume). */
+async function micMode(P, mode) {
+  await P.page.keyboard.press('Escape');
+  await P.page.waitForSelector('[data-testid=setting-mic-mode]');
+  await P.page.click(`[data-testid=setting-mic-mode] button[data-mode=${mode}]`);
+  await P.page.click('.pause__actions .toy-btn >> nth=0');
+  await P.page.waitForSelector('.pause', { state: 'detached' });
+}
+async function voiceChecks(A, B) {
+  const aId = await net(A.page, 'selfId');
+  const bId = await net(B.page, 'selfId');
+  check('voice: nobody is asked for a microphone on joining (no getUserMedia call)', (await gum(A.page)) === 0 && (await gum(B.page)) === 0, `A ${await gum(A.page)}, B ${await gum(B.page)}`);
+  const mic = await A.page.waitForSelector('[data-testid=voice-mic]');
+  const mb = await mic.boundingBox();
+  const near = await A.page.$$eval('.hud-sign, .hud-secrets, .hud-cogs, .online-chip, .hub-lobbies, .tickets .ticket, .look-hint', (els) => els.map((e) => { const r = e.getBoundingClientRect(); return { c: e.className, x: r.x, y: r.y, w: r.width, h: r.height }; }));
+  const hit = (a, b) => a.x < b.x + b.w && b.x < a.x + a.width && a.y < b.y + b.h && b.y < a.y + a.height;
+  check('voice: desktop mic button top right, ≥ 56 px, clear of the rest of the HUD', mb.width >= 56 && mb.height >= 56 && mb.x + mb.width <= 1280 && mb.x > 1280 / 2 && mb.y < 100 && !near.some((b) => b.w && hit(mb, b)), JSON.stringify({ mb, hits: near.filter((b) => b.w && hit(mb, b)).map((b) => b.c) }));
+  await shot(A.page, 'voice-01-desktop-mic-off.png');
+
+  // A: Always on, then press the mic button. B (hearing on by default) connects and hears A.
+  await A.page.evaluate(() => window.__toybox.teleport(0, 24, Math.PI));
+  await B.page.evaluate(() => window.__toybox.teleport(-3, 18, 0.3));
+  await micMode(A, 'open');
+  await A.page.keyboard.press('Escape');
+  await A.page.waitForSelector('[data-testid=setting-mic-mode]');
+  await sleep(1200); // the pause card's pop-in
+  await A.page.$eval('[data-testid=setting-mic-mode]', (e) => e.scrollIntoView({ block: 'center' }));
+  await shot(A.page, 'voice-02-settings.png');
+  check('voice: settings show Hear voice chat (on), Voice chat volume and Mic mode', (await A.page.isChecked('[data-testid=setting-voice-hear]')) && (await A.page.isVisible('[data-testid=setting-voice-chat]')) && (await A.page.textContent('[data-testid=setting-mic-mode]')).includes('Push to talk (V)'));
+  await A.page.click('.pause__actions .toy-btn >> nth=0');
+  await A.page.waitForSelector('.pause', { state: 'detached' });
+  check('voice: still no microphone request before the press', (await gum(A.page)) === 0);
+  await A.page.click('[data-testid=voice-mic]');
+  await A.page.waitForFunction(() => window.__toybox.voice.state().mic === 'on' && window.__toybox.voice.state().transmitting, null, { timeout: 30000, polling: 100 }).catch(() => null);
+  let a = await vstate(A.page);
+  check('voice: pressing the mic button asks once and turns the mic on (Always on)', a.mic === 'on' && (await gum(A.page)) === 1 && a.transmitting, JSON.stringify({ mic: a.mic, gum: await gum(A.page), tx: a.transmitting }));
+  await B.page.waitForFunction((id) => window.__toybox.voice.state().micOn.includes(id), aId, { timeout: 20000, polling: 100 }).catch(() => null);
+  check("voice: B is told A's mic is on, and B was never asked for a microphone", (await vstate(B.page)).micOn.includes(aId) && (await gum(B.page)) === 0);
+  await B.page.waitForFunction((id) => window.__toybox.voice.state().inbound.some((l) => l.id === id && l.state === 'connected' && l.audio), aId, { timeout: 60000, polling: 250 }).catch(() => null);
+  let b = await vstate(B.page);
+  check("voice: A and B close together: B's link from A reaches connected", inLink(b, aId)?.state === 'connected', JSON.stringify(b.inbound));
+  check("voice: …and A's side sends to B", (await vstate(A.page)).outbound.some((l) => l.id === bId && l.state === 'connected'), JSON.stringify((await vstate(A.page)).outbound));
+  const heard = await loudness(B, aId, 3000);
+  check("voice: B's analyser hears A's (fake) microphone", heard !== null && heard > 0.01, `peak RMS ${heard}`);
+  b = await vstate(B.page);
+  check('voice: close by, the voice plays at (near) full volume', (inLink(b, aId)?.gain ?? 0) > 0.6, `gain ${inLink(b, aId)?.gain}`);
+  await B.page.waitForFunction((id) => document.querySelector(`.name-tag[data-player="${id}"] .voice-tag.is-talking`), aId, { timeout: 20000, polling: 50 }).catch(() => null);
+  check("voice: A's name tag on B's screen shows the mic mark and the speaking ring", await B.page.evaluate((id) => !!document.querySelector(`.name-tag[data-player="${id}"] .voice-tag--on.is-talking`), aId));
+  await shot(B.page, 'voice-03-B-hears-A-talking-ring.png');
+  await A.page.waitForFunction(() => document.querySelector('[data-testid=voice-mic]').classList.contains('is-talking'), null, { timeout: 20000, polling: 50 }).catch(() => null);
+  check("voice: A's mic button shows A talking", await A.page.evaluate(() => document.querySelector('[data-testid=voice-mic]').classList.contains('is-talking')));
+  await shot(A.page, 'voice-04-A-mic-on-talking.png');
+
+  // Move apart (beyond 60 cm): the link closes. Come back: it opens again.
+  await walk(B, A, [[20, 10], [24, -40], [24, -108]], 0);
+  await B.page.waitForFunction((id) => !window.__toybox.voice.state().inbound.some((l) => l.id === id), aId, { timeout: 30000, polling: 250 }).catch(() => null);
+  await A.page.waitForFunction((id) => !window.__toybox.voice.state().outbound.some((l) => l.id === id), bId, { timeout: 30000, polling: 250 }).catch(() => null);
+  check('voice: B walks far away: both ends close the link', !inLink(await vstate(B.page), aId) && !(await vstate(A.page)).outbound.some((l) => l.id === bId));
+  await walk(B, A, [[24, -40], [20, 10], [-3, 18]], 0.3);
+  await B.page.waitForFunction((id) => window.__toybox.voice.state().inbound.some((l) => l.id === id && l.state === 'connected'), aId, { timeout: 60000, polling: 250 }).catch(() => null);
+  check('voice: B comes back: the link connects again', inLink(await vstate(B.page), aId)?.state === 'connected');
+
+  // B mutes A (pause menu → Voice chat): the link closes and B hears nothing from A.
+  await B.page.keyboard.press('Escape');
+  await B.page.waitForSelector(`[data-testid=voice-mute-${aId}]`);
+  await B.page.click(`[data-testid=voice-mute-${aId}]`);
+  await B.page.waitForSelector(`[data-testid=voice-mute-${aId}][aria-pressed=true]`);
+  await shot(B.page, 'voice-05-B-pause-mutes-A.png');
+  await B.page.click('.pause__actions .toy-btn >> nth=0');
+  await sleep(800);
+  b = await vstate(B.page);
+  const mutedPeak = await loudness(B, aId, 1500);
+  check('voice: B mutes A: link closed, silence', b.muted.includes(aId) && !inLink(b, aId) && !mutedPeak, JSON.stringify({ muted: b.muted, link: inLink(b, aId), mutedPeak }));
+  check("voice: …and A's name tag shows the muted mark", await B.page.evaluate((id) => !!document.querySelector(`.name-tag[data-player="${id}"] .voice-tag--muted`), aId));
+  await B.page.evaluate((id) => window.__toybox.voice.mute(id), aId); // unmute
+
+  // B: push to talk (the default) on V. The first press only asks for the microphone.
+  check('voice: B is in push-to-talk mode by default', (await vstate(B.page)).mode === 'ptt');
+  await B.page.keyboard.down('KeyV');
+  await B.page.waitForFunction(() => window.__toybox.voice.state().mic === 'on', null, { timeout: 30000, polling: 100 }).catch(() => null);
+  await sleep(500);
+  b = await vstate(B.page);
+  check('voice: the first V press asks for the microphone (once) and opens it without sending', b.mic === 'on' && (await gum(B.page)) === 1 && !b.transmitting, JSON.stringify({ mic: b.mic, gum: await gum(B.page), tx: b.transmitting }));
+  await B.page.keyboard.up('KeyV');
+  await A.page.waitForFunction((id) => window.__toybox.voice.state().inbound.some((l) => l.id === id && l.state === 'connected' && l.audio), bId, { timeout: 60000, polling: 250 }).catch(() => null);
+  check('voice: A connects to B (B is now a speaker)', inLink(await vstate(A.page), bId)?.state === 'connected');
+  const idle = await loudness(A, bId, 2000);
+  check('voice: V not held: A hears nothing from B', idle !== null && idle < 0.005, `peak ${idle}`);
+  await B.page.keyboard.down('KeyV');
+  await B.page.waitForFunction(() => window.__toybox.voice.state().transmitting, null, { timeout: 10000, polling: 50 }).catch(() => null);
+  const talking = await loudness(A, bId, 3000);
+  await shot(B.page, 'voice-06-B-holds-V.png');
+  await B.page.keyboard.up('KeyV');
+  check('voice: B holds V: B sends and A hears B', (await gum(B.page)) === 1 && talking !== null && talking > 0.01, `peak ${talking}`);
+  await sleep(600);
+  const after = await loudness(A, bId, 2000);
+  check('voice: B lets go of V: silence again', !(await vstate(B.page)).transmitting && after !== null && after < 0.005, `peak ${after}`);
+
+  // A turns the mic off with the button (Always on): B's link from A closes.
+  await A.page.click('[data-testid=voice-mic]');
+  await B.page.waitForFunction((id) => !window.__toybox.voice.state().micOn.includes(id) && !window.__toybox.voice.state().inbound.some((l) => l.id === id), aId, { timeout: 20000, polling: 100 }).catch(() => null);
+  b = await vstate(B.page);
+  check("voice: A presses the button again: A's mic is off, B's link from A closes", (await vstate(A.page)).mic === 'off' && !b.micOn.includes(aId) && !inLink(b, aId));
+  // B goes into the Workshop: voice is Hub-only, so B's mic closes.
+  await B.page.keyboard.press('Escape');
+  await B.page.click('.pause__actions .toy-btn >> nth=1');
+  await B.page.waitForFunction(() => window.__toybox.voice.state().mic === 'off', null, { timeout: 20000, polling: 100 }).catch(() => null);
+  await A.page.waitForFunction((id) => !window.__toybox.voice.state().micOn.includes(id), bId, { timeout: 20000, polling: 100 }).catch(() => null);
+  check("voice: B opens the Workshop: B's mic closes and A no longer lists it", (await vstate(B.page)).mic === 'off' && !(await vstate(A.page)).micOn.includes(bId) && (await vstate(A.page)).inbound.length === 0);
+  await B.page.keyboard.press('Escape');
+  await B.page.waitForSelector('.hud-sign', { timeout: 60000 }).catch(() => null);
+  await micMode(A, 'ptt');
+}
+
+/** Phones: the mic button is ≥ 56 px, on screen and clear of every other HUD control. */
+async function phoneMic(P, w, h, label, file) {
+  const m = await P.page.waitForSelector('[data-testid=voice-mic]', { timeout: 60000 }).catch(() => null);
+  const mb = m ? await m.evaluate((e) => { const r = e.getBoundingClientRect(); return { x: r.x, y: r.y, width: e.offsetWidth, height: e.offsetHeight }; }) : null;
+  const others = await P.page.$$eval('.touch-pause, .hud-sign, .hud-secrets, .hud-cogs, .online-chip, .hub-lobbies, .tickets .ticket, .lobby-alert, .hubplay-score, [data-testid=emote-button], .touch-btn--jump, .prompt', (els) => els.map((e) => { const r = e.getBoundingClientRect(); return { c: e.className, x: r.x, y: r.y, w: r.width, h: r.height }; }));
+  const hits = mb ? others.filter((b) => b.w && mb.x < b.x + b.w && b.x < mb.x + mb.width && mb.y < b.y + b.h && b.y < mb.y + mb.height).map((b) => b.c) : [];
+  check(`${label}: mic button ≥ 56 px, on screen at the top right, clear of the other HUD controls`, !!mb && mb.width >= 56 && mb.height >= 56 && mb.x >= 0 && mb.x + mb.width <= w && mb.y >= 0 && mb.y < h / 3 && mb.x > w / 2 && hits.length === 0, JSON.stringify({ mb, hits }));
+  await shot(P.page, file);
+}
+
 (async () => {
   const { child, log } = await startServer();
-  const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+  // Fake microphone (a beeping tone) granted without a prompt; real local addresses in ICE (no mDNS names) so two pages on one machine connect.
+  const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', '--autoplay-policy=no-user-gesture-required', '--disable-features=WebRtcHideLocalIpsWithMdns'] });
   try {
     // ------------------------------------------------------------ raw socket checks
     const health = await (await fetch(`${HTTP}/health`)).json();
@@ -149,8 +308,10 @@ const shot = (p, file) => p.screenshot({ path: path.join(OUT, file), timeout: T 
     const dw = dressed.msgs.find((m) => m.t === 'welcome');
     const dl = dw?.players.find((p) => p.id === dw.you)?.look;
     check('server keeps catalogue accessories and blanks unknown or wrong-slot ids', dl && dl.paint === 9 && dl.hat === 'propeller' && dl.keySkin === 'moon' && dl.face === 'goggles' && dl.back === 'none' && dl.neck === 'none', JSON.stringify(dl));
-    const big = await rawSession(`${WS}/`, { origin: ORIGIN }, ['x'.repeat(3000)]);
-    check('messages over 2 KB close the socket (1009)', big.code === 1009, `close ${big.code}`);
+    const big = await rawSession(`${WS}/`, { origin: ORIGIN }, [JSON.stringify({ t: 'emote', id: 'wave', pad: 'x'.repeat(3000) })]);
+    check('messages over 2 KB (other than voice handshakes) are refused with bad_request', big.msgs.some((m) => m.code === 'bad_request'), JSON.stringify(big.msgs[0]));
+    const huge = await rawSession(`${WS}/`, { origin: ORIGIN }, ['x'.repeat(9000)]);
+    check('frames over 8 KB close the socket (1009)', huge.code === 1009, `close ${huge.code}`);
     const flood = await rawSession(`${WS}/`, { origin: ORIGIN }, Array.from({ length: 400 }, () => '{"t":"leave"}'), 2500);
     check('a message flood is rate-limited and closed (4008)', flood.code === 4008, `close ${flood.code}`);
 
@@ -209,6 +370,15 @@ const shot = (p, file) => p.screenshot({ path: path.join(OUT, file), timeout: T 
     await B.page.click('[data-testid=online-join-code]');
     await waitNet(B.page, 'online');
     check('B joins with the code', (await net(B.page, 'room')).code === code);
+
+    // ONLY=voice: just A and B and the voice checks (the full run does them after the emotes, with C in the room too).
+    if (VOICE_ONLY) {
+      await A.page.setViewportSize({ width: 1280, height: 720 });
+      await Promise.all([waitTags(A.page, ['Bravo']), waitTags(B.page, ['Alpha'])]).catch(() => null);
+      await voiceChecks(A, B);
+      await A.ctx.close();
+      await B.ctx.close();
+    } else {
 
     await B.page.setViewportSize(tiny);
     const C = await openPage(browser, 'Charlie', { viewport: { width: 560, height: 360 } }, `${BASE}?debug#room=${code}`);
@@ -282,6 +452,9 @@ const shot = (p, file) => p.screenshot({ path: path.join(OUT, file), timeout: T 
     const bAfter = await remoteBy(A.page, 'Bravo');
     const bLocal = await B.page.evaluate(() => window.__toybox.state().anim.emote);
     check('keys 4 and 3 pressed together: exactly one emote is played and sent', bAfter.emoteEvents === evBefore + 1 && ['dance', 'spin'].includes(bAfter.lastEmote) && bLocal === bAfter.lastEmote, `events +${bAfter.emoteEvents - evBefore}, sent ${bAfter.lastEmote}, B plays ${bLocal}`);
+
+    // ------------------------------------------------------------ proximity voice chat
+    await voiceChecks(A, B);
 
     // ------------------------------------------------------------ hub play: one shared marble, ball and score per room
     const hp = (p) => p.evaluate(() => window.__toybox.hubplay.state());
@@ -412,6 +585,7 @@ const shot = (p, file) => p.screenshot({ path: path.join(OUT, file), timeout: T 
     const btn = await P.page.waitForSelector('[data-testid=emote-button]');
     const bb = await btn.boundingBox();
     check('touch Emote button is at least 56 px and on screen', bb.width >= 56 && bb.height >= 56 && bb.x >= 0 && bb.x + bb.width <= 390 && bb.y + bb.height <= 844, JSON.stringify(bb));
+    await phoneMic(P, 390, 844, 'phone portrait', 'voice-07-phone-portrait-mic.png');
     const leaveBox = await (await P.page.$('[data-testid=online-leave]')).boundingBox();
     check('online chip buttons are at least 56 px on touch', leaveBox.height >= 56 && leaveBox.width >= 56, JSON.stringify(leaveBox));
     await P.page.tap('[data-testid=emote-button]');
@@ -448,6 +622,7 @@ const shot = (p, file) => p.screenshot({ path: path.join(OUT, file), timeout: T 
     check('phone landscape (844×390) joins the public Hub', (await net(L.page, 'room')).instance === 1);
     const lb = await (await L.page.waitForSelector('[data-testid=emote-button]')).boundingBox();
     check('landscape: Emote button ≥ 56 px, on screen', lb.width >= 56 && lb.y >= 0 && lb.y + lb.height <= 390, JSON.stringify(lb));
+    await phoneMic(L, 844, 390, 'phone landscape', 'voice-08-phone-landscape-mic.png');
     await L.page.tap('[data-testid=emote-button]');
     await L.page.waitForSelector('[data-testid=emote-menu]');
     await L.page.waitForFunction(() => document.querySelector('.emote-menu')?.getAnimations().every((a) => a.playState === 'finished'), null, { timeout: 30000 }).catch(() => null);
@@ -462,6 +637,7 @@ const shot = (p, file) => p.screenshot({ path: path.join(OUT, file), timeout: T 
     await L.ctx.close();
     await P.ctx.close();
     await C.ctx.close();
+    } // end of the full run (ONLY=voice skips it)
     let end = null;
     for (let i = 0; i < 50; i++) {
       end = await (await fetch(`${HTTP}/health`)).json();

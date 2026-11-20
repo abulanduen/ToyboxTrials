@@ -7,7 +7,7 @@
 import { useEffect, useRef } from 'react';
 import { PALETTE } from '../game/palette';
 import { useGame } from '../game/store';
-import { holdVirtual } from '../game/input';
+import { holdVirtual, takePresses } from '../game/input';
 import { unlockAudio } from '../game/audio';
 import { useNet } from '../net/store';
 import { remotes } from '../net/remotes';
@@ -65,8 +65,13 @@ export function VoiceMicButton() {
         unlockAudio();
         e.currentTarget.setPointerCapture(e.pointerId);
         holdVirtual('talk', true);
-        // Ask inside the press itself (some browsers only show the prompt for a user gesture).
-        if (useVoice.getState().mic === 'off') void openMic();
+        if (useVoice.getState().mic === 'off') {
+          // Ask inside the press itself (some browsers only show the prompt for a user gesture), and
+          // let this press be only that: the frame loop must not take it as a toggle too, even if
+          // the permission comes back before the next frame.
+          takePresses('talk');
+          void openMic();
+        }
       }}
       onPointerUp={release}
       onPointerCancel={release}

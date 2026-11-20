@@ -48,6 +48,7 @@ The build output in `dist/` is a static folder with relative paths. Host it anyw
 | **Mouse** | Click the scene to capture the mouse and look around (or drag) |
 | **Esc** / **P** | Pause and settings (volume, quality, mouse sensitivity, invert Y, FPS meter) |
 | **H** | Show/hide the controls card |
+| **V** | Online Hub voice chat: hold to talk (push to talk), or mic on/off in Always on mode |
 
 **On phones and tablets** (works in both portrait and landscape):
 - Put your left thumb anywhere on the lower-left to bring up the joystick. Push it to the rim to run.
@@ -61,6 +62,7 @@ Things to find in the Playroom:
 - **Tournament Pavilion** (striped tent): run a Blitz (3), Normal (5) or Treasure (8) tournament against bots, or practise any single trial, including **Find the Original** (spot the real Baldwyn in a crowd of look-alikes). Blitz is three quick party trials; Normal and Treasure play party trials and finish with one strategy game (Toy Squad, Toybox Siege or Toy Tower Tumble). The practice list is folded into Party games and Strategy games.
 - **Workshop** (pencil case): opens the Workshop screen. Name your contender and pick a paint job, hat and key skin. Secrets unlock extra items.
 - **Scoreboard** (domino wall): tracks secrets.
+- **Online Hub voice chat** (optional, online Hub only): talk to the toys standing near you. The mic button at the top right (or V) asks for the microphone only when you press it; push to talk is the default, Always on is in Settings. Voices get quieter with distance and come from their side of the screen. Listening is on by default; mute anyone from the pause menu, or switch "Hear voice chat" off in Settings. See [`docs/ONLINE.md`](docs/ONLINE.md) for how it works and its privacy notes.
 - **Four hidden secrets.** Look behind the pavilion, near the fountain, behind the workshop, and on top of the book tower (jump: domino → book → eraser → block).
 
 ## What's in the box

@@ -36,6 +36,12 @@ export const VOICE_KEYS: Record<VoiceAction, string[]> = { talk: ['KeyV'] };
 export type InputAction = Action | EmoteAction | VoiceAction;
 const isEmoteAction = (a: InputAction): a is EmoteAction => a in EMOTE_KEYS;
 const isVoiceAction = (a: InputAction): a is VoiceAction => a in VOICE_KEYS;
+/**
+ * Voice presses not yet taken by voice chat. Kept apart from the per-frame edge sets, which the Hub's
+ * PlayerController clears at the end of its frame: a tap shorter than a frame (a quick click on a
+ * slow phone) must still count once.
+ */
+const voicePresses: Record<VoiceAction, number> = { talk: 0 };
 
 export const HUB_BINDINGS: Record<Action, string[]> = {
   forward: ['KeyW', 'ArrowUp'],
@@ -122,6 +128,7 @@ function onKeyDown(e: KeyboardEvent) {
   if (isTypingTarget(e.target)) return;
   if (!down.has(e.code)) {
     pressedThisFrame.add(e.code);
+    if (!e.repeat) for (const a of Object.keys(VOICE_KEYS) as VoiceAction[]) if (VOICE_KEYS[a].includes(e.code)) voicePresses[a]++;
     if (!e.repeat) logKeyPress(e.code, e.timeStamp);
   }
   down.add(e.code);
@@ -208,8 +215,15 @@ export function tapVirtual(a: InputAction, eventTime?: number) {
 }
 /** Hold or let go of a Hub-only action from a touch button (the mic button's push-to-talk). Never logged as a press. */
 export function holdVirtual(a: VoiceAction, held: boolean) {
+  if (held && !virtualDown.has(a)) voicePresses[a]++;
   if (held) virtualDown.add(a);
   else virtualDown.delete(a);
+}
+/** How many times a voice action was pressed (key or touch) since the last call; resets the count. */
+export function takePresses(a: VoiceAction): number {
+  const n = voicePresses[a];
+  voicePresses[a] = 0;
+  return n;
 }
 
 /** Ordered presses since the last frame (for minigames where order matters, e.g. Copycat). */
@@ -243,6 +257,7 @@ export function endFrame() {
 
 /** Used by UI layers (pause menu) to drop held keys so the toy doesn't keep walking. */
 export function clearInput() {
+  voicePresses.talk = 0;
   down.clear();
   pressedThisFrame.clear();
   virtualDown.clear();

@@ -110,7 +110,8 @@ const inbound = new Map<string, Link>();
 const outbound = new Map<string, Link>();
 const blockedUntil = new Map<string, number>();
 /** Last known positions (from the frame loop), for answering offers between plans. */
-const where = new Map<string, Point & { inHub: boolean }>();
+const where = new Map<string, Point & { inHub: boolean; seen: number }>();
+let frameNo = 0;
 const self: Point = { x: 0, z: 0 };
 let bus: GainNode | null = null;
 /** The talk action (V / held mic button) as of the last frame, and when that hold began. */
@@ -427,6 +428,8 @@ export interface VoiceFrameInput {
   rightZ: number;
   /** The talk action (V, or the mic button held) is down. */
   talk: boolean;
+  /** Presses of the talk action since the last frame (counted even when released within the frame). */
+  presses: number;
 }
 
 /** Called every frame while the Hub is on screen (src/character/VoiceProximity.tsx). */
@@ -434,11 +437,20 @@ export function voiceFrame(f: VoiceFrameInput) {
   const now = performance.now();
   self.x = f.self.x;
   self.z = f.self.z;
-  where.clear();
-  for (const o of f.others) where.set(o.id, { x: o.x, z: o.z, inHub: o.inHub });
+  // (objects reused frame to frame: no garbage per frame)
+  const stamp = ++frameNo;
+  for (const o of f.others) {
+    let w = where.get(o.id);
+    if (!w) where.set(o.id, (w = { x: 0, z: 0, inHub: false, seen: 0 }));
+    w.x = o.x;
+    w.z = o.z;
+    w.inHub = o.inHub;
+    w.seen = stamp;
+  }
+  for (const [id, w] of where) if (w.seen !== stamp) where.delete(id);
 
-  // push to talk / toggle
-  if (f.talk && !held) {
+  // push to talk / toggle: one press is one toggle (Always on) or the start of a hold (push to talk)
+  if (f.presses > 0) {
     holdAt = now;
     talkDown();
   }
