@@ -101,8 +101,8 @@ All numbers live in `FINALE` and `DEFAULT_CONFIG` (`prepMs`, `arenaMs`) in `conf
 | Class | Toy | Starting weapon | Health | Speed (cm/s) | Lean |
 | --- | --- | --- | --- | --- | --- |
 | Warrior | Tin Soldier (Toy Squad's soldier model) | Bayonet Sweep | 150 | 9.2 | 2 armour |
-| Ranger | Pop-Gun Ranger | Pop-Gun | 100 | 11.6 | ×1.35 pickup reach |
-| Mage | Clockwork Wizard | Chime Burst | 105 | 10 | ×0.9 cooldowns, ×1.15 area |
+| Ranger | Pop-Gun Ranger | Pop-Gun | 115 | 11.6 | ×1.35 pickup reach |
+| Mage | Clockwork Wizard | Chime Meteors | 105 | 10 | ×0.9 cooldowns, ×1.15 area |
 
 ## Weapons (maximum level 5, maximum 4 weapons held)
 
@@ -111,8 +111,8 @@ Every weapon is open to every class. Only the starting weapon depends on class.
 | Weapon | Level 1 | Levels 2–5 | Evolution (level 5 + partner + chest) |
 | --- | --- | --- | --- |
 | Bayonet Sweep | 150° arc at the nearest enemy, reach 6, 14 damage, every 1.15 s | +6 damage · swings behind too · +25% reach · +8 damage and faster | **Whirling Brigade**: a full 360° sweep, reach 9.5, 44 damage. Partner: **Tin Plating** |
-| Pop-Gun | 1 cork at the nearest enemy, 9 damage, every 0.75 s | +1 cork · pierce 1 · +5 damage · +1 cork and faster | **Cork Gatling**: 2 corks every 0.23 s, pierce 3. Partner: **Fast Gears** |
-| Chime Burst | 1 blast (radius 4.5) on a random enemy within 20, 16 damage, every 1.6 s | bigger · +1 burst · +8 damage · +1 burst and faster | **Grand Carillon**: 4 blasts, radius 7.5, 36 damage. Partner: **Magnifying Glass** |
+| Pop-Gun | 1 cork at the nearest enemy, 10 damage, every 0.75 s | +1 cork, pierce 1 · homing 1.6 rad/s, +2 damage · +5 damage, pierce 2 · +1 cork, pierce 3, homing 2.6 rad/s, faster | **Prism Ray**: a laser beam 34 cm long every 0.4 s, 52 damage to **every** enemy in its line. Partner: **Fast Gears** |
+| Chime Meteors | 1 meteor (radius 4.5) on a random enemy within 20, 18 damage, every 1.6 s | +1 meteor · +1 meteor, bigger · +1 meteor, +6 damage · +1 meteor, faster (5 at level 5) | **Firebell Meteors**: 6 meteors, radius 6.5, 32 damage, each leaving a **pool of flame**. Partner: **Magnifying Glass** |
 | Yo-Yo Orbit | 1 yo-yo orbiting at radius 5.5, 8 damage per touch (0.45 s per enemy) | +1 yo-yo · +5 damage · +1 yo-yo and wider · +5 damage and faster | **Yo-Yo Cyclone**: 5 yo-yos, radius 8, 24 damage. Partner: **Tight Mainspring** |
 | Paper Planes | 1 plane out 14 cm along your heading and back, pierces everything, 10 damage | +1 plane · +6 damage · +1 plane · further and faster | **Origami Squadron**: 6 planes in every direction, 24 damage. Partner: **Magnet Button** |
 | Marble Rain | 3 marbles fall on enemies within 20 (radius 2.4), 18 damage, every 2.4 s | +2 marbles · +8 damage · +2 marbles · bigger and faster | **Marble Avalanche**: 14 marbles, 36 damage. Partner: **Sharp Crayon** |
@@ -131,9 +131,59 @@ The full per-level rows are in `WEAPONS` in `config.ts`.
 | Magnet Button | +35% pickup reach, +4% experience |
 
 **Evolution rule (decided here):** a weapon at level 5, plus its partner passive at any level,
-plus opening an elite's treasure chest. The chest then offers the evolution. If no evolution is
-ready, the chest raises up to two owned items by one level. If everything is maxed, it gives full
-health and 50 points.
+plus opening an elite's treasure chest. The chest then offers the evolution. The **Rally Horn** has a
+secret upgrade too: at its top level (3) the next chest offers it (it has no partner; three horn cards
+are its price). Weapons are offered first when both are ready. If no evolution is ready, the chest
+raises up to two owned items by one level. If everything is maxed, it gives full health and 50 points.
+
+## The ranged upgrades and new secret upgrades (owner request, 20 November 2026)
+
+The owner asked for the two ranged classes to be upgraded: piercing and a little homing for the
+Ranger, more meteors for the Mage, and secret upgrades as distinct as the Whirling Brigade (the
+sword), including one for the elite-sending skill. All numbers are in `config.ts` (`WEAPONS`,
+`FLAME`, `BOILER`, `HOMING_SEEK`) and are **provisional**.
+
+- **Pop-Gun piercing:** a cork passes through 0 / 1 / 1 / 2 / 3 enemies at levels 1 to 5 (it was
+  0 / 0 / 1 / 1 / 1), each enemy once.
+- **Pop-Gun homing:** from level 3 a cork curves towards the nearest enemy **ahead of it** (within 90°
+  of its heading) within 12 cm that it has not hit yet, turning at most 1.6 rad/s (2.6 at level 5).
+  At 42 cm/s that is a turning circle of 26 cm (16 cm): it bends a near miss into a hit, it never
+  orbits. It keeps its target until that enemy falls or is hit, then picks the next.
+- **Prism Ray** (Pop-Gun + Fast Gears + a chest): the pop-gun becomes a toy ray gun. Every 0.4 s
+  a beam 34 cm long (past the edge of the view) and 0.9 cm either side (× area) fires at the nearest
+  enemy (else the way the toy faces) and hits **every** mob, elite and boss touching that line,
+  52 damage each, at once. It replaces the Cork Gatling (2 corks every 0.23 s, pierce 3).
+  Why these numbers: 130 damage per second to a single target (the Gatling's best case was 139 if
+  every cork landed), but through a whole lane of the swarm; it reaches further than the Whirling
+  Brigade (44 damage, 9.5 cm all round, every 0.85 s), which keeps the close-quarters crown.
+- **Chime Meteors:** the Chime Burst is now drawn as meteors falling in at a slant (they land 0.2 s
+  after they appear, as the burst did) and gains a meteor at every level: 1 / 2 / 3 / 4 / 5 (was
+  1 / 1 / 2 / 2 / 3) with the same 26 damage per meteor at levels 4–5 and 2 more at levels 1–3, so a
+  level-5 volley does about 67% more in all (5 × 26 against 3 × 26).
+- **Firebell Meteors** (Chime + Magnifying Glass + a chest): 6 meteors every 1.2 s, and each leaves
+  a **pool of flame** (radius 3.2 × area, so about 5.5 cm with a maxed Magnifying Glass on the Mage)
+  that burns every enemy in it for 9 × damage every 0.4 s for 3 s (about 63 damage over its life
+  to an enemy that stays in it; mobs walk through, elites and the boss linger). Up to 24 pools per
+  board (`fireCap`); a full pool replaces its oldest flame. Drawn as a flickering coral disc with a
+  honey rim and two or three flame tongues, all instanced.
+- **Boiler Heart** (Rally Horn at level 3 + a chest): the toy fires a **ring of 16 rivets all round
+  itself every 1.5 s**, like the Boiler Baron's bullet rings: 18 damage each (× damage), 22 cm/s for
+  1 s (about 22 cm), each passing through one enemy; every ring turns half a gap so the gaps sweep.
+  It takes **no weapon slot** (a fifth weapon) and the horn keeps its active skill (sending elites,
+  summoning the Baron in the arena). Why: the horn costs three level-up cards that could have been
+  weapon or passive levels; the reward is the strongest crowd-clearer for its cost, up to 576 damage
+  per ring if every rivet hits twice, though only one or two rivets reach a single enemy.
+- **In the arena** all of these hit rival toys and their summoned Barons (never their owner) at the
+  usual arena multiplier (0.013): homing corks curve towards rival toys, the beam hits every rival in
+  its line, flame pools burn rivals standing in them (bots step out of them), rivet rings hit rivals.
+- **Bots** take a secret upgrade from a chest whenever one is offered (never skipping it to send an
+  elite), and once they hold the horn they value raising it (it now leads to the Boiler Heart).
+- **Balance check (headless bots, 40 matches × 8 bots, mixed skills; not people):** compared with
+  the previous rules, Rangers reach the arena more often (64% → 82%) and slay the boss more often
+  (23% → 34%), Mages slay the boss more often (69% → 86%), and the mean place of a Ranger rose from
+  5.41 to 5.19 (Warrior 4.14 → 3.90, Mage 3.97 → 4.48). Bots win the arena with a Ranger less often
+  than with a Warrior (7% against 24% of arena entries): the arena favours armour and melee, an open
+  question below. 1.1–1.5 Boiler Hearts per match; matches 318–360 s.
 
 ## Level-up cards
 
@@ -148,14 +198,17 @@ Each option shows the item's **icon** (code-drawn SVG, `icons.tsx`), its **level
 badge (`evolutionHint` in `rules.ts`):
 
 - **Unlocks the secret upgrade** (gold): taking it completes a weapon's evolution pair (the weapon
-  reaches level 5 with its partner owned, or the partner of a level-5 weapon), so the next chest
-  evolves it;
+  reaches level 5 with its partner owned, or the partner of a level-5 weapon), or takes the Rally
+  Horn to level 3, so the next chest evolves it;
 - **Secret upgrade pair** (dashed): a new partner passive for a weapon you hold, or a weapon whose
   partner you hold, with the levels still needed;
 - **Max level, add the partner**: the weapon reaches level 5 without its partner;
+- the Rally Horn's levels below 3 show how many more it needs for the Boiler Heart;
 - the treasure card's evolution itself.
 
-The kit strip under the clock uses the same icons, with level pips (gold when evolved).
+The kit strip under the clock uses the same icons, with level pips (gold when evolved), and shows
+the Rally Horn (three pips) once taken. The Prism Ray, Firebell Meteors and Boiler Heart have their
+own icons (a ray gun, a meteor over flames, a boiler throwing rivets); the other evolutions keep the star.
 
 Experience to the next level is `5 + 3(L−1) + ⌊0.3(L−1)²⌋`, giving 5, 8, 11 … 56 at level 10 and
 170 at level 20. In bot matches, toys reach about level 12 by 2:00, 20 by 4:00 and 25–32 by 5:00.
@@ -194,6 +247,8 @@ than being dropped, and the boss always arrives at 4:00.
 - **Rally Horn (active skill):** an optional level-up card at levels 1 to 3, with cooldowns of
   75, 60 and 45 s, first ready 8 s after it is taken. Press Space or the big touch button.
   Clicking a rival's row aims it (otherwise it goes to the leader).
+  At level 3 its secret upgrade, the **Boiler Heart**, is offered by the next chest (see above): the
+  horn keeps sending elites and also fires rivet rings all round the toy.
 - **Telegraph:** the target sees "Elite incoming from X!" for 3 s before it lands. The rivals
   panel marks boards with an elite on the way.
 - **The elite sent** depends on the clock: Rag Bear before 2:00, Tin Drummer before 3:00, then
@@ -248,17 +303,27 @@ revive). The game counts as long (`durationSec` [300, 390], see the finale).
   | Player projectiles | 96 |
   | Enemy bullets | 64 |
   | Gems | 160 |
-  | Area hits | 40 |
+  | Area hits (including laser beams) | 40 |
+  | Flame pools | 24 |
   | Chests | 4 |
   | Elites | 4 |
 
   A full gem pool folds new experience into existing gems, so nothing is lost.
-- **Allocation:** every pool is allocated once at init and recycled through an `on` flag.
+- **Allocation:** every pool is allocated once at init and recycled through an `on` flag. The board
+  step is split into one small function per entity kind with indexed loops (no `for…of`, closures or
+  helper calls the JIT cannot inline in the hot loops): a late-game step of eight full boards and
+  seven bots allocates about 2 KB (it was 79 KB, iterator results and boxed numbers) and takes about
+  0.2 ms instead of 0.47 ms (node, same harness; see the performance notes in the branch report).
 - **Collisions:** a uniform spatial hash (4 cm cells) is rebuilt per board per step from scratch
   typed arrays held outside the state. Mob separation checks at most six neighbours in the mob's
   own cell.
 - **Rendering:** only the board on screen is drawn. Each mob kind, projectile kind, gem kind and
-  effect shape is one `InstancedMesh`, sized to the gameplay cap. Effect shapes come from Toy
+  effect shape is one `InstancedMesh`, sized to the gameplay cap; only the live instances are
+  uploaded each frame. Single toys (hero, elites, rivals) use their own material, not the swarm's:
+  one material drawn by instanced and plain meshes made three.js rebuild its program key on every
+  switch, every frame. Nothing in Siege casts a moving shadow, so the sun's shadow map is drawn when
+  the set changes, not every frame (about 50 draw calls into a 2048- or 4096-texel map saved per
+  frame on Balanced and High). HUD bars fill with `transform: scaleX`, not an eased width. Effect shapes come from Toy
   Squad (`fxShapeGeometry`, an additive export). The Low tier (touch default) uses a 48-particle
   pool instead of 140 and drops impact bursts. Gameplay caps are the same on every tier, because
   the rules must agree across clients.
@@ -312,7 +377,13 @@ wire size needs measuring.
   Baron's numbers come from headless bot arenas only. Whether 15 s of prep is enough to read three
   chests and several level-ups needs people to try it. Early boss slayers wait for the arena (up to
   about 40 s); a shorter shared deadline is an alternative if the wait feels long.
+- **The arena and the ranged classes:** in bot arenas, armour (4% per point, up to 40%) and melee
+  builds win most often; the Ranger's new numbers help it reach the arena but not win it. A per-weapon
+  arena multiplier, or a lower armour cap, is the obvious lever if people find the same.
+- **Secret upgrades for the other three weapons** (Whirling Brigade, Yo-Yo Cyclone, Origami Squadron,
+  Marble Avalanche) are unchanged bigger versions; the owner singled out the sword as the bar, and the
+  three new ones (beam, flame pools, rivet ring) each change how the weapon plays.
 - **Unverified:** balance and feel with real players, especially how strong the Ranger is, boss
   kill rates, revive costs and the arena. Bot matches suggest 0 to 5 boss kills per 8-toy match
-  and 2 to 8 toys in the arena. Touch feel, audio mix (including the new, softer Chime Burst cue)
+  and 2 to 8 toys in the arena. Touch feel, audio mix (including the softer chime cue, the beam's zap and the rivet ring)
   and real-device frame rates have not been measured.

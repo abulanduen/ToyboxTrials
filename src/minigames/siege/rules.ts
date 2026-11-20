@@ -21,10 +21,10 @@
  */
 import type { Contestant, MatchEvent, Placement, RulesCore } from '../types';
 import {
-  ARENA_HALF, BASE_PICKUP, BIGS, BOSS_AT, BOSS_SUMMON_AT, BOSS_SUMMON_COUNT, CLASSES, CLASS_IDS, DEFAULT_CONFIG, ELITE_SCHEDULE, FINALE, HORN, HORN_MAX, overtime,
+  ARENA_HALF, BASE_PICKUP, BIGS, BOILER, BOSS_AT, FLAME, HOMING_SEEK, BOSS_SUMMON_AT, BOSS_SUMMON_COUNT, CLASSES, CLASS_IDS, DEFAULT_CONFIG, ELITE_SCHEDULE, FINALE, HORN, HORN_MAX, overtime,
   MAX_LEVEL, MAX_PASSIVES, MAX_WEAPONS, MOBS, PASSIVE_IDS, PASSIVE_PER_LEVEL, PLAYER_RADIUS, POINTS, SENT_GEM_XP, SENT_HP, SNACK_CHANCE,
   SNACK_HEAL, SPAWN_DIST, WAVE_MS, WEAPONS, WEAPON_IDS, dmgScale, hpScale, reviveCost, sentEliteFor, spawnRate, waveSize, xpToNext,
-  type BigId, type ClassId, type PassiveId, type SiegeConfig, type WeaponId, type WeaponStats,
+  type BigId, type ClassId, type EvoId, type PassiveId, type SiegeConfig, type WeaponId, type WeaponStats,
 } from './config';
 
 export * from './config';
@@ -35,20 +35,30 @@ export interface Mob { on: boolean; serial: number; kind: number; x: number; z: 
   hp: number; maxHp: number; speed: number; dmg: number; r: number; xp: number; pts: number; hurt: number; yo: number; timer: number }
 export interface Big { on: boolean; serial: number; type: BigId; x: number; z: number; hp: number; maxHp: number; r: number; speed: number; dmg: number; xp: number; pts: number;
   sent: boolean; from: string | null; mode: 0 | 1 | 2; modeT: number; dashT: number; ringT: number; summonT: number; aimX: number; aimZ: number; hurt: number; yo: number; summons: number }
-/** Player projectiles. kind 0 = cork, 1 = paper plane. `own`: the shooter's player index in the arena (−1 on a board). */
+/**
+ * Player projectiles. kind 0 = cork, 1 = paper plane, 2 = Boiler Heart rivet. `own`: the shooter's player index in
+ * the arena (−1 on a board). `homing`: the most a cork may turn towards its target, radians per second; `ti` the
+ * target (a mob index, −2 − i for elite i on a board, or −2 − j for rival toy j in the arena; −1 none) and `ts` its serial.
+ */
 export interface Proj { on: boolean; kind: number; x: number; z: number; vx: number; vz: number; r: number; dmg: number; pierce: number; life: number;
-  ox: number; oz: number; range: number; back: boolean; hits: number[]; nh: number; own: number }
+  ox: number; oz: number; range: number; back: boolean; hits: number[]; nh: number; own: number; homing: number; ti: number; ts: number }
 /** Enemy bullets (in the arena: a summoned boss's, `own` = its owner's player index). */
 export interface Shot { on: boolean; x: number; z: number; vx: number; vz: number; r: number; dmg: number; life: number; own: number }
 /** kind 0 = experience gem, 1 = biscuit (heals). */
 export interface Gem { on: boolean; kind: number; x: number; z: number; v: number; pull: boolean }
 export interface Chest { on: boolean; x: number; z: number }
-/** Area hits. kind 0 sweep (instant), 1 chime (short fuse), 2 marble (falls), 3 revive shockwave. `age` counts up, damage lands at `delay`. */
-export interface Blast { on: boolean; kind: number; x: number; z: number; r: number; ang: number; arc: number; delay: number; age: number; life: number; dmg: number; knock: number; done: boolean; own: number }
+/**
+ * Area hits. kind 0 sweep (instant), 1 chime meteor (short fuse), 2 marble (falls), 3 revive shockwave, 4 Prism Ray laser
+ * (a line from (x, z) along `ang`, `r` long and `w` either side). `age` counts up, damage lands at `delay`. A meteor with
+ * `burn` > 0 (Firebell Meteors) leaves a flame pool of radius `w` that deals `burn` per tick.
+ */
+export interface Blast { on: boolean; kind: number; x: number; z: number; r: number; ang: number; arc: number; delay: number; age: number; life: number; dmg: number; knock: number; done: boolean; own: number; w: number; burn: number }
+/** A pool of flame (Firebell Meteors): burns everything in radius `r` for `dmg` every FLAME.tickMs until `age` reaches `life`. `tick` counts down to the next burn. */
+export interface Fire { on: boolean; x: number; z: number; r: number; age: number; life: number; tick: number; dmg: number; own: number }
 
 export interface Board {
   bt: number;
-  mobs: Mob[]; bigs: Big[]; projs: Proj[]; shots: Shot[]; gems: Gem[]; chests: Chest[]; blasts: Blast[];
+  mobs: Mob[]; bigs: Big[]; projs: Proj[]; shots: Shot[]; gems: Gem[]; chests: Chest[]; blasts: Blast[]; fires: Fire[];
   spawnAcc: number; waveT: number; nextElite: number; bossUp: boolean; bossDown: boolean; serial: number; gemCursor: number;
 }
 
@@ -59,7 +69,7 @@ export type Option =
   | { kind: 'weapon'; id: WeaponId; level: number }
   | { kind: 'passive'; id: PassiveId; level: number }
   | { kind: 'horn'; level: number }
-  | { kind: 'evolve'; id: WeaponId }
+  | { kind: 'evolve'; id: EvoId }
   | { kind: 'bundle'; items: ({ kind: 'weapon'; id: WeaponId } | { kind: 'passive'; id: PassiveId })[] }
   | { kind: 'heal' }
   | { kind: 'send' };
@@ -84,7 +94,8 @@ export interface SiegePlayer {
   level: number; xp: number; xpNext: number;
   kills: number; points: number; elites: number;
   weapons: WeaponSlot[]; passives: PassiveSlot[];
-  horn: { level: number; readyAt: number } | null;
+  /** The Rally Horn: its level (1–3) and when it is next ready; `evolved` = the Boiler Heart, which fires a ring every BOILER.cd (`cd` counts down; `aux` turns the ring). */
+  horn: { level: number; readyAt: number; evolved: boolean; cd: number; aux: number } | null;
   choice: Choice | null; pendingLevels: number; pendingChests: number;
   /** Board time until which hits are ignored. */
   invuln: number;
@@ -150,27 +161,32 @@ const emit = (s: SiegeState, e: MatchEvent) => { if (s.events.length < 256) s.ev
 
 const blankStats = (): Stats => ({ maxHp: 100, armour: 0, speed: 10, dmg: 1, cd: 1, area: 1, projSpeed: 1, pickup: BASE_PICKUP, xp: 1 });
 
-function newBoard(c: Pick<SiegeConfig, 'mobCap' | 'bigCap' | 'projectileCap' | 'shotCap' | 'gemCap' | 'chestCap' | 'blastCap'>): Board {
+function newBoard(c: Pick<SiegeConfig, 'mobCap' | 'bigCap' | 'projectileCap' | 'shotCap' | 'gemCap' | 'chestCap' | 'blastCap' | 'fireCap'>): Board {
   const n = <T>(k: number, f: () => T) => Array.from({ length: k }, f);
   return {
     bt: 0,
     mobs: n(c.mobCap, () => ({ on: false, serial: 0, kind: 0, x: 0, z: 0, vx: 0, vz: 0, kx: 0, kz: 0, hp: 0, maxHp: 0, speed: 0, dmg: 0, r: 0, xp: 0, pts: 0, hurt: -1e9, yo: -1e9, timer: 0 })),
     bigs: n(c.bigCap, () => ({ on: false, serial: 0, type: 'bear' as BigId, x: 0, z: 0, hp: 0, maxHp: 0, r: 0, speed: 0, dmg: 0, xp: 0, pts: 0, sent: false, from: null as string | null,
       mode: 0 as 0 | 1 | 2, modeT: 0, dashT: 0, ringT: 0, summonT: 0, aimX: 0, aimZ: 1, hurt: -1e9, yo: -1e9, summons: 0 })),
-    projs: n(c.projectileCap, () => ({ on: false, kind: 0, x: 0, z: 0, vx: 0, vz: 0, r: 0, dmg: 0, pierce: 0, life: 0, ox: 0, oz: 0, range: 0, back: false, hits: [0, 0, 0, 0, 0, 0, 0, 0], nh: 0, own: -1 })),
+    projs: n(c.projectileCap, () => ({ on: false, kind: 0, x: 0, z: 0, vx: 0, vz: 0, r: 0, dmg: 0, pierce: 0, life: 0, ox: 0, oz: 0, range: 0, back: false, hits: [0, 0, 0, 0, 0, 0, 0, 0], nh: 0, own: -1, homing: 0, ti: -1, ts: 0 })),
     shots: n(c.shotCap, () => ({ on: false, x: 0, z: 0, vx: 0, vz: 0, r: 0, dmg: 0, life: 0, own: -1 })),
     gems: n(c.gemCap, () => ({ on: false, kind: 0, x: 0, z: 0, v: 0, pull: false })),
     chests: n(c.chestCap, () => ({ on: false, x: 0, z: 0 })),
-    blasts: n(c.blastCap, () => ({ on: false, kind: 0, x: 0, z: 0, r: 0, ang: 0, arc: 0, delay: 0, age: 0, life: 0, dmg: 0, knock: 0, done: false, own: -1 })),
+    blasts: n(c.blastCap, () => ({ on: false, kind: 0, x: 0, z: 0, r: 0, ang: 0, arc: 0, delay: 0, age: 0, life: 0, dmg: 0, knock: 0, done: false, own: -1, w: 0, burn: 0 })),
+    fires: n(c.fireCap, () => ({ on: false, x: 0, z: 0, r: 0, age: 0, life: 0, tick: 0, dmg: 0, own: -1 })),
     spawnAcc: 0, waveT: WAVE_MS, nextElite: 0, bossUp: false, bossDown: false, serial: 0, gemCursor: 0,
   };
 }
 
 export const weaponStats = (slot: WeaponSlot): WeaponStats => (slot.evolved ? WEAPONS[slot.id].evolved : WEAPONS[slot.id].levels[slot.level - 1]);
 export const passiveLevel = (p: SiegePlayer, id: PassiveId) => p.passives.find((x) => x.id === id)?.level ?? 0;
-/** The evolution a player qualifies for (weapon at level 5, not yet evolved, partner passive owned). */
-export function evolutionReady(p: SiegePlayer): WeaponId | null {
+/**
+ * The secret upgrade (evolution) a player qualifies for: a weapon at level 5, not yet evolved, with its partner
+ * passive owned; else a Rally Horn at its top level (3), not yet the Boiler Heart. Weapons come first.
+ */
+export function evolutionReady(p: SiegePlayer): EvoId | null {
   for (const w of p.weapons) if (!w.evolved && w.level >= MAX_LEVEL && passiveLevel(p, WEAPONS[w.id].partner) > 0) return w.id;
+  if (p.horn && !p.horn.evolved && p.horn.level >= HORN_MAX) return 'horn';
   return null;
 }
 
@@ -502,10 +518,18 @@ function applyOption(s: SiegeState, p: SiegePlayer, o: Option, target: string | 
     case 'weapon': addWeapon(p, o.id); emit(s, { type: 'siege-upgrade', id: p.id, item: o.id }); return true;
     case 'passive': addPassive(p, o.id); emit(s, { type: 'siege-upgrade', id: p.id, item: o.id }); return true;
     case 'horn':
-      if (!p.horn) p.horn = { level: 1, readyAt: s.runT + HORN.firstReadyMs };
+      if (!p.horn) p.horn = { level: 1, readyAt: s.runT + HORN.firstReadyMs, evolved: false, cd: 0, aux: 0 };
       else if (p.horn.level < HORN_MAX) p.horn.level++;
       emit(s, { type: 'siege-upgrade', id: p.id, item: 'horn' }); return true;
-    case 'evolve': { const w = owned(p, o.id); if (w && w.level >= MAX_LEVEL) { w.evolved = true; emit(s, { type: 'siege-evolve', id: p.id, weapon: o.id }); } return true; }
+    case 'evolve': {
+      if (o.id === 'horn') {
+        if (p.horn && p.horn.level >= HORN_MAX && !p.horn.evolved) { p.horn.evolved = true; p.horn.cd = 400; p.horn.aux = 0; emit(s, { type: 'siege-evolve', id: p.id, weapon: 'horn' }); }
+        return true;
+      }
+      const w = owned(p, o.id);
+      if (w && w.level >= MAX_LEVEL) { w.evolved = true; emit(s, { type: 'siege-evolve', id: p.id, weapon: o.id }); }
+      return true;
+    }
     case 'bundle': for (const it of o.items) it.kind === 'weapon' ? addWeapon(p, it.id) : addPassive(p, it.id); emit(s, { type: 'siege-treasure', id: p.id }); return true;
     case 'heal': p.hp = p.stat.maxHp; p.points += 50; return true;
     case 'send': return trySend(s, p, target);
@@ -545,7 +569,7 @@ function addBlast(b: Board, kind: number, x: number, z: number, r: number, ang: 
   for (let i = 0; i < list.length; i++) {
     const k = list[i];
     if (k.on) continue;
-    k.on = true; k.kind = kind; k.x = x; k.z = z; k.r = r; k.ang = ang; k.arc = arc; k.delay = delay; k.age = 0; k.life = life; k.dmg = dmg; k.knock = knock; k.done = false; k.own = own;
+    k.on = true; k.kind = kind; k.x = x; k.z = z; k.r = r; k.ang = ang; k.arc = arc; k.delay = delay; k.age = 0; k.life = life; k.dmg = dmg; k.knock = knock; k.done = false; k.own = own; k.w = 0; k.burn = 0;
     return k;
   }
   return null;
@@ -556,6 +580,7 @@ function addProj(b: Board, kind: number, x: number, z: number, vx: number, vz: n
     const q = list[i];
     if (q.on) continue;
     q.on = true; q.kind = kind; q.x = x; q.z = z; q.vx = vx; q.vz = vz; q.r = r; q.dmg = dmg; q.pierce = pierce; q.life = life; q.ox = x; q.oz = z; q.range = range; q.back = false; q.nh = 0; q.own = own;
+    q.homing = 0; q.ti = -1; q.ts = 0;
     return q;
   }
   return null;
@@ -588,18 +613,56 @@ function randomEnemy(s: SiegeState, p: SiegePlayer, range: number): boolean {
   return false;
 }
 
+/** Nearest / a random enemy (on a board) or rival (in the arena, `own` ≥ 0) within `range`: sets `aim`. */
+const nearestFoe = (s: SiegeState, p: SiegePlayer, range: number, own: number) => (own < 0 ? nearestEnemy(p, range) : foeNearest(s, p, range));
+const randomFoe = (s: SiegeState, p: SiegePlayer, range: number, own: number) => (own < 0 ? randomEnemy(s, p, range) : foeRandom(s, p, range));
+/** How long a chime meteor falls before it lands (ms), and how long a Prism Ray beam stays on screen. */
+export const METEOR_FALL = 200;
+export const LASER_LIFE = 240;
+
+/** The Boiler Heart's volley: a ring of rivets all round the toy, turned half a gap from the last ring. */
+function fireRing(p: SiegePlayer, b: Board, own: number) {
+  const h = p.horn!, n = BOILER.count, sp = BOILER.speed * p.stat.projSpeed, dmg = BOILER.dmg * p.stat.dmg;
+  for (let k = 0; k < n; k++) {
+    const a = h.aux + (k / n) * Math.PI * 2;
+    addProj(b, 2, p.x, p.z, Math.sin(a) * sp, Math.cos(a) * sp, BOILER.r, dmg, BOILER.pierce, BOILER.lifeMs, 0, own);
+  }
+  h.aux = (h.aux + Math.PI / n) % (Math.PI * 2);
+}
+/** The Boiler Heart's clock: fires a ring every BOILER.cd (scaled by cooldowns). */
+function stepBoiler(p: SiegePlayer, b: Board, own: number, dt: number) {
+  const h = p.horn;
+  if (!h || !h.evolved) return;
+  h.cd -= dt;
+  if (h.cd > 0) return;
+  h.cd += Math.max(120, BOILER.cd * p.stat.cd);
+  if (h.cd < 0) h.cd = 0;
+  fireRing(p, b, own);
+}
+
+/** Light a pool of flame (a full pool replaces its oldest flame). */
+function addFire(b: Board, x: number, z: number, r: number, dmg: number, own: number) {
+  const list = b.fires;
+  if (!list.length) return;
+  let pick = list[0];
+  for (let i = 0; i < list.length; i++) {
+    const f = list[i];
+    if (!f.on) { pick = f; break; }
+    if (f.age > pick.age) pick = f;
+  }
+  pick.on = true; pick.x = x; pick.z = z; pick.r = r; pick.age = 0; pick.life = FLAME.lifeMs; pick.tick = FLAME.tickMs; pick.dmg = dmg; pick.own = own;
+}
+
 /**
  * Fire one volley. On a board (`own` −1) weapons aim at the swarm; in the arena (`own` = the
  * shooter's player index) at rival toys and their summoned bosses, and every hit carries `own`.
  */
 function fire(s: SiegeState, p: SiegePlayer, w: WeaponSlot, st: WeaponStats, b: Board = p.board, own = -1) {
   const area = st.area * p.stat.area, dmg = st.dmg * p.stat.dmg, face = Math.atan2(p.fx, p.fz);
-  const nearestFoe = (range: number) => (own < 0 ? nearestEnemy(p, range) : foeNearest(s, p, range));
-  const randomFoe = (range: number) => (own < 0 ? randomEnemy(s, p, range) : foeRandom(s, p, range));
   switch (w.id) {
     case 'sweep': {
       // Swings at the nearest enemy in reach (auto-aim), else the way the toy faces.
-      const base = nearestFoe(area + 3) ? Math.atan2(aim.x - p.x, aim.z - p.z) : face;
+      const base = nearestFoe(s, p, area + 3, own) ? Math.atan2(aim.x - p.x, aim.z - p.z) : face;
       for (let k = 0; k < st.count; k++) {
         const ang = base + k * Math.PI;
         addBlast(b, 0, p.x, p.z, area, ang, st.arc, 0, 260, dmg, st.knock, own);
@@ -607,23 +670,35 @@ function fire(s: SiegeState, p: SiegePlayer, w: WeaponSlot, st: WeaponStats, b: 
       break;
     }
     case 'popgun': {
-      const target = nearestFoe(30);
-      const base = target ? Math.atan2(aim.x - p.x, aim.z - p.z) : face, sp = st.speed * p.stat.projSpeed;
+      if (w.evolved) {
+        // The Prism Ray: one beam per volley from the toy, at the nearest enemy (else the way it faces),
+        // through everything in its line. Damage lands at once; the beam lingers on screen briefly.
+        for (let k = 0; k < st.count; k++) {
+          const base = nearestFoe(s, p, st.range, own) ? Math.atan2(aim.x - p.x, aim.z - p.z) : face;
+          const beam = addBlast(b, 4, p.x, p.z, st.range, base + k * 0.2, 0, 0, LASER_LIFE, dmg, 2, own);
+          if (beam) beam.w = area;
+        }
+        break;
+      }
+      const base = nearestFoe(s, p, 30, own) ? Math.atan2(aim.x - p.x, aim.z - p.z) : face, sp = st.speed * p.stat.projSpeed;
       for (let k = 0; k < st.count; k++) {
         const a = base + (k - (st.count - 1) / 2) * 0.14;
-        addProj(b, 0, p.x, p.z, Math.sin(a) * sp, Math.cos(a) * sp, st.area, dmg, st.pierce, st.range, 0, own);
+        const q = addProj(b, 0, p.x, p.z, Math.sin(a) * sp, Math.cos(a) * sp, st.area, dmg, st.pierce, st.range, 0, own);
+        if (q) q.homing = st.homing;
       }
       break;
     }
     case 'chime':
       for (let k = 0; k < st.count; k++) {
-        if (!randomFoe(st.range)) { const a = rand(s) * Math.PI * 2, d = 4 + rand(s) * 8; aim.x = p.x + Math.cos(a) * d; aim.z = p.z + Math.sin(a) * d; }
-        addBlast(b, 1, aim.x, aim.z, area, 0, 360, 150, 420, dmg, 3, own);
+        if (!randomFoe(s, p, st.range, own)) { const a = rand(s) * Math.PI * 2, d = 4 + rand(s) * 8; aim.x = p.x + Math.cos(a) * d; aim.z = p.z + Math.sin(a) * d; }
+        const m = addBlast(b, 1, aim.x, aim.z, area, 0, 360, METEOR_FALL, 520, dmg, 3, own);
+        // Firebell Meteors: the meteor leaves a pool of flame where it lands.
+        if (m && w.evolved) { m.w = FLAME.radius * p.stat.area; m.burn = FLAME.dmg * p.stat.dmg; }
       }
       break;
     case 'marbles':
       for (let k = 0; k < st.count; k++) {
-        if (!randomFoe(st.range)) { const a = rand(s) * Math.PI * 2, d = 3 + rand(s) * 10; aim.x = p.x + Math.cos(a) * d; aim.z = p.z + Math.sin(a) * d; }
+        if (!randomFoe(s, p, st.range, own)) { const a = rand(s) * Math.PI * 2, d = 3 + rand(s) * 10; aim.x = p.x + Math.cos(a) * d; aim.z = p.z + Math.sin(a) * d; }
         addBlast(b, 2, aim.x + (rand(s) - 0.5), aim.z + (rand(s) - 0.5), area, 0, 360, 450, 700, dmg, 2, own);
       }
       break;
@@ -677,6 +752,7 @@ function weapons(s: SiegeState, p: SiegePlayer, dt: number) {
     if (w.cd < 0) w.cd = 0;
     fire(s, p, w, st);
   }
+  stepBoiler(p, b, -1, dt);
 }
 
 // ---------------------------------------------------------------- board step
@@ -712,6 +788,8 @@ function stepBoard(s: SiegeState, p: SiegePlayer, dt: number) {
   stepProjs(s, p, dt);
   stepBlasts(s, p, dt);
   if (p.status !== 'alive') return; // the boss fell: the run is won
+  stepFires(s, p, dt);
+  if (p.status !== 'alive') return;
   stepPickups(s, p, dt);
   openChoice(s, p);
 }
@@ -880,7 +958,50 @@ function projSeen(q: Proj, serial: number): boolean {
   return false;
 }
 
-/** Player projectiles: corks and paper planes. */
+/**
+ * Turn a projectile's velocity towards (tx, tz) by at most `maxTurn` radians, keeping its speed.
+ * Returns the angle it turned (signed). Exported for the unit tests.
+ */
+export function steerTowards(q: { x: number; z: number; vx: number; vz: number }, tx: number, tz: number, maxTurn: number): number {
+  const cur = Math.atan2(q.vx, q.vz);
+  let da = Math.atan2(tx - q.x, tz - q.z) - cur;
+  da = Math.atan2(Math.sin(da), Math.cos(da));
+  if (da > maxTurn) da = maxTurn; else if (da < -maxTurn) da = -maxTurn;
+  const sp = Math.sqrt(q.vx * q.vx + q.vz * q.vz), a = cur + da;
+  q.vx = Math.sin(a) * sp; q.vz = Math.cos(a) * sp;
+  return da;
+}
+/** Is (x, z) ahead of projectile q (within 90° of its heading) and within `r2` (squared)? */
+const ahead = (q: Proj, x: number, z: number, r2: number) => { const dx = x - q.x, dz = z - q.z; return dx * dx + dz * dz <= r2 && dx * q.vx + dz * q.vz > 0; };
+
+/**
+ * A homing cork on a board: keep its target while that enemy lives and has not been hit by this cork, else
+ * pick the nearest enemy ahead of it within HOMING_SEEK; then turn towards it by at most `homing` rad/s.
+ */
+function homeOnBoard(q: Proj, b: Board, sec: number) {
+  const mobs = b.mobs;
+  let tx = 0, tz = 0, have = false;
+  if (q.ti >= 0) { const m = mobs[q.ti]; if (m.on && m.serial === q.ts && !projSeen(q, m.serial)) { tx = m.x; tz = m.z; have = true; } }
+  else if (q.ti <= -2) { const g = b.bigs[-2 - q.ti]; if (g && g.on && g.serial === q.ts && !projSeen(q, g.serial)) { tx = g.x; tz = g.z; have = true; } }
+  if (!have) {
+    q.ti = -1;
+    let best = HOMING_SEEK * HOMING_SEEK;
+    const n = query(mobs, q.x, q.z, HOMING_SEEK);
+    for (let k = 0; k < n; k++) {
+      const i = near[k], m = mobs[i];
+      if (!ahead(q, m.x, m.z, best) || projSeen(q, m.serial)) continue;
+      best = (m.x - q.x) ** 2 + (m.z - q.z) ** 2; q.ti = i; q.ts = m.serial; tx = m.x; tz = m.z; have = true;
+    }
+    for (let i = 0; i < b.bigs.length; i++) {
+      const g = b.bigs[i];
+      if (!g.on || !ahead(q, g.x, g.z, best) || projSeen(q, g.serial)) continue;
+      best = (g.x - q.x) ** 2 + (g.z - q.z) ** 2; q.ti = -2 - i; q.ts = g.serial; tx = g.x; tz = g.z; have = true;
+    }
+  }
+  if (have) steerTowards(q, tx, tz, q.homing * sec);
+}
+
+/** Player projectiles: corks (homing ones curve), paper planes and Boiler Heart rivets. */
 function stepProjs(s: SiegeState, p: SiegePlayer, dt: number) {
   const b = p.board, sec = dt / 1000, projs = b.projs, mobs = b.mobs;
   for (let qi = 0; qi < projs.length; qi++) {
@@ -894,7 +1015,7 @@ function stepProjs(s: SiegeState, p: SiegePlayer, dt: number) {
         q.vx = (dx / dl) * sp; q.vz = (dz / dl) * sp;
         if (dl < 1.5) { q.on = false; continue; }
       }
-    }
+    } else if (q.homing > 0) homeOnBoard(q, b, sec);
     q.x += q.vx * sec; q.z += q.vz * sec;
     if (q.life <= 0 || Math.abs(q.x) > ARENA_HALF + 4 || Math.abs(q.z) > ARENA_HALF + 4) { q.on = false; continue; }
     const n = query(mobs, q.x, q.z, q.r + 1.2);
@@ -905,7 +1026,7 @@ function stepProjs(s: SiegeState, p: SiegePlayer, dt: number) {
       if (q.nh < q.hits.length) q.hits[q.nh++] = m.serial;
       else { q.hits[0] = m.serial; } // planes pierce forever: keep the newest hits only
       const sp = Math.sqrt(q.vx * q.vx + q.vz * q.vz) || 1;
-      hitMob(s, p, m, q.dmg, q.vx / sp, q.vz / sp, q.kind === 0 ? 3 : 1.5);
+      hitMob(s, p, m, q.dmg, q.vx / sp, q.vz / sp, q.kind === 1 ? 1.5 : 3);
       if (q.pierce >= 0) { if (q.pierce === 0) q.on = false; else q.pierce--; }
     }
     for (let gi = 0; gi < b.bigs.length; gi++) {
@@ -919,15 +1040,43 @@ function stepProjs(s: SiegeState, p: SiegePlayer, dt: number) {
   }
 }
 
-/** Area hits (sweeps, chimes, marbles, the revive shockwave). */
+/**
+ * Is a circle at (x, z) of radius `r` touched by laser `k` (a line from (k.x, k.z) along `k.ang`, `k.r` long,
+ * `k.w` either side)? Exported for the unit tests.
+ */
+export function laserHits(k: { x: number; z: number; r: number; ang: number; w: number }, x: number, z: number, r: number): boolean {
+  const dx = Math.sin(k.ang), dz = Math.cos(k.ang), ox = x - k.x, oz = z - k.z;
+  let t = ox * dx + oz * dz;
+  if (t < 0) t = 0; else if (t > k.r) t = k.r;
+  const ex = ox - dx * t, ez = oz - dz * t, reach = k.w + r;
+  return ex * ex + ez * ez <= reach * reach;
+}
+
+/** A Prism Ray beam on a board: everything in its line takes the hit. */
+function laserBoard(s: SiegeState, p: SiegePlayer, k: Blast) {
+  const b = p.board, mobs = b.mobs, dx = Math.sin(k.ang), dz = Math.cos(k.ang);
+  const n = query(mobs, k.x + dx * k.r / 2, k.z + dz * k.r / 2, k.r / 2 + k.w + 1.2);
+  for (let i = 0; i < n; i++) {
+    const m = mobs[near[i]];
+    if (m.on && laserHits(k, m.x, m.z, m.r)) hitMob(s, p, m, k.dmg, dx, dz, k.knock);
+  }
+  for (let gi = 0; gi < b.bigs.length && p.status === 'alive'; gi++) {
+    const g = b.bigs[gi];
+    if (g.on && laserHits(k, g.x, g.z, g.r)) hitBig(s, p, g, k.dmg);
+  }
+}
+
+/** Area hits (sweeps, meteors, marbles, the revive shockwave, laser beams). */
 function stepBlasts(s: SiegeState, p: SiegePlayer, dt: number) {
   const b = p.board, blasts = b.blasts, mobs = b.mobs;
   for (let bi = 0; bi < blasts.length; bi++) {
     const k = blasts[bi];
     if (!k.on) continue;
     k.age += dt;
+    if (!k.done && k.age >= k.delay && k.kind === 4) { k.done = true; laserBoard(s, p, k); if (p.status !== 'alive') return; }
     if (!k.done && k.age >= k.delay) {
       k.done = true;
+      if (k.burn > 0) addFire(b, k.x, k.z, k.w, k.burn, -1);
       const n = query(mobs, k.x, k.z, k.r + 1.2), half = (k.arc / 2) * (Math.PI / 180);
       for (let i = 0; i < n; i++) {
         const m = mobs[near[i]];
@@ -948,6 +1097,29 @@ function stepBlasts(s: SiegeState, p: SiegePlayer, dt: number) {
       if (k.kind === 3) for (let i = 0; i < b.shots.length; i++) { const sh = b.shots[i]; if (sh.on && len(sh.x - k.x, sh.z - k.z) < k.r) sh.on = false; }
     }
     if (k.age >= k.life) k.on = false;
+  }
+}
+
+/** Pools of flame: each burns everything standing in it once per FLAME.tickMs, then goes out. */
+function stepFires(s: SiegeState, p: SiegePlayer, dt: number) {
+  const b = p.board, fires = b.fires, mobs = b.mobs;
+  for (let fi = 0; fi < fires.length; fi++) {
+    const f = fires[fi];
+    if (!f.on) continue;
+    f.age += dt; f.tick -= dt;
+    if (f.tick <= 0) {
+      f.tick += FLAME.tickMs;
+      const n = query(mobs, f.x, f.z, f.r + 1.2);
+      for (let i = 0; i < n; i++) {
+        const m = mobs[near[i]];
+        if (m.on && (m.x - f.x) ** 2 + (m.z - f.z) ** 2 <= (f.r + m.r) ** 2) hitMob(s, p, m, f.dmg, 0, 0, 0);
+      }
+      for (let gi = 0; gi < b.bigs.length; gi++) {
+        const g = b.bigs[gi];
+        if (g.on && (g.x - f.x) ** 2 + (g.z - f.z) ** 2 <= (f.r + g.r) ** 2) { hitBig(s, p, g, f.dmg); if (p.status !== 'alive') return; }
+      }
+    }
+    if (f.age >= f.life) f.on = false;
   }
 }
 
@@ -988,6 +1160,7 @@ function enterPrep(s: SiegeState, p: SiegePlayer, chests: number, x: number, z: 
   for (const sh of b.shots) sh.on = false;
   for (const q of b.projs) q.on = false;
   for (const k of b.blasts) k.on = false;
+  for (const f of b.fires) f.on = false;
   b.bossDown = true;
   for (let i = 0; i < chests; i++) {
     const c = b.chests.find((q) => !q.on);
@@ -1039,7 +1212,7 @@ function stepPrep(s: SiegeState, p: SiegePlayer, dt: number) {
 
 /** Arena pools: no swarm, gems or chests; room for every toy's volleys and one summoned boss each. */
 function arenaBoard(c: SiegeConfig, players: number): Board {
-  return newBoard({ mobCap: 0, gemCap: 0, chestCap: 0, bigCap: Math.max(1, players), projectileCap: c.projectileCap * 2, shotCap: c.shotCap * 2, blastCap: c.blastCap * 2 });
+  return newBoard({ mobCap: 0, gemCap: 0, chestCap: 0, bigCap: Math.max(1, players), projectileCap: c.projectileCap * 2, shotCap: c.shotCap * 2, blastCap: c.blastCap * 2, fireCap: c.fireCap * 2 });
 }
 
 /** Open the arena for every toy in prep (downed toys that have not revived become ghosts). Fewer than two: no arena, the match ends. */
@@ -1058,7 +1231,7 @@ function openArena(s: SiegeState) {
     p.status = 'arena'; p.inArena = true; p.arenaOutAt = -1; p.hp = p.stat.maxHp; p.invuln = 0; p.lastHitBy = null; p.hurtAt = -1e9;
     p.choice = null; p.watching = null;
     for (const w of p.weapons) { w.cd = 500 + k * 60; w.aux = 0; }
-    if (p.horn) p.horn.readyAt = FINALE.ally.firstReadyMs;
+    if (p.horn) { p.horn.readyAt = FINALE.ally.firstReadyMs; p.horn.cd = 500 + k * 60; }
   });
   for (const p of s.players) if (p.status === 'ghost' && p.watching && playerById(s, p.watching)?.status !== 'arena') p.watching = null;
   emit(s, { type: 'siege-arena', fighters: fighters.length });
@@ -1145,6 +1318,18 @@ function arenaWeapons(s: SiegeState, p: SiegePlayer, own: number, dt: number) {
     if (w.cd < 0) w.cd = 0;
     fire(s, p, w, st, a, own);
   }
+  stepBoiler(p, a, own, dt);
+}
+
+/** A homing cork in the arena curves towards the nearest rival toy ahead of it (not yet hit by it). */
+function homeInArena(s: SiegeState, q: Proj, sec: number) {
+  let best = HOMING_SEEK * HOMING_SEEK, tx = 0, tz = 0, have = false;
+  for (let j = 0; j < s.players.length; j++) {
+    const v = s.players[j];
+    if (j === q.own || v.status !== 'arena' || !ahead(q, v.x, v.z, best) || projSeen(q, -(j + 1))) continue;
+    best = (v.x - q.x) ** 2 + (v.z - q.z) ** 2; tx = v.x; tz = v.z; have = true;
+  }
+  if (have) steerTowards(q, tx, tz, q.homing * sec);
 }
 
 function stepAllies(s: SiegeState, dt: number) {
@@ -1216,7 +1401,7 @@ function stepArena(s: SiegeState, dt: number) {
         q.vx = (dx / dl) * sp; q.vz = (dz / dl) * sp;
         if (dl < 1.5) { q.on = false; continue; }
       }
-    }
+    } else if (q.homing > 0) homeInArena(s, q, sec);
     q.x += q.vx * sec; q.z += q.vz * sec;
     if (q.life <= 0 || Math.abs(q.x) > half + 4 || Math.abs(q.z) > half + 4) { q.on = false; continue; }
     for (let j = 0; j < s.players.length && q.on; j++) {
@@ -1234,7 +1419,7 @@ function stepArena(s: SiegeState, dt: number) {
     }
   }
 
-  // Area hits (sweeps, chimes, marbles).
+  // Area hits (sweeps, meteors, marbles, laser beams).
   for (let bi = 0; bi < a.blasts.length; bi++) {
     const k = a.blasts[bi];
     if (!k.on) continue;
@@ -1242,7 +1427,9 @@ function stepArena(s: SiegeState, dt: number) {
     if (!k.done && k.age >= k.delay) {
       k.done = true;
       const owner = s.players[k.own], half2 = (k.arc / 2) * (Math.PI / 180);
+      if (k.burn > 0 && owner && owner.status === 'arena') addFire(a, k.x, k.z, k.w, k.burn, k.own);
       const inArc = (x: number, z: number, r: number, slack: number) => {
+        if (k.kind === 4) return laserHits(k, x, z, r);
         const dx = x - k.x, dz = z - k.z, dd = len(dx, dz);
         if (dd > k.r + r) return false;
         if (k.arc >= 360 || dd <= 0.5) return true;
@@ -1255,6 +1442,27 @@ function stepArena(s: SiegeState, dt: number) {
       }
     }
     if (k.age >= k.life) k.on = false;
+  }
+
+  // Pools of flame burn rival toys (and their summoned bosses) standing in them, never their owner.
+  for (let fi = 0; fi < a.fires.length; fi++) {
+    const f = a.fires[fi];
+    if (!f.on) continue;
+    const owner = s.players[f.own];
+    if (!owner || owner.status !== 'arena') { f.on = false; continue; }
+    f.age += dt; f.tick -= dt;
+    if (f.tick <= 0) {
+      f.tick += FLAME.tickMs;
+      for (let j = 0; j < s.players.length; j++) {
+        const v = s.players[j];
+        if (j !== f.own && v.status === 'arena' && (v.x - f.x) ** 2 + (v.z - f.z) ** 2 <= (f.r + PLAYER_RADIUS) ** 2) arenaHurt(s, v, f.dmg * mul, owner);
+      }
+      for (let gi = 0; gi < a.bigs.length; gi++) {
+        const g = a.bigs[gi];
+        if (g.on && g.from !== owner.id && (g.x - f.x) ** 2 + (g.z - f.z) ** 2 <= (f.r + g.r) ** 2) allyHurt(s, g, f.dmg * mul);
+      }
+    }
+    if (f.age >= f.life) f.on = false;
   }
 
   // A summoned boss's bullets.
@@ -1450,17 +1658,19 @@ export function viewedPlayer(s: SiegeState, localId: string): SiegePlayer | unde
 export const viewedBoard = (s: SiegeState, v: SiegePlayer): Board => (s.phase === 'arena' || (s.phase === 'over' && s.arena && v.inArena) ? s.arena! : v.board);
 
 export type EvoHint =
-  /** Taking this card completes a weapon's evolution pair: the next chest evolves it. */
-  | { kind: 'ready'; weapon: WeaponId }
-  /** Taking this card pairs a weapon with its partner passive (the weapon still needs level 5). */
-  | { kind: 'pair'; weapon: WeaponId; levelsLeft: number }
+  /** Taking this card completes a weapon's evolution pair (or maxes the Rally Horn): the next chest evolves it. */
+  | { kind: 'ready'; weapon: EvoId }
+  /** Taking this card pairs a weapon with its partner passive (the weapon still needs level 5), or raises the Rally Horn short of its top level. */
+  | { kind: 'pair'; weapon: EvoId; levelsLeft: number }
   /** The weapon reaches level 5 but still needs its partner passive. */
   | { kind: 'needs'; weapon: WeaponId }
   /** The evolution itself (a treasure card). */
-  | { kind: 'evolve'; weapon: WeaponId };
+  | { kind: 'evolve'; weapon: EvoId };
 /** What a card does for the "secret upgrade" (a weapon's evolution), for the card's badge. Null = nothing. */
 export function evolutionHint(p: SiegePlayer, o: Option): EvoHint | null {
   if (o.kind === 'evolve') return { kind: 'evolve', weapon: o.id };
+  // The Rally Horn has no partner: its three levels are the price of its secret upgrade (the Boiler Heart).
+  if (o.kind === 'horn') return o.level >= HORN_MAX ? { kind: 'ready', weapon: 'horn' } : { kind: 'pair', weapon: 'horn', levelsLeft: HORN_MAX - o.level };
   if (o.kind === 'weapon') {
     if (owned(p, o.id)?.evolved) return null;
     const paired = passiveLevel(p, WEAPONS[o.id].partner) > 0;
@@ -1479,5 +1689,5 @@ export function evolutionHint(p: SiegePlayer, o: Option): EvoHint | null {
 /** Debug/test helper: total live entities on a board. */
 export function boardCounts(b: Board) {
   const n = (list: { on: boolean }[]) => list.reduce((k, x) => k + (x.on ? 1 : 0), 0);
-  return { mobs: n(b.mobs), bigs: n(b.bigs), projs: n(b.projs), shots: n(b.shots), gems: n(b.gems), chests: n(b.chests), blasts: n(b.blasts) };
+  return { mobs: n(b.mobs), bigs: n(b.bigs), projs: n(b.projs), shots: n(b.shots), gems: n(b.gems), chests: n(b.chests), blasts: n(b.blasts), fires: n(b.fires) };
 }

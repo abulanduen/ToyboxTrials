@@ -57,7 +57,7 @@ async function run(name) {
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
     // Phones keep the layout shots; desktop takes every moment.
-    const PHONE_SHOTS = ['1-class-pick', '2-levelup', '5-swarm', '7-boss', '8-prep', '9-arena', '10-ally', '11-out', '12-watching'];
+    const PHONE_SHOTS = ['1-class-pick', '2-levelup', '5-swarm', '5b-secrets', '7-boss', '8-prep', '9-arena', '10-ally', '11-out', '12-watching'];
     const missed = [];
     const shot = async (label) => {
       if (v.touch && !PHONE_SHOTS.includes(label)) return;
@@ -235,6 +235,29 @@ async function run(name) {
     await step('5-swarm');
     await shot('5-swarm');
 
+    // ---- The secret upgrades the owner asked for (20 Nov 2026): Prism Ray (a laser through the line),
+    // Firebell Meteors (pools of flame) and the Boiler Heart (a ring of rivets), all at once on our board
+    await state(() => {
+      const p = window.__toybox.match.state().players.find((q) => q.id === 'you');
+      for (const id of ['popgun', 'chime']) {
+        const w = p.weapons.find((x) => x.id === id);
+        if (w) Object.assign(w, { level: 5, evolved: true, cd: 0 }); else if (p.weapons.length < 4) p.weapons.push({ id, level: 5, evolved: true, cd: 0, aux: 0 });
+        else Object.assign(p.weapons[p.weapons.length - 1], { id, level: 5, evolved: true, cd: 0, aux: 0 });
+      }
+      p.horn = { level: 3, readyAt: 1e12, evolved: true, cd: 0, aux: 0 };
+    });
+    await page.evaluate(() => window.__toybox.match.timeScale(1));
+    await page.waitForFunction(new Function(`const b = ${me}.board; return b.blasts.some(k => k.on && k.kind === 4) && b.fires.some(f => f.on) && b.projs.some(q => q.on && q.kind === 2)`));
+    await page.evaluate(() => window.__toybox.match.timeScale(0));
+    await page.waitForTimeout(1500);
+    const secrets = await state(() => window.__toybox.siege.counts());
+    assert.ok(secrets.fires > 0, 'flame pools on the board');
+    assert.ok((await page.locator('[data-testid="siege-items"] li[title="Boiler Heart"]').count()) === 1, 'the kit strip shows the Boiler Heart');
+    assert.ok((await page.locator('[data-testid="siege-items"] li[title="Prism Ray"] svg.siege-icon').count()) === 1, 'the kit strip shows the Prism Ray');
+    console.log(`  [${name}] secret upgrades on the board ${JSON.stringify(secrets)}`);
+    await step('5b-secrets');
+    await shot('5b-secrets');
+
     // ---- Knocked down → revive (paid in points)
     await state(() => { const p = window.__toybox.match.state().players.find((q) => q.id === 'you'); p.points = Math.max(p.points, 900); p.invuln = 0; p.hp = 0.5; if (p.choice) p.choice = null; p.pendingLevels = 0; p.pendingChests = 0; });
     await page.evaluate(() => window.__toybox.match.timeScale(1));
@@ -277,7 +300,7 @@ async function run(name) {
         p.xpNext = 30; p.xp = 0; // so the magnet's gems bring a level-up card or two
         // Gems scattered over the board, for the magnet to pull in.
         p.board.gems.slice(0, 24).forEach((gem, i) => Object.assign(gem, { on: true, kind: 0, v: 4, x: p.x - 18 + (i % 6) * 7, z: p.z - 14 + Math.floor(i / 6) * 8, pull: false }));
-        p.horn = { level: 2, readyAt: 0 }; // for the arena
+        p.horn = { level: 2, readyAt: 0, evolved: false, cd: 0, aux: 0 }; // for the arena
       });
       await page.evaluate(() => window.__toybox.match.timeScale(2));
       await page.waitForFunction(new Function(`return ${me}.status === 'prep'`));

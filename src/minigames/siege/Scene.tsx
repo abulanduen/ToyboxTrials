@@ -82,6 +82,14 @@ const SOLO_MATERIAL = new THREE.MeshStandardMaterial({ vertexColors: true, rough
 const BAR_BACK = new THREE.MeshBasicMaterial({ color: PALETTE.ink, toneMapped: false });
 const BAR_FILL = new THREE.MeshBasicMaterial({ color: PALETTE.coral, toneMapped: false });
 const BAR_GEOMETRY = new THREE.BoxGeometry(1, 0.22, 0.22);
+/** A flat strip from the origin along +z, 1 long and 1 wide (Prism Ray beams, scaled per beam). */
+const BEAM_GEOMETRY = new THREE.PlaneGeometry(1, 1).rotateX(-H).translate(0, 0, 0.5);
+const glow = (opacity: number) => new THREE.MeshBasicMaterial({ color: PALETTE.white, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide, toneMapped: false, blending: THREE.AdditiveBlending });
+const BEAM_GLOW = glow(0.55);
+const BEAM_CORE = glow(0.95);
+/** Flame pools: a soft burning disc and a brighter rim. */
+const FIRE_SOFT = fade(0.5);
+const FIRE_RIM = fade(0.75);
 
 interface Particle { on: boolean; x: number; y: number; z: number; vx: number; vy: number; vz: number; age: number; life: number; size: number; shape: number; colour: THREE.Color; spin: number }
 
@@ -103,6 +111,15 @@ class SiegeView {
   private readonly shots: THREE.InstancedMesh;
   private readonly yoyos: THREE.InstancedMesh;
   private readonly marbles: THREE.InstancedMesh;
+  /** Prism Ray beams (a wide glow and a hot core), flame pools (disc, rim, flame tongues), Boiler Heart rivets. */
+  private readonly beamGlow: THREE.InstancedMesh;
+  private readonly beamCore: THREE.InstancedMesh;
+  private readonly fireDiscs: THREE.InstancedMesh;
+  private readonly fireRims: THREE.InstancedMesh;
+  private readonly flames: THREE.InstancedMesh;
+  private readonly rivets: THREE.InstancedMesh;
+  private readonly flamesPerPool: number;
+  private readonly mix = new THREE.Color();
   private readonly rings: THREE.InstancedMesh;
   private readonly arcs: THREE.InstancedMesh;
   private readonly discs: THREE.InstancedMesh;
@@ -133,7 +150,7 @@ class SiegeView {
   private kills = 0;
   private readonly counts = [0, 0, 0, 0];
 
-  constructor(caps: { mobs: number; projs: number; shots: number; gems: number; blasts: number; chests: number; bigs: number }, private readonly low: boolean) {
+  constructor(caps: { mobs: number; projs: number; shots: number; gems: number; blasts: number; chests: number; bigs: number; fires: number }, private readonly low: boolean) {
     mobGeometry ??= MOB_PARTS.map((parts) => bakeParts(parts));
     chestGeometry ??= bakeParts(CHEST_PARTS);
     snackGeometry ??= bakeParts(SNACK_PARTS);
@@ -145,6 +162,13 @@ class SiegeView {
     this.shots = instanced(fxShapeGeometry('orb'), UNLIT_VERTEX_MATERIAL, caps.shots, 'siege-shots');
     this.yoyos = instanced(fxShapeGeometry('disc'), UNLIT_VERTEX_MATERIAL, 48, 'siege-yoyos');
     this.marbles = instanced(fxShapeGeometry('orb'), UNLIT_VERTEX_MATERIAL, caps.blasts, 'siege-marbles');
+    this.beamGlow = instanced(BEAM_GEOMETRY, BEAM_GLOW, caps.blasts, 'siege-beam-glow');
+    this.beamCore = instanced(BEAM_GEOMETRY, BEAM_CORE, caps.blasts, 'siege-beam-core');
+    this.fireDiscs = instanced(DISC_GEOMETRY, FIRE_SOFT, caps.fires, 'siege-fire-discs');
+    this.fireRims = instanced(RING_GEOMETRY, FIRE_RIM, caps.fires, 'siege-fire-rims');
+    this.flamesPerPool = low ? 2 : 3;
+    this.flames = instanced(fxShapeGeometry('flame'), UNLIT_VERTEX_MATERIAL, caps.fires * this.flamesPerPool, 'siege-flames');
+    this.rivets = instanced(fxShapeGeometry('orb'), UNLIT_VERTEX_MATERIAL, caps.projs, 'siege-rivets');
     this.rings = instanced(RING_GEOMETRY, FX_FLAT, caps.blasts + caps.bigs, 'siege-rings');
     this.arcs = instanced(ARC_GEOMETRY, FX_FLAT, caps.blasts, 'siege-arcs');
     this.discs = instanced(DISC_GEOMETRY, FX_SOFT, caps.blasts, 'siege-discs');
@@ -153,7 +177,8 @@ class SiegeView {
     this.particles = Array.from({ length: pool }, () => ({ on: false, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, age: 0, life: 1, size: 1, shape: 0, colour: WHITE, spin: 0 }));
     this.chips = instanced(fxShapeGeometry('chip'), UNLIT_VERTEX_MATERIAL, pool, 'siege-chips');
     this.stars = instanced(fxShapeGeometry('star'), UNLIT_VERTEX_MATERIAL, pool, 'siege-stars');
-    for (const m of [...this.mobs, this.gems, this.snacks, this.corks, this.planes, this.shots, this.yoyos, this.marbles, this.rings, this.arcs, this.discs, this.chests, this.chips, this.stars]) this.group.add(m);
+    for (const m of [...this.mobs, this.gems, this.snacks, this.corks, this.planes, this.shots, this.yoyos, this.marbles, this.rings, this.arcs, this.discs, this.chests, this.chips, this.stars,
+      this.beamGlow, this.beamCore, this.fireDiscs, this.fireRims, this.flames, this.rivets]) this.group.add(m);
     this.prevSerial = new Int32Array(caps.mobs); this.prevX = new Float32Array(caps.mobs); this.prevZ = new Float32Array(caps.mobs);
     this.prevBlast = new Int8Array(caps.blasts); this.prevProj = new Int8Array(caps.projs); this.prevBig = new Int32Array(caps.bigs); this.prevBigX = new Float32Array(caps.bigs); this.prevBigZ = new Float32Array(caps.bigs);
     this.heroShadow.scale.setScalar(1.3); this.heroShadow.position.y = 0.09;
@@ -327,13 +352,14 @@ class SiegeView {
     this.finish(this.chests, nc);
 
     // ---------------- projectiles
-    let nk = 0, np = 0, nb = 0, ny = 0;
+    let nk = 0, np = 0, nb = 0, ny = 0, nv = 0;
     for (let i = 0; i < b.projs.length; i++) {
       const q = b.projs[i];
       if (!q.on) { this.prevProj[i] = 0; continue; }
-      if (!this.prevProj[i]) { this.prevProj[i] = 1; this.sounds.push(q.kind === 0 ? 'pop' : 'plane'); }
+      if (!this.prevProj[i]) { this.prevProj[i] = 1; this.sounds.push(q.kind === 0 ? 'pop' : q.kind === 2 ? 'rivets' : 'plane'); }
       obj.position.set(q.x, 1.4, q.z); obj.rotation.set(0, Math.atan2(q.vx, q.vz), 0);
-      if (q.kind === 0) { obj.scale.setScalar(0.75); this.put(this.corks, nk++, tint(WEAPON_COLOUR.popgun)); }
+      if (q.kind === 2) { obj.position.y = 1.1; obj.scale.setScalar(q.r * 1.5); this.put(this.rivets, nv++, tint(FX.rivet)); }
+      else if (q.kind === 0) { obj.scale.setScalar(0.75); this.put(this.corks, nk++, tint(WEAPON_COLOUR.popgun)); }
       else { obj.rotation.set(0, Math.atan2(q.vx, q.vz), Math.sin(sec * 8) * 0.3); obj.scale.setScalar(1.3); this.put(this.planes, np++, tint(WEAPON_COLOUR.planes)); }
     }
     for (let i = 0; i < b.shots.length; i++) { const sh = b.shots[i]; if (!sh.on) continue; obj.position.set(sh.x, 1.2, sh.z); obj.rotation.set(0, 0, 0); obj.scale.setScalar(sh.r * 1.6); this.put(this.shots, nb++, tint(SHOT_COLOUR)); }
@@ -345,35 +371,71 @@ class SiegeView {
         for (let k = 0; k < st.count && ny < 48; k++) { yoyoAt(q, w, k, this.obj.position); obj.position.y = 1.3; obj.rotation.set(0, sec * 9, 0); obj.scale.setScalar(w.evolved ? 1.2 : 0.95); this.put(this.yoyos, ny++, tint(k % 2 ? PALETTE.honey : WEAPON_COLOUR.yoyo)); }
       }
     }
-    this.finish(this.corks, nk); this.finish(this.planes, np); this.finish(this.shots, nb); this.finish(this.yoyos, ny);
+    this.finish(this.corks, nk); this.finish(this.planes, np); this.finish(this.shots, nb); this.finish(this.yoyos, ny); this.finish(this.rivets, nv);
 
     // ---------------- area hits
-    let nr = 0, na = 0, nd = 0, nm = 0;
+    let nr = 0, na = 0, nd = 0, nm = 0, nl = 0;
     for (let i = 0; i < b.blasts.length; i++) {
       const k = b.blasts[i];
       if (!k.on) { this.prevBlast[i] = 0; continue; }
       const fresh = this.prevBlast[i] === 0;
-      if (fresh) this.sounds.push(k.kind === 0 ? 'sweep' : k.kind === 1 ? 'chime' : k.kind === 2 ? 'marble' : 'revive');
+      if (fresh) this.sounds.push(k.kind === 0 ? 'sweep' : k.kind === 1 ? 'chime' : k.kind === 2 ? 'marble' : k.kind === 4 ? 'laser' : 'revive');
       const landed = k.done && this.prevBlast[i] < 2;
       this.prevBlast[i] = k.done ? 2 : 1;
       const t = Math.min(1, k.age / k.life);
+      if (k.kind === 4) { // Prism Ray: a glowing beam that narrows as it fades
+        const wide = k.w * 2 * (1 - 0.7 * t), y = 1.25;
+        obj.position.set(k.x, y, k.z); obj.rotation.set(0, k.ang, 0);
+        obj.scale.set(wide * 2.4, 1, k.r); this.put(this.beamGlow, nl, tint(FX.laser));
+        obj.scale.set(wide * 0.7, 1, k.r); obj.position.y = y + 0.02; this.put(this.beamCore, nl++, WHITE);
+        if (landed && !this.low) this.burst(k.x + Math.sin(k.ang) * k.r * 0.5, 1.2, k.z + Math.cos(k.ang) * k.r * 0.5, 3, FX.laser, 1, 6, 0.24);
+        continue;
+      }
       if (k.kind === 0) { // bayonet sweep
         if (k.arc >= 360) { obj.position.set(k.x, 0.35, k.z); obj.rotation.set(0, 0, 0); obj.scale.setScalar(k.r * (0.6 + 0.4 * easeOut(t))); this.put(this.rings, nr++, tint(FX.sweep)); }
         else { obj.position.set(k.x, 0.35, k.z); obj.rotation.set(0, k.ang + (t - 0.5) * 0.5, 0); obj.scale.setScalar(k.r * (0.7 + 0.3 * easeOut(t))); this.put(this.arcs, na++, tint(FX.sweep)); }
         continue;
       }
-      if (!k.done) { // fuse / falling marble: a target ring, and the marble itself
-        obj.position.set(k.x, 0.12, k.z); obj.rotation.set(0, 0, 0); obj.scale.setScalar(k.r * 0.9); this.put(this.rings, nr++, tint(k.kind === 2 ? FX.marble : FX.chime));
-        if (k.kind === 2) { const f = 1 - k.age / k.delay; obj.position.set(k.x, 0.8 + 14 * f * f, k.z); obj.scale.setScalar(1.3); this.put(this.marbles, nm++, tint(FX.marble)); }
+      if (!k.done) { // fuse: a target ring, and the falling marble or chime meteor itself
+        const hot = k.burn > 0;
+        obj.position.set(k.x, 0.12, k.z); obj.rotation.set(0, 0, 0); obj.scale.setScalar(k.r * 0.9); this.put(this.rings, nr++, tint(k.kind === 2 ? FX.marble : hot ? FX.flame : FX.chime));
+        if (k.kind === 2 || k.kind === 1) {
+          const f = 1 - k.age / Math.max(1, k.delay), m = k.kind === 1;
+          // Meteors come in at a slant, from up and behind (the camera's side), so a phone sees them fall.
+          obj.position.set(k.x + (m ? f * 4 : 0), 0.8 + 14 * f * f, k.z + (m ? f * 6 : 0)); obj.scale.setScalar(m ? 1.6 : 1.3);
+          this.put(this.marbles, nm++, tint(k.kind === 2 ? FX.marble : hot ? FX.flameCore : FX.chimeCore));
+        }
         continue;
       }
       if (landed && !this.low) this.burst(k.x, 0.6, k.z, k.kind === 3 ? 10 : 4, k.kind === 1 ? FX.chimeCore : k.kind === 3 ? FX.revive : FX.marble, k.kind === 1 || k.kind === 3 ? 1 : 0, 8, 0.3);
       const u = (k.age - k.delay) / Math.max(1, k.life - k.delay);
       obj.position.set(k.x, 0.14, k.z); obj.rotation.set(0, 0, 0); obj.scale.setScalar(k.r * (0.35 + 0.65 * easeOut(Math.min(1, u))));
-      this.put(this.discs, nd++, tint(k.kind === 1 ? FX.chime : k.kind === 3 ? FX.revive : FX.marble));
+      this.put(this.discs, nd++, tint(k.kind === 1 ? (k.burn > 0 ? FX.flame : FX.chime) : k.kind === 3 ? FX.revive : FX.marble));
       this.put(this.rings, nr++, tint(k.kind === 1 ? FX.chimeCore : FX.revive));
     }
     this.finish(this.rings, nr); this.finish(this.arcs, na); this.finish(this.discs, nd); this.finish(this.marbles, nm);
+    this.finish(this.beamGlow, nl); this.finish(this.beamCore, nl);
+
+    // ---------------- flame pools: a flickering disc, a bright rim and a few flame tongues each
+    let nf = 0, nt = 0;
+    const per = this.flamesPerPool;
+    for (let i = 0; i < b.fires.length; i++) {
+      const f = b.fires[i];
+      if (!f.on) continue;
+      const grow = Math.min(1, f.age / 180), fadeOut = Math.min(1, (f.life - f.age) / 450), k = grow * fadeOut;
+      const flick = 0.5 + 0.5 * Math.sin(sec * 13 + i * 1.7);
+      this.mix.copy(tint(FX.flame)).lerp(tint(FX.flameCore), flick * 0.6);
+      obj.position.set(f.x, 0.13 + i * 0.001, f.z); obj.rotation.set(0, 0, 0); obj.scale.setScalar(f.r * k);
+      this.put(this.fireDiscs, nf, this.mix);
+      obj.position.y = 0.15; obj.scale.setScalar(f.r * k * (0.97 + 0.05 * flick)); this.put(this.fireRims, nf++, tint(FX.flameCore));
+      for (let j = 0; j < per; j++) {
+        const a = j * ((Math.PI * 2) / per) + f.age * 0.0012 + i, d = f.r * 0.45 * (j === 0 ? 0.3 : 1);
+        const h = (0.75 + 0.35 * Math.sin(sec * 9 + i * 2.3 + j * 1.9)) * k;
+        obj.position.set(f.x + Math.cos(a) * d, 0.35 * h, f.z + Math.sin(a) * d); obj.rotation.set(0, a, 0); obj.scale.set(1.1 * k, 1.9 * h, 1.1 * k);
+        this.put(this.flames, nt++, tint(j % 2 ? FX.flameCore : FX.flame));
+      }
+    }
+    this.finish(this.fireDiscs, nf); this.finish(this.fireRims, nf); this.finish(this.flames, nt);
 
     // ---------------- ghosts watching this board (you can see the other ghosts)
     let gi = 0;
@@ -491,6 +553,7 @@ const PLAY: Record<SiegeCue, () => void> = {
   elite: () => playToyCue('warning'), boss: () => { playToyCue('warning'); sfx.windUp(12); }, chest: () => sfx.purchase(), evolve: () => sfx.musicBoxTune(),
   downed: () => playToyCue('out'), revive: () => sfx.windUp(9), ghost: () => sfx.eliminate(), victory: () => sfx.reward(), sent: () => playToyCue('storm'),
   incoming: () => playToyCue('warning'), blocked: () => sfx.reject(), start: () => sfx.bell(),
+  laser: () => playToyCue('charge', WEAPON_GAIN.laser), rivets: () => playToyCue('stitch', WEAPON_GAIN.rivets),
   arena: () => { sfx.windUp(12); playToyCue('stitch'); }, ally: () => { playToyCue('storm'); sfx.windUp(8); }, ko: () => playToyCue('out', 0.6),
 };
 
@@ -511,7 +574,7 @@ export function SiegeScene({ getState, localId }: MinigameSceneProps<SiegeState>
     const c = getState()?.config;
     // Sized for the busier of a board and the arena (twice the projectile pools, one summoned boss per toy).
     const players = getState()?.players.length ?? 8;
-    return new SiegeView({ mobs: c?.mobCap ?? 150, projs: 2 * (c?.projectileCap ?? 96), shots: 2 * (c?.shotCap ?? 64), gems: c?.gemCap ?? 160, blasts: 2 * (c?.blastCap ?? 40), chests: c?.chestCap ?? 4, bigs: Math.max(c?.bigCap ?? 4, players) }, low);
+    return new SiegeView({ mobs: c?.mobCap ?? 150, projs: 2 * (c?.projectileCap ?? 96), shots: 2 * (c?.shotCap ?? 64), gems: c?.gemCap ?? 160, blasts: 2 * (c?.blastCap ?? 40), chests: c?.chestCap ?? 4, bigs: Math.max(c?.bigCap ?? 4, players), fires: 2 * (c?.fireCap ?? 24) }, low);
   }, [getState, low]);
   const limiter = useMemo(() => new CueLimiter(), []);
   useEffect(() => () => view.dispose(), [view]);

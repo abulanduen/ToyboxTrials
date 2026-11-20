@@ -21,7 +21,8 @@ export function rateOption(p: SiegePlayer, o: Option, skill: 'easy' | 'normal' |
     case 'evolve': return 100;
     case 'heal': return p.hp < p.stat.maxHp * 0.5 ? 45 : 10;
     case 'send': return 0; // treasure skips are decided separately
-    case 'horn': return p.horn ? 8 : skill === 'hard' ? 30 : skill === 'normal' ? 25 : 8;
+    // Once taken, the horn is worth raising to its top level: that unlocks its secret upgrade (the Boiler Heart).
+    case 'horn': return p.horn ? (skill === 'easy' ? 10 : 24 + p.horn.level * 3) : skill === 'hard' ? 30 : skill === 'normal' ? 25 : 8;
     case 'bundle': return 40;
     case 'weapon': {
       const have = p.weapons.find((w) => w.id === o.id);
@@ -173,6 +174,13 @@ function arenaSteer(s: SiegeState, p: SiegePlayer, skill: 'easy' | 'normal' | 'h
       const dx = p.x - g.x, dz = p.z - g.z, d = len(dx, dz) || 1;
       if (g.mode === 1 && skill !== 'easy') { const sd = g.aimX * dz - g.aimZ * dx > 0 ? 1 : -1; vx += -g.aimZ * sd * 3; vz += g.aimX * sd * 3; }
       if (d < 9) { const k = (9 - d) / 9; vx += (dx / d) * 2.5 * k; vz += (dz / d) * 2.5 * k; }
+    }
+    // Rival flame pools (Firebell Meteors) burn: step out of them.
+    const me = s.players.indexOf(p);
+    if (skill !== 'easy') for (const f of a.fires) {
+      if (!f.on || f.own === me) continue;
+      const dx = p.x - f.x, dz = p.z - f.z, d = len(dx, dz) || 1, edge = f.r + 2;
+      if (d < edge) { const k = (edge - d) / edge; vx += (dx / d) * 2.5 * k; vz += (dz / d) * 2.5 * k; }
     }
     if (skill !== 'easy') for (const sh of a.shots) {
       if (!sh.on || s.players[sh.own] === p) continue;
