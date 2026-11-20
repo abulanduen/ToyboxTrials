@@ -251,7 +251,9 @@
 /* Desktop and tablets: the purse and the three actions in a 2 × 2 block (purse beside Reroll), so the dock is no taller
    than before the purse and the reserve row above it stays clear. */
 @media(min-width:601px) and (min-height:501px) {
-  .squad-workbench { grid-template-columns:minmax(0,1fr) 212px; }
+  .squad-workbench:not(.squad-viewbench) { grid-template-columns:minmax(0,1fr) 212px; }
+  /* Viewing a squad: its kit panel opens below the "Watching" banner. */
+  .squad-hud.is-viewing .squad-tooltip { top:172px; }
   .squad-hud .squad-shop-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); grid-auto-rows:minmax(56px,1fr); gap:5px; }
   .squad-shop-actions .squad-purse { min-height:56px; }
 }
