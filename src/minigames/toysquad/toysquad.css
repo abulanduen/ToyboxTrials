@@ -156,6 +156,8 @@
   .squad-hud { --dock:38%; --rail-w:64px; --rail-top:calc(max(10px,env(safe-area-inset-top)) + 62px); }
   .squad-watch { top:auto; bottom:max(12px,env(safe-area-inset-bottom)); max-width:calc(100% - 160px - var(--rail-w)); }
   .squad-hud.is-building .squad-watch { bottom:calc(var(--dock) + 20px); }
+  /* Viewing a squad while building: the banner sits left, clear of the kit panel on the right. */
+  .squad-hud.is-building.is-viewing .squad-watch { left:calc(max(8px,env(safe-area-inset-left)) + 132px); transform:none; }
   .squad-tooltip { top:70px; right:calc(var(--rail-w) + 16px); width:260px; font-size:11px; padding:5px 8px; }
   .squad-tooltip p { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; overflow:hidden; margin:3px 0; }
   .squad-tooltip>small:last-child { display:none; }
@@ -245,4 +247,11 @@
   .squad-shop-actions .squad-purse b { font-size:19px; }
   .squad-viewbench__units { grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); }
   .squad-passive-chip small { display:none !important; }
+}
+/* Desktop and tablets: the purse and the three actions in a 2 × 2 block (purse beside Reroll), so the dock is no taller
+   than before the purse and the reserve row above it stays clear. */
+@media(min-width:601px) and (min-height:501px) {
+  .squad-workbench { grid-template-columns:minmax(0,1fr) 212px; }
+  .squad-hud .squad-shop-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); grid-auto-rows:minmax(56px,1fr); gap:5px; }
+  .squad-shop-actions .squad-purse { min-height:56px; }
 }
