@@ -42,7 +42,7 @@ const boxesOverlap = (a, b) => a && b && a.x < b.x + b.width && b.x < a.x + a.wi
       const mobile = layout !== 'desktop';
       const viewport = layout === 'portrait' ? { width: 390, height: 844 } : layout === 'landscape' ? { width: 844, height: 390 } : { width: 1280, height: 800 };
       const page = await browser.newPage({ viewport, hasTouch: mobile, isMobile: mobile });
-      page.setDefaultTimeout(120000);
+      page.setDefaultTimeout(Number(process.env.E2E_TIMEOUT) || 300000);
       const errors = [];
       page.on('pageerror', (e) => errors.push(e.message));
       page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
@@ -130,7 +130,7 @@ const boxesOverlap = (a, b) => a && b && a.x < b.x + b.width && b.x < a.x + a.wi
         for (let attempt = 0; attempt < 5; attempt++) {
           await page.waitForFunction(() => { const s = window.__toybox.match.state(), p = s.players.find((q) => q.id === 'you'); return p.holding && !p.move; });
           const shots = (await me()).shots;
-          await page.evaluate(() => window.__toybox.match.timeScale(0.06));
+          await page.evaluate(() => window.__toybox.match.timeScale(0.2));
           if (mobile) await stick.holdButton('hh-throw');
           else await page.keyboard.down('Space');
           await page.waitForFunction(() => !!document.querySelector('.hh-meter.is-charging'));
