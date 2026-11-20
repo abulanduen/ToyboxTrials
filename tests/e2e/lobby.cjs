@@ -105,6 +105,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(OUT, name), timeo
 
     // 2. B, in the Hub, gets the alert and joins from it.
     await B.waitForSelector('[data-testid=lobby-alert]', { timeout: T });
+    await B.waitForFunction(() => document.querySelector('[data-testid=lobby-alert]').getAnimations().every((a) => a.playState === 'finished'), null, { timeout: T });
     await shot(B, 'lobby-02-hub-alert.png');
     const alertText = await B.textContent('[data-testid=lobby-alert]');
     check('B sees the Hub alert "Ticker is hosting a Blitz tournament · 1/8"', /Ticker is hosting a Blitz tournament · 1\/8/.test(alertText), alertText);
