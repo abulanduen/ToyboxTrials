@@ -300,6 +300,10 @@ async function run(name) {
         const p = window.__toybox.match.state().players.find((q) => q.id === 'you');
         const g = p.board.bigs.find((b) => b.on && b.type === 'baron'); g.hp = 1; g.x = p.x + 2.5; g.z = p.z; g.mode = 0;
         for (const m of p.board.mobs) m.on = false;
+        // Only the boss's chests count below: no elite (or its chest) left over from earlier.
+        for (const b of p.board.bigs) if (b !== g) b.on = false;
+        for (const c of p.board.chests) c.on = false;
+        p.pendingChests = 0; p.choice = null;
         p.xpNext = 30; p.xp = 0; // so the magnet's gems bring a level-up card or two
         // Gems scattered over the board, for the magnet to pull in.
         p.board.gems.slice(0, 24).forEach((gem, i) => Object.assign(gem, { on: true, kind: 0, v: 4, x: p.x - 18 + (i % 6) * 7, z: p.z - 14 + Math.floor(i / 6) * 8, pull: false }));
