@@ -20,7 +20,7 @@ import { BALL, HOOP, MARBLE, NET, NETS, PITCH_CENTRE, rollFloorAt, type Net } fr
 import { BODY_R, PUSH_POWER, predictThrow, type PlayBody } from '../game/hubPlaySim';
 import { aimYaw, cancelCharge, chargePower, fxClock, fxQueue, iHold, pushMarble, releaseCharge, selfId, stepHubPlayView, view } from '../hubplay/runtime';
 import { meter } from '../hubplay/store';
-import { paintMat, woodMat } from './props';
+import { Kit } from './kit';
 
 // ---------------------------------------------------------------- a net texture (white mesh on clear)
 let netTex: THREE.CanvasTexture | null = null;
@@ -30,7 +30,7 @@ function netTexture() {
   c.width = c.height = 64;
   const g = c.getContext('2d')!;
   g.clearRect(0, 0, 64, 64);
-  g.strokeStyle = PALETTE.white;
+  g.strokeStyle = '#ffffff';
   g.lineWidth = 5;
   for (let i = 0; i <= 64; i += 16) {
     g.beginPath();
@@ -46,11 +46,78 @@ function netTexture() {
   return netTex;
 }
 
-function netMat(repeatX: number, repeatY: number) {
-  const t = netTexture().clone();
-  t.needsUpdate = true;
-  t.repeat.set(repeatX, repeatY);
-  return new THREE.MeshStandardMaterial({ map: t, alphaTest: 0.5, transparent: false, side: THREE.DoubleSide, roughness: 0.9 });
+// ---------------------------------------------------------------- the static pieces, merged (Kit)
+const HALF = NET.width / 2 + NET.post;
+
+/** One net's mesh (back, sides, roof), in the net's own frame: +x out of the mouth, the back at −depth. */
+function netGeometry(depth: number) {
+  const k = new Kit();
+  const cell = 1.2; // cm per square of mesh
+  const uv = (w: number, h: number) => [0, 0, w / cell, h / cell] as const;
+  k.add(new THREE.PlaneGeometry(HALF * 2, NET.h - 0.4), PALETTE.white, -depth, (NET.h - 0.4) / 2, 0, { ry: Math.PI / 2 }, uv(HALF * 2, NET.h));
+  for (const s of [-1, 1]) k.add(new THREE.PlaneGeometry(depth, NET.h - 0.2), PALETTE.white, -depth / 2, (NET.h - 0.2) / 2, s * HALF, {}, uv(depth, NET.h));
+  // the roof slopes from the crossbar down to the back bar
+  const roof = new THREE.PlaneGeometry(Math.hypot(depth, 0.4), HALF * 2).rotateX(-Math.PI / 2).rotateZ(Math.atan2(0.4, depth));
+  k.add(roof, PALETTE.white, -depth / 2, NET.h - 0.2, 0, {}, uv(depth, HALF * 2));
+  return k.build().solid!;
+}
+
+/** The hoop's net: an open, tapering tube hanging from the rim (its top at the origin). */
+function hoopNetGeometry() {
+  const k = new Kit();
+  k.add(new THREE.CylinderGeometry(HOOP.rim.r * 0.97, HOOP.rim.r * 0.6, 1.9, 16, 1, true), PALETTE.white, 0, -0.95, 0, {}, [0, 0, 6, 2]);
+  return k.build().solid!;
+}
+
+/** Posts, crossbars, flags and the hoop (one draw), and the chalk marks on the felt (one draw). */
+function staticGeometry() {
+  const k = new Kit();
+  const chalk = new Kit();
+  for (const n of NETS) {
+    const depth = Math.abs(n.backX - n.mouthX);
+    const team = n.scorer === 1 ? PALETTE.coral : PALETTE.toyBlue; // the colour of the team defending it
+    k.push(n.mouthX, 0, n.z, n.dir === 1 ? 0 : Math.PI);
+    for (const s of [-1, 1]) {
+      k.cyl(NET.post, NET.post, NET.h, 0, NET.h / 2, s * HALF, PALETTE.white, 10);
+      k.cyl(NET.post + 0.03, NET.post + 0.03, 0.6, 0, NET.h * 0.55, s * HALF, team, 10);
+      k.cyl(0.16, 0.16, NET.h - 0.4, -depth, (NET.h - 0.4) / 2, s * HALF, PALETTE.white, 6);
+      k.rod([0, NET.h, s * HALF], [-depth, NET.h - 0.4, s * HALF], 0.12, PALETTE.white);
+    }
+    k.rod([0, NET.h, -HALF - NET.post], [0, NET.h, HALF + NET.post], NET.post, PALETTE.white, 10);
+    k.rod([-depth, NET.h - 0.4, -HALF], [-depth, NET.h - 0.4, HALF], 0.16, PALETTE.white);
+    // a team flag on the far post
+    k.cyl(0.06, 0.06, 1.4, 0, NET.h + 0.7, HALF, PALETTE.white, 5);
+    k.box(1.1, 0.7, 0.05, 0.55, NET.h + 1.0, HALF, team);
+    k.pop();
+    // the goal line
+    chalk.push(n.mouthX, 0, n.z, n.dir === 1 ? 0 : Math.PI);
+    chalk.add(new THREE.PlaneGeometry(0.35, HALF * 2), PALETTE.white, 0.25, 0.12, 0, { rx: -Math.PI / 2 });
+    chalk.pop();
+  }
+  // the hoop: weighted base, pole, backboard with a target square, an arm and the rim
+  k.cyl(1.3, 1.5, 0.7, HOOP.x, 0.35, HOOP.z, PALETTE.woodMid, 14);
+  k.cyl(HOOP.pole.r * 0.7, HOOP.pole.r * 0.8, HOOP.pole.top, HOOP.x, HOOP.pole.top / 2, HOOP.z, PALETTE.toyBlue, 10);
+  k.box(HOOP.board.w, HOOP.board.h, HOOP.board.t, HOOP.x, HOOP.board.y, HOOP.board.z, PALETTE.white);
+  k.add(new THREE.RingGeometry(0.95, 1.2, 4, 1, Math.PI / 4), PALETTE.coral, HOOP.x, HOOP.rim.y + 1.2, HOOP.board.z + HOOP.board.t / 2 + 0.01);
+  const armLen = HOOP.rim.z - HOOP.board.z - HOOP.rim.r;
+  k.box(0.5, 0.18, armLen, HOOP.x, HOOP.rim.y, HOOP.board.z + armLen / 2 + HOOP.board.t / 2, PALETTE.coral);
+  k.torus(HOOP.rim.r, HOOP.rim.tube, HOOP.rim.x, HOOP.rim.y, HOOP.rim.z, PALETTE.coral, { rx: Math.PI / 2 }, Math.PI * 2, 24);
+  // chalk: the centre spot and ring, the ball's spot
+  chalk.disc(0.5, PITCH_CENTRE.x, 0.12, PITCH_CENTRE.z, PALETTE.white, { rx: -Math.PI / 2 }, 16);
+  chalk.add(new THREE.RingGeometry(5.6, 6, 40), PALETTE.white, PITCH_CENTRE.x, 0.12, PITCH_CENTRE.z, { rx: -Math.PI / 2 });
+  chalk.add(new THREE.RingGeometry(1.25, 1.5, 24), PALETTE.white, BALL.spot.x, 0.12, BALL.spot.z, { rx: -Math.PI / 2 });
+  return { solid: k.build().solid!, chalk: chalk.build().solid! };
+}
+
+/** The basketball, seams and all, as one mesh. */
+function ballGeometry() {
+  const k = new Kit();
+  k.ball(BALL.r, 0, 0, 0, PALETTE.ballOrange, 20);
+  const seam = (xf: { rx?: number; ry?: number }) => k.torus(BALL.r * 1.005, 0.045, 0, 0, 0, PALETTE.ink, xf, Math.PI * 2, 28);
+  seam({ rx: Math.PI / 2 });
+  seam({});
+  seam({ ry: Math.PI / 2 });
+  return k.build().solid!;
 }
 
 // ---------------------------------------------------------------- the marble
@@ -91,12 +158,13 @@ function Marble() {
 }
 
 // ---------------------------------------------------------------- the basketball
-function Ball() {
-  const g = useRef<THREE.Group>(null!);
+const throwSpot = { x: 0, z: 0 };
+function Ball({ material }: { material: THREE.Material }) {
+  const mesh = useRef<THREE.Mesh>(null!);
   const last = useRef({ x: view.ball.x, z: view.ball.z });
   const q = useMemo(() => new THREE.Quaternion(), []);
   const axis = useMemo(() => new THREE.Vector3(), []);
-  const seam = useMemo(() => paintMat(PALETTE.ink, 0.7), []);
+  const geo = useMemo(ballGeometry, []);
   useFrame(() => {
     const b = view.ball;
     const dx = b.x - last.current.x;
@@ -105,166 +173,50 @@ function Ball() {
     if (!b.held && moved > 1e-4 && moved < 5) {
       axis.set(dz, 0, -dx).normalize();
       q.setFromAxisAngle(axis, moved / BALL.r);
-      g.current.quaternion.premultiply(q);
+      mesh.current.quaternion.premultiply(q);
     }
     last.current.x = b.x;
     last.current.z = b.z;
-    g.current.position.set(b.x, b.y, b.z);
+    mesh.current.position.set(b.x, b.y, b.z);
     livePositions.set('ball', b);
-    livePositions.set('ball-throw', player.pos);
+    // "Hold to throw" is always in reach while you hold the ball, but anything nearer (a gate's
+    // spot, the marble at your feet) comes first, so you can still walk into a trial carrying it.
+    throwSpot.x = player.pos.x + Math.sin(player.yaw) * 2.9;
+    throwSpot.z = player.pos.z + Math.cos(player.yaw) * 2.9;
+    livePositions.set('ball-throw', throwSpot);
   });
-  return (
-    <group ref={g} name="hubplay:ball">
-      <mesh castShadow material={paintMat('#E8893F', 0.75)}>
-        <sphereGeometry args={[BALL.r, 20, 14]} />
-      </mesh>
-      {/* the seams: one round the middle, two crossing over the top */}
-      <mesh material={seam} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[BALL.r * 1.005, 0.045, 4, 28]} />
-      </mesh>
-      <mesh material={seam}>
-        <torusGeometry args={[BALL.r * 1.005, 0.045, 4, 28]} />
-      </mesh>
-      <mesh material={seam} rotation={[0, Math.PI / 2, 0]}>
-        <torusGeometry args={[BALL.r * 1.005, 0.045, 4, 28]} />
-      </mesh>
-    </group>
-  );
+  return <mesh ref={mesh} geometry={geo} material={material} castShadow name="hubplay:ball" />;
 }
 
-// ---------------------------------------------------------------- the nets
-function FootballNet({ n, color }: { n: Net; color: string }) {
+// ---------------------------------------------------------------- the moving parts of the nets and the hoop
+function NetMesh({ n, material }: { n: Net; material: THREE.Material }) {
   const wobble = useRef<THREE.Group>(null!);
   const depth = Math.abs(n.backX - n.mouthX);
-  const half = NET.width / 2 + NET.post;
-  const post = useMemo(() => paintMat(PALETTE.white, 0.45), []);
-  const band = useMemo(() => paintMat(color, 0.5), [color]);
-  const back = useMemo(() => netMat(NET.width / 1.2, NET.h / 1.2), []);
-  const side = useMemo(() => netMat(depth / 1.2, NET.h / 1.2), [depth]);
-  const top = useMemo(() => netMat(NET.width / 1.2, depth / 1.2), [depth]);
+  const geo = useMemo(() => netGeometry(depth), [depth]);
   useFrame(() => {
     const k = Math.max(0, 1 - (performance.now() - fxClock.goalAt[n.id]) / 850);
     wobble.current.scale.set(1 + Math.sin(k * 30) * k * 0.12, 1, 1);
   });
-  // group in the net's frame: +x points into the pitch (out of the mouth)
   return (
     <group position={[n.mouthX, 0, n.z]} rotation={[0, n.dir === 1 ? 0 : Math.PI, 0]} name={`hubplay:net-${n.id}`}>
-      {/* posts and crossbar, with a team-coloured band */}
-      {[-1, 1].map((s) => (
-        <group key={s}>
-          <mesh position={[0, NET.h / 2, s * half]} castShadow material={post}>
-            <cylinderGeometry args={[NET.post, NET.post, NET.h, 10]} />
-          </mesh>
-          <mesh position={[0, NET.h * 0.55, s * half]} material={band}>
-            <cylinderGeometry args={[NET.post + 0.03, NET.post + 0.03, 0.6, 10]} />
-          </mesh>
-          {/* the back corner posts and the bar along the top of each side net */}
-          <mesh position={[-depth, (NET.h - 0.4) / 2, s * half]} material={post}>
-            <cylinderGeometry args={[0.16, 0.16, NET.h - 0.4, 6]} />
-          </mesh>
-          <mesh position={[-depth / 2, NET.h - 0.2, s * half]} rotation={[0, 0, Math.PI / 2 - Math.atan2(0.4, depth)]} material={post}>
-            <cylinderGeometry args={[0.12, 0.12, Math.hypot(depth, 0.4), 6]} />
-          </mesh>
-        </group>
-      ))}
-      <mesh position={[0, NET.h, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow material={post}>
-        <cylinderGeometry args={[NET.post, NET.post, half * 2 + NET.post * 2, 10]} />
-      </mesh>
-      <mesh position={[-depth, NET.h - 0.4, 0]} rotation={[Math.PI / 2, 0, 0]} material={post}>
-        <cylinderGeometry args={[0.16, 0.16, half * 2, 6]} />
-      </mesh>
-      {/* a flag on top of the far post */}
-      <mesh position={[0.5, NET.h + 0.9, half]} material={band}>
-        <boxGeometry args={[1.1, 0.7, 0.05]} />
-      </mesh>
-      <mesh position={[0, NET.h + 0.7, half]} material={post}>
-        <cylinderGeometry args={[0.06, 0.06, 1.4, 5]} />
-      </mesh>
-      {/* the net: back, sides and roof, wobbling after a goal */}
+      {/* the net bulges from its back after a goal */}
       <group ref={wobble} position={[-depth, 0, 0]}>
-        <group position={[depth, 0, 0]}>
-          <mesh position={[-depth, (NET.h - 0.4) / 2, 0]} rotation={[0, Math.PI / 2, 0]} material={back}>
-            <planeGeometry args={[half * 2, NET.h - 0.4]} />
-          </mesh>
-          {[-1, 1].map((s) => (
-            <mesh key={s} position={[-depth / 2, (NET.h - 0.2) / 2, s * half]} material={side}>
-              <planeGeometry args={[depth, NET.h - 0.2]} />
-            </mesh>
-          ))}
-          <mesh position={[-depth / 2, NET.h - 0.2, 0]} rotation={[Math.PI / 2 - Math.atan2(0.4, depth), 0, 0]} material={top}>
-            <planeGeometry args={[depth, half * 2]} />
-          </mesh>
-        </group>
+        <mesh geometry={geo} material={material} position={[depth, 0, 0]} />
       </group>
-      {/* goal line, a chalk stripe on the felt */}
-      <mesh position={[0.25, 0.12, 0]} rotation={[-Math.PI / 2, 0, 0]} material={paintMat(PALETTE.white, 0.9)}>
-        <planeGeometry args={[0.35, half * 2]} />
-      </mesh>
     </group>
   );
 }
 
-// ---------------------------------------------------------------- the hoop
-function Hoop() {
+function HoopNet({ material }: { material: THREE.Material }) {
   const net = useRef<THREE.Group>(null!);
-  const pole = useMemo(() => paintMat(PALETTE.toyBlue, 0.5), []);
-  const board = useMemo(() => paintMat(PALETTE.white, 0.4), []);
-  const rimMat = useMemo(() => paintMat(PALETTE.coral, 0.35, 0.2), []);
-  const netM = useMemo(() => netMat(6, 2), []);
-  const armLen = HOOP.rim.z - HOOP.board.z - HOOP.rim.r;
+  const geo = useMemo(hoopNetGeometry, []);
   useFrame(() => {
     const k = Math.max(0, 1 - (performance.now() - fxClock.hoopAt) / 450);
     net.current.scale.set(1 - k * 0.15, 1 + Math.sin(k * 9) * k * 0.35, 1 - k * 0.15);
   });
   return (
-    <group name="hubplay:hoop">
-      {/* weighted base and pole */}
-      <mesh position={[HOOP.x, 0.35, HOOP.z]} castShadow receiveShadow material={woodMat(PALETTE.woodMid)}>
-        <cylinderGeometry args={[1.3, 1.5, 0.7, 14]} />
-      </mesh>
-      <mesh position={[HOOP.x, HOOP.pole.top / 2, HOOP.z]} castShadow material={pole}>
-        <cylinderGeometry args={[HOOP.pole.r * 0.7, HOOP.pole.r * 0.8, HOOP.pole.top, 10]} />
-      </mesh>
-      {/* backboard with a target square */}
-      <mesh position={[HOOP.x, HOOP.board.y, HOOP.board.z]} castShadow material={board}>
-        <boxGeometry args={[HOOP.board.w, HOOP.board.h, HOOP.board.t]} />
-      </mesh>
-      <mesh position={[HOOP.x, HOOP.rim.y + 1.2, HOOP.board.z + HOOP.board.t / 2 + 0.01]} material={rimMat}>
-        <ringGeometry args={[0.95, 1.2, 4, 1, Math.PI / 4]} />
-      </mesh>
-      {/* rim on a little arm */}
-      <mesh position={[HOOP.x, HOOP.rim.y, HOOP.board.z + armLen / 2 + HOOP.board.t / 2]} material={rimMat}>
-        <boxGeometry args={[0.5, 0.18, armLen]} />
-      </mesh>
-      <mesh position={[HOOP.rim.x, HOOP.rim.y, HOOP.rim.z]} rotation={[Math.PI / 2, 0, 0]} castShadow material={rimMat}>
-        <torusGeometry args={[HOOP.rim.r, HOOP.rim.tube, 6, 24]} />
-      </mesh>
-      {/* the net: an open, tapering tube hanging from the rim */}
-      <group ref={net} position={[HOOP.rim.x, HOOP.rim.y, HOOP.rim.z]}>
-        <mesh position={[0, -0.95, 0]} material={netM}>
-          <cylinderGeometry args={[HOOP.rim.r * 0.97, HOOP.rim.r * 0.6, 1.9, 16, 1, true]} />
-        </mesh>
-      </group>
-    </group>
-  );
-}
-
-// ---------------------------------------------------------------- pitch markings
-function PitchMarks() {
-  const chalk = useMemo(() => paintMat(PALETTE.white, 0.95), []);
-  return (
-    <group>
-      {/* centre spot and ring */}
-      <mesh position={[PITCH_CENTRE.x, 0.12, PITCH_CENTRE.z]} rotation={[-Math.PI / 2, 0, 0]} material={chalk}>
-        <circleGeometry args={[0.5, 16]} />
-      </mesh>
-      <mesh position={[PITCH_CENTRE.x, 0.12, PITCH_CENTRE.z]} rotation={[-Math.PI / 2, 0, 0]} material={chalk}>
-        <ringGeometry args={[5.6, 6, 40]} />
-      </mesh>
-      {/* the ball's spot by the hoop */}
-      <mesh position={[BALL.spot.x, 0.12, BALL.spot.z]} rotation={[-Math.PI / 2, 0, 0]} material={chalk}>
-        <ringGeometry args={[1.25, 1.5, 24]} />
-      </mesh>
+    <group ref={net} position={[HOOP.rim.x, HOOP.rim.y, HOOP.rim.z]} name="hubplay:hoop-net">
+      <mesh geometry={geo} material={material} />
     </group>
   );
 }
@@ -405,16 +357,27 @@ function Driver() {
 }
 
 export function HubPlay() {
+  const geos = useMemo(staticGeometry, []);
+  const mats = useMemo(
+    () => ({
+      solid: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55 }),
+      chalk: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }),
+      net: new THREE.MeshStandardMaterial({ vertexColors: true, map: netTexture(), alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.9 }),
+    }),
+    [],
+  );
   return (
     <group name="hubplay">
       <Driver />
       <Marble />
-      <Ball />
+      <Ball material={mats.solid} />
+      {/* posts, crossbars, flags and the hoop: one draw; the chalk marks: one more */}
+      <mesh geometry={geos.solid} material={mats.solid} castShadow receiveShadow name="hubplay:nets-and-hoop" />
+      <mesh geometry={geos.chalk} material={mats.chalk} receiveShadow name="hubplay:chalk" />
       {NETS.map((n) => (
-        <FootballNet key={n.id} n={n} color={n.scorer === 1 ? PALETTE.coral : PALETTE.toyBlue} />
+        <NetMesh key={n.id} n={n} material={mats.net} />
       ))}
-      <Hoop />
-      <PitchMarks />
+      <HoopNet material={mats.net} />
       <ThrowArc />
       <Confetti />
       <Pusher />

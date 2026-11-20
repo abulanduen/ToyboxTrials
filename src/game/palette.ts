@@ -23,6 +23,8 @@ export const PALETTE = {
   white: '#FFF9EE',
   /** Knocked-out toys (MiniContender greys them) and other dull tin. */
   tinGrey: '#8E8A93',
+  /** The hub's basketball (src/scene/HubPlay.tsx). */
+  ballOrange: '#E8893F',
 
   // Room scale (muted, slightly desaturated so the toy layer reads first)
   roomWall: '#B7A99A',

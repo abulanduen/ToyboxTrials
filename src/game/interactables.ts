@@ -48,7 +48,8 @@ export const INTERACTABLES: Interactable[] = [
   { id: 'marble', x: MARBLE.home.x, z: MARBLE.home.z, radius: 3.6, verb: 'Kick', label: 'the giant marble', secret: true },
   // the basketball by the hoop on the trials table: pick it up, then hold Interact to throw
   { id: 'ball', x: BALL.spot.x, z: BALL.spot.z, radius: 3.0, verb: 'Pick up', label: 'the basketball', disabled: () => !ballFree() },
-  { id: 'ball-throw', x: BALL.spot.x, z: BALL.spot.z, radius: 1, verb: 'Hold to throw', label: 'the basketball', disabled: () => !iHold() },
+  // (while you hold it: its live spot sits 2.9 cm ahead of you, so a nearer prompt such as a gate wins)
+  { id: 'ball-throw', x: BALL.spot.x, z: BALL.spot.z, radius: 3, verb: 'Hold to throw', label: 'the basketball', disabled: () => !iHold() },
   { id: 'jack', x: JACK.x + 3.2, z: JACK.z + 0.5, radius: 3.4, verb: 'Open', label: 'a suspicious box', secret: true },
   { id: 'key', x: TOWER.block.x, z: TOWER.block.z, radius: 2.4, verb: 'Grab', label: 'the golden key', secret: true, minY: TOWER.block.top - 0.5, disabled: () => !keyAvailable() },
 ];
