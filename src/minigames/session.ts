@@ -24,6 +24,7 @@ import { newSeed, seededRng, subSeed } from './rng';
 import { addRound, rankStandings, type Standing } from './scoring';
 import { FORMATS, poolForFormat, selectGames, type TournamentFormat } from './tournament';
 import type { BotDifficulty, Contestant, MatchEvent, MinigameId, MinigameModule, MinigameResult } from './types';
+import { importFresh } from '../game/staleBuild';
 
 /** `lobby`: an online lobby's waiting room (src/minigames/remote.ts). */
 export type MatchPhase = 'idle' | 'picker' | 'reveal' | 'loading' | 'intro' | 'countdown' | 'playing' | 'results' | 'standings' | 'final' | 'lobby';
@@ -151,7 +152,7 @@ async function loadGame(id: MinigameId) {
   runtime.bot = null;
   useMatch.getState().set({ phase: 'loading', gameId: id, module: null, error: null });
   try {
-    const mod = await def.load();
+    const mod = await importFresh(def.load);
     useMatch.getState().set({ module: mod, phase: 'intro' });
   } catch (e) {
     useMatch.getState().set({ error: (e as Error).message, phase: 'intro' });

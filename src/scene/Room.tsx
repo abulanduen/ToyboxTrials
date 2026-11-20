@@ -16,10 +16,11 @@ import { useGame } from '../game/store';
 import { RoomShell } from './room/Shell';
 import { Tabletop } from './room/Tabletop';
 import { WindowLight } from './room/WindowLight';
+import { importFresh } from '../game/staleBuild';
 
 export { LAMP_AIM, LAMP_HEAD, Pencil, usePencilMaterials } from './room/Tabletop';
 
-const RoomFurniture = lazy(() => import('./room/Furniture'));
+const RoomFurniture = lazy(() => importFresh(() => import('./room/Furniture')));
 
 export function Room() {
   const quality = useGame((s) => s.quality);

@@ -5,8 +5,9 @@
  */
 import { lazy, Suspense } from 'react';
 import type { TutorialArtId } from './tutorialArt';
+import { importFresh } from '../game/staleBuild';
 
-const loadArt = () => import('./tutorialArt');
+const loadArt = () => importFresh(() => import('./tutorialArt'));
 const Art = lazy(() => loadArt().then((m) => ({ default: m.TutorialArt })));
 
 /** Start fetching the pictures early (e.g. while a minigame module loads). */
