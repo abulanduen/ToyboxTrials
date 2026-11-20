@@ -262,7 +262,11 @@ async function run(name) {
     await shot('5b-secrets');
 
     // ---- Knocked down → revive (paid in points)
-    await state(() => { const p = window.__toybox.match.state().players.find((q) => q.id === 'you'); p.points = Math.max(p.points, 900); p.invuln = 0; p.hp = 0.5; if (p.choice) p.choice = null; p.pendingLevels = 0; p.pendingChests = 0; });
+    await state(() => { const p = window.__toybox.match.state().players.find((q) => q.id === 'you'); p.points = Math.max(p.points, 900); p.invuln = 0; p.hp = 0.5; if (p.choice) p.choice = null; p.pendingLevels = 0; p.pendingChests = 0;
+      // A dust bunny right on the toy (it bites before the weapons fire; the revive shockwave clears it):
+      // the secret upgrades above clear the swarm before anything else can bite.
+      const m = p.board.mobs.find((x) => !x.on) ?? p.board.mobs[0];
+      Object.assign(m, { on: true, serial: ++p.board.serial, kind: 0, x: p.x + 0.4, z: p.z, vx: 0, vz: 0, kx: 0, kz: 0, hp: 30, maxHp: 30, speed: 4, dmg: 10, r: 0.85, xp: 1, pts: 1, timer: 0 }); });
     await page.evaluate(() => window.__toybox.match.timeScale(1));
     await page.getByTestId('siege-downed').waitFor();
     await step('6-downed');
