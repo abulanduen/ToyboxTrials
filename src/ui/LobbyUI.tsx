@@ -212,10 +212,11 @@ export function formatRule(format: LobbyFormat): string {
     : `${f.name}: ${words[parties] ?? parties} quick party trials.`;
 }
 
-// ---------------------------------------------------------------- Hub: alert, Lobbies button, sheet
+// ---------------------------------------------------------------- Hub: join popup, open lobbies, sheet
 /**
- * "Ticker is hosting a Blitz tournament · 3/8 · Join". Stays in the Hub until dismissed, until you
- * join a lobby, or until that lobby closes (src/net/lobby.ts clears it then).
+ * "Ticker is hosting a Blitz tournament. Join?" A popup on every other player's screen in this Hub
+ * room when a lobby opens. It stays until answered (Join / No thanks), until you join a lobby some
+ * other way, or until that lobby closes (src/net/lobby.ts clears it then).
  */
 export function HubLobbyAlert() {
   const alert = useLobby((s) => s.alert);
@@ -223,31 +224,76 @@ export function HubLobbyAlert() {
   if (!alert) return null;
   const live = list.find((l) => l.id === alert.lobby.id) ?? alert.lobby;
   const full = live.players >= live.cap || live.locked;
+  const no = () => (sfx.click(), useLobby.getState().set({ alert: null }));
   return (
-    <div className="lobby-alert" role="status" data-testid="lobby-alert">
+    <div className="lobby-alert" role="alertdialog" aria-labelledby="lobby-alert-title" data-testid="lobby-alert">
+      <strong className="lobby-alert__title" id="lobby-alert-title">
+        Join this lobby?
+      </strong>
       <span className="lobby-alert__text">
         <strong>{live.host}</strong> is hosting {lobbyWhat(live)} · {live.players}/{live.cap}
         {live.playing ? ' · playing now' : ''}
       </span>
-      <button className="lobby-alert__join" onClick={() => joinLobby(live.id)} disabled={full} data-testid="lobby-alert-join">
-        {full ? (live.locked ? 'Locked' : 'Full') : 'Join'}
-      </button>
-      <button className="lobby-alert__x" aria-label="Dismiss" onClick={() => useLobby.getState().set({ alert: null })}>
-        ×
-      </button>
+      <div className="lobby-alert__actions">
+        <button className="lobby-alert__join" onClick={() => (sfx.click(), joinLobby(live.id))} disabled={full} data-testid="lobby-alert-join">
+          {full ? (live.locked ? 'Locked' : 'Full') : 'Join'}
+        </button>
+        <button className="lobby-alert__no" onClick={no} data-testid="lobby-alert-no">
+          No thanks
+        </button>
+      </div>
     </div>
   );
 }
 
-/** HUD button while online: how many lobbies are open in this Hub room. */
-export function LobbiesButton() {
+/** How many open lobbies the Hub lists under the room chip before "+N more". */
+const HUB_LOBBY_ROWS = 3;
+
+/**
+ * Under the room chip while online: the open lobbies in this Hub room, each with Join. The heading
+ * opens the full Lobbies sheet. (On desktop, hold Alt to free the cursor and click these.)
+ */
+export function HubLobbies() {
   const online = useNet((s) => s.status === 'online');
-  const n = useLobby((s) => s.list.length);
+  const list = useLobby((s) => s.list);
   if (!online) return null;
+  const shown = list.slice(0, HUB_LOBBY_ROWS);
   return (
-    <button className="lobbies-btn" onClick={() => (sfx.click(), openLobbiesSheet())} data-testid="lobbies-button">
-      Lobbies{n ? ` · ${n}` : ''}
-    </button>
+    <section className="hub-lobbies" aria-label="Open lobbies" data-testid="hub-lobbies">
+      <button className="hub-lobbies__head" onClick={() => (sfx.click(), openLobbiesSheet())} data-testid="lobbies-button">
+        Open lobbies{list.length ? ` · ${list.length}` : ''}
+      </button>
+      {shown.length ? (
+        <ul className="hub-lobbies__list">
+          {shown.map((l) => {
+            const full = l.players >= l.cap || l.locked;
+            return (
+              <li key={l.id} className="hub-lobbies__row" data-testid={`hub-lobby-${l.id}`}>
+                <span className="hub-lobbies__what">
+                  <strong>{l.host}</strong>
+                  <small>
+                    {lobbyWhat(l)} · {l.players}/{l.cap}
+                    {l.playing ? ' · playing' : ''}
+                  </small>
+                </span>
+                <button className="hub-lobbies__join" onClick={() => (sfx.click(), joinLobby(l.id))} disabled={full} data-testid={`hub-lobby-join-${l.id}`}>
+                  {l.locked ? 'Locked' : full ? 'Full' : 'Join'}
+                </button>
+              </li>
+            );
+          })}
+          {list.length > HUB_LOBBY_ROWS && (
+            <li>
+              <button className="hub-lobbies__more" onClick={() => (sfx.click(), openLobbiesSheet())}>
+                +{list.length - HUB_LOBBY_ROWS} more
+              </button>
+            </li>
+          )}
+        </ul>
+      ) : (
+        <p className="hub-lobbies__none">None open. Host one at the Pavilion or a trial gate.</p>
+      )}
+    </section>
   );
 }
 

@@ -4177,71 +4177,164 @@ textarea,
   font: 700 1rem var(--font-display);
 }
 
-/* Hub: the lobby alert, the Lobbies button, lists. */
+/* Hub: the "join this lobby?" popup, the open lobbies under the room chip, lists. */
 .lobby-alert {
   position: absolute;
-  top: calc(14px + env(safe-area-inset-top));
+  top: calc(84px + env(safe-area-inset-top));
   left: 50%;
   transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  max-width: min(560px, calc(100vw - 24px));
-  padding: 6px 6px 6px 14px;
-  border-radius: 16px;
+  display: grid;
+  gap: 6px;
+  width: min(440px, calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+  padding: 12px 14px 14px;
+  border-radius: 18px;
   border: 3px solid var(--ink-deep);
   background: #fff3d6;
   box-shadow: var(--shadow);
-  font: 600 0.9rem var(--font-body);
+  font: 600 0.95rem var(--font-body);
+  text-align: center;
   pointer-events: auto;
-  z-index: 5;
-  animation: ticket-in 0.35s ease-out;
+  z-index: 6;
+  animation: prompt-pop 0.3s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+.lobby-alert__title {
+  font: 600 1.2rem var(--font-display);
 }
 .lobby-alert__text {
   min-width: 0;
 }
-.lobby-alert__join {
-  flex: none;
+.lobby-alert__actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+.lobby-alert__join,
+.lobby-alert__no {
+  flex: 1 1 0;
+  max-width: 180px;
   min-height: 56px;
-  min-width: 72px;
   padding: 0 14px;
   border-radius: 12px;
   border: 2.5px solid var(--ink-deep);
-  background: var(--sage);
+  box-shadow: 0 3px 0 rgba(43, 36, 51, 0.3);
   font: 700 1rem var(--font-display);
   cursor: pointer;
 }
-.lobby-alert__x {
-  flex: none;
-  width: 44px;
-  height: 56px;
-  border: 0;
-  background: transparent;
-  font: 700 1.4rem var(--font-display);
-  cursor: pointer;
+.lobby-alert__join {
+  background: var(--sage);
 }
-.lobbies-btn {
+.lobby-alert__no {
+  background: var(--paper);
+}
+.lobby-alert__join:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+/* Open lobbies, listed under the room chip (OnlineUI's .online-chip) while online. */
+.hub-lobbies {
   position: absolute;
   top: calc(172px + env(safe-area-inset-top));
   left: calc(18px + env(safe-area-inset-left));
-  min-height: 48px;
-  padding: 0 16px;
+  width: min(290px, calc(100vw - 36px));
+  display: grid;
+  gap: 6px;
+  pointer-events: auto;
+}
+.hub-lobbies__head,
+.hub-lobbies__more {
+  justify-self: start;
+  min-height: 44px;
+  padding: 0 14px;
   border-radius: 14px;
   border: 2.5px solid var(--ink-deep);
   background: var(--paper);
   box-shadow: 0 3px 0 rgba(43, 36, 51, 0.3);
   font: 700 0.95rem var(--font-display);
-  pointer-events: auto;
   cursor: pointer;
 }
+.hub-lobbies__list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.hub-lobbies__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 6px 12px;
+  border-radius: 14px;
+  border: 2.5px solid var(--ink-deep);
+  background: var(--paper);
+  box-shadow: 0 3px 0 rgba(43, 36, 51, 0.3);
+}
+.hub-lobbies__what {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  line-height: 1.2;
+}
+.hub-lobbies__what strong {
+  font: 600 0.95rem var(--font-display);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hub-lobbies__what small {
+  font: 600 0.78rem var(--font-body);
+  color: var(--ink);
+}
+.hub-lobbies__join {
+  flex: none;
+  min-height: 44px;
+  min-width: 64px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 2.5px solid var(--ink-deep);
+  background: var(--sage);
+  font: 700 0.95rem var(--font-display);
+  cursor: pointer;
+}
+.hub-lobbies__join:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.hub-lobbies__none {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 12px;
+  background: rgba(255, 249, 238, 0.85);
+  font: 600 0.8rem var(--font-body);
+}
 @media (max-width: 700px), (max-height: 500px) {
-  .lobbies-btn {
+  .hub-lobbies {
     top: calc(150px + env(safe-area-inset-top));
+    width: min(250px, calc(100vw - 36px));
+  }
+  .lobby-alert {
+    top: calc(64px + env(safe-area-inset-top));
   }
 }
+/* Phones: touch targets of at least 56 px; the list keeps to one row so the play area stays clear
+   (the heading opens the full sheet). */
 @media (pointer: coarse) {
-  .lobbies-btn {
+  .hub-lobbies__head,
+  .hub-lobbies__more,
+  .hub-lobbies__join {
     min-height: 56px;
+  }
+  .hub-lobbies__list > li:nth-child(n + 2),
+  .hub-lobbies__none {
+    display: none;
+  }
+}
+/* Short landscape phones: just the heading. */
+@media (max-height: 500px) {
+  .hub-lobbies__list,
+  .hub-lobbies__none {
+    display: none;
   }
 }
 .lobby-list {

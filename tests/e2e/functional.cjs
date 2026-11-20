@@ -174,6 +174,14 @@ const check = (name, ok, detail = '') => { results.push(`${ok ? 'PASS' : 'FAIL'}
   await waitHp(() => { const m = window.__toybox.hubplay.state().marble; return !m.inNet && Math.abs(m.x - 26) < 0.5; }, null, 120000);
   check('after the goal the marble goes back to the centre spot', Math.abs((await hp()).marble.x - 26) < 0.5);
 
+  // Hold Alt: a free cursor for the HUD (no pause), with its hint; let go and it's gone.
+  await page.keyboard.down('Alt');
+  await page.waitForSelector('[data-testid=cursor-free]', { timeout: 30000 }).catch(() => null);
+  const freed = await T(() => ({ hint: !!document.querySelector('[data-testid=cursor-free]'), paused: !!document.querySelector('.pause'), locked: !!document.pointerLockElement }));
+  await page.keyboard.up('Alt');
+  await page.waitForTimeout(400);
+  const after = await T(() => !!document.querySelector('[data-testid=cursor-free]'));
+  check('holding Alt frees the cursor (hint shown, no pause, no pointer lock); letting go ends it', freed.hint && !freed.paused && !freed.locked && !after, JSON.stringify({ ...freed, after }));
   check('no console/page errors', errors.length === 0, errors.slice(0, 5).join(' | '));
   console.log(results.join('\n'));
   await browser.close();

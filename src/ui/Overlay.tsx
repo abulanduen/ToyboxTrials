@@ -22,7 +22,7 @@ import { useNet } from '../net/store';
 import { leaveOnline, leaveOnlineByChoice } from '../net/client';
 import { closeAccountSheet, useAccount } from '../net/account';
 import { AccountSettingsRow, AccountSheet } from './AccountUI';
-import { HubLobbyAlert, LobbiesButton, LobbyList, OnlineLeaderboard } from './LobbyUI';
+import { HubLobbies, HubLobbyAlert, LobbyList, OnlineLeaderboard } from './LobbyUI';
 import { JukeboxList, WelcomeUI } from './WelcomeUI';
 import { useWelcome } from '../game/welcome';
 import { HubPlayHud } from './HubPlayHud';
@@ -109,6 +109,9 @@ function Controls() {
         <span className="controls__mouse" /> click &amp; move mouse to look
       </div>
       <div className="controls__row">
+        <KeyCap k="Alt" wide /> hold for a cursor (lobbies, menus)
+      </div>
+      <div className="controls__row">
         <KeyCap k="1" />
         <KeyCap k="2" />
         <KeyCap k="3" />
@@ -180,6 +183,7 @@ function Hud() {
   const secrets = useGame((s) => s.secretsFound.length);
   const name = useGame((s) => s.contenderName);
   const locked = useGame((s) => s.pointerLocked);
+  const cursorFree = useGame((s) => s.cursorFree);
   const touch = useGame((s) => s.touchUI);
   const paintName = itemById(useGame((s) => s.profile.loadout.paint))?.name ?? '';
   const cogs = useGame((s) => s.profile.wallet.cogs);
@@ -201,12 +205,12 @@ function Hud() {
       <Prompt />
       <HubPlayHud />
       <OnlineChip />
-      <LobbiesButton />
+      <HubLobbies />
       <HubLobbyAlert />
       <Tickets />
       {!welcoming && (touch ? <TouchControls /> : <Controls />)}
       <BoostMeter />
-      {!welcoming && (touch ? <LookHint /> : !locked && <div className="look-hint">Click the scene to look around</div>)}
+      {!welcoming && (touch ? <LookHint /> : cursorFree ? <div className="look-hint" data-testid="cursor-free">Cursor free: click a button · let go of Alt to look again</div> : !locked && <div className="look-hint">Click the scene to look around · hold Alt for a cursor</div>)}
       <WelcomeUI />
       <Fps />
     </>

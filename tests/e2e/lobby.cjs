@@ -108,6 +108,10 @@ const shot = (page, name) => page.screenshot({ path: path.join(OUT, name), timeo
     await shot(B, 'lobby-02-hub-alert.png');
     const alertText = await B.textContent('[data-testid=lobby-alert]');
     check('B sees the Hub alert "Ticker is hosting a Blitz tournament · 1/8"', /Ticker is hosting a Blitz tournament · 1\/8/.test(alertText), alertText);
+    check('the alert is a popup asking to join, with Join and No thanks', /Join this lobby\?/.test(alertText) && (await B.locator('[data-testid=lobby-alert-no]').count()) === 1, alertText);
+    // The open lobby is also listed under the room chip, with its own Join.
+    await B.waitForSelector(`[data-testid=hub-lobby-join-${L.id}]`, { timeout: T });
+    check('the Hub lists the open lobby under the room chip, with Join', /Ticker/.test(await B.textContent(`[data-testid=hub-lobby-${L.id}]`)));
     await B.click('[data-testid=lobby-alert-join]');
     await waitPhase(B, 'lobby', T);
     // C got the same alert, and joins with a protocol message.

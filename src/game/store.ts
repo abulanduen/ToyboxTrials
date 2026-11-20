@@ -97,6 +97,8 @@ interface SessionSlice {
   panel: Panel | null;
   boostUntil: number;
   pointerLocked: boolean;
+  /** Desktop: Alt is held, so the mouse is a free cursor for the HUD (lobbies, the room chip) instead of looking. */
+  cursorFree: boolean;
   /** Show on-screen touch controls (touch-primary device, or a touch was seen). */
   touchUI: boolean;
 }
@@ -166,6 +168,7 @@ export const useGame = create<GameState>()(
       panel: null,
       boostUntil: 0,
       pointerLocked: false,
+      cursorFree: false,
       touchUI: device.touch,
 
       set: (patch) => set(patch),

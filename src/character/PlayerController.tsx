@@ -100,7 +100,44 @@ export function PlayerController() {
       // Workshop: drag to spin the camera around the contender (no pointer lock).
       return (s.screen === 'playing' || s.screen === 'workshop') && !s.paused && !s.panel && !tourFlag.active;
     };
+    // Desktop: hold Alt for a free cursor (click the open lobbies, the room chip, etc.), let go to look again.
+    let altHeld = false;
+    let relockOnRelease = false;
+    const altEligible = () => {
+      const s = useGame.getState();
+      return s.screen === 'playing' && !s.paused && !s.panel && !s.touchUI;
+    };
+    const freeCursor = (on: boolean) => {
+      altHeld = on;
+      if (useGame.getState().cursorFree !== on) useGame.getState().set({ cursorFree: on });
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Alt' || e.repeat || !altEligible()) return;
+      e.preventDefault();
+      relockOnRelease = document.pointerLockElement === el;
+      freeCursor(true);
+      mouseDragging = false;
+      if (relockOnRelease) document.exitPointerLock();
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key !== 'Alt' || !altHeld) return;
+      // Stops Windows / Firefox moving focus to the browser's menu bar on a lone Alt press.
+      e.preventDefault();
+      freeCursor(false);
+      if (relockOnRelease && altEligible() && !document.pointerLockElement) {
+        // Not every browser lets a key release take the pointer back: then the usual
+        // "Click the scene to look around" hint shows and a click locks it again.
+        const p = el.requestPointerLock?.() as unknown as Promise<void> | undefined;
+        p?.catch?.(() => {});
+      }
+      relockOnRelease = false;
+    };
+    const onBlur = () => {
+      if (altHeld) freeCursor(false);
+      relockOnRelease = false;
+    };
     const onDown = (e: PointerEvent) => {
+      if (altHeld && e.pointerType === 'mouse') return; // a free cursor clicks; it doesn't look
       if (e.pointerType === 'touch') {
         if (!useGame.getState().touchUI) useGame.getState().set({ touchUI: true });
         if (!canLook()) return;
@@ -135,8 +172,8 @@ export function PlayerController() {
       const locked = document.pointerLockElement === el;
       const s = useGame.getState();
       s.set({ pointerLocked: locked });
-      // Browser consumes Escape to leave pointer lock — treat that as "pause".
-      if (!locked && s.screen === 'playing' && !s.paused && !s.panel) {
+      // Browser consumes Escape to leave pointer lock — treat that as "pause" (but not when Alt freed the cursor).
+      if (!locked && !altHeld && s.screen === 'playing' && !s.paused && !s.panel) {
         s.togglePause(true);
         clearInput();
       }
@@ -146,7 +183,14 @@ export function PlayerController() {
     window.addEventListener('pointercancel', onUp);
     window.addEventListener('pointermove', onMove);
     document.addEventListener('pointerlockchange', onLockChange);
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
     return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
+      if (altHeld) freeCursor(false);
       el.removeEventListener('pointerdown', onDown);
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onUp);
