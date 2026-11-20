@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { HubRoom, KICK_COOLDOWN_MS, type Outgoing } from '../../server/hubRoom';
 import { seededRng } from '../../src/minigames/rng';
 import { BALL, HOOP, MARBLE, NETS, PITCH_CENTRE } from '../../src/game/hubPlay';
-import { solveShot, yawToHoop } from '../../src/game/hubPlaySim';
+import { STEAL_GUARD, STEP, createHubPlay, solveShot, stepHubPlay, throwBall, yawToHoop } from '../../src/game/hubPlaySim';
 import { PROTOCOL_VERSION, parseClientMessage, parseServerMessage, type ClientMsg, type HelloMsg, type PlayEventWire, type ServerMsg, type SnapMsg } from '../../src/net/protocol';
 
 const look = { paint: 1, hat: 'thimble', keySkin: 'heart', back: 'none', face: 'none', neck: 'none' };
@@ -187,6 +187,76 @@ describe('the shared basketball in a Hub room', () => {
       expect(eventsFor('b').some((e) => e.k === 'drop' && e.by === id), how).toBe(true);
       expect(room.hubPlay.ball.y).toBeCloseTo(BALL.r, 3);
     }
+  });
+});
+
+describe('snatching and stealing the basketball online', () => {
+  /** Where a power-0 lob thrown from `from` facing +x is, and when, once it comes down to y 4. */
+  function lobPoint(from: { x: number; z: number }) {
+    const s = createHubPlay();
+    s.ball.holder = 'a';
+    throwBall(s, { id: 'a', x: from.x, y: 0, z: from.z, yaw: Math.PI / 2 }, Math.PI / 2, 0);
+    let t = 0;
+    while (!(s.ball.vy < 0 && s.ball.y <= 4)) {
+      stepHubPlay(s, [], []);
+      t += STEP;
+    }
+    return { x: s.ball.x, z: s.ball.z, ms: t * 1000 };
+  }
+
+  it('another toy catches a thrown ball in mid-air with Interact, even pressing a moment late', () => {
+    for (const lateMs of [0, 300]) {
+      const { room, send, advance, eventsFor, walk } = setup();
+      send('a', hello('Alpha'));
+      send('b', hello('Bravo'));
+      walk('a', [...TO_TRIALS, [BALL.spot.x, BALL.spot.z + 2]], Math.PI);
+      send('a', { t: 'ball', a: 'grab' });
+      advance(100);
+      const from = { x: BALL.spot.x - 20, z: BALL.spot.z + 6 };
+      walk('a', [[from.x, from.z]], Math.PI / 2);
+      const pa = room.playerOf('a')!;
+      const at = lobPoint(pa);
+      walk('b', [...TO_TRIALS, [at.x - 1.5, at.z]], -Math.PI / 2);
+      send('a', { t: 'ball', a: 'throw', yaw: Math.PI / 2, p: 0 });
+      advance(at.ms + lateMs);
+      send('b', { t: 'ball', a: 'grab' });
+      const bId = room.playerOf('b')!.id;
+      expect(room.hubPlay.ball.holder, `late ${lateMs}`).toBe(bId);
+      advance(100);
+      expect(eventsFor('a').some((e) => e.k === 'snatch' && e.by === bId), `late ${lateMs}`).toBe(true);
+    }
+  });
+
+  it('a toy dribbling (moving with the ball) can have it stolen up close, not while standing or straight after taking it', () => {
+    const { room, send, advance, eventsFor, walk } = setup();
+    send('a', hello('Alpha'));
+    send('b', hello('Bravo'));
+    walk('a', [...TO_TRIALS, [BALL.spot.x, BALL.spot.z + 2]], Math.PI);
+    send('a', { t: 'ball', a: 'grab' });
+    advance(100);
+    const aId = room.playerOf('a')!.id;
+    const bId = room.playerOf('b')!.id;
+    expect(room.hubPlay.ball.holder).toBe(aId);
+    walk('b', [...TO_TRIALS, [BALL.spot.x + 1.5, BALL.spot.z + 1]], -Math.PI / 2);
+    // a stands still: no steal
+    advance(STEAL_GUARD * 1000 + 200);
+    send('b', { t: 'ball', a: 'grab' });
+    advance(200);
+    expect(room.hubPlay.ball.holder).toBe(aId);
+    // a moves (dribbles): b steals it
+    const pa = room.playerOf('a')!;
+    send('a', { t: 'move', x: pa.x + 0.3, y: 0, z: pa.z, yaw: Math.PI, grounded: true, speed: 9 });
+    advance(66);
+    send('b', { t: 'ball', a: 'grab' });
+    expect(room.hubPlay.ball.holder).toBe(bId);
+    advance(100);
+    expect(eventsFor('a')).toContainEqual({ k: 'steal', by: bId, from: aId });
+    // b is now moving too, but a can't steal it straight back
+    const pb = room.playerOf('b')!;
+    send('b', { t: 'move', x: pb.x + 0.3, y: 0, z: pb.z, yaw: 0, grounded: true, speed: 9 });
+    advance(200);
+    send('a', { t: 'ball', a: 'grab' });
+    expect(room.hubPlay.ball.holder).toBe(bId);
   });
 });
 

@@ -161,6 +161,53 @@ const check = (name, ok, detail = '') => { results.push(`${ok ? 'PASS' : 'FAIL'}
   const afterBasket = await hp();
   check('a throw through the hoop scores a basket (yours, and the Hub tally)', afterBasket.hoops === 1 && afterBasket.mine === 1, `power ${shot.power}, hoops ${afterBasket.hoops}, mine ${afterBasket.mine}`);
   check('…and the HUD shows the tally', ((await page.textContent('[data-testid=hubplay-baskets]').catch(() => '')) || '').includes('Baskets 1'), await page.textContent('[data-testid=hubplay-score]').catch(() => ''));
+  // Dribble: walking with the ball bounces it between hand and floor. Snatch: a ball in mid-air is
+  // caught with E (the test freezes the offline ball mid-flight: software GL draws a few frames a second).
+  await waitHp(() => window.__toybox.hubplay.state().ballRest, null, 400000);
+  const bl2 = (await hp()).ball;
+  await T(([x, z]) => { const d = Math.hypot(76 - x, -128 - z) || 1; window.__toybox.teleport(x + ((76 - x) / d) * 2, z + ((-128 - z) / d) * 2, Math.PI); }, [bl2.x, bl2.z]);
+  await page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Pick up'), null, { timeout: 120000 }).catch(() => null);
+  await page.keyboard.press('KeyE');
+  await waitHp(() => window.__toybox.hubplay.state().holding);
+  await T(() => window.__toybox.teleport(40, -122, Math.PI / 2));
+  await page.waitForTimeout(300);
+  await page.keyboard.down('KeyW');
+  const ys = [];
+  for (let i = 0; i < 30; i++) {
+    ys.push((await hp()).ball.y);
+    if (i === 15) await page.screenshot({ path: `${OUT}/15b-hubplay-dribble.png` });
+    await page.waitForTimeout(120);
+  }
+  await page.keyboard.up('KeyW');
+  const lo = Math.min(...ys), hi = Math.max(...ys);
+  check('walking with the ball dribbles it: it bounces between the floor and the hand', lo < 1.5 && hi > 1.8 && (await hp()).holding, `ball y ${lo.toFixed(2)} … ${hi.toFixed(2)}`);
+  await page.waitForTimeout(800);
+  const still = (await hp()).ball.y;
+  check('…and standing still holds it up again', still > 2, `y ${still.toFixed(2)}`);
+  await T(() => window.__toybox.teleport(60, -122, Math.PI / 2));
+  await page.waitForTimeout(300);
+  const lob = await T(() => {
+    const h = window.__toybox.hubplay;
+    h.throw(Math.PI / 2, 0);
+    h.freeze(true);
+    let b = h.advance(0);
+    for (let i = 0; i < 300 && !(b.vy < 0 && b.y < 4.6); i++) b = h.advance(1);
+    return b;
+  });
+  await page.waitForTimeout(700); // past your own throw's half second
+  check('a frozen lob hangs in mid-air, not held', !lob.holder && lob.y > 3 && lob.y < 4.7 && (await hp()).ball.y > 3, JSON.stringify(lob));
+  await T(([x, z]) => window.__toybox.teleport(x - 1.2, z, Math.PI / 2), [lob.x, lob.z]);
+  await page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Snatch'), null, { timeout: 120000 }).catch(() => null);
+  check('under a ball in mid-air the prompt says Snatch (the basketball), not Pick up', await promptHas('Snatch', 'the basketball'), await page.textContent('.prompt').catch(() => ''));
+  await page.screenshot({ path: `${OUT}/15c-hubplay-snatch-prompt.png` });
+  await page.keyboard.press('KeyE');
+  await waitHp(() => window.__toybox.hubplay.state().holding, null, 60000);
+  const snatched = await T(() => [...document.querySelectorAll('.ticket')].some((t) => t.textContent.includes('Snatched!')));
+  check('E snatches it: you hold it, with a Snatched! ticket', (await hp()).holding && snatched);
+  await T(() => window.__toybox.hubplay.freeze(false));
+  await T(() => window.__toybox.hubplay.throw(Math.PI / 2, 0.3));
+  await waitHp(() => window.__toybox.hubplay.state().ballRest, null, 400000);
+
   // a goal in the east net (Coral scores)
   await T(() => window.__toybox.hubplay.place(101 - 11.8, -126));
   await T(() => window.__toybox.teleport(101 - 14.2, -126, Math.PI / 2));

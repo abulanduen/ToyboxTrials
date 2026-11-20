@@ -671,6 +671,28 @@ async function phoneMic(P, w, h, label, file) {
       check('A sinks a basket: the room tally is 1 for both, and it counts as A\'s', ha.hoops === 1 && hb.hoops === 1 && ha.mine === 1 && hb.mine === 0, `power ${sol.power}; A ${ha.hoops}/${ha.mine}, B ${hb.hoops}/${hb.mine}`);
       check('…and both HUDs show it', ((await A.page.textContent('[data-testid=hubplay-baskets]').catch(() => '')) || '').includes('Baskets 1') && ((await B.page.textContent('[data-testid=hubplay-baskets]').catch(() => '')) || '').includes('Baskets 1'));
 
+      // a steal: B picks the ball up and dribbles (walks) past A; A takes it off the dribble (Steal)
+      await B.page.waitForFunction(() => { const n = window.__toybox.hubplay.state().newest; return n && !n.h && n.b[3] === 0 && n.b[4] === 0 && n.b[5] === 0; }, null, { timeout: 120000, polling: 250 }).catch(() => null);
+      const rest2 = (await hp(B.page)).newest.b;
+      const toSpot2 = Math.hypot(76 - rest2[0], -128 - rest2[2]) || 1;
+      await travel(B, A, [[rest2[0] + ((76 - rest2[0]) / toSpot2) * 2, rest2[2] + ((-128 - rest2[2]) / toSpot2) * 2]], Math.atan2(rest2[0] - 76, rest2[2] + 128));
+      await B.page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Pick up'), null, { timeout: 60000 }).catch(() => null);
+      await B.page.keyboard.press('KeyE');
+      const bId = await net(B.page, 'selfId');
+      await A.page.waitForFunction((id) => window.__toybox.hubplay.state().newest?.h === id, bId, { timeout: 60000, polling: 100 }).catch(() => null);
+      await travel(B, A, [[50, -120]], Math.PI / 2);
+      await travel(A, B, [[57, -118]], -Math.PI / 2);
+      await sleep(1700); // past the 1.5 s after the ball changed hands
+      const stoleP = A.page.waitForFunction(() => window.__toybox.hubplay.stealable() && window.__toybox.hubplay.grab(), null, { timeout: 20000, polling: 30 }).then(() => true).catch(() => false);
+      await B.page.keyboard.down('KeyW');
+      const stole = await stoleP;
+      await B.page.keyboard.up('KeyW');
+      await B.page.waitForFunction((id) => window.__toybox.hubplay.state().newest?.h === id, aId, { timeout: 30000, polling: 100 }).catch(() => null);
+      const stolenNote = await B.page.waitForFunction(() => [...document.querySelectorAll('.ticket')].some((t) => t.textContent.includes('Stolen!')), null, { timeout: 15000 }).then(() => true).catch(() => false);
+      check('B dribbles past A: A can Steal it (E), the server gives A the ball, and B is told', stole && (await hp(B.page)).newest?.h === aId && (await hp(A.page)).holding && stolenNote, JSON.stringify({ stole, h: (await hp(B.page)).newest?.h, stolenNote }));
+      await A.page.evaluate(() => window.__toybox.hubplay.throw(Math.PI, 0.2));
+      await sleep(300);
+
       // a goal: the test server lets A put the marble in front of the east net (hpdebug), then A kicks it in
       await A.page.evaluate(() => window.__toybox.hubplay.place(101 - 11.8, -126));
       await travel(A, B, [[101 - 14.2, -126]], Math.PI / 2);

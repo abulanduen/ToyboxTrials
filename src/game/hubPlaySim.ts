@@ -12,7 +12,8 @@
  *
  * The basketball is a 3D ball: held by one toy at a time, thrown with a power (0..1) and a facing
  * at a fixed launch angle, under gravity; it bounces on the table, props, the backboard and the
- * rim, and scores when it drops through the rim. Left alone (or stuck on top of something) it goes
+ * rim, and scores when it drops through the rim. Interact takes it: picked up off the floor,
+ * snatched in mid-air, or stolen from a holder who is dribbling (moving on the ground). Left alone (or stuck on top of something) it goes
  * back to its spot by the hoop.
  */
 import { clampToWalkable } from './hubBounds';
@@ -53,6 +54,19 @@ export const HELD = { fwd: 0.95, y: 2.3 };
 export const GRAB_REACH = 3.2;
 /** A ball left alone this long (s) goes back to its spot; one stuck on top of something, sooner. */
 export const BALL_IDLE_RESET = 30;
+/**
+ * Snatching a ball in mid-air: its centre must be within GRAB_REACH across and between `below`
+ * under and `above` over the toy's feet (a jump adds about 2.4 cm).
+ */
+export const SNATCH_REACH_Y = { below: 1.0, above: 5.4 };
+/** A ball counts as in mid-air (snatch, not pick up) when it is this far off the floor and moving. */
+export const AIRBORNE_Y = 0.4;
+/** A holder moving at least this fast (cm/s) on the ground is dribbling, and the ball can be stolen. */
+export const DRIBBLE_SPEED = 2;
+/** How close (cm, across) a toy must be to a dribbled ball to steal it. */
+export const STEAL_REACH = 2.6;
+/** After any pick-up, snatch or steal, the ball can't be stolen for this long (s). */
+export const STEAL_GUARD = 1.5;
 export const BALL_STUCK_RESET = 2.5;
 const BALL_SUBSTEPS = 2;
 
@@ -83,6 +97,8 @@ export interface BallState {
   idle: number;
   /** Seconds resting on top of something (back to the spot after BALL_STUCK_RESET). */
   stuck: number;
+  /** Sim time of the last pick-up, snatch or steal (for STEAL_GUARD). */
+  grabT: number;
 }
 
 export interface HubPlayState {
@@ -111,6 +127,10 @@ export type PlayEvent =
   | { k: 'hoop'; by: string | null; total: number }
   | { k: 'kick'; by: string; p: number }
   | { k: 'grab'; by: string }
+  /** Caught in mid-air. */
+  | { k: 'snatch'; by: string }
+  /** Taken from a dribbling holder (`from`). */
+  | { k: 'steal'; by: string; from: string }
   | { k: 'throw'; by: string; p: number }
   | { k: 'drop'; by: string }
   | { k: 'rim'; v: number }
@@ -123,7 +143,7 @@ export function createHubPlay(): HubPlayState {
   return {
     t: 0,
     marble: { x: MARBLE.home.x, z: MARBLE.home.z, vx: 0, vz: 0, lastTouch: null, inNet: null, netUntil: 0 },
-    ball: { x: BALL.spot.x, y: BALL.r, z: BALL.spot.z, vx: 0, vy: 0, vz: 0, holder: null, thrower: null, idle: 0, stuck: 0 },
+    ball: { x: BALL.spot.x, y: BALL.r, z: BALL.spot.z, vx: 0, vy: 0, vz: 0, holder: null, thrower: null, idle: 0, stuck: 0, grabT: -1e9 },
     score: [0, 0],
     hoops: 0,
   };
@@ -388,19 +408,59 @@ export function heldPoint(body: PlayBody) {
   return { x: body.x + f.x * HELD.fwd, y: body.y + HELD.y, z: body.z + f.z * HELD.fwd };
 }
 
-export function grabBall(s: HubPlayState, body: PlayBody, slack = 0, ev?: PlayEvent[]): boolean {
+/** Is a loose ball in mid-air (moving, off the floor)? A ball resting on a prop is not. */
+export function ballAirborne(b: Pick<BallState, 'x' | 'y' | 'z' | 'vy' | 'holder'>): boolean {
+  return !b.holder && b.vy !== 0 && b.y - BALL.r > rollFloorAt(b.x, b.z) + AIRBORNE_Y;
+}
+
+/** Can a toy at `body` catch a mid-air ball centred at `p`? */
+export function inSnatchReach(body: PlayBody, p: { x: number; y: number; z: number }, slack = 0): boolean {
+  if (Math.hypot(p.x - body.x, p.z - body.z) > GRAB_REACH + slack) return false;
+  const up = p.y - body.y;
+  return up >= -SNATCH_REACH_Y.below - slack * 0.5 && up <= SNATCH_REACH_Y.above + slack * 0.5;
+}
+
+export interface GrabOptions {
+  /**
+   * Where the ball was a moment ago (newest last), for the server's lag allowance: a player
+   * presses on the ball they see, which is a little behind the server's. Any one in reach counts.
+   */
+  rewind?: readonly { x: number; y: number; z: number }[];
+  /** Is the current holder dribbling (moving on the ground)? Only a dribbled ball can be stolen. */
+  holderDribbling?: boolean;
+}
+
+/**
+ * A toy takes the ball (Interact): picks it up off the floor, snatches it in mid-air, or steals
+ * it from a holder who is dribbling. Returns whether it took.
+ */
+export function grabBall(s: HubPlayState, body: PlayBody, slack = 0, ev?: PlayEvent[], opts?: GrabOptions): boolean {
   const b = s.ball;
-  if (b.holder) return false;
-  if (Math.hypot(b.x - body.x, b.z - body.z) > GRAB_REACH + slack) return false;
-  if (b.y - Math.max(rollFloorAt(b.x, b.z), body.y) > 4.5) return false;
+  let kind: 'grab' | 'snatch' | 'steal';
+  const from = b.holder;
+  if (from) {
+    if (from === body.id || !opts?.holderDribbling) return false;
+    if (s.t - b.grabT < STEAL_GUARD) return false;
+    if (Math.hypot(b.x - body.x, b.z - body.z) > STEAL_REACH + slack) return false;
+    kind = 'steal';
+  } else if (ballAirborne(b)) {
+    if (!inSnatchReach(body, b, slack) && !opts?.rewind?.some((p) => inSnatchReach(body, p, slack))) return false;
+    kind = 'snatch';
+  } else {
+    if (Math.hypot(b.x - body.x, b.z - body.z) > GRAB_REACH + slack) return false;
+    if (b.y - Math.max(rollFloorAt(b.x, b.z), body.y) > 4.5) return false;
+    kind = 'grab';
+  }
   b.holder = body.id;
   b.idle = b.stuck = 0;
+  b.grabT = s.t;
   const h = heldPoint(body);
   b.x = h.x;
   b.y = h.y;
   b.z = h.z;
   b.vx = b.vy = b.vz = 0;
-  ev?.push({ k: 'grab', by: body.id });
+  if (kind === 'steal') ev?.push({ k: 'steal', by: body.id, from: from! });
+  else ev?.push({ k: kind, by: body.id });
   return true;
 }
 
@@ -449,6 +509,7 @@ function resetBall(b: BallState) {
   b.vx = b.vy = b.vz = 0;
   b.holder = null;
   b.idle = b.stuck = 0;
+  b.grabT = -1e9;
 }
 
 const BOARD = {

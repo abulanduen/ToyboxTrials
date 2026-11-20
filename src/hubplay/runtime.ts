@@ -16,7 +16,12 @@
 import { BALL, HOOP, MARBLE, NETS, PITCH_AREA, TEAMS, rollFloorAt } from '../game/hubPlay';
 import {
   BALL_GRAVITY,
+  DRIBBLE_SPEED,
   GRAB_REACH,
+  STEAL_GUARD,
+  STEAL_REACH,
+  AIRBORNE_Y,
+  inSnatchReach,
   KICK_REACH,
   STEP,
   createHubPlay,
@@ -65,8 +70,11 @@ interface Snap {
 /** What the scene draws this frame. */
 export const view = {
   marble: { x: MARBLE.home.x, y: MARBLE.r, z: MARBLE.home.z, vx: 0, vz: 0, inNet: false },
-  ball: { x: BALL.spot.x, y: BALL.r, z: BALL.spot.z, held: false, holder: null as string | null },
+  ball: { x: BALL.spot.x, y: BALL.r, z: BALL.spot.z, vy: 0, held: false, holder: null as string | null },
 };
+
+/** Dribble timing: bounces per second at a walk (rising a little with speed), hand height (cm). */
+const DRIBBLE = { hz: 1.9, perSpeed: 0.06, hand: 2.1, fwd: 1.05, side: 0.5 };
 
 /** When the last goal went into each net and the last basket dropped (performance.now()), for the nets' wobble. */
 export const fxClock = { goalAt: { w: -1e9, e: -1e9 } as Record<'w' | 'e', number>, hoopAt: -1e9 };
@@ -84,7 +92,14 @@ const rt = {
   pred: null as { s: HubPlayState; at: number; acc: number } | null,
   blend: null as { x: number; y: number; z: number; at: number } | null,
   pendingGrab: 0,
+  /** ?debug only: the offline ball and marble stand still (tests catch the ball in mid-air). */
+  frozen: false,
   thrownAt: -1e9,
+  /** The ball's holder as last drawn, and since when (performance.now()), for STEAL_GUARD. */
+  holderSeen: null as string | null,
+  holderSince: -1e9,
+  /** The dribble being drawn: whose, its phase (bounces) and how far into it (0 held up .. 1 dribbling). */
+  drib: { id: null as string | null, phase: 0, k: 0 },
   charge: null as { t0: number } | null,
   lastPushAt: 0,
   score: [0, 0] as [number, number],
@@ -109,16 +124,21 @@ function stepLocal(dt: number) {
   const bodies = localBodies();
   // holding the ball but not in the hub (a trial, the Workshop): keep it in your hands
   const keep = !bodies.length && rt.local.ball.holder === LOCAL_ID ? [{ ...selfBody(), id: LOCAL_ID }] : bodies;
+  if (rt.frozen && !rt.local.ball.holder) rt.acc = 0;
   while (rt.acc >= STEP) {
     stepHubPlay(rt.local, keep, ev);
     rt.acc -= STEP;
   }
   for (const e of ev) onEvent(e, false);
+  syncLocalView();
+}
+
+function syncLocalView() {
   const s = rt.local;
   const m = s.marble;
   Object.assign(view.marble, { x: m.x, z: m.z, y: rollFloorAt(m.x, m.z) + MARBLE.r, vx: m.vx, vz: m.vz, inNet: !!m.inNet });
   const b = s.ball;
-  Object.assign(view.ball, { x: b.x, y: b.y, z: b.z, held: !!b.holder, holder: b.holder });
+  Object.assign(view.ball, { x: b.x, y: b.y, z: b.z, vy: b.vy, held: !!b.holder, holder: b.holder });
   setScore(s.score, s.hoops);
 }
 
@@ -142,7 +162,7 @@ export function onHubPlayEvents(list: PlayEventWire[]) {
   const me = selfId();
   for (const w of list) {
     // our own kicks, throws and pick-ups were heard when we pressed
-    if ((w.k === 'kick' || w.k === 'throw' || w.k === 'grab') && w.by === me) continue;
+    if ((w.k === 'kick' || w.k === 'throw' || w.k === 'grab' || w.k === 'snatch' || w.k === 'steal') && w.by === me) continue;
     if (w.k === 'reset') endPrediction();
     const e = wireToEvent(w);
     if (e) window.setTimeout(() => onEvent(e, true), INTERP_DELAY_MS);
@@ -159,8 +179,11 @@ function wireToEvent(w: PlayEventWire): PlayEvent | null {
     case 'throw':
       return w.by ? { k: w.k, by: w.by, p: w.p ?? 1 } : null;
     case 'grab':
+    case 'snatch':
     case 'drop':
       return w.by ? { k: w.k, by: w.by } : null;
+    case 'steal':
+      return w.by && w.from ? { k: 'steal', by: w.by, from: w.from } : null;
     case 'rim':
     case 'board':
     case 'bounce':
@@ -172,13 +195,13 @@ function wireToEvent(w: PlayEventWire): PlayEvent | null {
 }
 
 const tmpSample: NetSample = { t: 0, x: 0, y: 0, z: 0, yaw: 0, speed: 0, grounded: true };
-/** Where a remote toy is drawn now (for the ball in its hands). */
-function remoteBody(id: string): PlayBody | null {
+/** Where a remote toy is drawn now (for the ball in its hands), and whether it is dribbling. */
+function remoteBody(id: string): (PlayBody & { moving: boolean; speed: number }) | null {
   const r = remotes.get(id);
   const now = netLink.serverTime();
   if (!r || now === null) return null;
   const s = r.buf.sample(now - INTERP_DELAY_MS, tmpSample);
-  return s ? { id, x: s.x, y: s.y, z: s.z, yaw: s.yaw } : null;
+  return s ? { id, x: s.x, y: s.y, z: s.z, yaw: s.yaw, moving: s.grounded && s.speed >= DRIBBLE_SPEED, speed: s.speed } : null;
 }
 
 /** Cubic Hermite between two samples with their velocities (exact for a ballistic arc). */
@@ -222,9 +245,10 @@ function sampleRemote() {
     vm.inNet = (k < 0.5 ? a.n : b.n) === 1;
     const hold = k < 0.5 ? a.h : b.h;
     const bJump = Math.hypot(b.b[0] - a.b[0], b.b[1] - a.b[1], b.b[2] - a.b[2]) > (Math.hypot(a.b[3], a.b[4], a.b[5]) + Math.hypot(b.b[3], b.b[4], b.b[5])) * dt + 3;
+    vb.vy = a.b[4] + (b.b[4] - a.b[4]) * k;
     if (a.h || b.h || bJump) {
       const s = k < 0.5 ? a : b;
-      Object.assign(vb, { x: s.b[0], y: s.b[1], z: s.b[2] });
+      Object.assign(vb, { x: s.b[0], y: s.b[1], z: s.b[2], vy: s.b[4] });
     } else {
       vb.x = hermite(a.b[0], a.b[3], b.b[0], b.b[3], dt, k);
       vb.y = hermite(a.b[1], a.b[4], b.b[1], b.b[4], dt, k);
@@ -236,7 +260,7 @@ function sampleRemote() {
     const ahead = Math.max(0, Math.min(0.12, (T - a.t) / 1000));
     Object.assign(vm, { x: a.m[0] + a.m[2] * ahead, z: a.m[1] + a.m[3] * ahead, vx: a.m[2], vz: a.m[3], inNet: a.n === 1 });
     const fly = a.h ? 0 : ahead;
-    Object.assign(vb, { x: a.b[0] + a.b[3] * fly, y: a.b[1] + a.b[4] * fly - 0.5 * BALL_GRAVITY * fly * fly, z: a.b[2] + a.b[5] * fly, holder: a.h });
+    Object.assign(vb, { x: a.b[0] + a.b[3] * fly, y: a.b[1] + a.b[4] * fly - 0.5 * BALL_GRAVITY * fly * fly, z: a.b[2] + a.b[5] * fly, vy: a.b[4] - BALL_GRAVITY * fly, holder: a.h });
   }
   vm.y = rollFloorAt(vm.x, vm.z) + MARBLE.r;
   vb.y = Math.max(vb.y, rollFloorAt(vb.x, vb.z) + BALL.r);
@@ -260,7 +284,7 @@ function stepRemote(dt: number) {
   const me = selfId();
   // your own ball: in your hands as soon as you pick it up, and until the server has your throw
   if (iHold()) {
-    Object.assign(vb, heldPoint(selfBody()), { held: true, holder: me });
+    Object.assign(vb, heldPoint(selfBody()), { vy: 0, held: true, holder: me });
     return;
   }
   if (rt.pred) {
@@ -272,7 +296,7 @@ function stepRemote(dt: number) {
       p.acc -= STEP;
     }
     const b = p.s.ball;
-    Object.assign(vb, { x: b.x, y: b.y, z: b.z, held: false, holder: null });
+    Object.assign(vb, { x: b.x, y: b.y, z: b.z, vy: b.vy, held: false, holder: null });
     const resting = b.vx === 0 && b.vz === 0 && Math.abs(b.vy) < 1e-9;
     if (resting || performance.now() - p.at > PREDICT_MS) endPrediction();
     return;
@@ -293,12 +317,81 @@ function stepRemote(dt: number) {
 export function stepHubPlayView(dt: number) {
   if (rt.mode === 'local') stepLocal(dt);
   else stepRemote(dt);
+  if (view.ball.holder !== rt.holderSeen) {
+    rt.holderSeen = view.ball.holder;
+    rt.holderSince = performance.now();
+  }
+  drawDribble(dt);
   const ui = useHubPlay.getState();
   const holding = iHold();
   const p = player.pos;
   const near = p.x > PITCH_AREA.minX && p.x < PITCH_AREA.maxX && p.z > PITCH_AREA.minZ && p.z < PITCH_AREA.maxZ;
   if (holding !== ui.holding || near !== ui.nearPitch) ui.set({ holding, nearPitch: near });
   if (!holding) rt.charge = null;
+}
+
+/**
+ * A holder on the move dribbles: the ball bounces between their hand and the floor, in front and
+ * a little to the side. Drawing only (the authority keeps a held ball at the hands); the server
+ * uses the same test (moving on the ground) to let other toys steal it.
+ */
+function drawDribble(dt: number) {
+  const vb = view.ball;
+  const d = rt.drib;
+  if (!vb.holder) {
+    d.id = null;
+    d.k = 0;
+    return;
+  }
+  const me = vb.holder === selfId();
+  const body = me ? { ...selfBody(), moving: player.grounded && player.speed >= DRIBBLE_SPEED && !rt.charge, speed: player.speed } : remoteBody(vb.holder);
+  if (!body) return;
+  if (d.id !== vb.holder) {
+    d.id = vb.holder;
+    d.phase = 0;
+    d.k = 0;
+  }
+  const speed = body.speed;
+  d.k += ((body.moving ? 1 : 0) - d.k) * Math.min(1, dt * 9);
+  if (d.k < 0.01) return;
+  const before = d.phase;
+  if (body.moving || d.phase % 1 > 0.02) d.phase += dt * (DRIBBLE.hz + Math.min(speed, 20) * DRIBBLE.perSpeed);
+  // the ball meets the floor halfway through each bounce
+  if (Math.floor(d.phase - 0.5) > Math.floor(before - 0.5)) cue('bounce', vb, me ? 0.3 : 0.22, 50);
+  const u = d.phase % 1;
+  const x = Math.abs(2 * u - 1); // 1 at the hand, 0 at the floor
+  const fx = Math.sin(body.yaw);
+  const fz = Math.cos(body.yaw);
+  const px = body.x + fx * DRIBBLE.fwd - fz * DRIBBLE.side;
+  const pz = body.z + fz * DRIBBLE.fwd + fx * DRIBBLE.side;
+  const py = body.y + BALL.r + (DRIBBLE.hand - BALL.r) * (1 - (1 - x) * (1 - x));
+  vb.x += (px - vb.x) * d.k;
+  vb.y += (py - vb.y) * d.k;
+  vb.z += (pz - vb.z) * d.k;
+}
+
+/** Is the loose ball in mid-air as drawn (a snatch, not a pick-up)? */
+export function ballInAir(): boolean {
+  const vb = view.ball;
+  return !vb.held && vb.vy !== 0 && vb.y - BALL.r > rollFloorAt(vb.x, vb.z) + AIRBORNE_Y;
+}
+
+/** Can you catch the ball in mid-air right now (E)? Not your own throw in its first half second. */
+export function canSnatch(): boolean {
+  if (!ballFree() || !ballInAir() || performance.now() - rt.thrownAt < 500) return false;
+  return inSnatchReach(selfBody(), view.ball, 0.3);
+}
+
+/** Can you steal the ball from someone dribbling it next to you (online)? */
+export function canSteal(): boolean {
+  const vb = view.ball;
+  if (rt.mode !== 'remote' || !vb.holder || vb.holder === selfId() || iHold()) return false;
+  if (performance.now() - rt.holderSince < STEAL_GUARD * 1000) return false;
+  const h = remoteBody(vb.holder);
+  if (!h || !h.moving) return false;
+  const at = heldPoint(h);
+  const me = selfBody();
+  return Math.hypot(at.x - me.x, at.z - me.z) <= STEAL_REACH + 0.3;
 }
 
 // ---------------------------------------------------------------- your actions
@@ -343,9 +436,14 @@ export function pushMarble(dx: number, dz: number, power: number) {
   kick(dx, dz, power);
 }
 
+/** Take the ball: pick it up, snatch it in mid-air, or steal it from a dribbler. */
 export function grab(): boolean {
   const body = selfBody();
-  if (!ballFree() || Math.hypot(view.ball.x - body.x, view.ball.z - body.z) > GRAB_REACH + 0.3) return false;
+  const steal = canSteal();
+  if (!steal) {
+    if (!ballFree()) return false;
+    if (ballInAir() ? !canSnatch() : Math.hypot(view.ball.x - body.x, view.ball.z - body.z) > GRAB_REACH + 0.3) return false;
+  }
   if (rt.mode === 'local') {
     const ev: PlayEvent[] = [];
     if (!grabBall(rt.local, body, 0.3, ev)) return false;
@@ -397,13 +495,13 @@ export function releaseCharge() {
 export function throwNow(yaw: number, power: number): boolean {
   if (!iHold()) return false;
   const body = { ...selfBody(), yaw };
+  rt.thrownAt = performance.now();
   if (rt.mode === 'local') {
     const ev: PlayEvent[] = [];
     if (!throwBall(rt.local, body, yaw, power, ev)) return false;
     for (const e of ev) onEvent(e, false);
   } else {
     netLink.send({ t: 'ball', a: 'throw', yaw, p: power });
-    rt.thrownAt = performance.now();
     rt.pendingGrab = 0;
     const s = createHubPlay();
     s.ball.holder = body.id;
@@ -483,6 +581,18 @@ function onEvent(e: PlayEvent, remote: boolean) {
     case 'grab':
       cue('grab', view.ball, 0.8);
       break;
+    case 'snatch':
+      cue('grab', view.ball, 1);
+      if (e.by === selfId() && g.screen === 'playing') g.pushTicket({ title: 'Snatched!', body: 'Caught in mid-air', tone: 'reward' });
+      break;
+    case 'steal': {
+      cue('grab', view.ball, 1);
+      const me = selfId();
+      if (g.screen !== 'playing') break;
+      if (e.from === me) g.pushTicket({ title: 'Stolen!', body: `${nameOf(e.by) ?? 'Someone'} took the ball off your dribble`, tone: 'info' });
+      else if (e.by === me) g.pushTicket({ title: 'Stolen!', body: `You took the ball from ${nameOf(e.from) ?? 'them'}`, tone: 'reward' });
+      break;
+    }
     case 'throw':
       cue('throw', view.ball, 0.8);
       break;
@@ -565,6 +675,21 @@ exposeDebug({
     }),
     kick: (dx: number, dz: number, p = 1) => kick(dx, dz, p),
     grab: () => grab(),
+    /** Offline: stop (true) or restart the loose ball and the marble where they are. */
+    freeze: (on: boolean) => {
+      rt.frozen = on;
+    },
+    /** Offline, frozen: step the ball and marble by hand, `steps` fixed steps at a time. Returns the ball. */
+    advance: (steps: number) => {
+      if (rt.mode !== 'local') return null;
+      const ev: PlayEvent[] = [];
+      for (let i = 0; i < steps; i++) stepHubPlay(rt.local, localBodies(), ev);
+      for (const e of ev) onEvent(e, false);
+      syncLocalView();
+      return { ...rt.local.ball };
+    },
+    snatchable: () => canSnatch(),
+    stealable: () => canSteal(),
     throw: (yaw: number, p: number) => throwNow(yaw, p),
     /** Power that sinks a throw from where you stand, facing the hoop (null if none). */
     solve: () => {

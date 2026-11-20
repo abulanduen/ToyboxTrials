@@ -16,6 +16,7 @@ import { HUB_MAX_SPEED, HUB_MAX_Y, HUB_MOTION, HUB_SPAWN } from '../src/game/hub
 import { EMOTE_COOLDOWN, EMOTE_DURATION, type EmoteId } from '../src/game/emotes';
 import {
   REACH_SLACK,
+  DRIBBLE_SPEED,
   advanceHubPlay,
   createHubPlay,
   dropBall,
@@ -88,6 +89,12 @@ export const KICK_COOLDOWN_MS = 120;
 export const BALL_COOLDOWN_MS = 150;
 /** Most hub play events sent per snapshot (bounces and rattles beyond this are dropped). */
 export const MAX_PLAY_EVENTS = 12;
+/**
+ * A snatch (catching the ball in mid-air) also counts if the ball was in reach this long ago (ms):
+ * a player presses on the ball they see, drawn INTERP_DELAY_MS behind the server plus the time
+ * their press took to arrive.
+ */
+export const SNATCH_REWIND_MS = 400;
 
 const ALLOWED_SPEED = HUB_MAX_SPEED * MOVE_SPEED_TOLERANCE;
 
@@ -171,6 +178,8 @@ export class HubRoom {
   /** Room clock (ms) at hub play sim time 0; re-anchored when the room wakes from empty. */
   private playEpoch: number | null = null;
   private playEvents: PlayEvent[] = [];
+  /** Where the loose ball was lately (room clock ms), for SNATCH_REWIND_MS. Emptied while it is held. */
+  private ballTrail: { t: number; x: number; y: number; z: number }[] = [];
   private readonly matchDebug: boolean;
   /** Text chat and Who Am I? cards (hubChat.ts). */
   private readonly chat: HubChat;
@@ -563,6 +572,7 @@ export class HubRoom {
     this.play = createHubPlay();
     this.playEpoch = null;
     this.playEvents = [];
+    this.ballTrail = [];
   }
 
   private updateEmpty(now: number) {
@@ -585,6 +595,11 @@ export class HubRoom {
     }
     advanceHubPlay(this.play, t, this.playBodies(), this.playEvents, 90);
     if (this.playEvents.length > 4 * MAX_PLAY_EVENTS) this.playEvents.splice(0, this.playEvents.length - 4 * MAX_PLAY_EVENTS);
+    const b = this.play.ball;
+    const trail = this.ballTrail;
+    if (b.holder) trail.length = 0;
+    else if (!trail.length || now > trail[trail.length - 1].t) trail.push({ t: now, x: b.x, y: b.y, z: b.z });
+    while (trail.length && trail[0].t < now - SNATCH_REWIND_MS) trail.shift();
   }
 
   private playBodies(): PlayBody[] {
@@ -611,13 +626,20 @@ export class HubRoom {
     return [];
   }
 
-  /** Pick up the basketball (in reach, nobody holding it) or throw it (only its holder). */
+  /**
+   * Take the basketball (pick it up, snatch it in mid-air, or steal it from a dribbling holder) or
+   * throw it (only its holder). A snatch also counts against where the ball was in the last
+   * SNATCH_REWIND_MS; a holder is dribbling while the server has them moving on the ground.
+   */
   private ball(p: Player, m: BallMsg, now: number): Outgoing[] {
     if (p.activity || now - p.lastBallAt < BALL_COOLDOWN_MS) return [];
     p.lastBallAt = now;
     this.advancePlay(now);
-    if (m.a === 'grab') grabBall(this.play, this.body(p), REACH_SLACK, this.playEvents);
-    else throwBall(this.play, this.body(p), m.yaw, m.p, this.playEvents);
+    if (m.a === 'grab') {
+      const h = this.play.ball.holder ? this.players.get(this.play.ball.holder) : undefined;
+      const holderDribbling = !!h && !!h.conn && !h.activity && h.grounded && h.speed >= DRIBBLE_SPEED;
+      grabBall(this.play, this.body(p), REACH_SLACK, this.playEvents, { rewind: this.ballTrail, holderDribbling });
+    } else throwBall(this.play, this.body(p), m.yaw, m.p, this.playEvents);
     return [];
   }
 
