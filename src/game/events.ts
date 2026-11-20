@@ -27,6 +27,8 @@ export type GameEvents = {
   /** Someone cranked the Hub jukebox (it plays a little flourish). */
   'prop:jukebox-crank': void;
   'gate:open': { id: string };
+  /** The local toy petted the dog at the spawn table (src/game/dogVisit.ts); the 10th pet is a lick. */
+  'dog:pet': { lick: boolean };
   /** The hub TV beside the Scoreboard changes channel. */
   'tv:next': void;
   /** Workshop/shop: play a gesture on the local toy as a preview (not sent online). */
