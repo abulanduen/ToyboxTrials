@@ -4,8 +4,8 @@
  *
  *   reveal → countdown → playing → results → (tournament) standings → reveal … → final → done
  *
- * The server owns the seed, picks the tournament's trials from the format's pool (Toy Squad only
- * in Normal and Treasure), seats the field (humans, then bots when the host turned bot fill on),
+ * The server owns the seed, picks the tournament's trials from the format's pool (the same
+ * `selectTournament` as local play: Normal and Treasure end with one strategy finale), seats the field (humans, then bots when the host turned bot fill on),
  * steps the rules (GameRun), keeps the standings, and decides results and placements. Players who
  * joined mid-match watch and are seated at the next trial. A player who leaves, is kicked or stays
  * disconnected longer than RESUME_WINDOW_MS forfeits the trial (last place) and the tournament.
@@ -15,7 +15,7 @@
 import { makeBots } from '../src/minigames/bots';
 import { subSeed } from '../src/minigames/rng';
 import { addRound, pointsForPlace, rankStandings, type Standing } from '../src/minigames/scoring';
-import { FORMATS, poolForFormat, selectGames } from '../src/minigames/tournament';
+import { poolForFormat, selectTournament } from '../src/minigames/tournament';
 import { GAME_FACTS, onlineGames } from '../src/minigames/facts';
 import { SERVER_GAMES } from './games';
 import type { MinigameId } from '../src/minigames/ids';
@@ -149,7 +149,7 @@ export class MatchFlow {
     this.field = [...seated, ...this.bots.map((b) => ({ ...b, account: null }))];
     if (settings.mode === 'tournament') {
       const pool = poolForFormat(settings.format, serverPool(), this.field.length);
-      const games = selectGames(subSeed(seed, 'games'), FORMATS[settings.format].games, pool);
+      const games = selectTournament(subSeed(seed, 'games'), settings.format, pool);
       this.tournament = { format: settings.format, games, round: 0, standings: this.field.map((c) => ({ contestantId: c.id, points: 0, rounds: [], wins: 0 })) };
       this.game = games[0];
     } else {

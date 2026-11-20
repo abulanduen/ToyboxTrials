@@ -23,6 +23,14 @@ export type { MinigameId };
 
 export type MinigameCategory = 'memory' | 'survival' | 'observation' | 'reflex' | 'pvp' | 'racing' | 'rhythm' | 'strategy' | 'knowledge';
 
+/**
+ * Which shelf a trial sits on in the pickers, and its role in tournaments (owner decision,
+ * 20 Nov 2026): `party` trials are the quick ones every format draws from; `strategy` trials are
+ * the long, much more complex games (Toy Squad, Toybox Siege, Toy Tower Tumble) that only ever
+ * close a Normal or Treasure tournament, as its finale. See tournament.ts `selectTournament`.
+ */
+export type TrialGroup = 'party' | 'strategy';
+
 export type BotDifficulty = 'easy' | 'normal' | 'hard';
 
 export interface Contestant {
@@ -123,6 +131,8 @@ export interface MinigameDefinition {
   tagline: string;
   description: string;
   category: MinigameCategory;
+  /** Party (default) or strategy: the pickers' sections and the tournament finale (see TrialGroup). */
+  group?: TrialGroup;
   accent: string;
   players: { min: number; max: number };
   /** Typical round length in seconds [min, max]. */

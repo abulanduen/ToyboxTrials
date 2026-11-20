@@ -251,10 +251,12 @@ export const MINIGAMES: MinigameDefinition[] = [
     tagline: 'A pocket-sized auto-battler.',
     description: 'Ten rounds of toy auto-battles. Buy from a level-weighted shop, merge matching copies up to three stars, deploy your squad, and choose passives on rounds 3, 6 and 9.',
     category: 'strategy',
+    group: 'strategy',
     accent: PALETTE.sage,
     players: { min: 1, max: 8 },
     durationSec: [300, 630],
-    // Owner decision (19 Nov 2026): the full 5–10 minute game, in the longer formats only (never Blitz).
+    // Owner decisions (19 and 20 Nov 2026): the full 5–10 minute game, in the longer formats only
+    // (never Blitz), and as a strategy trial only ever their finale.
     eligibility: { tournament: true, ranked: false, casual: true, formats: ['normal', 'treasure'] },
     scoring: 'score',
     tieBreak: 'Remaining unit health',
@@ -352,12 +354,14 @@ export const MINIGAMES: MinigameDefinition[] = [
     description:
       'Every player defends their own 8×8 board. Build pays for a random tower, and any two towers of the same tier merge into a random tower one tier up, all the way to tier 7. Level your builder for better odds, finish quick quests for gold, and beat the bosses on waves 5, 10, 15 and 20 for free towers. Leaks cost lives; knocked-out players watch the other boards. Survive the most waves to win.',
     category: 'strategy',
+    group: 'strategy',
     accent: PALETTE.honey,
     players: { min: 1, max: 8 },
     durationSec: [300, 600],
     inputs: ['keyboard', 'mouse', 'touch'],
     bots: 'available',
-    eligibility: { tournament: false, ranked: false, casual: true },
+    // Owner decision (20 Nov 2026): a strategy finale for Normal and Treasure tournaments only.
+    eligibility: { tournament: true, ranked: false, casual: true, formats: ['normal', 'treasure'] },
     scoring: 'progress',
     tieBreak: 'Waves survived, then lives left, then damage score',
     recordUnit: 'waves',
@@ -392,13 +396,15 @@ export const MINIGAMES: MinigameDefinition[] = [
     description:
       'Pick a Tin Soldier, a Pop-Gun Ranger or a Clockwork Wizard and hold out on your own patch of the table. Your weapons fire on their own: you only move. Swarms of dust bunnies, wind-up mice, marbles and paper planes close in, an elite arrives every minute and the Boiler Baron at 4:00. Level up, max a weapon, crack an elite’s chest to evolve it, or skip the chest to send an elite to a rival. Beat the boss to win; otherwise the toy that lasts longest wins.',
     category: 'survival',
+    group: 'strategy',
     accent: PALETTE.honey,
     players: { min: 1, max: 8 },
     durationSec: [240, 330],
     inputs: ['keyboard', 'mouse', 'touch'],
     bots: 'available',
-    // Provisional: a five-minute run is long for a tournament round (like Toy Squad), so practice only for now.
-    eligibility: { tournament: false, ranked: false, casual: true },
+    // Owner decision (20 Nov 2026): a five-minute run is long for a tournament round, so like Toy
+    // Squad it is a strategy trial: only ever the finale of a Normal or Treasure tournament.
+    eligibility: { tournament: true, ranked: false, casual: true, formats: ['normal', 'treasure'] },
     scoring: 'time',
     tieBreak: 'Boss slain first (earlier is better), then survival time, then knockouts, then points',
     recordUnit: 'points',
@@ -432,3 +438,4 @@ export const tournamentPool = (format?: TournamentFormat) =>
   format ? poolForFormat(format, MINIGAMES) : MINIGAMES.filter((g) => g.status === 'playable' && g.eligibility.tournament);
 
 export { lengthClassOf, durationLabel, durationChip } from './length';
+export { groupOf, isStrategy } from './tournament';

@@ -22,7 +22,7 @@ import { MINIGAMES, gameById } from './registry';
 import { makeBots } from './bots';
 import { newSeed, seededRng, subSeed } from './rng';
 import { addRound, rankStandings, type Standing } from './scoring';
-import { FORMATS, poolForFormat, selectGames, type TournamentFormat } from './tournament';
+import { poolForFormat, selectTournament, type TournamentFormat } from './tournament';
 import type { BotDifficulty, Contestant, MatchEvent, MinigameId, MinigameModule, MinigameResult } from './types';
 import { importFresh } from '../game/staleBuild';
 
@@ -186,10 +186,10 @@ export function openTournamentPicker() {
 
 export function startTournament(format: TournamentFormat, opponents: number, difficulty: BotDifficulty) {
   const field = opponents + 1;
-  // The format's rotation for this field size (Toy Squad: Normal and Treasure only).
+  // The format's rotation for this field size; Normal and Treasure end with a strategy finale.
   const pool = poolForFormat(format, MINIGAMES, field);
   const seed = newSeed();
-  const games = selectGames(seed, FORMATS[format].games, pool);
+  const games = selectTournament(seed, format, pool);
   const local = localContestant();
   const bots = makeBots(subSeed(seed, 'bots'), opponents, difficulty, local.name);
   const contestants = [local, ...bots];
