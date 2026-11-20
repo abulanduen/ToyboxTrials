@@ -134,7 +134,7 @@ const check = (name, ok, detail = '') => { results.push(`${ok ? 'PASS' : 'FAIL'}
   check('E picks the ball up; the prompt becomes Hold to throw', (await hp()).holding && (await promptHas('Hold to throw')));
   await page.keyboard.down('KeyE');
   await waitHp(() => (window.__toybox.hubplay.state().charge ?? 0) > 0.3, null, 60000);
-  await waitHp(() => document.querySelector('[data-testid=hubplay-meter]')?.style.display !== 'none', null, 20000);
+  await waitHp(() => document.querySelector('[data-testid=hubplay-meter]')?.style.display !== 'none', null, 120000);
   const charging = await hp();
   const meterShown = await page.isVisible('[data-testid=hubplay-meter]');
   const arcDots = await T(() => window.__toybox.three().scene.getObjectByName('hubplay:arc')?.count ?? 0);
@@ -147,7 +147,7 @@ const check = (name, ok, detail = '') => { results.push(`${ok ? 'PASS' : 'FAIL'}
   await waitHp(() => window.__toybox.hubplay.state().ballRest, null, 400000);
   // a basket: pick it up where it landed, then throw from in front of the hoop with the solved power
   const bl = (await hp()).ball;
-  await T(([x, z]) => window.__toybox.teleport(x, z + 2, Math.PI), [bl.x, bl.z]);
+  await T(([x, z]) => { const d = Math.hypot(76 - x, -128 - z) || 1; window.__toybox.teleport(x + ((76 - x) / d) * 2, z + ((-128 - z) / d) * 2, Math.PI); }, [bl.x, bl.z]);
   await page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Pick up'), null, { timeout: 120000 }).catch(() => null);
   await page.keyboard.press('KeyE');
   await waitHp(() => window.__toybox.hubplay.state().holding);

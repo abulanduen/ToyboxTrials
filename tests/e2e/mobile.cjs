@@ -145,7 +145,11 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
   const hp = () => page.evaluate(() => window.__toybox.hubplay.state());
   const btnText = (t) => page.waitForFunction((s) => document.querySelector('.touch-btn--interact')?.textContent?.includes(s), t, { timeout: 120000 }).catch(() => null);
   const pressBtn = async (id, ms) => {
-    const b = await (await page.$('.touch-btn--interact')).boundingBox();
+    const el = await page.$('.touch-btn--interact');
+    const b = await el.boundingBox();
+    // the button pops in with a scale animation: its layout size is the touch target
+    const [w, h] = await el.evaluate((e) => [e.offsetWidth, e.offsetHeight]);
+    b.layout = { w, h };
     await touch('touchStart', [[b.x + b.width / 2, b.y + b.height / 2, id]]);
     if (ms) await page.waitForTimeout(ms);
     return b;
@@ -156,7 +160,7 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
   const kb = await pressBtn(40, 300);
   await touch('touchEnd', []);
   await page.waitForFunction((x) => window.__toybox.hubplay.state().marble.x < x - 4, m0.x, { timeout: 120000, polling: 200 }).catch(() => null);
-  check('touch: the Interact button (≥ 56 px) reads Kick by the marble and kicks it', kb.width >= 56 && kb.height >= 56 && (await hp()).marble.x < m0.x - 4, `${JSON.stringify(kb)} x ${m0.x} → ${(await hp()).marble.x.toFixed(1)}`);
+  check('touch: the Interact button (≥ 56 px) reads Kick by the marble and kicks it', kb.layout.w >= 56 && kb.layout.h >= 56 && (await hp()).marble.x < m0.x - 4, `${JSON.stringify(kb)} x ${m0.x} → ${(await hp()).marble.x.toFixed(1)}`);
   await page.evaluate(() => window.__toybox.teleport(76, -125.6, Math.PI));
   await btnText('Pick');
   await pressBtn(41, 300);
@@ -166,6 +170,7 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
   check('touch: Pick up takes the ball; the button now reads Hold (to throw)', (await hp()).holding && ((await page.textContent('.touch-btn--interact').catch(() => '')) || '').includes('Hold'));
   await pressBtn(42);
   await page.waitForFunction(() => (window.__toybox.hubplay.state().charge ?? 0) > 0.3, null, { timeout: 120000, polling: 100 }).catch(() => null);
+  await page.waitForFunction(() => document.querySelector('[data-testid=hubplay-meter]')?.style.display !== 'none', null, { timeout: 120000, polling: 100 }).catch(() => null);
   const ch = await hp();
   const meterBox = await page.locator('[data-testid=hubplay-meter]').boundingBox().catch(() => null);
   await page.screenshot({ path: `${OUT}/mobile-10-hubplay-charge-landscape.png` });
@@ -208,13 +213,14 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
   // and the meter stay on screen, clear of the touch buttons.
   await page.waitForFunction(() => window.__toybox.hubplay.state().ballRest, null, { timeout: 400000, polling: 250 }).catch(() => null);
   const bl = (await hp()).ball;
-  await page.evaluate(([x, z]) => window.__toybox.teleport(x, z + 2, Math.PI), [bl.x, bl.z]);
+  await page.evaluate(([x, z]) => { const d = Math.hypot(76 - x, -128 - z) || 1; window.__toybox.teleport(x + ((76 - x) / d) * 2, z + ((-128 - z) / d) * 2, Math.PI); }, [bl.x, bl.z]);
   await btnText('Pick');
   await pressBtn(43, 300);
   await touch('touchEnd', []);
   await btnText('Hold');
   await pressBtn(44);
   await page.waitForFunction(() => (window.__toybox.hubplay.state().charge ?? 0) > 0.25, null, { timeout: 120000, polling: 100 }).catch(() => null);
+  await page.waitForFunction(() => document.querySelector('[data-testid=hubplay-meter]')?.style.display !== 'none', null, { timeout: 120000, polling: 100 }).catch(() => null);
   const chip = await page.locator('[data-testid=hubplay-score]').boundingBox().catch(() => null);
   const mb = await page.locator('[data-testid=hubplay-meter]').boundingBox().catch(() => null);
   const btns = await page.$$eval('.touch-btn, .touch-pause', (els) => els.map((e) => { const r = e.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; }));
