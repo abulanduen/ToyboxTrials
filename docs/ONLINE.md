@@ -357,6 +357,11 @@ online"). The other choice in both places is the existing **practice with bots**
   - Blink Duel and Spellbox Showdown: inputs act on the next server step after they arrive, so a
     blink or swing lands one network trip (plus up to ~33 ms of input batching) after the press.
     There is no client-side prediction. Not measured on a real network.
+  - Hoop Hustle throws carry the power the player's meter showed and the match time they let go
+    (`at`); the rules honour that time up to 250 ms back (`maxLagMs`) and fly the ball the missed
+    steps at once, so the gold arc a player saw (the sliding hoop included) is the throw they get.
+    A modified client could choose its power; the trial's power assist already makes the perfect
+    power easy to hit. Not measured on a real network.
 - **Spellbox Showdown** runs online through the generic path: its inputs are only shape-checked
   here and validated by its own rules core, so changes to its inputs keep working online. Like
   practice, it skips the 3 s countdown and opens on its draft (`skipStartCountdown`, mirrored in
@@ -378,7 +383,8 @@ online"). The other choice in both places is the existing **practice with bots**
   shops, matchups and later pictures).
 - **Toy Tower Tumble:** each board's random-draw state (`rng`) is not sent (it would tell which
   tower the next Build gives).
-- **Blink Duel, Spellbox:** other players' queued inputs (`pending`) are not sent.
+- **Blink Duel, Spellbox, Hoop Hustle:** other players' queued inputs (`pending`) are not sent.
+- **Hoop Hustle:** the seed (it deals every toy's next spot) is not sent.
 - **Toy Squad:** you get your own shop, passive offers and battle; other players' shops and
   offers are blanked and their battles are not sent.
 - Inferno Escape, Wind-Up Dash and Music Box Rhythm have nothing hidden (the course and chart are

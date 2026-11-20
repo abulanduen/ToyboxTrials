@@ -116,35 +116,53 @@ const boxesOverlap = (a, b) => a && b && a.x < b.x + b.width && b.x < a.x + a.wi
         await page.keyboard.up('KeyA');
       }
       if (!mobile) {
-        // The mouse aims too: point at the hoop.
-        const p = await page.evaluate(() => window.__toybox.hoop.point(0, 9.6, 0));
+        // The mouse aims too: point at the court under the rim.
+        const p = await page.evaluate(() => window.__toybox.hoop.point(0, 0.06, 0.5));
         await page.mouse.move(p.x, p.y);
-        await page.waitForFunction(() => { const s = window.__toybox.match.state(), me = s.players.find((q) => q.id === 'you'), sp = s.spots[me.spot]; return Math.abs(window.__toybox.hoop.aim() - Math.atan2(-sp.x, -sp.z)) < 0.25; });
+        await page.waitForFunction(() => { const s = window.__toybox.match.state(), me = s.players.find((q) => q.id === 'you'), sp = s.spots[me.spot]; return Math.abs(window.__toybox.hoop.aim() - Math.atan2(-sp.x, 0.5 - sp.z)) < 0.1; });
       }
 
-      // ----- hold to charge, let go in the gold zone: a basket (slowed down so headless timing can hit it)
+      // ----- hold to charge, let go in the gold zone: a basket. Slowed right down so software
+      // rendering (a few frames a second on a loaded machine) can still see the meter in the zone;
+      // if a slow frame jumps past it, that throw is let go late (a miss) and we try again.
       const throwInZone = async (stick) => {
         const before = await me();
-        await page.evaluate(() => window.__toybox.match.timeScale(0.2));
-        if (mobile) await stick.holdButton('hh-throw');
-        else await page.keyboard.down('Space');
-        await page.waitForFunction(() => !!document.querySelector('.hh-meter.is-charging'));
-        await page.waitForFunction(() => !!document.querySelector('.hh-meter.is-perfect'), null, { polling: 'raf' });
-        if (mobile) await stick.releaseButton();
-        else await page.keyboard.up('Space');
-        await page.waitForFunction((n) => window.__toybox.match.state().players.find((p) => p.id === 'you').shots > n, before.shots);
-        await page.evaluate(() => window.__toybox.match.timeScale(0));
-        await shot('throw');
-        await page.evaluate(() => window.__toybox.match.timeScale(1));
-        await page.waitForFunction((n) => { const p = window.__toybox.match.state().players.find((q) => q.id === 'you'); return p.makes > n || !!p.lastMiss; }, before.makes);
-        const after = await me();
-        assert.equal(after.makes, before.makes + 1, `${layout}: a throw let go in the gold zone goes in (${JSON.stringify(after.lastMiss)})`);
-        assert.ok(after.points > before.points);
-        assert.notEqual(after.spot, before.spot, 'hops to a new spot after a make');
-        await page.getByTestId('hh-pop').waitFor();
-        assert.match(await page.getByTestId('hh-pop').innerText(), /^\+[1-3]!/);
-        await page.waitForFunction(() => window.__toybox.match.state().players.find((p) => p.id === 'you').holding);
-        return after;
+        for (let attempt = 0; attempt < 5; attempt++) {
+          await page.waitForFunction(() => { const s = window.__toybox.match.state(), p = s.players.find((q) => q.id === 'you'); return p.holding && !p.move; });
+          const shots = (await me()).shots;
+          await page.evaluate(() => window.__toybox.match.timeScale(0.06));
+          if (mobile) await stick.holdButton('hh-throw');
+          else await page.keyboard.down('Space');
+          await page.waitForFunction(() => !!document.querySelector('.hh-meter.is-charging'));
+          await page.waitForFunction(() => {
+            const m = document.querySelector('.hh-meter');
+            const k = parseFloat((document.querySelector('.hh-meter__fill')?.style.transform ?? '').replace(/[^0-9.]/g, '')) || 0;
+            return m?.classList.contains('is-perfect') || k > 0.97;
+          }, null, { polling: 'raf' });
+          const inZone = await page.evaluate(() => document.querySelector('.hh-meter')?.classList.contains('is-perfect'));
+          if (mobile) await stick.releaseButton();
+          else await page.keyboard.up('Space');
+          await page.waitForFunction((n) => window.__toybox.match.state().players.find((p) => p.id === 'you').shots > n, shots);
+          if (inZone) {
+            await page.evaluate(() => window.__toybox.match.timeScale(0));
+            await shot('throw');
+          }
+          await page.evaluate(() => window.__toybox.match.timeScale(1));
+          await page.waitForFunction(() => window.__toybox.match.state().balls.every((b) => b.owner !== 'you' || b.result));
+          const after = await me();
+          if (!inZone) {
+            console.log(`  (${layout}: a slow frame let go past the zone; again)`);
+            continue;
+          }
+          assert.equal(after.makes, before.makes + 1, `${layout}: a throw let go in the gold zone goes in (${JSON.stringify(after.lastMiss)})`);
+          assert.ok(after.points > before.points);
+          assert.notEqual(after.spot, before.spot, 'hops to a new spot after a make');
+          await page.getByTestId('hh-pop').waitFor();
+          assert.match(await page.getByTestId('hh-pop').innerText(), /^\+[1-3]!/);
+          await page.waitForFunction(() => window.__toybox.match.state().players.find((p) => p.id === 'you').holding);
+          return after;
+        }
+        throw new Error(`${layout}: never caught the gold zone in five tries`);
       };
       let stick = null;
       if (mobile) stick = await holdStick(page, [0, -1]); // up: at the hoop
@@ -165,13 +183,14 @@ const boxesOverlap = (a, b) => a && b && a.x < b.x + b.width && b.x < a.x + a.wi
       await page.waitForFunction(() => !!document.querySelector('.hh-meter.is-charging'));
       await page.getByRole('button', { name: 'Pause', exact: true }).click();
       await page.waitForSelector('.pause');
-      if (!mobile) await page.keyboard.up('Space');
+      // (Let go of Space with nothing focused, so the key-up can't press a button on the pause sheet.)
+      if (!mobile) { await page.evaluate(() => document.activeElement?.blur()); await page.keyboard.up('Space'); }
       const t = (await state()).t;
       await page.waitForTimeout(300);
       assert.equal((await state()).t, t, 'paused');
       await page.keyboard.press('Escape');
       await page.waitForSelector('.pause', { state: 'detached' });
-      await page.waitForTimeout(500);
+      await page.waitForFunction((t0) => window.__toybox.match.state().t > t0 + 300, t);
       assert.equal((await me()).shots, shots, 'the charge was dropped, not thrown');
       assert.equal((await me()).charging, false);
 
