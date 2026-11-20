@@ -235,8 +235,10 @@ export function Greeters() {
       v.set(nearest.x, GREETER_BUBBLE_Y, nearest.z).project(camera);
       const vis = v.z < 1;
       el.style.opacity = vis ? '1' : '0';
-      const x = Math.min(size.width - 12, Math.max(12, (v.x * 0.5 + 0.5) * size.width));
-      const y = Math.max(8, (-v.y * 0.5 + 0.5) * size.height);
+      // keep the whole bubble on screen (it is centred above its anchor point)
+      const hw = el.offsetWidth / 2 + 8;
+      const x = Math.min(size.width - hw, Math.max(hw, (v.x * 0.5 + 0.5) * size.width));
+      const y = Math.max(el.offsetHeight + 20, (-v.y * 0.5 + 0.5) * size.height);
       el.style.setProperty('--bx', `${x}px`);
       el.style.setProperty('--by', `${y}px`);
     }
