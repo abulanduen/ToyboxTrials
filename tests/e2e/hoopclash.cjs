@@ -167,8 +167,7 @@ async function touch(page) {
       s = await st();
       assert.equal(s.score[0], before + 2, `the gold-arc shot went in (${JSON.stringify(s.score)})`);
       assert.equal(s.players.find((p) => p.id === 'you').pts, 2);
-      await page.getByTestId('hc-banner').waitFor();
-      assert.match(await page.getByTestId('hc-banner').innerText(), /\+2/);
+      await page.waitForFunction((n) => document.querySelector('[data-testid=hc-score-red]')?.textContent === String(n), before + 2);
       await shot('scored');
 
       // A pass to the teammate you face (Q, or the Pass button).

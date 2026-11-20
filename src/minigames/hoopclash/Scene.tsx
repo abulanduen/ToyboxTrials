@@ -182,6 +182,7 @@ function Toy({ e, getState }: { e: RosterEntry; getState: () => HoopState | null
     drawn.set(e.id, { x: 0, y: 0, z: 0, yaw: 0, speed: 0, init: false });
     return () => void drawn.delete(e.id);
   }, [e.id]);
+  // Before the ball, the camera and the arc (default priority), which read where the toy is drawn.
   useFrame((_, rawDt) => {
     const s = getState();
     const p = s?.players.find((q) => q.id === e.id);
@@ -223,7 +224,7 @@ function Toy({ e, getState }: { e: RosterEntry; getState: () => HoopState | null
     // The floor ring: team colour; brighter and bigger under the ball handler.
     const hold = s.ball.holder === p.id;
     ring.current.scale.setScalar(hold ? 1.25 : 1);
-  });
+  }, -1);
   return (
     <group ref={root} name={`hoopclash:toy-${e.id}`}>
       {e.local ? (
@@ -430,8 +431,8 @@ function Confetti() {
 // ---------------------------------------------------------------- camera
 /** Broadcast framing: height and distance back from the focus, and the field of view. */
 const SHOT = {
-  landscape: { h: 30, back: 36, fov: 45, look: -2, lead: 0.35 },
-  portrait: { h: 46, back: 34, fov: 62, look: -1, lead: 0.25 },
+  landscape: { h: 27, back: 32, fov: 46, look: -2, lead: 0.35 },
+  portrait: { h: 31, back: 25, fov: 60, look: -1, lead: 0.25 },
 };
 
 function useBroadcastCamera(getState: () => HoopState | null, localId: string) {
@@ -457,7 +458,9 @@ function useBroadcastCamera(getState: () => HoopState | null, localId: string) {
       tz = meIn ? me!.z + (ballAt.z - me!.z) * shot.lead : ballAt.z;
       if (s.phase === 'jump' || s.phase === 'half') tx = tz = 0;
     }
-    const maxX = portrait ? COURT.halfL - 6 : COURT.halfL - 14;
+    // Lean towards the nearer end, so the hoop stays in the picture near either basket.
+    tx *= 1.25;
+    const maxX = portrait ? COURT.halfL - 4 : COURT.halfL - 8;
     tx = Math.max(-maxX, Math.min(maxX, tx));
     tz = Math.max(-COURT.halfW * 0.5, Math.min(COURT.halfW * 0.4, tz * 0.5));
     const k = f.current.init ? 1 - Math.exp(-dt * 3.2) : 1;
