@@ -153,7 +153,7 @@ const seedLow = async (page) =>
   page.addInitScript(() => {
     if (!sessionStorage.getItem('seeded')) {
       sessionStorage.setItem('seeded', '1');
-      localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { quality: 'low', tutorials: false }, version: 0 }));
+      localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { tourSeen: true, quality: 'low', tutorials: false }, version: 0 }));
     }
   });
 
@@ -322,7 +322,7 @@ async function phone(browser, errors, orientation) {
   const vp = orientation === 'portrait' ? { width: 412, height: 915 } : { width: 915, height: 412 };
   const ctx = await browser.newContext({ ...dev, viewport: vp, screen: vp });
   const page = await ctx.newPage();
-  await page.addInitScript(() => { if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { quality: 'low', tutorials: false }, version: 0 })); } }); // phones default to Low anyway; tutorials are tested elsewhere
+  await page.addInitScript(() => { if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { tourSeen: true, quality: 'low', tutorials: false }, version: 0 })); } }); // phones default to Low anyway; tutorials are tested elsewhere
   page.setDefaultTimeout(120000);
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });

@@ -90,7 +90,7 @@ async function run(name) {
         if (!(await state(() => !!window.__toybox.match.state().players.find((q) => q.id === 'you').choice))) return;
       }
     };
-    await page.addInitScript(() => localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { quality: 'low', tutorials: false }, version: 0 })));
+    await page.addInitScript(() => localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { tourSeen: true, quality: 'low', tutorials: false }, version: 0 })));
     await page.goto((process.env.BASE_URL || 'http://localhost:4198/') + '?debug#play');
     await page.waitForSelector('.loading', { state: 'detached', timeout: 180000 });
 

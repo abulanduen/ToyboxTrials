@@ -34,7 +34,7 @@ async function open(browser, opts, quality = QUALITY) {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  await page.addInitScript((q) => localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { quality: q, tutorials: false }, version: 0 })), quality);
+  await page.addInitScript((q) => localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { tourSeen: true, quality: q, tutorials: false }, version: 0 })), quality);
   await page.goto(`${BASE}?debug#play`);
   await page.waitForFunction(() => window.__toybox && window.__toybox.hub && window.__toybox.renderInfo && window.__toybox.teleport, null, { timeout: 180000 });
   await page.waitForSelector('.loading', { state: 'detached', timeout: 180000 }).catch(() => {});

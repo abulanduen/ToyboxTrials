@@ -155,8 +155,8 @@ async function layoutOf(page, sel) {
   }, sel);
 }
 
-const V0_SAVE = { state: { quality: 'low', tutorials: false, contenderName: 'Guesty', paintIndex: 1, secretsFound: ['musicbox', 'marble', 'jack', 'key'] }, version: 0 };
-const FRESH = { state: { quality: 'low', tutorials: false }, version: 1 };
+const V0_SAVE = { state: { tourSeen: true, quality: 'low', tutorials: false, contenderName: 'Guesty', paintIndex: 1, secretsFound: ['musicbox', 'marble', 'jack', 'key'] }, version: 0 };
+const FRESH = { state: { tourSeen: true, quality: 'low', tutorials: false }, version: 1 };
 
 // ---------------------------------------------------------------- the main flow
 async function flow(browser, dev) {

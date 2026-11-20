@@ -17,7 +17,7 @@ fs.mkdirSync(OUT, { recursive: true });
     const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
     page.setDefaultTimeout(240000);
     page.on('pageerror', e => { throw e; });
-    await page.addInitScript(() => localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { quality: 'low', tutorials: false }, version: 0 })));
+    await page.addInitScript(() => localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { tourSeen: true, quality: 'low', tutorials: false }, version: 0 })));
     await page.goto(BASE + '?debug#play');
     await page.waitForFunction(() => window.__toybox?.match && !document.querySelector('.loading'));
     const games = await page.evaluate(async () => {

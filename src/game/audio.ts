@@ -16,6 +16,8 @@ let musicOut: GainNode | null = null;
 let musicActive = false;
 const MUSIC_LEVEL = 0.8;
 let noiseBuf: AudioBuffer | null = null;
+/** The shared output stage (compressor → speakers) that every bus feeds. */
+let outStage: DynamicsCompressorNode | null = null;
 
 function ensure(): AudioContext | null {
   if (ctx) return ctx;
@@ -25,6 +27,7 @@ function ensure(): AudioContext | null {
   const comp = ctx.createDynamicsCompressor();
   comp.threshold.value = -14;
   comp.ratio.value = 4;
+  outStage = comp;
   master = ctx.createGain();
   master.connect(comp).connect(ctx.destination);
   musicOut = ctx.createGain();
@@ -52,6 +55,16 @@ useGame.subscribe((s, p) => {
 export function unlockAudio() {
   const c = ensure();
   if (c && c.state === 'suspended') void c.resume();
+}
+
+/**
+ * The running AudioContext and the shared output stage, for the background music and voice lines
+ * (src/game/music.ts, src/game/voice.ts), which keep their own buses. Null until the first user
+ * gesture has unlocked audio (and wherever Web Audio is unavailable).
+ */
+export function audioOut(): { ctx: AudioContext; out: AudioNode } | null {
+  if (!ctx || ctx.state !== 'running' || !outStage) return null;
+  return { ctx, out: outStage };
 }
 
 function live(): AudioContext | null {

@@ -76,6 +76,7 @@ entry via the registry, bots and tournament eligibility. See `src/minigames/infe
 provisional rules and integration notes. Claude retains the three worktrees listed above; recover
 and review those separately. This branch has not been merged or deployed.
 
+- **Hub welcome and music (implemented, first pass):** Pipwick, a wind-up tin songbird mascot, gives new players a skippable, replayable camera tour of the Hub (`tourSeen`, store v2); a dressed greeter at each of the 14 gates pitches its trial in a speech bubble; the Jukebox by the Music Box Rhythm gate picks the Hub's track; calm generative background music synthesised in code with per-trial moods (silent in Music Box Rhythm); Music and Voice volume settings. Voice lines are scripted (`src/game/voiceLines.ts`) but not recorded yet (ElevenLabs pending). See `docs/VOICE.md`. How the music sounds has not been judged by ear.
 - **M1–M3:** art direction, procedural tabletop/room, wind-up character, third-person exploration, collision, interactions/secrets, synthesised sound, menu, Workshop, settings and local persistence; keyboard/mouse and touch controls.
 - **M4:** modular minigame host, intro/countdown/pause/results, local records, bot opponents, seeded Blitz (3), Normal (5), Treasure (8) tournaments, standings/final results and local history.
 - **Copycat Conductor:** seeded growing sequences, four ASJK/touch instruments, elimination, solo/bot play and rules tests. Preserve its working functionality.

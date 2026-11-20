@@ -92,7 +92,7 @@ async function checkStartVisible(page, viewport, where) {
         const page = await browser.newPage({ viewport, hasTouch: mobile, isMobile: mobile });
         page.setDefaultTimeout(180000);
         page.on('pageerror', (e) => { if (!/webgl|context/i.test(e.message)) errors.push(e.message); });
-        await page.addInitScript(() => localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { quality: 'low', tutorials: true }, version: 0 })));
+        await page.addInitScript(() => localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { tourSeen: true, quality: 'low', tutorials: true }, version: 0 })));
         await page.goto(BASE + '?debug' + hash);
         await page.waitForSelector('.loading', { state: 'detached', timeout: 600000 });
         if (!process.env.TUT_GL) await page.addStyleTag({ content: 'canvas { visibility: hidden !important; }' });

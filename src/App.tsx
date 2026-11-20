@@ -4,6 +4,7 @@ import { Overlay } from './ui/Overlay';
 import { ErrorBoundary } from './ui/ErrorBoundary';
 import { installInput } from './game/input';
 import { unlockAudio } from './game/audio';
+import { installMusic } from './game/music';
 import { useGame, type Screen } from './game/store';
 import { installNet, joinOnline } from './net/client';
 import { installAccount } from './net/account';
@@ -81,6 +82,7 @@ export function App() {
 
   useEffect(() => {
     installInput();
+    installMusic();
     // Browsers only allow audio after a user gesture.
     const unlock = () => unlockAudio();
     window.addEventListener('pointerdown', unlock);

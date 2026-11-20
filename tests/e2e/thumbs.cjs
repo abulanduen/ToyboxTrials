@@ -72,7 +72,7 @@ const KEEP_OVERLAY = new Set(['odd-page-out', 'toy-squad']);
   await ctx.addInitScript(() => {
     if (!sessionStorage.getItem('s')) {
       sessionStorage.setItem('s', '1');
-      localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { quality: 'low', tutorials: false, contenderName: 'Ticker', autoOnline: false }, version: 1 }));
+      localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { tourSeen: true, quality: 'low', tutorials: false, contenderName: 'Ticker', autoOnline: false }, version: 1 }));
     }
   });
   const page = await ctx.newPage();

@@ -9,7 +9,7 @@
       "characters": "Production character assets. Empty: the contender is built procedurally (src/character/WindupBot.tsx).",
       "props": "Production prop assets. Empty: all props are code-built primitives (src/scene/*).",
       "ui": "Production UI images, including transparent Spellbox ability icons and real gameplay tutorial screenshots; other UI uses CSS and inline SVG.",
-      "audio": "Production audio files. Empty: all sound is synthesised at runtime (src/game/audio.ts), including the three Music Box Rhythm tracks, which are composed in code (see the music-* entries).",
+      "audio": "Production audio files. Empty: all sound is synthesised at runtime (src/game/audio.ts), including the three Music Box Rhythm tracks and the calm background music (src/game/musicScore.ts, src/game/music.ts), which are composed in code (see the music-* entries). audio/voice/ will hold recorded voice lines (<line id>.mp3, script in src/game/voiceLines.ts, docs/VOICE.md); none are recorded yet, and each recording gets its own entry here with \"file\": \"audio/voice/<id>.mp3\".",
       "thumbs": "Game-card thumbnails (480x270 WebP): original captures of real gameplay from this build, made by tests/e2e/thumbs.cjs and tests/e2e/thumbs.py. Cards fall back to the trial accent colour when one is missing."
     },
     "naming": "<category>-<nn>-<kebab-case-subject>[-<variant>].<ext>",
@@ -882,6 +882,33 @@
       "what": "Music Box Rhythm track 3 (hard): A minor, 4/4, 150 bpm, about 69 s",
       "source": "Composed in code for Toybox Trials (original; not based on any existing song)",
       "license": "Project-owned"
+    },
+    {
+      "id": "music-hub-background",
+      "type": "music",
+      "title": "Hub background tracks (jukebox): Windowsill Waltz, Felt and Sawdust, Tin Lullaby, Clockwork Afternoon, Rainy Playroom",
+      "where": "src/game/musicScore.ts (styles and generative composer), src/game/music.ts (Web Audio player)",
+      "what": "Calm generative background music for the Hub, chosen at the jukebox: composed bar by bar at runtime from seeded rules (58-88 bpm), synthesised with oscillators; never a fixed loop",
+      "source": "Composed in code for Toybox Trials (original; not based on any existing song)",
+      "license": "Project-owned"
+    },
+    {
+      "id": "music-trial-moods",
+      "type": "music",
+      "title": "Trial moods (bright, playful, curious, breezy, warm, night, thoughtful, focus, twinkle, storybook, gallant, interlude)",
+      "where": "src/game/musicScore.ts (GAME_MOODS), src/game/music.ts",
+      "what": "Calm generative background music for each trial (none for Music Box Rhythm, which plays its own tracks), synthesised at runtime",
+      "source": "Composed in code for Toybox Trials (original; not based on any existing song)",
+      "license": "Project-owned"
+    },
+    {
+      "id": "voice-lines",
+      "type": "voice",
+      "status": "script-only",
+      "where": "src/game/voiceLines.ts (script: ids, speakers, exact text), src/game/voice.ts (playback), docs/VOICE.md (recording hand-off)",
+      "what": "Spoken lines for Pipwick (welcome mascot) and the 14 gate greeters. No recordings yet: lines show as text and play public/assets/audio/voice/<id>.mp3 once a recording is added (with its own manifest entry)",
+      "source": "Pending (planned: ElevenLabs, owner's account)",
+      "license": "To be recorded per recording entry"
     },
     {
       "id": "ui-svg",

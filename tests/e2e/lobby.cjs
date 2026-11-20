@@ -36,7 +36,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(OUT, name), timeo
   // `tutorials`: the player's "Game tutorials" setting (B keeps it on to see the How to play steps online).
   const open = async (name, ctxOpts = { viewport: { width: 800, height: 500 } }, tutorials = false) => {
     const ctx = await browser.newContext(ctxOpts);
-    await ctx.addInitScript(([n, tut]) => { if (!sessionStorage.getItem('s')) { sessionStorage.setItem('s', '1'); localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { quality: 'low', tutorials: tut, contenderName: n }, version: 1 })); } }, [name, tutorials]);
+    await ctx.addInitScript(([n, tut]) => { if (!sessionStorage.getItem('s')) { sessionStorage.setItem('s', '1'); localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { tourSeen: true, quality: 'low', tutorials: tut, contenderName: n }, version: 1 })); } }, [name, tutorials]);
     const page = await ctx.newPage();
     page.setDefaultTimeout(T);
     page.on('pageerror', (e) => errors.push(`${name}: ${e.message}`));

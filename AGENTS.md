@@ -43,7 +43,7 @@ Applies to Codex, Claude Code and other contributors. Read this file before edit
 - Each minigame uses `src/minigames/types.ts` and the lazy-loaded registry. Keep deterministic, seeded rules independent of DOM, rendering, wall-clock timers and unseeded randomness. Reuse the host for lifecycle, bots, results and tournaments.
 - Use `MiniContender` for opponents/crowds and the full `WindupBot` for the local character. Debug hooks are test aids, never gameplay dependencies.
 - Every feature must support keyboard/mouse and touch, portrait and landscape where practical. Declare a real minigame touch layout; `TOUCH_TBD` blocks shipping. Use safe-area-aware controls with targets at least 56 px; touch defaults to Low quality.
-- Follow `ART_DIRECTION.md`. Keep content original. Synthesise sound effects; original/licensed music is allowed for Music Box Rhythm. Record external/generated assets and licences in `public/assets/asset-manifest.json`.
+- Follow `ART_DIRECTION.md`. Keep content original. Synthesise sound effects; original/licensed music is allowed for Music Box Rhythm. Calm background music for the Hub and trials is allowed by the owner if original and synthesised in code (`src/game/musicScore.ts`; silent in Music Box Rhythm). Voice lines are scripted in `src/game/voiceLines.ts` (`docs/VOICE.md`). Record external/generated assets and licences in `public/assets/asset-manifest.json`.
 - The owner declined the parallax trial and requested 3D town concept art for Claude Code.
   Use `docs/assets/town-concept-v1/HANDOFF.md` and its four views for visual direction; preserve
   source anchors, interaction points, collision and working games. The drawings are not measured

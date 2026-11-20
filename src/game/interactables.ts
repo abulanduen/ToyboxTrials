@@ -11,7 +11,7 @@ import { SECRET_IDS, rewardForSecret } from './cosmetics';
 import { EARN } from './economy';
 import { exposeDebug } from './debug';
 import { openPractice } from '../minigames/session';
-import { GATES, GATE_STAND, JACK, MUSICBOX, PAVILION, SCOREBOARD, SHOP, TOWER, TV, WORKSHOP, frontOf } from '../scene/layout';
+import { GATES, GATE_STAND, JACK, JUKEBOX, MUSICBOX, PAVILION, PIPWICK_HOME, SCOREBOARD, SHOP, TOWER, TV, WORKSHOP, frontOf } from '../scene/layout';
 
 export interface Interactable {
   id: string;
@@ -41,6 +41,9 @@ export const INTERACTABLES: Interactable[] = [
   { id: 'shop', ...frontOf(SHOP.x, SHOP.z, SHOP.rot, SHOP.d / 2 + 6), radius: 5, verb: 'Browse', label: 'Odds & Ends Shop' },
   { id: 'scoreboard', ...frontOf(SCOREBOARD.x, SCOREBOARD.z, SCOREBOARD.rot, 3.5), radius: 5, verb: 'Read', label: 'the Scoreboard' },
   { id: 'tv', ...frontOf(TV.x, TV.z, TV.rot, TV.d / 2 + 2.6), radius: 3.2, verb: 'Change channel on', label: 'the TV' },
+  // Pipwick, the welcome mascot (talk to replay the tour), and the Jukebox (pick the Hub's music)
+  { id: 'pipwick', ...frontOf(PIPWICK_HOME.x, PIPWICK_HOME.z, PIPWICK_HOME.yaw, 2.3), radius: 3.6, verb: 'Talk to', label: 'Pipwick' },
+  { id: 'jukebox', ...frontOf(JUKEBOX.x, JUKEBOX.z, JUKEBOX.rot, JUKEBOX.d / 2 + 2.4), radius: 4, verb: 'Choose music at', label: 'the Jukebox' },
   // hidden
   { id: 'musicbox', x: MUSICBOX.x, z: MUSICBOX.z + 3, radius: 3.4, verb: 'Crank', label: 'a forgotten music box', secret: true },
   { id: 'marble', x: -9, z: -6, radius: 3.6, verb: 'Push', label: 'the giant marble', secret: true },
@@ -100,6 +103,15 @@ export function interact(id: string, facing: { x: number; z: number }) {
     case 'tv':
       sfx.click();
       events.emit('tv:next');
+      break;
+    case 'pipwick':
+      sfx.interact();
+      events.emit('pipwick:talk'); // src/game/welcome.ts opens the chat
+      break;
+    case 'jukebox':
+      sfx.crank(0);
+      events.emit('prop:jukebox-crank');
+      g.openPanel({ kind: 'jukebox', title: 'The Jukebox', subtitle: 'Pick the music for the Hub', accent: PALETTE.honey });
       break;
     case 'scoreboard':
       sfx.click();

@@ -37,7 +37,7 @@ async function frames(page, n) {
       const errors = [];
       page.on('pageerror', (e) => errors.push(e.message));
       page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-      await page.addInitScript(() => localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { quality: 'low', tutorials: false }, version: 0 })));
+      await page.addInitScript(() => localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { tourSeen: true, quality: 'low', tutorials: false }, version: 0 })));
       const log = (msg) => console.log(`[${layout}] ${msg}`);
       const shot = (name) => page.screenshot({ path: path.join(OUT, `towertumble-${layout}-${name}.png`), timeout: 240000 });
       const state = (fn, arg) => page.evaluate(fn, arg);

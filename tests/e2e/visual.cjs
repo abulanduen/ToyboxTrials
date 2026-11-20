@@ -52,7 +52,7 @@ async function open(browser, tier, opts, hash) {
   const ctx = await browser.newContext(opts);
   const page = await ctx.newPage();
   page.on('pageerror', (e) => console.log(`[${tier}] pageerror: ${e.message}`));
-  await page.addInitScript((q) => localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { quality: q }, version: 0 })), tier);
+  await page.addInitScript((q) => localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { tourSeen: true, quality: q }, version: 0 })), tier);
   await page.goto(`${BASE}?debug${hash}`);
   await page.waitForFunction(() => window.__toybox && window.__toybox.renderInfo, null, { timeout: 120000 });
   await settle(page, 12);
