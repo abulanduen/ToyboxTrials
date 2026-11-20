@@ -7,7 +7,9 @@ async function holdStick(page,[dx,dy]){const cdp=await page.context().newCDPSess
   const stick=[x+dx*60,y+dy*60],send=(type,pts)=>cdp.send('Input.dispatchTouchEvent',{type,touchPoints:pts.map(([px,py,id])=>({x:px,y:py,id}))});
   await send('touchStart',[[x,y,1]]);await send('touchMove',[[x+dx*20,y+dy*20,1]]);await send('touchMove',[[...stick,1]]);
   return{async tap(testId){const b=await page.getByTestId(testId).boundingBox(),bx=b.x+b.width/2,by=b.y+b.height/2;
-      await send('touchStart',[[...stick,1],[bx,by,2]]);await send('touchEnd',[[...stick,1]]);},
+      await send('touchStart',[[...stick,1],[bx,by,2]]);
+      // touchEnd lifts only the fingers it lists: the stick stays down.
+      await send('touchEnd',[[bx,by,2]]);},
     async release(){await send('touchEnd',[]);await cdp.detach();}};}
 /** Push the touch joystick (CDP touch events) in a direction until `until(arg)` holds, then let go. */
 async function stickUntil(page,[dx,dy],until,arg){const cdp=await page.context().newCDPSession(page);const zone=await page.locator('.touch-stick-zone').boundingBox();const x=zone.x+zone.width*0.4,y=zone.y+zone.height*0.55;

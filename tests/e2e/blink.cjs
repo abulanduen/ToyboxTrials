@@ -7,7 +7,9 @@ async function holdStick(page,[dx,dy]){const cdp=await page.context().newCDPSess
   const stick=[x+dx*60,y+dy*60],send=(type,pts)=>cdp.send('Input.dispatchTouchEvent',{type,touchPoints:pts.map(([px,py,id])=>({x:px,y:py,id}))});
   await send('touchStart',[[x,y,1]]);await send('touchMove',[[x+dx*20,y+dy*20,1]]);await send('touchMove',[[...stick,1]]);
   return{async tap(testId){const b=await page.getByTestId(testId).boundingBox(),bx=b.x+b.width/2,by=b.y+b.height/2;
-      await send('touchStart',[[...stick,1],[bx,by,2]]);await send('touchEnd',[[...stick,1]]);},
+      await send('touchStart',[[...stick,1],[bx,by,2]]);
+      // touchEnd lifts only the fingers it lists: the stick stays down.
+      await send('touchEnd',[[bx,by,2]]);},
     async release(){await send('touchEnd',[]);await cdp.detach();}};}
 (async()=>{
   const browser=await chromium.launch({args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
@@ -38,10 +40,11 @@ async function holdStick(page,[dx,dy]){const cdp=await page.context().newCDPSess
     }
     assert.ok((await state()).players[0].x>14);assert.equal(await page.getByTestId('blink-blink').isDisabled(),false);
     await page.getByRole('button',{name:'Pause',exact:true}).click();await page.waitForSelector('.pause');const t=(await state()).t;await page.waitForTimeout(250);assert.equal((await state()).t,t);await page.keyboard.press('Escape');await page.waitForSelector('.pause',{state:'detached'});
-    await page.evaluate(()=>{const s=window.__toybox.match.state(),p=s.players[0];Object.assign(p,{x:0,z:0,moveX:0,moveZ:0,angle:0,aimX:0,aimZ:1,nextAttack:0,attack:null});});
+    // Re-pin the bots too: their own AI has had a few seconds (longer on phones, holding the stick) to blink out of their locked swings.
+    await page.evaluate(()=>{const s=window.__toybox.match.state(),p=s.players[0];Object.assign(p,{x:0,z:0,moveX:0,moveZ:0,angle:0,aimX:0,aimZ:1,nextAttack:0,attack:null});s.players.slice(1).forEach((q,i)=>Object.assign(q,{alive:true,outAt:-1,x:-12,z:-12+i*4,moveX:0,moveZ:0,nextAttack:1e9,attack:{x:-12,z:-12+i*4,angle:Math.PI,start:s.t,until:1e9}}));});
     await aim(0,10);if(mobile)await click('blink-attack');else await page.keyboard.press('KeyJ');
     await page.waitForFunction(()=>!!window.__toybox.match.state().players[0].attack);await page.evaluate(()=>window.__toybox.match.timeScale(0));
-    assert.equal((await state()).players.filter(p=>p.alive).length,(await state()).players.length);
+    {const st=await state();assert.equal(st.players.filter(p=>p.alive).length,st.players.length,JSON.stringify(st.players.map(p=>({id:p.id,alive:p.alive,x:+p.x.toFixed(1),z:+p.z.toFixed(1),outAt:p.outAt,kills:p.kills})))+' t='+st.t);}
     await page.screenshot({path:path.join(out,`blink-${layout}-windup.png`)});
     // Steer a cancel blink sideways while the attack cone stays locked.
     await aim(-10,0);if(mobile)await click('blink-blink');else await page.keyboard.press('Space');await page.evaluate(()=>window.__toybox.match.timeScale(1));
