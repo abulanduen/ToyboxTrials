@@ -5031,6 +5031,11 @@ textarea,
 .overlay:has(.voice-mic) .lobby-alert {
   top: calc(80px + env(safe-area-inset-top));
 }
+/* Touch: the first-minutes "Drag the scene to look around" hint moves off the crowded top row to
+   open scene (in portrait it would cover the mic button). */
+.overlay:has(.voice-mic) .look-hint--touch {
+  top: 40%;
+}
 
 /* The mark on a name tag: shown while that player's mic is on (or they're muted); rings while they talk. */
 .voice-tag {

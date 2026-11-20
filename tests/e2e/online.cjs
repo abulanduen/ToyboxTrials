@@ -286,7 +286,7 @@ async function voiceChecks(A, B) {
 async function phoneMic(P, w, h, label, file) {
   const m = await P.page.waitForSelector('[data-testid=voice-mic]', { timeout: 60000 }).catch(() => null);
   const mb = m ? await m.evaluate((e) => { const r = e.getBoundingClientRect(); return { x: r.x, y: r.y, width: e.offsetWidth, height: e.offsetHeight }; }) : null;
-  const others = await P.page.$$eval('.touch-pause, .hud-sign, .hud-secrets, .hud-cogs, .online-chip, .hub-lobbies, .tickets .ticket, .lobby-alert, .hubplay-score, [data-testid=emote-button], .touch-btn--jump, .prompt', (els) => els.map((e) => { const r = e.getBoundingClientRect(); return { c: e.className, x: r.x, y: r.y, w: r.width, h: r.height }; }));
+  const others = await P.page.$$eval('.touch-pause, .hud-sign, .hud-secrets, .hud-cogs, .online-chip, .hub-lobbies, .tickets .ticket, .lobby-alert, .hubplay-score, [data-testid=emote-button], .touch-btn--jump, .prompt, .look-hint', (els) => els.map((e) => { const r = e.getBoundingClientRect(); return { c: e.className, x: r.x, y: r.y, w: r.width, h: r.height }; }));
   const hits = mb ? others.filter((b) => b.w && mb.x < b.x + b.w && b.x < mb.x + mb.width && mb.y < b.y + b.h && b.y < mb.y + mb.height).map((b) => b.c) : [];
   check(`${label}: mic button ≥ 56 px, on screen at the top right, clear of the other HUD controls`, !!mb && mb.width >= 56 && mb.height >= 56 && mb.x >= 0 && mb.x + mb.width <= w && mb.y >= 0 && mb.y < h / 3 && mb.x > w / 2 && hits.length === 0, JSON.stringify({ mb, hits }));
   await shot(P.page, file);

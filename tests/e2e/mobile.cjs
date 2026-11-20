@@ -4,7 +4,7 @@
    (VITE_SERVER_URL=ws://localhost:<port>) and `npm run server:build` done, the suite also starts that
    server, joins the public Hub on a phone and checks the mic button in portrait and landscape
    (≥ 56 px, top right, clear of the other HUD controls), and that it asks for the microphone only
-   when pressed. Offline builds skip that part (and say so). */
+   when pressed. Offline builds skip that part (and say so). ONLY=voice runs just that part. */
 const { chromium, devices } = require('playwright');
 const { spawn } = require('child_process');
 const path = require('path');
@@ -19,6 +19,13 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
   // fake microphone, granted without a prompt (only the online voice part uses it)
   const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] });
   const phone = devices['Pixel 7'];
+  if (process.env.ONLY === 'voice') {
+    // just the voice chat part (see the header)
+    await voiceMicOnline(browser, phone);
+    console.log(res.join('\n'));
+    await browser.close();
+    return;
+  }
   const ctx = await browser.newContext({ ...phone, viewport: { width: 915, height: 412 }, screen: { width: 915, height: 412 } });
   const page = await ctx.newPage();
   page.setDefaultTimeout(+process.env.E2E_TIMEOUT || 120000);
@@ -345,7 +352,9 @@ async function voiceMicOnline(browser, phone) {
       const real = md.getUserMedia.bind(md);
       md.getUserMedia = (c) => { window.__gum++; return real(c); };
     }
-    if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { tourSeen: true, contenderName: 'Phone' }, version: 2 })); }
+    try {
+      if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { tourSeen: true, contenderName: 'Phone' }, version: 2 })); }
+    } catch { /* about:blank has no storage */ }
   });
   const p = await ctx.newPage();
   p.setDefaultTimeout(+process.env.E2E_TIMEOUT || 120000);
@@ -361,7 +370,7 @@ async function voiceMicOnline(browser, phone) {
       await p.setViewportSize({ width: w, height: h });
       await p.waitForTimeout(1200);
       const mb = await p.$eval('[data-testid=voice-mic]', (e) => { const r = e.getBoundingClientRect(); return { x: r.x, y: r.y, width: e.offsetWidth, height: e.offsetHeight }; }).catch(() => null);
-      const others = await p.$$eval('.touch-pause, .hud-sign, .hud-secrets, .hud-cogs, .online-chip, .hub-lobbies, .tickets .ticket, .lobby-alert, .hubplay-score, [data-testid=emote-button], .touch-btn--jump, .touch-btn--interact, .prompt', (els) => els.map((e) => { const r = e.getBoundingClientRect(); return { c: e.className, x: r.x, y: r.y, w: r.width, h: r.height }; }));
+      const others = await p.$$eval('.touch-pause, .hud-sign, .hud-secrets, .hud-cogs, .online-chip, .hub-lobbies, .tickets .ticket, .lobby-alert, .hubplay-score, [data-testid=emote-button], .touch-btn--jump, .touch-btn--interact, .prompt, .look-hint', (els) => els.map((e) => { const r = e.getBoundingClientRect(); return { c: e.className, x: r.x, y: r.y, w: r.width, h: r.height }; }));
       const hits = mb ? others.filter((b) => b.w && mb.x < b.x + b.w && b.x < mb.x + mb.width && mb.y < b.y + b.h && b.y < mb.y + mb.height).map((b) => b.c) : [];
       check(`voice chat (${label}): mic button ≥ 56 px, top right, on screen, clear of the other HUD buttons`, !!mb && mb.width >= 56 && mb.height >= 56 && mb.x >= w / 2 && mb.x + mb.width <= w && mb.y >= 0 && mb.y < h / 3 && hits.length === 0, JSON.stringify({ mb, hits }));
       await p.screenshot({ path: `${OUT}/${file}` });
