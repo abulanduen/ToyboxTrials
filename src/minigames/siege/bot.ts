@@ -7,7 +7,7 @@
  */
 import type { BotPolicy } from '../types';
 import {
-  ARENA_HALF, BIGS, CLASS_IDS, FINALE, WEAPONS, len, passiveLevel, reviveCost, standings,
+  ARENA_HALF, CLASS_IDS, FINALE, WEAPONS, len, passiveLevel, reviveCost, standings,
   type Option, type SiegeInput, type SiegePlayer, type SiegeState,
 } from './rules';
 
@@ -97,11 +97,25 @@ export function createSiegeBot(): BotPolicy<SiegeState, SiegeInput> {
   };
 }
 
+/** A push away from enemy bullets within 5 cm (into `dodge`). Its own function, so the JIT optimises it on its own. */
+const dodge = { x: 0, z: 0 };
+function dodgeShots(shots: SiegeState['players'][number]['board']['shots'], x: number, z: number) {
+  let vx = 0, vz = 0;
+  for (let i = 0; i < shots.length; i++) {
+    const sh = shots[i];
+    if (!sh.on) continue;
+    const dx = x - sh.x, dz = z - sh.z, d2 = dx * dx + dz * dz;
+    if (d2 < 25) { const w = 1 / (d2 + 1); vx += dx * w * 4; vz += dz * w * 4; }
+  }
+  dodge.x = vx; dodge.z = vz;
+}
+
 /** Kiting: push away from nearby enemies (harder the closer), circle the swarm, drift to gems and chests, stay off the walls. */
 function steer(p: SiegePlayer, skill: 'easy' | 'normal' | 'hard', rng: () => number): SiegeInput {
   const b = p.board, fear = skill === 'easy' ? 6 : skill === 'normal' ? 8.5 : 10;
   let vx = 0, vz = 0, crowdX = 0, crowdZ = 0, crowd = 0;
-  for (const m of b.mobs) {
+  for (let i = 0; i < b.mobs.length; i++) {
+    const m = b.mobs[i];
     if (!m.on) continue;
     const dx = p.x - m.x, dz = p.z - m.z, d2 = dx * dx + dz * dz;
     if (d2 > 400) continue;
@@ -110,7 +124,8 @@ function steer(p: SiegePlayer, skill: 'easy' | 'normal' | 'hard', rng: () => num
     const w = 1 / (d2 + 1);
     vx += dx * w * 6; vz += dz * w * 6;
   }
-  for (const g of b.bigs) {
+  for (let i = 0; i < b.bigs.length; i++) {
+    const g = b.bigs[i];
     if (!g.on) continue;
     const dx = p.x - g.x, dz = p.z - g.z, d = len(dx, dz) || 1, reach = fear + 6;
     if (g.mode === 1 && skill !== 'easy') { // side-step a telegraphed charge
@@ -119,13 +134,10 @@ function steer(p: SiegePlayer, skill: 'easy' | 'normal' | 'hard', rng: () => num
     }
     if (d < reach) { const k = (reach - d) / reach; vx += (dx / d) * 3 * k; vz += (dz / d) * 3 * k; }
     // Melee classes still need to get close: lean in when the elite is not charging.
-    if (g.mode === 0 && p.cls === 'warrior' && d > BIGS[g.type].r + 5 && d < 16) { vx -= (dx / d) * 0.6; vz -= (dz / d) * 0.6; }
+    if (g.mode === 0 && p.cls === 'warrior' && d > g.r + 5 && d < 16) { vx -= (dx / d) * 0.6; vz -= (dz / d) * 0.6; }
   }
-  for (const sh of b.shots) {
-    if (!sh.on) continue;
-    const dx = p.x - sh.x, dz = p.z - sh.z, d2 = dx * dx + dz * dz;
-    if (d2 < 25) { const w = 1 / (d2 + 1); vx += dx * w * 4; vz += dz * w * 4; }
-  }
+  dodgeShots(p.board.shots, p.x, p.z);
+  vx += dodge.x; vz += dodge.z;
   // Circle the crowd rather than backing into a corner.
   if (crowd > 3) {
     const cx = crowdX / crowd - p.x, cz = crowdZ / crowd - p.z, cl = len(cx, cz) || 1;
@@ -133,8 +145,9 @@ function steer(p: SiegePlayer, skill: 'easy' | 'normal' | 'hard', rng: () => num
   }
   // Treasure first, then the nearest gem.
   let tx = 0, tz = 0, best = skill === 'easy' ? 120 : 260;
-  for (const c of b.chests) if (c.on) { const d2 = (c.x - p.x) ** 2 + (c.z - p.z) ** 2; if (d2 < 2500) { tx = c.x; tz = c.z; best = -1; } }
-  if (best > 0) for (const g of b.gems) {
+  for (let i = 0; i < b.chests.length; i++) { const c = b.chests[i]; if (c.on && (c.x - p.x) ** 2 + (c.z - p.z) ** 2 < 2500) { tx = c.x; tz = c.z; best = -1; } }
+  if (best > 0) for (let i = 0; i < b.gems.length; i++) {
+    const g = b.gems[i];
     if (!g.on || g.pull) continue;
     const d2 = (g.x - p.x) ** 2 + (g.z - p.z) ** 2;
     if (d2 < best) { best = d2; tx = g.x; tz = g.z; }

@@ -161,19 +161,29 @@ const emit = (s: SiegeState, e: MatchEvent) => { if (s.events.length < 256) s.ev
 
 const blankStats = (): Stats => ({ maxHp: 100, armour: 0, speed: 10, dmg: 1, cd: 1, area: 1, projSpeed: 1, pickup: BASE_PICKUP, xp: 1 });
 
+/**
+ * The placeholder for pooled number fields that will hold fractions (positions, speeds, health,
+ * timers). It is a fraction itself on purpose: V8 then stores those fields as doubles from the
+ * start. Created as whole numbers (0), each field's representation is generalised the first time a
+ * pooled entity is used, which deprecates the shared hidden class, and code reading the pools (the
+ * bots' steering most of all) fell into an optimise/deoptimise loop that allocated ~30 KB per step.
+ * Its value never matters: a pooled entity is only read while `on`, after being set.
+ */
+const D = 0.5;
+
 function newBoard(c: Pick<SiegeConfig, 'mobCap' | 'bigCap' | 'projectileCap' | 'shotCap' | 'gemCap' | 'chestCap' | 'blastCap' | 'fireCap'>): Board {
   const n = <T>(k: number, f: () => T) => Array.from({ length: k }, f);
   return {
     bt: 0,
-    mobs: n(c.mobCap, () => ({ on: false, serial: 0, kind: 0, x: 0, z: 0, vx: 0, vz: 0, kx: 0, kz: 0, hp: 0, maxHp: 0, speed: 0, dmg: 0, r: 0, xp: 0, pts: 0, hurt: -1e9, yo: -1e9, timer: 0 })),
-    bigs: n(c.bigCap, () => ({ on: false, serial: 0, type: 'bear' as BigId, x: 0, z: 0, hp: 0, maxHp: 0, r: 0, speed: 0, dmg: 0, xp: 0, pts: 0, sent: false, from: null as string | null,
-      mode: 0 as 0 | 1 | 2, modeT: 0, dashT: 0, ringT: 0, summonT: 0, aimX: 0, aimZ: 1, hurt: -1e9, yo: -1e9, summons: 0 })),
-    projs: n(c.projectileCap, () => ({ on: false, kind: 0, x: 0, z: 0, vx: 0, vz: 0, r: 0, dmg: 0, pierce: 0, life: 0, ox: 0, oz: 0, range: 0, back: false, hits: [0, 0, 0, 0, 0, 0, 0, 0], nh: 0, own: -1, homing: 0, ti: -1, ts: 0 })),
-    shots: n(c.shotCap, () => ({ on: false, x: 0, z: 0, vx: 0, vz: 0, r: 0, dmg: 0, life: 0, own: -1 })),
-    gems: n(c.gemCap, () => ({ on: false, kind: 0, x: 0, z: 0, v: 0, pull: false })),
-    chests: n(c.chestCap, () => ({ on: false, x: 0, z: 0 })),
-    blasts: n(c.blastCap, () => ({ on: false, kind: 0, x: 0, z: 0, r: 0, ang: 0, arc: 0, delay: 0, age: 0, life: 0, dmg: 0, knock: 0, done: false, own: -1, w: 0, burn: 0 })),
-    fires: n(c.fireCap, () => ({ on: false, x: 0, z: 0, r: 0, age: 0, life: 0, tick: 0, dmg: 0, own: -1 })),
+    mobs: n(c.mobCap, () => ({ on: false, serial: 0, kind: 0, x: D, z: D, vx: D, vz: D, kx: D, kz: D, hp: D, maxHp: D, speed: D, dmg: D, r: D, xp: 0, pts: 0, hurt: -1e9 - D, yo: -1e9 - D, timer: D })),
+    bigs: n(c.bigCap, () => ({ on: false, serial: 0, type: 'bear' as BigId, x: D, z: D, hp: D, maxHp: D, r: D, speed: D, dmg: D, xp: 0, pts: 0, sent: false, from: null as string | null,
+      mode: 0 as 0 | 1 | 2, modeT: D, dashT: D, ringT: D, summonT: D, aimX: D, aimZ: D, hurt: -1e9 - D, yo: -1e9 - D, summons: 0 })),
+    projs: n(c.projectileCap, () => ({ on: false, kind: 0, x: D, z: D, vx: D, vz: D, r: D, dmg: D, pierce: 0, life: D, ox: D, oz: D, range: D, back: false, hits: [0, 0, 0, 0, 0, 0, 0, 0], nh: 0, own: -1, homing: D, ti: -1, ts: 0 })),
+    shots: n(c.shotCap, () => ({ on: false, x: D, z: D, vx: D, vz: D, r: D, dmg: D, life: D, own: -1 })),
+    gems: n(c.gemCap, () => ({ on: false, kind: 0, x: D, z: D, v: 0, pull: false })),
+    chests: n(c.chestCap, () => ({ on: false, x: D, z: D })),
+    blasts: n(c.blastCap, () => ({ on: false, kind: 0, x: D, z: D, r: D, ang: D, arc: D, delay: D, age: D, life: D, dmg: D, knock: D, done: false, own: -1, w: D, burn: D })),
+    fires: n(c.fireCap, () => ({ on: false, x: D, z: D, r: D, age: D, life: D, tick: D, dmg: D, own: -1 })),
     spawnAcc: 0, waveT: WAVE_MS, nextElite: 0, bossUp: false, bossDown: false, serial: 0, gemCursor: 0,
   };
 }
