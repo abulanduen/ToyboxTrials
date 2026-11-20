@@ -45,6 +45,14 @@ interface SettingsSlice {
   mouseSensitivity: number; // 0.5..2
   invertY: boolean;
   showFps: boolean;
+  /** Lower the graphics by itself when this device can't keep up (src/scene/PerformanceGuard.tsx). */
+  autoQuality: boolean;
+  /**
+   * How far the performance guard has stepped down this session (not saved): 0 none, 1 render at
+   * 1× pixels, 2 also no post-processing, 3 also no shadows. Reaching 3 also saves Low quality
+   * for next time (when you're next back in the Hub, so a trial never reloads under you).
+   */
+  perfStep: 0 | 1 | 2 | 3;
   contenderName: string;
   /**
    * Wallet, owned items and the equipped loadout (paint, hat, key, accessories, gestures): one
@@ -139,6 +147,8 @@ export const useGame = create<GameState>()(
       mouseSensitivity: 1,
       invertY: false,
       showFps: false,
+      autoQuality: true,
+      perfStep: 0,
       contenderName: 'Ticker',
       profile: defaultProfile(),
       secretsFound: [],
@@ -231,6 +241,7 @@ export const useGame = create<GameState>()(
         mouseSensitivity: s.mouseSensitivity,
         invertY: s.invertY,
         showFps: s.showFps,
+        autoQuality: s.autoQuality,
         contenderName: s.contenderName,
         profile: s.profile,
         secretsFound: s.secretsFound,

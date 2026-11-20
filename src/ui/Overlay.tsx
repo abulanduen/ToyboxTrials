@@ -212,7 +212,6 @@ function Hud() {
       <BoostMeter />
       {!welcoming && (touch ? <LookHint /> : cursorFree ? <div className="look-hint" data-testid="cursor-free">Cursor free: click a button · let go of Alt to look again</div> : !locked && <div className="look-hint">Click the scene to look around · hold Alt for a cursor</div>)}
       <WelcomeUI />
-      <Fps />
     </>
   );
 }
@@ -428,6 +427,7 @@ export function Overlay() {
       {screen === 'menu' && <MainMenu />}
       {screen === 'workshop' && <WorkshopScreen />}
       {screen === 'minigame' && <MatchOverlay />}
+      {(screen === 'playing' || screen === 'minigame') && <Fps />}
       {screen === 'playing' && <NameTags />}
       {screen === 'playing' && <Hud />}
       {screen === 'playing' && panel && <Panel />}

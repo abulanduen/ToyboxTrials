@@ -100,7 +100,8 @@ export function SettingsForm() {
               className={s.quality === q ? 'on' : ''}
               onClick={() => {
                 sfx.click();
-                s.set({ quality: q });
+                // A tier picked by hand starts from scratch: the guard's step-downs were for the old one.
+                s.set({ quality: q, perfStep: 0 });
               }}
             >
               {q}
@@ -111,6 +112,10 @@ export function SettingsForm() {
       <label className="setting setting--check">
         <input type="checkbox" checked={s.invertY} onChange={(e) => s.set({ invertY: e.target.checked })} />
         <span>Invert camera Y</span>
+      </label>
+      <label className="setting setting--check">
+        <input type="checkbox" checked={s.autoQuality} onChange={(e) => s.set({ autoQuality: e.target.checked, ...(e.target.checked ? {} : { perfStep: 0 }) })} data-testid="setting-auto-quality" />
+        <span>Lower quality automatically if the game runs slowly</span>
       </label>
       <label className="setting setting--check">
         <input type="checkbox" checked={s.showFps} onChange={(e) => s.set({ showFps: e.target.checked })} />

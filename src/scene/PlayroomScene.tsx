@@ -8,6 +8,7 @@ import { AdaptiveDpr, Environment, Lightformer } from '@react-three/drei';
 import { Bloom, DepthOfField, EffectComposer, TiltShift2, ToneMapping, Vignette } from '@react-three/postprocessing';
 import { ToneMappingMode } from 'postprocessing';
 import * as THREE from 'three';
+import { PerformanceGuard } from './PerformanceGuard';
 import { useGame, type Quality } from '../game/store';
 import { PALETTE } from '../game/palette';
 import { player } from '../game/player';
@@ -88,6 +89,7 @@ function Lights({ quality }: { quality: Quality }) {
 }
 
 function Effects({ quality, sharp }: { quality: Quality; sharp: boolean }) {
+  const perfStep = useGame((st) => st.perfStep);
   const q = QUALITY[quality];
   const target = useMemo(() => new THREE.Vector3(), []);
   const dofRef = useRef<{ target?: THREE.Vector3 } | null>(null);
@@ -97,7 +99,8 @@ function Effects({ quality, sharp }: { quality: Quality; sharp: boolean }) {
     if (dofRef.current) dofRef.current.target = target;
   });
   useEffect(() => { exposeDebug({ postprocessing: { state: () => ({ quality, focusBlur: !sharp && q.post !== 'none', focusBlurMounted: !!dofRef.current || !!tiltRef.current }) } }); }, [quality, sharp, q.post]);
-  if (q.post === 'none') return null;
+  // The performance guard's second step drops post-processing on a device that can't keep up.
+  if (q.post === 'none' || perfStep >= 2) return null;
   return (
     // Recreate the pass chain when removing DOF so High never keeps the previous scene buffer.
     <EffectComposer key={sharp ? 'minigame' : 'hub'} multisampling={q.aa ? 4 : 0} enableNormalPass={false}>
@@ -169,6 +172,7 @@ export function PlayroomScene() {
       </Suspense>
       <AdaptiveDpr pixelated={false} />
       <FrameStats />
+      <PerformanceGuard post={q.post !== 'none'} shadows={!!q.shadow} />
     </Canvas>
   );
 }

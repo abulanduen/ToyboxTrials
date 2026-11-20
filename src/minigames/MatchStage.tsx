@@ -2,11 +2,12 @@
  * In-canvas side of the minigame host: drives the session clock and shows either the active
  * game's Scene or a contestant lineup / tournament podium on the tabletop.
  */
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { endFrame } from '../game/input';
 import { PALETTE } from '../game/palette';
+import { useGame } from '../game/store';
 import { WindupBot } from '../character/WindupBot';
 import { createToyAnim, type ToyAnim } from '../character/anim';
 import { MiniContender, createMiniAnim, type MiniAnim } from '../character/MiniContender';
@@ -25,13 +26,49 @@ export function MatchStage() {
     endFrame(); // the hub controller isn't mounted, so the host owns the input frame boundary
   });
 
-  const showGame = module && phase !== 'final' && phase !== 'reveal' && phase !== 'loading';
+  const showGame = !!module && phase !== 'final' && phase !== 'reveal' && phase !== 'loading';
+  const gameId = useMatch((s) => s.gameId);
+  useWarmShaders(showGame ? `${gameId}:${localId}` : null, phase === 'playing');
   if (showGame) {
     const Scene = module.Scene;
     // Remounted per trial and per viewer, so a spectator switching toys starts from a clean Scene.
     return <Scene key={localId} getState={getMatchState} contestants={contestants} localId={localId} />;
   }
   return <Lineup podium={phase === 'final'} />;
+}
+
+/**
+ * Compile the trial's shaders up front, while its intro card is up, instead of the first time each
+ * effect, enemy or flash appears mid-play (on Windows a compile can stall a frame for tens to
+ * hundreds of ms: felt as stutter). three's compile covers hidden objects too, so pooled effects
+ * are included. Once when the trial's scene mounts and again as play begins (some games mount
+ * more of their set then). compileAsync uses parallel compiling where the browser offers it.
+ */
+function useWarmShaders(key: string | null, playing: boolean) {
+  const { gl, scene, camera } = useThree();
+  useEffect(() => {
+    if (!key) return;
+    const id = requestAnimationFrame(() => {
+      // With post-processing on, the scene draws into the composer's buffer, whose shaders differ
+      // from drawing to the screen (linear output, no tone mapping): compile for that target.
+      const g = useGame.getState();
+      const post = g.quality !== 'low' && g.perfStep < 2;
+      const prev = gl.getRenderTarget();
+      const rt = post ? new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType }) : null;
+      try {
+        if (rt) gl.setRenderTarget(rt);
+        void gl.compileAsync(scene, camera).catch(() => {});
+      } catch {
+        /* a context that can't precompile just compiles on first draw, as before */
+      } finally {
+        if (rt) {
+          gl.setRenderTarget(prev);
+          rt.dispose();
+        }
+      }
+    });
+    return () => cancelAnimationFrame(id);
+  }, [key, playing, gl, scene, camera]);
 }
 
 /** Contestants lined up on a felt mat (between rounds), or on a block podium (final). */
