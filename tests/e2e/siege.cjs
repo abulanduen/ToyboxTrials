@@ -384,7 +384,9 @@ async function run(name) {
       await page.evaluate(() => { for (const q of window.__toybox.match.state().players) if (q.status === 'arena') q.hp = Math.min(q.hp, q.stat.maxHp); window.__toybox.match.timeScale(20); });
     } else {
       // ---- Second knockout in the run: no revive left, so out for good. The popup; the toy stays on its own board.
-      await state(() => { const p = window.__toybox.match.state().players.find((q) => q.id === 'you'); p.invuln = 0; p.hp = 0.5; p.choice = null; p.pendingLevels = 0; p.pendingChests = 0; });
+      await state(() => { const p = window.__toybox.match.state().players.find((q) => q.id === 'you'); p.invuln = 0; p.hp = 0.5; p.choice = null; p.pendingLevels = 0; p.pendingChests = 0;
+        const m = p.board.mobs.find((x) => !x.on) ?? p.board.mobs[0]; // a sure bite (see the first knockout)
+        Object.assign(m, { on: true, serial: ++p.board.serial, kind: 0, x: p.x + 0.4, z: p.z, vx: 0, vz: 0, kx: 0, kz: 0, hp: 30, maxHp: 30, speed: 4, dmg: 10, r: 0.85, xp: 1, pts: 1, timer: 0 }); });
       await page.evaluate(() => window.__toybox.match.timeScale(1));
       await page.getByTestId('siege-out-popup').waitFor();
       assert.equal(await state(new Function(`return ${me}.status`)), 'ghost');
