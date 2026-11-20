@@ -11,7 +11,9 @@ import { SECRET_IDS, rewardForSecret } from './cosmetics';
 import { EARN } from './economy';
 import { exposeDebug } from './debug';
 import { openPractice } from '../minigames/session';
-import { GATES, GATE_STAND, JACK, MUSICBOX, PAVILION, SCOREBOARD, SHOP, TOWER, TV, WORKSHOP, frontOf } from '../scene/layout';
+import { BALL, MARBLE } from './hubPlay';
+import { ballFree, grab, iHold, kick, startCharge } from '../hubplay/runtime';
+import { GATES, GATE_STAND, JACK, JUKEBOX, MUSICBOX, PAVILION, PIPWICK_HOME, SCOREBOARD, SHOP, TOWER, TV, WORKSHOP, frontOf } from '../scene/layout';
 
 export interface Interactable {
   id: string;
@@ -41,9 +43,16 @@ export const INTERACTABLES: Interactable[] = [
   { id: 'shop', ...frontOf(SHOP.x, SHOP.z, SHOP.rot, SHOP.d / 2 + 6), radius: 5, verb: 'Browse', label: 'Odds & Ends Shop' },
   { id: 'scoreboard', ...frontOf(SCOREBOARD.x, SCOREBOARD.z, SCOREBOARD.rot, 3.5), radius: 5, verb: 'Read', label: 'the Scoreboard' },
   { id: 'tv', ...frontOf(TV.x, TV.z, TV.rot, TV.d / 2 + 2.6), radius: 3.2, verb: 'Change channel on', label: 'the TV' },
+  // Pipwick, the welcome mascot (talk to replay the tour), and the Jukebox (pick the Hub's music)
+  { id: 'pipwick', ...frontOf(PIPWICK_HOME.x, PIPWICK_HOME.z, PIPWICK_HOME.yaw, 2.3), radius: 3.6, verb: 'Talk to', label: 'Pipwick' },
+  { id: 'jukebox', ...frontOf(JUKEBOX.x, JUKEBOX.z, JUKEBOX.rot, JUKEBOX.d / 2 + 2.4), radius: 4, verb: 'Choose music at', label: 'the Jukebox' },
   // hidden
   { id: 'musicbox', x: MUSICBOX.x, z: MUSICBOX.z + 3, radius: 3.4, verb: 'Crank', label: 'a forgotten music box', secret: true },
-  { id: 'marble', x: -9, z: -6, radius: 3.6, verb: 'Push', label: 'the giant marble', secret: true },
+  { id: 'marble', x: MARBLE.home.x, z: MARBLE.home.z, radius: 3.6, verb: 'Kick', label: 'the giant marble', secret: true },
+  // the basketball by the hoop on the trials table: pick it up, then hold Interact to throw
+  { id: 'ball', x: BALL.spot.x, z: BALL.spot.z, radius: 3.0, verb: 'Pick up', label: 'the basketball', disabled: () => !ballFree() },
+  // (while you hold it: its live spot sits 2.9 cm ahead of you, so a nearer prompt such as a gate wins)
+  { id: 'ball-throw', x: BALL.spot.x, z: BALL.spot.z, radius: 3, verb: 'Hold to throw', label: 'the basketball', disabled: () => !iHold() },
   { id: 'jack', x: JACK.x + 3.2, z: JACK.z + 0.5, radius: 3.4, verb: 'Open', label: 'a suspicious box', secret: true },
   { id: 'key', x: TOWER.block.x, z: TOWER.block.z, radius: 2.4, verb: 'Grab', label: 'the golden key', secret: true, minY: TOWER.block.top - 0.5, disabled: () => !keyAvailable() },
 ];
@@ -51,7 +60,7 @@ export const INTERACTABLES: Interactable[] = [
 // ?debug only: where each interactable is (e.g. tests teleport next to the shop's prompt).
 exposeDebug({ interactables: () => INTERACTABLES.map(({ id, x, z, radius, verb, label }) => ({ id, x, z, radius, verb, label })) });
 
-/** Live position overrides for movable interactables (the marble rolls). */
+/** Live position overrides for movable interactables (the marble rolls, the ball is carried). */
 export const livePositions = new Map<string, { x: number; z: number }>();
 
 export function interactablePos(i: Interactable) {
@@ -101,6 +110,15 @@ export function interact(id: string, facing: { x: number; z: number }) {
       sfx.click();
       events.emit('tv:next');
       break;
+    case 'pipwick':
+      sfx.interact();
+      events.emit('pipwick:talk'); // src/game/welcome.ts opens the chat
+      break;
+    case 'jukebox':
+      sfx.crank(0);
+      events.emit('prop:jukebox-crank');
+      g.openPanel({ kind: 'jukebox', title: 'The Jukebox', subtitle: 'Pick the music for the Hub', accent: PALETTE.honey });
+      break;
     case 'scoreboard':
       sfx.click();
       g.openPanel({ kind: 'scoreboard', title: 'Scoreboard', subtitle: 'Playroom records', accent: PALETTE.honey });
@@ -111,9 +129,15 @@ export function interact(id: string, facing: { x: number; z: number }) {
       discover('musicbox', 'Forgotten music box');
       break;
     case 'marble':
-      sfx.bump();
+      kick(facing.x, facing.z, 1);
       events.emit('prop:marble-push', { dirX: facing.x, dirZ: facing.z });
       discover('marble', 'The rolling marble');
+      break;
+    case 'ball':
+      grab();
+      break;
+    case 'ball-throw':
+      startCharge();
       break;
     case 'jack':
       events.emit('prop:jack-pop');

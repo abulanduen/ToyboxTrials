@@ -72,11 +72,11 @@ export function KeyCap({ k, wide }: { k: string; wide?: boolean }) {
   return <kbd className={`keycap${wide ? ' keycap--wide' : ''}`}>{k}</kbd>;
 }
 
-export function Slider({ label, value, onChange, min = 0, max = 1, step = 0.05 }: { label: string; value: number; onChange: (v: number) => void; min?: number; max?: number; step?: number }) {
+export function Slider({ label, value, onChange, min = 0, max = 1, step = 0.05, testId }: { label: string; value: number; onChange: (v: number) => void; min?: number; max?: number; step?: number; testId?: string }) {
   return (
     <label className="setting">
       <span>{label}</span>
-      <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(parseFloat(e.target.value))} onPointerUp={() => sfx.tick()} />
+      <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(parseFloat(e.target.value))} onPointerUp={() => sfx.tick()} data-testid={testId} />
     </label>
   );
 }
@@ -88,6 +88,8 @@ export function SettingsForm() {
     <div className="pause__grid">
       <Slider label="Master volume" value={s.masterVolume} onChange={(v) => s.set({ masterVolume: v })} />
       <Slider label="Effects volume" value={s.sfxVolume} onChange={(v) => s.set({ sfxVolume: v })} />
+      <Slider label="Music volume" value={s.musicVolume} onChange={(v) => s.set({ musicVolume: v })} testId="setting-music" />
+      <Slider label="Voice volume" value={s.voiceVolume} onChange={(v) => s.set({ voiceVolume: v })} testId="setting-voice" />
       <Slider label={s.touchUI ? 'Look sensitivity' : 'Mouse sensitivity'} value={s.mouseSensitivity} min={0.4} max={2} step={0.1} onChange={(v) => s.set({ mouseSensitivity: v })} />
       <div className="setting">
         <span>Visual quality</span>

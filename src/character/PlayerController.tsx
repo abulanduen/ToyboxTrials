@@ -19,6 +19,8 @@ import { cameraBlockers, player, SPAWN } from '../game/player';
 import { paintJobFor } from '../game/cosmetics';
 import { blobShadowTexture } from '../scene/textures';
 import { exposeDebug } from '../game/debug';
+import { tourFlag } from '../game/tourFlag';
+import { tourCamera } from '../game/welcome';
 
 // Shared with the online server's movement validation (src/game/hubMotion.ts).
 const { radius: RADIUS, walk: WALK, run: RUN, boost: BOOST, jumpV: JUMP_V, gravity: GRAVITY, turnRate: TURN_RATE } = HUB_MOTION;
@@ -78,6 +80,8 @@ export function PlayerController() {
     nextWave: 3,
     /** performance.now() of the last emote (same 1.5 s cooldown as the server). */
     lastEmoteAt: -Infinity,
+    /** Pipwick's tour had the camera last frame (cut back behind the toy when it ends). */
+    touring: false,
   });
 
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
@@ -94,7 +98,7 @@ export function PlayerController() {
     const canLook = () => {
       const s = useGame.getState();
       // Workshop: drag to spin the camera around the contender (no pointer lock).
-      return (s.screen === 'playing' || s.screen === 'workshop') && !s.paused && !s.panel;
+      return (s.screen === 'playing' || s.screen === 'workshop') && !s.paused && !s.panel && !tourFlag.active;
     };
     const onDown = (e: PointerEvent) => {
       if (e.pointerType === 'touch') {
@@ -266,10 +270,10 @@ export function PlayerController() {
     const a = anim.current;
     const g = useGame.getState();
     const playing = g.screen === 'playing';
-    const blocked = inputBlocked(g);
+    const blocked = inputBlocked(g) || tourFlag.ate;
 
     // ---------- pause toggle (Esc / P) ----------
-    if (playing && wasPressed('pause')) {
+    if (playing && wasPressed('pause') && !tourFlag.active && !tourFlag.ate) {
       if (g.panel) g.closePanel();
       else g.togglePause();
     }
@@ -508,7 +512,18 @@ export function PlayerController() {
       tmp.look.set(s.pos.x + rx * side, s.pos.y + 1.9 - (portrait ? 3.1 : 0), s.pos.z + rz * side); // portrait: toy above the bottom sheet
       camera.lookAt(tmp.look);
       s.camTarget.set(s.pos.x, s.pos.y + TARGET_H, s.pos.z);
+    } else if (playing && tourFlag.camera) {
+      // Pipwick's welcome tour flies the camera round the Hub (src/game/welcome.ts)
+      tourCamera(persp);
+      s.touring = true;
     } else {
+      if (s.touring) {
+        // the tour is over: cut back behind the toy (never sweep through it)
+        s.touring = false;
+        s.camYaw = s.yaw + Math.PI;
+        s.camPitch = DEFAULT_PITCH;
+        s.snapCam = true;
+      }
       s.camTarget.x = damp(s.camTarget.x, s.pos.x, 12, dt);
       s.camTarget.z = damp(s.camTarget.z, s.pos.z, 12, dt);
       s.camTarget.y = damp(s.camTarget.y, (eliminated ? 0 : s.pos.y) + TARGET_H, 6, dt);

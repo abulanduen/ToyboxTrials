@@ -1,9 +1,10 @@
 # Toy Squad
 
 Casual auto-battler, 1–8 contenders with solo clockwork squads or bot fill. Entry: Tournament
-Pavilion → **Or practise one trial → Toy Squad**, or an online lobby (the server runs the rules and
-hides each player's shop and passive offers; see `server/games.ts`). Ten rounds; excluded from the
-Blitz tournament pool. Full unit/passive designs: [CATALOGUE.md](CATALOGUE.md).
+Pavilion → **Or practise one trial → Strategy games → Toy Squad**, or an online lobby (the server
+runs the rules and hides each player's shop and passive offers; see `server/games.ts`). Ten rounds;
+not ranked. A strategy trial (owner decisions 19 and 20 Nov 2026): never in Blitz, and only ever the
+finale of a Normal or Treasure tournament. Full unit/passive designs: [CATALOGUE.md](CATALOGUE.md).
 
 ## Owner-defined progression
 

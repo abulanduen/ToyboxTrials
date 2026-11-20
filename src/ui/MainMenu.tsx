@@ -15,6 +15,8 @@ import { openOnlineSheet } from './OnlineUI';
 import { useNet } from '../net/store';
 import { useAccount } from '../net/account';
 import { AccountSettingsRow, MenuAccountButton } from './AccountUI';
+import { requestTour } from '../game/welcome';
+import { PipwickBadge } from './WelcomeUI';
 
 export function MainMenu() {
   const s = useGame();
@@ -177,6 +179,13 @@ function HowToPlay({ onClose, touch }: { onClose: () => void; touch: boolean }) 
             <li>Gear button: pause</li>
           </ul>
         </div>
+      </div>
+      <div className="howto__tour">
+        <PipwickBadge size={56} />
+        <span>Pipwick, the Playroom's Welcomer, can fly you round the Hub and show you where everything is.</span>
+        <ToyButton tone="sage" onClick={requestTour} testId="howto-tour">
+          Take the Hub tour
+        </ToyButton>
       </div>
       <div className="pause__actions">
         <ToyButton onClick={onClose} autoFocus>

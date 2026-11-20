@@ -22,6 +22,8 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
   const touch = (type, points) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: points.map(([x, y, id = 0]) => ({ x, y, id })) });
   const st = () => page.evaluate(() => window.__toybox.state());
 
+  // Pipwick's first-visit Hub tour has its own suite (welcome.cjs); this one starts as a returning player.
+  await page.addInitScript(() => { if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { tourSeen: true }, version: 2 })); } });
   await page.goto(BASE + '?debug');
   await page.waitForTimeout(4000);
   check('main menu shows on touch device', await page.isVisible('[data-testid=menu-play]'));
@@ -140,6 +142,44 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
   await page.waitForSelector('.touch-stick-zone', { timeout: 60000 }).catch(() => null);
   check('back to the Playroom with touch controls', await page.isVisible('.touch-stick-zone'));
 
+  // Hub play by touch (offline): the Interact button kicks the marble, picks up the basketball,
+  // and held down charges a throw (meter + arc), which goes when the thumb lets go.
+  const hp = () => page.evaluate(() => window.__toybox.hubplay.state());
+  const btnText = (t) => page.waitForFunction((s) => document.querySelector('.touch-btn--interact')?.textContent?.includes(s), t, { timeout: 120000 }).catch(() => null);
+  const pressBtn = async (id, ms) => {
+    const el = await page.$('.touch-btn--interact');
+    const b = await el.boundingBox();
+    // the button pops in with a scale animation: its layout size is the touch target
+    const [w, h] = await el.evaluate((e) => [e.offsetWidth, e.offsetHeight]);
+    b.layout = { w, h };
+    await touch('touchStart', [[b.x + b.width / 2, b.y + b.height / 2, id]]);
+    if (ms) await page.waitForTimeout(ms);
+    return b;
+  };
+  const m0 = (await hp()).marble;
+  await page.evaluate(([x, z]) => window.__toybox.teleport(x + 2.3, z, -Math.PI / 2), [m0.x, m0.z]);
+  await btnText('Kick');
+  const kb = await pressBtn(40, 300);
+  await touch('touchEnd', []);
+  await page.waitForFunction((x) => window.__toybox.hubplay.state().marble.x < x - 4, m0.x, { timeout: 120000, polling: 200 }).catch(() => null);
+  check('touch: the Interact button (≥ 56 px) reads Kick by the marble and kicks it', kb.layout.w >= 56 && kb.layout.h >= 56 && (await hp()).marble.x < m0.x - 4, `${JSON.stringify(kb)} x ${m0.x} → ${(await hp()).marble.x.toFixed(1)}`);
+  await page.evaluate(() => window.__toybox.teleport(76, -125.6, Math.PI));
+  await btnText('Pick');
+  await pressBtn(41, 300);
+  await touch('touchEnd', []);
+  await page.waitForFunction(() => window.__toybox.hubplay.state().holding, null, { timeout: 120000, polling: 200 }).catch(() => null);
+  await btnText('Hold');
+  check('touch: Pick up takes the ball; the button now reads Hold (to throw)', (await hp()).holding && ((await page.textContent('.touch-btn--interact').catch(() => '')) || '').includes('Hold'));
+  await pressBtn(42);
+  await page.waitForFunction(() => (window.__toybox.hubplay.state().charge ?? 0) > 0.3, null, { timeout: 120000, polling: 100 }).catch(() => null);
+  await page.waitForFunction(() => document.querySelector('[data-testid=hubplay-meter]')?.style.display !== 'none', null, { timeout: 120000, polling: 100 }).catch(() => null);
+  const ch = await hp();
+  const meterBox = await page.locator('[data-testid=hubplay-meter]').boundingBox().catch(() => null);
+  await page.screenshot({ path: `${OUT}/mobile-10-hubplay-charge-landscape.png` });
+  await touch('touchEnd', []);
+  await page.waitForFunction(() => !window.__toybox.hubplay.state().holding, null, { timeout: 120000, polling: 100 }).catch(() => null);
+  check('touch: holding the button charges (meter on screen), letting go throws', ch.charge > 0.3 && !!meterBox && meterBox.y > 0 && meterBox.y + meterBox.height < 412 && !(await hp()).holding, `charge ${ch.charge?.toFixed(2)} meter ${JSON.stringify(meterBox)}`);
+
   // Tapping the prompt pill also interacts (workshop building → Workshop screen)
   await page.evaluate(() => window.__toybox.hub.goTo('workshop'));
   await page.waitForTimeout(2500);
@@ -170,6 +210,26 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
   const p = await st();
   check('portrait widens the camera FOV', p.fov > 60, `fov=${p.fov.toFixed(1)}`);
   await page.screenshot({ path: `${OUT}/mobile-05-portrait.png` });
+
+  // Hub play in portrait: pick the ball up wherever it landed and charge a throw; the score chip
+  // and the meter stay on screen, clear of the touch buttons.
+  await page.waitForFunction(() => window.__toybox.hubplay.state().ballRest, null, { timeout: 400000, polling: 250 }).catch(() => null);
+  const bl = (await hp()).ball;
+  await page.evaluate(([x, z]) => { const d = Math.hypot(76 - x, -128 - z) || 1; window.__toybox.teleport(x + ((76 - x) / d) * 2, z + ((-128 - z) / d) * 2, Math.PI); }, [bl.x, bl.z]);
+  await btnText('Pick');
+  await pressBtn(43, 300);
+  await touch('touchEnd', []);
+  await btnText('Hold');
+  await pressBtn(44);
+  await page.waitForFunction(() => (window.__toybox.hubplay.state().charge ?? 0) > 0.25, null, { timeout: 120000, polling: 100 }).catch(() => null);
+  await page.waitForFunction(() => document.querySelector('[data-testid=hubplay-meter]')?.style.display !== 'none', null, { timeout: 120000, polling: 100 }).catch(() => null);
+  const chip = await page.locator('[data-testid=hubplay-score]').boundingBox().catch(() => null);
+  const mb = await page.locator('[data-testid=hubplay-meter]').boundingBox().catch(() => null);
+  const btns = await page.$$eval('.touch-btn, .touch-pause', (els) => els.map((e) => { const r = e.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; }));
+  const hit = (a, b) => a && b && a.x < b.x + b.w && b.x < a.x + a.width && a.y < b.y + b.h && b.y < a.y + a.height;
+  await page.screenshot({ path: `${OUT}/mobile-11-hubplay-portrait.png` });
+  await touch('touchEnd', []);
+  check('portrait: score chip and throw meter on screen, clear of the touch buttons', !!chip && !!mb && chip.x >= 0 && chip.x + chip.width <= 412 && mb.x >= 0 && mb.x + mb.width <= 412 && !btns.some((b) => hit(chip, b) || hit(mb, b)), JSON.stringify({ chip, mb }));
 
   // Jack-in-the-Box in portrait: the answer box sits high (clear of the phone keyboard), tap Crank! to pass.
   await page.evaluate(() => window.__toybox.match.timeScale(2));

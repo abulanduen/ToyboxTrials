@@ -10,12 +10,12 @@ async function stickUntil(page,[dx,dy],until,arg){const cdp=await page.context()
 try{for(const layout of(process.env.SPELLBOX_LAYOUTS||'desktop,portrait,landscape').split(',')){
   const mobile=layout!=='desktop',viewport=layout==='portrait'?{width:390,height:844}:layout==='landscape'?{width:844,height:390}:{width:1280,height:800};
   const page=await browser.newPage({viewport,hasTouch:mobile,isMobile:mobile});page.setDefaultTimeout(90000);const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
-  await page.addInitScript(()=>localStorage.setItem('toybox-trials:prototype:v1',JSON.stringify({state:{quality:'low',tutorials:false},version:0})));
+  await page.addInitScript(()=>localStorage.setItem('toybox-trials:prototype:v1',JSON.stringify({state:{tourSeen:true,quality:'low',tutorials:false},version:0})));
   const state=()=>page.evaluate(()=>window.__toybox.match.state());const click=async id=>mobile?page.getByTestId(id).tap():page.getByTestId(id).click();
   const aim=async(x,z)=>{const p=await page.evaluate(v=>window.__toybox.spellbox.point(v.x,v.z),{x,z});if(mobile)await page.touchscreen.tap(p.x,p.y);else await page.mouse.move(p.x,p.y);};
   const cast=async slot=>{if(mobile)await click(`spellbox-cast-${slot}`);else await page.keyboard.press(['KeyQ','KeyE','KeyR'][slot]);};
   await page.goto((process.env.BASE_URL||'http://localhost:4173/')+'?debug#play');await page.waitForSelector('.loading',{state:'detached'});await page.evaluate(()=>window.__toybox.hub.goTo('pavilion'));await page.waitForSelector('.prompt');if(mobile)await page.locator('.prompt').tap();else await page.keyboard.press('KeyE');
-  await click('practice-spellbox-showdown');await page.getByTestId('match-start').waitFor({state:'visible'});await page.waitForTimeout(900);await page.getByRole('button',{name:'7 bots',exact:true}).click();// The host's 3-2-1 is skipped for Spellbox: Start opens the untimed draft at once. Watch for any countdown element appearing.
+  await click('practice-group-party');await click('practice-spellbox-showdown');await page.getByTestId('match-start').waitFor({state:'visible'});await page.waitForTimeout(900);await page.getByRole('button',{name:'7 bots',exact:true}).click();// The host's 3-2-1 is skipped for Spellbox: Start opens the untimed draft at once. Watch for any countdown element appearing.
   await page.evaluate(()=>{window.__sawCountdown=false;new MutationObserver(()=>{if(document.querySelector('.countdown'))window.__sawCountdown=true;}).observe(document.body,{childList:true,subtree:true});});
   await click('match-start');await page.waitForFunction(()=>window.__toybox.match.phase()!=='intro');
   assert.equal(await page.evaluate(()=>window.__toybox.match.phase()),'playing','Start goes straight to playing');

@@ -82,7 +82,7 @@ const seedLow = (page) =>
   page.addInitScript(() => {
     if (!sessionStorage.getItem('seeded')) {
       sessionStorage.setItem('seeded', '1');
-      localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { quality: 'low', tutorials: false }, version: 0 }));
+      localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { tourSeen: true, quality: 'low', tutorials: false }, version: 0 }));
     }
   });
 
@@ -94,6 +94,7 @@ async function openFromPavilion(page, mobile) {
   await page.waitForSelector('.prompt', { timeout: 120000 });
   if (mobile) await page.locator('.prompt').tap();
   else await page.keyboard.press('KeyE');
+  await page.getByTestId('practice-group-party').click(); // the practice list opens by section
   const entry = page.getByTestId('practice-odd-page-out');
   await entry.waitFor({ state: 'visible', timeout: 120000 });
   if (mobile) await entry.tap();

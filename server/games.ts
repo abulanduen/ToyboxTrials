@@ -286,6 +286,8 @@ const GAMES: ServerGame[] = [
           return { type: i.type };
         case 'watch':
           return (i.dir === 1 || i.dir === -1) && who(i.id) ? { type: 'watch', dir: i.dir, ...(typeof i.id === 'string' ? { id: i.id } : {}) } : null;
+        case 'spectate':
+          return typeof i.on === 'boolean' ? { type: 'spectate', on: i.on } : null;
         default:
           return null;
       }
@@ -298,18 +300,21 @@ const GAMES: ServerGame[] = [
     // A board is a few hundred pooled entities: send whole boards only for the viewer's own toy
     // and the board it is watching. Everyone else's board is cut to its live elites (the HUD's
     // send-limit check reads them); the players' own fields (status, level, points, incoming
-    // elites, ghost position) always go out in full.
+    // elites, ghost position) always go out in full. Once the final arena opens, every board is
+    // stubbed: the shared arena (`v.arena`) is what everyone sees, and it goes out whole.
     viewFor(v, viewer) {
       const players = v.players as Obj[];
       const me = players.find((p) => p.id === viewer);
-      const keep = new Set<unknown>([viewer, me?.watching ?? null]);
-      if (!me) keep.add(players.find((p) => p.status === 'alive')?.id ?? players[0]?.id);
+      const keep = new Set<unknown>(v.phase === 'arena' || v.phase === 'over' ? [] : [viewer, me?.watching ?? null]);
+      if (!me && v.phase === 'run') keep.add(players.find((p) => p.status === 'alive')?.id ?? players[0]?.id);
       const stub = (b: Obj): Obj => ({ ...b, mobs: [], projs: [], shots: [], gems: [], chests: [], blasts: [], bigs: (b.bigs as Obj[]).filter((g) => g.on) });
       return { ...v, players: players.map((p) => (keep.has(p.id) ? p : { ...p, board: stub(p.board as Obj) })) };
     },
     snapshotEvery: 2,
     // Online, nobody may stall a shared match: the class pick closes after a minute (first class
     // for anyone still choosing) and a level-up or treasure card after 20 s (its first option).
+    // The finale needs no extra timer: the prep window settles its own cards after 15 s, the arena
+    // opens 15 s after 5:00 at the latest, and the arena itself ends by 90 s.
     config: { pickTimeoutMs: 60_000, choiceTimeoutMs: 20_000 },
   },
 ];

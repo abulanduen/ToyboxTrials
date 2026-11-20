@@ -16,9 +16,11 @@ import { HubTV, TV_AERIAL_TIP } from './HubTV';
 import { Gates } from './Gates';
 import { DustMotes, Fingerpost } from './Ambience';
 import { hubFence, hubPathTiles, TILE_SIZE } from './paths';
-import { JackInTheBox, KeyTower, Marble, MusicBox, PencilLog, Train, TrainTrack } from './Interactive';
-import { BLOCKS, BLOCK_SIZE, BRIDGE, GATES, GATE_STAND, PAVILION, SCOREBOARD, SHOP, TREES, TV, WORKSHOP, frontOf, gateLocal, registerHubColliders } from './layout';
+import { JackInTheBox, KeyTower, MusicBox, PencilLog, Train, TrainTrack } from './Interactive';
+import { HubPlay } from './HubPlay';
+import { BLOCKS, BLOCK_SIZE, BRIDGE, GATES, GATE_STAND, JUKEBOX, PAVILION, PIPWICK_HOME, SCOREBOARD, SHOP, TREES, TV, WORKSHOP, frontOf, gateLocal, registerHubColliders } from './layout';
 import { exposeDebug } from '../game/debug';
+import { HubWelcome } from './HubWelcome';
 
 function roundedRectShape(minX: number, minZ: number, maxX: number, maxZ: number, r: number) {
   const s = new THREE.Shape();
@@ -89,7 +91,7 @@ function DominoFence() {
 function facingTarget(id: string): { x: number; z: number } | null {
   const g = GATES.find((x) => x.id === id);
   if (g) return g;
-  const b: Record<string, { x: number; z: number }> = { pavilion: PAVILION, workshop: WORKSHOP, shop: SHOP, scoreboard: SCOREBOARD, tv: TV };
+  const b: Record<string, { x: number; z: number }> = { pavilion: PAVILION, workshop: WORKSHOP, shop: SHOP, scoreboard: SCOREBOARD, tv: TV, pipwick: PIPWICK_HOME, jukebox: JUKEBOX };
   return b[id] ?? null;
 }
 
@@ -146,11 +148,13 @@ export function Village() {
       <DustMotes />
       <TrainTrack />
       <Train />
-      <Marble />
+      {/* the shared marble, the football nets, the basketball hoop and its ball */}
+      <HubPlay />
       <MusicBox />
       <JackInTheBox />
       <KeyTower />
       <PencilLog />
+      <HubWelcome />
       {/* trees and blocks are instanced: a handful of draws for all of them */}
       <FeltTrees trees={TREES} />
       <Blocks items={BLOCKS.map((b) => ({ ...b, size: (b.s ?? 1) * BLOCK_SIZE }))} />

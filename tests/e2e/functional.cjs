@@ -11,7 +11,7 @@ const check = (name, ok, detail = '') => { results.push(`${ok ? 'PASS' : 'FAIL'}
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  await page.addInitScript(() => localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { quality: 'low' }, version: 0 })));
+  await page.addInitScript(() => localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { tourSeen: true, quality: 'low' }, version: 0 })));
   await page.goto('' + (process.env.BASE_URL || 'http://localhost:4173/') + '?debug');
   await page.waitForTimeout(4000);
   const T = (fn, ...a) => page.evaluate(fn, ...a);
@@ -109,6 +109,70 @@ const check = (name, ok, detail = '') => { results.push(`${ok ? 'PASS' : 'FAIL'}
   check('toy respawns at spawn after elimination', respawned);
   const secrets = await page.textContent('.hud-secrets');
   check('secret counter increments', secrets?.trim().startsWith('1'), secrets);
+
+  // Hub play, offline (the browser runs the same physics as the online server): kick the marble
+  // with E, pick up the basketball with E, hold E to charge and let go to throw; a basket; a goal.
+  const hp = () => T(() => window.__toybox.hubplay.state());
+  const waitHp = (fn, arg, timeout = 120000) => page.waitForFunction(fn, arg, { timeout, polling: 200 }).catch(() => null);
+  const m0 = (await hp()).marble;
+  await T(([x, z]) => window.__toybox.teleport(x + 2.3, z, -Math.PI / 2), [m0.x, m0.z]);
+  await page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Kick'), null, { timeout: 120000 }).catch(() => null);
+  const promptHas = async (...parts) => { const t = (await page.textContent('.prompt').catch(() => '')) || ''; return parts.every((x) => t.includes(x)); };
+  check('next to the marble the prompt says Kick (the giant marble)', await promptHas('Kick', 'the giant marble'));
+  await page.keyboard.press('KeyE');
+  await waitHp((x) => window.__toybox.hubplay.state().marble.x < x - 4, m0.x);
+  const m1 = (await hp()).marble;
+  check('E kicks the marble the way the toy faces', m1.x < m0.x - 4 && Math.abs(m1.z - m0.z) < 2, `x ${m0.x.toFixed(1)} → ${m1.x.toFixed(1)}`);
+  check('kicking the marble is still a playroom secret', (await page.textContent('.hud-secrets'))?.trim().startsWith('2'));
+
+  await T(() => window.__toybox.teleport(76, -125.6, Math.PI));
+  await page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Pick up'), null, { timeout: 120000 }).catch(() => null);
+  check('by the hoop the prompt says Pick up (the basketball)', await promptHas('Pick up', 'the basketball'));
+  await page.keyboard.press('KeyE');
+  await waitHp(() => window.__toybox.hubplay.state().holding);
+  await page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Hold to throw'), null, { timeout: 60000 }).catch(() => null);
+  check('E picks the ball up; the prompt becomes Hold to throw', (await hp()).holding && (await promptHas('Hold to throw')));
+  await page.keyboard.down('KeyE');
+  await waitHp(() => (window.__toybox.hubplay.state().charge ?? 0) > 0.3, null, 60000);
+  await waitHp(() => document.querySelector('[data-testid=hubplay-meter]')?.style.display !== 'none', null, 120000);
+  const charging = await hp();
+  const meterShown = await page.isVisible('[data-testid=hubplay-meter]');
+  const arcDots = await T(() => window.__toybox.three().scene.getObjectByName('hubplay:arc')?.count ?? 0);
+  await page.screenshot({ path: `${OUT}/14-hubplay-charge.png` });
+  await page.keyboard.up('KeyE');
+  await waitHp(() => { const s = window.__toybox.hubplay.state(); return !s.holding && !s.ball.held; });
+  const thrown = await hp();
+  check('holding E charges (meter and arc preview showing); letting go throws', charging.charge > 0.3 && meterShown && arcDots > 3 && !thrown.holding && !thrown.ball.held, `charge ${charging.charge?.toFixed(2)}, meter ${meterShown}, arc ${arcDots} dots`);
+  // software GL runs a few frames a second here, so the flight takes a while: wait until it rests
+  await waitHp(() => window.__toybox.hubplay.state().ballRest, null, 400000);
+  // a basket: pick it up where it landed, then throw from in front of the hoop with the solved power
+  const bl = (await hp()).ball;
+  await T(([x, z]) => { const d = Math.hypot(76 - x, -128 - z) || 1; window.__toybox.teleport(x + ((76 - x) / d) * 2, z + ((-128 - z) / d) * 2, Math.PI); }, [bl.x, bl.z]);
+  await page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Pick up'), null, { timeout: 120000 }).catch(() => null);
+  await page.keyboard.press('KeyE');
+  await waitHp(() => window.__toybox.hubplay.state().holding);
+  await T(() => window.__toybox.teleport(72, -125, Math.atan2(76 - 72, -137.2 + 125)));
+  await page.waitForTimeout(500);
+  const shot = await T(() => window.__toybox.hubplay.solve());
+  await T(([y, p]) => window.__toybox.hubplay.throw(y, p), [shot.yaw, shot.power]);
+  await waitHp(() => window.__toybox.hubplay.state().hoops >= 1, null, 120000);
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: `${OUT}/15-hubplay-basket.png` });
+  const afterBasket = await hp();
+  check('a throw through the hoop scores a basket (yours, and the Hub tally)', afterBasket.hoops === 1 && afterBasket.mine === 1, `power ${shot.power}, hoops ${afterBasket.hoops}, mine ${afterBasket.mine}`);
+  check('…and the HUD shows the tally', ((await page.textContent('[data-testid=hubplay-baskets]').catch(() => '')) || '').includes('Baskets 1'), await page.textContent('[data-testid=hubplay-score]').catch(() => ''));
+  // a goal in the east net (Coral scores)
+  await T(() => window.__toybox.hubplay.place(101 - 11.8, -126));
+  await T(() => window.__toybox.teleport(101 - 14.2, -126, Math.PI / 2));
+  await page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Kick'), null, { timeout: 120000 }).catch(() => null);
+  await page.keyboard.press('KeyE');
+  await waitHp(() => window.__toybox.hubplay.state().score[0] === 1, null, 120000);
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: `${OUT}/16-hubplay-goal.png` });
+  check('kicking the marble into the east net scores for Coral', (await hp()).score.join() === '1,0', JSON.stringify((await hp()).score));
+  check('…and the HUD shows Coral 1 – 0 Blue', ((await page.textContent('[data-testid=hubplay-goals]').catch(() => '')) || '').replace(/\s/g, '') === '1–0');
+  await waitHp(() => { const m = window.__toybox.hubplay.state().marble; return !m.inNet && Math.abs(m.x - 26) < 0.5; }, null, 120000);
+  check('after the goal the marble goes back to the centre spot', Math.abs((await hp()).marble.x - 26) < 0.5);
 
   check('no console/page errors', errors.length === 0, errors.slice(0, 5).join(' | '));
   console.log(results.join('\n'));

@@ -10,12 +10,15 @@
  */
 import { addStatic, resetStatic, type Collider } from '../game/collision';
 import { BRIDGE_WALK, BRIDGE_X, GATES_WALK, HUB_WALK, WALK_AREAS } from '../game/hubBounds';
+import { hubPlayColliders } from '../game/hubPlay';
 import { PALETTE } from '../game/palette';
 import { MINIGAMES } from '../minigames/registry';
 import type { MinigameId } from '../minigames/types';
 import { DOMINO } from './domino';
 
 export { BRIDGE_WALK, GATES_WALK, HUB_WALK, WALK_AREAS };
+/** Hub play objects (the shared marble, the football nets, the basketball hoop): src/game/hubPlay.ts. */
+export { BALL, HOOP, MARBLE, NET, NETS, PITCH_AREA, PITCH_CENTRE, hubPlayColliders } from '../game/hubPlay';
 
 /** The spawn table. */
 export const TABLE = { minX: -80, maxX: 80, minZ: -60, maxZ: 46, thickness: 3.5, legHeight: 72 };
@@ -209,6 +212,24 @@ export const GATE_DECOR = {
   side: { lx: 6.8, lz: -0.3, r: 1.8, top: 3.2 },
 };
 
+/**
+ * The gate greeters (src/scene/Greeters.tsx): a small toy at the front of every arch, to the
+ * right of its path as you walk up, in front of the gate's low prop. Gate-local cm. Solid, but
+ * clear of the arch, the gate's stub path, the loop road and the spot where you stand to play.
+ */
+export const GREETER = { lx: 5.0, lz: 2.6, r: 0.9, top: 3 };
+/** Gates whose greeter stands on the other side (the Siege fort's right-hand side is on the loop road). */
+const GREETER_LEFT: readonly MinigameId[] = ['toybox-siege'];
+export const greeterSpot = (g: { x: number; z: number; rot: number; game: MinigameId }) => gateLocal(g, GREETER_LEFT.includes(g.game) ? -GREETER.lx : GREETER.lx, GREETER.lz);
+
+/** Where Pipwick, the welcome mascot, waits between tours: by the plaza, ahead-right of spawn. */
+export const PIPWICK_HOME = { x: 7, z: 15, r: 1.2, top: 3.8, yaw: Math.PI + 0.5 };
+/**
+ * The Jukebox (src/scene/Jukebox.tsx): on the gates table's north row, just east of the Music Box
+ * Rhythm gate, facing the road like the arches. Picks the Hub's background track.
+ */
+export const JUKEBOX = { x: 73, z: -150, rot: 0, w: 5, d: 3.4, h: 6.6 };
+
 // ------------------------------------------------------------------ household objects and props
 
 /** Big household objects on the spawn table that reach into the play area. */
@@ -251,10 +272,10 @@ export const TREES: [number, number, number][] = [
   [27, 31.5, 0.8], // kept clear of the menu / Workshop camera paths near spawn
   [-40, 31, 0.8],
   // gates table: the green inside the loop road, and its corners
-  [-36, -126, 1.0],
+  [-30, -138, 1.0], // off the pitch's centre line (the west net is at x = -49)
   [-4, -130, 0.9],
   [52, -130, 0.9],
-  [84, -124, 1.0],
+  [90, -114, 1.0], // off the pitch's centre line (the east net is at x = 101)
   [-61, -157, 0.9],
   [116, -157, 0.9],
   [116, -98, 0.8],
@@ -327,7 +348,11 @@ export function hubColliders(): Collider[] {
       const p = gateLocal(g, d.lx, d.lz);
       list.push({ kind: 'circle', id: `${g.id}-${k}`, x: p.x, z: p.z, r: d.r, top: d.top });
     }
+    const gr = greeterSpot(g);
+    list.push({ kind: 'circle', id: `${g.id}-greeter`, x: gr.x, z: gr.z, r: GREETER.r, top: GREETER.top });
   }
+  list.push({ kind: 'circle', id: 'pipwick', x: PIPWICK_HOME.x, z: PIPWICK_HOME.z, r: PIPWICK_HOME.r, top: PIPWICK_HOME.top });
+  list.push({ kind: 'box', id: 'jukebox', x: JUKEBOX.x, z: JUKEBOX.z, hx: JUKEBOX.w / 2, hz: JUKEBOX.d / 2, rot: JUKEBOX.rot, top: JUKEBOX.h });
   const t = TOWER;
   for (const [id, b] of Object.entries(t)) list.push({ kind: 'box', id: `tower-${id}`, x: b.x, z: b.z, hx: b.hx, hz: b.hz, rot: 0, top: b.top });
   list.push({ kind: 'box', id: 'pencil', x: PENCIL.x, z: PENCIL.z, hx: PENCIL.length / 2, hz: PENCIL.r, rot: PENCIL.rot, top: PENCIL.r * 2 });
@@ -346,6 +371,7 @@ export function hubColliders(): Collider[] {
   list.push({ kind: 'circle', id: 'mug', x: MUG.x, z: MUG.z, r: MUG.r, top: MUG.top });
   list.push({ kind: 'circle', id: 'mug-handle', x: MUG.x + MUG.handleX, z: MUG.z, r: MUG.handleR, top: MUG.top });
   list.push(...bridgeColliders());
+  list.push(...hubPlayColliders());
   return list;
 }
 

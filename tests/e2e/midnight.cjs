@@ -23,12 +23,13 @@ async function stickUntil(page, [dx, dy], until, arg) {
       const viewport = layout === 'portrait' ? { width: 390, height: 844 } : layout === 'landscape' ? { width: 844, height: 390 } : { width: 1280, height: 800 };
       const page = await browser.newPage({ viewport, hasTouch: mobile, isMobile: mobile }); page.setDefaultTimeout(90000);
       const errors = []; page.on('pageerror', e => errors.push(e.message)); page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
-      await page.addInitScript(() => localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { quality: 'low', tutorials: false }, version: 0 })));
+      await page.addInitScript(() => localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { tourSeen: true, quality: 'low', tutorials: false }, version: 0 })));
       await page.goto((process.env.BASE_URL || 'http://localhost:4173/') + '?debug#play');
       await page.waitForSelector('.loading', { state: 'detached' });
       await page.evaluate(() => window.__toybox.hub.goTo('pavilion'));
       await page.waitForSelector('.prompt');
       if (mobile) await page.locator('.prompt').tap(); else await page.keyboard.press('KeyE');
+      await page.getByTestId('practice-group-party').click(); // the practice list opens by section
       await page.getByTestId('practice-midnight-hunger').click();
       // The module loads lazily and match buttons ignore taps for 0.7 s after they appear.
       await page.getByTestId('match-start').waitFor({ state: 'visible' }); await page.waitForTimeout(900);

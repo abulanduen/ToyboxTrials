@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useGame } from '../game/store';
 import { sfx } from '../game/audio';
-import { MINIGAMES, gameById } from '../minigames/registry';
+import { gameById } from '../minigames/registry';
 import {
   LOCAL_ID,
   beginCountdown,
@@ -21,16 +21,16 @@ import {
   startTournament,
   useMatch,
 } from '../minigames/session';
-import { FORMATS, poolForFormat, type TournamentFormat } from '../minigames/tournament';
+import { FORMATS, isStrategy, type TournamentFormat } from '../minigames/tournament';
 import { pointsForPlace, rankStandings } from '../minigames/scoring';
-import type { BotDifficulty, Contestant } from '../minigames/types';
+import type { BotDifficulty, Contestant, MinigameDefinition, MinigameId } from '../minigames/types';
 import { tutorialFor, tutorialText, type TutorialStep } from '../minigames/tutorials';
 import { CardboardSheet, KeyCap, ToyButton } from './common';
 import { TutorialPicture, preloadTutorialArt } from './TutorialPicture';
 import { GearIcon, StarSticker, WindKeyIcon } from './icons';
 import { CogIcon } from './itemIcons';
 import type { Reward } from '../game/economy';
-import { GameCardGrid, HostTrialRow, LengthChip, OnlineMatchOverlay, PavilionOnline, PavilionTabs, type PavilionTab } from './LobbyUI';
+import { GameCardGrid, HostTrialRow, LengthChip, OnlineMatchOverlay, PavilionOnline, PavilionTabs, formatRule, type PavilionTab } from './LobbyUI';
 import { durationLabel } from '../minigames/length';
 
 /** "+23 cogs" with the breakdown, and anything an achievement just unlocked. */
@@ -158,14 +158,10 @@ function Intro({ touch }: { touch: boolean }) {
   const rec = useGame((s) => s.records[def.id]);
   const t = m.tournament;
   const isTournament = m.kind === 'tournament';
-  const steps = tutorialFor(def.id);
-  // Decided once per intro card: the setting only controls whether it opens by itself.
-  const [showTutorial, setShowTutorial] = useState(() => useGame.getState().tutorials);
-  const [turnedOff, setTurnedOff] = useState(false);
   return (
     <CardboardSheet title={def.title} className="match-intro" onBackdrop={undefined}>
       <div className="info-panel__sub" style={{ ['--accent' as string]: def.accent, background: def.accent }}>
-        {isTournament && t ? `${FORMATS[t.format].name} · Trial ${t.round + 1} of ${t.games.length}` : 'Practice with bots'}
+        {isTournament && t ? `${FORMATS[t.format].name} · Trial ${t.round + 1} of ${t.games.length}${finaleOf(t) ? ' · the finale' : ''}` : 'Practice with bots'}
       </div>
       <div className="intro-length">
         <LengthChip def={def} /> <span>{durationLabel(def)}</span>
@@ -174,38 +170,7 @@ function Intro({ touch }: { touch: boolean }) {
         <p className="panel__lead">{m.error}</p>
       ) : (
         <>
-          {steps && showTutorial ? (
-            <Tutorial steps={steps} touch={touch} accent={def.accent} onClose={() => setShowTutorial(false)} onNever={() => (useGame.getState().set({ tutorials: false }), setShowTutorial(false), setTurnedOff(true))} />
-          ) : (
-            <>
-              {steps && (
-                <div className="intro-art-row" data-testid="intro-art-row" aria-hidden>
-                  {steps.map((st, k) => (
-                    <TutorialPicture key={k} id={(touch && st.touchArt) || st.art} className="intro-art-row__item" testId="intro-art" />
-                  ))}
-                </div>
-              )}
-              <p className="panel__lead">{def.description}</p>
-              <div className="intro-controls">
-                {touch ? (
-                  <span>{def.touch.notes ?? 'Use the on-screen buttons.'}</span>
-                ) : (
-                  def.controls.map((c) => (
-                    <span key={c.keys} className="intro-controls__item">
-                      <KeyCap k={c.keys} /> {c.action}
-                    </span>
-                  ))
-                )}
-              </div>
-              {turnedOff ? (
-                <p className="tutorial-note" data-testid="tutorial-off-note">Tutorials are off. You can turn them back on in Settings.</p>
-              ) : steps ? (
-                <button className="tutorial-open" onClick={() => (sfx.click(), setShowTutorial(true))} data-testid="tutorial-open">
-                  How to play
-                </button>
-              ) : null}
-            </>
-          )}
+          <IntroGuide def={def} touch={touch} />
           {!isTournament && (
             <div className="intro-options">
               <div className="setting">
@@ -250,6 +215,62 @@ function Intro({ touch }: { touch: boolean }) {
         </ToyButton>
       </div>
     </CardboardSheet>
+  );
+}
+
+/**
+ * The teaching part of every intro card: practice, local tournament rounds and online lobby
+ * trials all use this, so they all follow the player's "Game tutorials" setting the same way. With
+ * tutorials on, the paged How to play opens by itself; otherwise (or after "Got it") the card shows
+ * the step pictures, the description, the controls and a "How to play" button to open it again.
+ */
+export function IntroGuide({ def, touch }: { def: MinigameDefinition; touch: boolean }) {
+  const steps = tutorialFor(def.id);
+  // Decided once per intro card: the setting only controls whether it opens by itself.
+  const [showTutorial, setShowTutorial] = useState(() => useGame.getState().tutorials);
+  const [turnedOff, setTurnedOff] = useState(false);
+  if (steps && showTutorial) {
+    return (
+      <Tutorial
+        steps={steps}
+        touch={touch}
+        accent={def.accent}
+        onClose={() => setShowTutorial(false)}
+        onNever={() => (useGame.getState().set({ tutorials: false }), setShowTutorial(false), setTurnedOff(true))}
+      />
+    );
+  }
+  return (
+    <>
+      {steps && (
+        <div className="intro-art-row" data-testid="intro-art-row" aria-hidden>
+          {steps.map((st, k) => (
+            <TutorialPicture key={k} id={(touch && st.touchArt) || st.art} className="intro-art-row__item" testId="intro-art" />
+          ))}
+        </div>
+      )}
+      <p className="panel__lead">{def.description}</p>
+      <div className="intro-controls" data-testid="intro-controls">
+        {touch ? (
+          <span>{def.touch.notes ?? 'Use the on-screen buttons.'}</span>
+        ) : (
+          def.controls.map((c) => (
+            // The key chip never breaks inside its label; the row wraps between items and a long
+            // action wraps beside its chip.
+            <span key={c.keys} className="intro-controls__item">
+              <KeyCap k={c.keys} /> <span className="intro-controls__action">{c.action}</span>
+            </span>
+          ))
+        )}
+      </div>
+      {turnedOff ? (
+        <p className="tutorial-note" data-testid="tutorial-off-note">Tutorials are off. You can turn them back on in Settings.</p>
+      ) : steps ? (
+        <button className="tutorial-open" onClick={() => (sfx.click(), setShowTutorial(true))} data-testid="tutorial-open">
+          How to play
+        </button>
+      ) : null}
+    </>
   );
 }
 
@@ -320,6 +341,9 @@ function DifficultyPicker({ value, onChange }: { value: BotDifficulty; onChange:
   );
 }
 
+/** The tournament's last trial is a strategy game (Normal and Treasure): its finale. */
+const finaleOf = (t: { games: readonly MinigameId[]; round: number }) => t.round === t.games.length - 1 && isStrategy(gameById(t.games[t.round]));
+
 function Reveal() {
   const t = useMatch((s) => s.tournament)!;
   const def = gameById(t.games[t.round]);
@@ -330,7 +354,7 @@ function Reveal() {
         <span className="reveal-ticket__round">
           {FORMATS[t.format].name} · Trial {t.round + 1} of {t.games.length}
         </span>
-        <span className="reveal-ticket__next">Next up</span>
+        <span className="reveal-ticket__next">{finaleOf(t) ? 'The strategy finale' : 'Next up'}</span>
         <strong className="reveal-ticket__title">{def.title}</strong>
         <span className="reveal-ticket__tag">{def.tagline}</span>
         <ToyButton armDelay={700} onClick={playRevealedGame} autoFocus testId="reveal-go">
@@ -522,9 +546,8 @@ export function TournamentPicker({ onClose }: { onClose: () => void }) {
         </div>
         <DifficultyPicker value={difficulty} onChange={setDifficulty} />
       </div>
-      <p className="panel__note">
-        Practice against bots, unranked. In the {FORMATS[format].name} rotation:{' '}
-        {new Intl.ListFormat('en', { style: 'long', type: 'conjunction' }).format(poolForFormat(format, MINIGAMES).map((g) => g.title))}.
+      <p className="panel__note" data-testid="format-rule">
+        Practice against bots, unranked. {formatRule(format)}
       </p>
       <PracticeList onClose={onClose} />
       {history[0] && (

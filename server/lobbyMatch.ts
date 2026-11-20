@@ -4,8 +4,11 @@
  *
  *   reveal → countdown → playing → results → (tournament) standings → reveal … → final → done
  *
- * The server owns the seed, picks the tournament's trials from the format's pool (Toy Squad only
- * in Normal and Treasure), seats the field (humans, then bots when the host turned bot fill on),
+ * `reveal` is the trial's intro card (the local host's reveal + intro): the How to play steps,
+ * then Ready. It lasts until every seated human is ready, or PHASE_MS.reveal at most.
+ *
+ * The server owns the seed, picks the tournament's trials from the format's pool (the same
+ * `selectTournament` as local play: Normal and Treasure end with one strategy finale), seats the field (humans, then bots when the host turned bot fill on),
  * steps the rules (GameRun), keeps the standings, and decides results and placements. Players who
  * joined mid-match watch and are seated at the next trial. A player who leaves, is kicked or stays
  * disconnected longer than RESUME_WINDOW_MS forfeits the trial (last place) and the tournament.
@@ -15,7 +18,7 @@
 import { makeBots } from '../src/minigames/bots';
 import { subSeed } from '../src/minigames/rng';
 import { addRound, pointsForPlace, rankStandings, type Standing } from '../src/minigames/scoring';
-import { FORMATS, poolForFormat, selectGames } from '../src/minigames/tournament';
+import { poolForFormat, selectTournament } from '../src/minigames/tournament';
 import { GAME_FACTS, onlineGames } from '../src/minigames/facts';
 import { SERVER_GAMES } from './games';
 import type { MinigameId } from '../src/minigames/ids';
@@ -27,8 +30,12 @@ import type { LeaderboardResult } from '../src/net/leaderboardProtocol';
 import type { LobbyDifficulty, LobbySettings, Look, MatchEventWire, MatchInfo, MatchPhaseWire, MatchSeat, MatchStateMsg } from '../src/net/protocol';
 import { GameRun } from './matchRunner';
 
-/** How long each between-trial phase lasts (ms of match time; `continue` from everyone skips results, standings and final). */
-export const PHASE_MS = { reveal: 4500, countdown: 3000, results: 9000, standings: 8000, final: 15000 } as const;
+/**
+ * How long each between-trial phase lasts at most (ms of match time). `ready` from every seated
+ * human ends `reveal` (the trial's intro card, with its How to play steps), `results`, `standings`
+ * and `final` early. The reveal is long enough to read a tutorial; nobody waits once all are ready.
+ */
+export const PHASE_MS = { reveal: 30000, countdown: 3000, results: 9000, standings: 8000, final: 15000 } as const;
 /** A trial that hasn't ended by itself after this long is stopped and scored as it stands. */
 export const MAX_TRIAL_MS = 15 * 60_000;
 export const MAX_FIELD = 8;
@@ -149,13 +156,12 @@ export class MatchFlow {
     this.field = [...seated, ...this.bots.map((b) => ({ ...b, account: null }))];
     if (settings.mode === 'tournament') {
       const pool = poolForFormat(settings.format, serverPool(), this.field.length);
-      const games = selectGames(subSeed(seed, 'games'), FORMATS[settings.format].games, pool);
+      const games = selectTournament(subSeed(seed, 'games'), settings.format, pool);
       this.tournament = { format: settings.format, games, round: 0, standings: this.field.map((c) => ({ contestantId: c.id, points: 0, rounds: [], wins: 0 })) };
       this.game = games[0];
     } else {
       this.tournament = null;
       this.game = settings.game;
-      this.phaseLeft = PHASE_MS.reveal - 1500;
     }
   }
 
@@ -222,7 +228,8 @@ export class MatchFlow {
 
     switch (this.phase) {
       case 'reveal':
-        if ((this.phaseLeft -= dt) <= 0) {
+        // The intro card: on until everyone seated has pressed Ready, or the time is up.
+        if ((this.phaseLeft -= dt) <= 0 || allReady) {
           this.startTrial(members);
           out.changed = true;
         }

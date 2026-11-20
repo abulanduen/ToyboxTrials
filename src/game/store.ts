@@ -7,6 +7,7 @@ import { defaultProfile, normalizeProfile, type Loadout, type Profile } from './
 import { STORE_VERSION, buyItem, dateKey, equipItem, migratePersisted, rewardSecret, unequipSlot, type BuyResult, type EquipResult } from './economy';
 import type { MinigameId } from '../minigames/types';
 import type { TournamentFormat } from '../minigames/tournament';
+import { tourFlag } from './tourFlag';
 
 export type Quality = 'low' | 'balanced' | 'high';
 /** Top-level screens. `menu` = live 3D diorama main menu; `workshop` = customisation. */
@@ -29,7 +30,7 @@ export interface Ticket {
 }
 
 export interface Panel {
-  kind: 'tournament' | 'preview' | 'scoreboard' | 'lobbies';
+  kind: 'tournament' | 'preview' | 'scoreboard' | 'lobbies' | 'jukebox';
   title: string;
   subtitle?: string;
   body?: string;
@@ -66,6 +67,14 @@ interface SettingsSlice {
   autoOnline: boolean;
   /** Toy Squad: roster ids the player starred in the Toy Handbook (marked on shop cards). */
   squadFavourites: string[];
+  /** Background music volume (0..1, times the master volume). Music Box Rhythm's own music ignores it. */
+  musicVolume: number;
+  /** Spoken lines (Pipwick and the gate greeters), 0..1 times the master volume. */
+  voiceVolume: number;
+  /** The Hub's background track, picked at the jukebox (src/game/musicScore.ts HUB_TRACKS, or 'off'). Local only. */
+  hubTrack: string;
+  /** The first-visit Hub tour has been shown (finished or skipped). */
+  tourSeen: boolean;
 }
 
 interface SessionSlice {
@@ -138,6 +147,10 @@ export const useGame = create<GameState>()(
       tutorials: true,
       autoOnline: true,
       squadFavourites: [],
+      musicVolume: 0.6,
+      voiceVolume: 0.9,
+      hubTrack: 'windowsill-waltz',
+      tourSeen: false,
 
       // session
       screen: 'menu',
@@ -225,14 +238,18 @@ export const useGame = create<GameState>()(
         tutorials: s.tutorials,
         autoOnline: s.autoOnline,
         squadFavourites: s.squadFavourites,
+        musicVolume: s.musicVolume,
+        voiceVolume: s.voiceVolume,
+        hubTrack: s.hubTrack,
+        tourSeen: s.tourSeen,
       }),
     },
   ),
 );
 
-/** True whenever gameplay input should be ignored (menus, panels, pause, workshop). */
+/** True whenever gameplay input should be ignored (menus, panels, pause, workshop, the welcome tour). */
 export function inputBlocked(s: GameState = useGame.getState()): boolean {
-  return s.screen !== 'playing' || s.paused || s.panel !== null;
+  return s.screen !== 'playing' || s.paused || s.panel !== null || tourFlag.active;
 }
 
 /** The loadout to draw on the local toy: what's equipped, with any shop try-on on top. */

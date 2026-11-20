@@ -278,8 +278,11 @@ export function placeGesture(gestures: readonly EmoteId[], id: EmoteId, index: n
 }
 
 // ---------------------------------------------------------------- migration of saves
-/** Version of the persisted store (zustand persist `version`): 0 = before profiles, 1 = profile. */
-export const STORE_VERSION = 1;
+/**
+ * Version of the persisted store (zustand persist `version`): 0 = before profiles, 1 = profile,
+ * 2 = the Hub welcome tour (`tourSeen`) plus music/voice volumes and the jukebox track.
+ */
+export const STORE_VERSION = 2;
 /** How many paint jobs existed before the shop (legacy `paintIndex` cycled modulo this). */
 const LEGACY_PAINTS = 5;
 
@@ -306,6 +309,19 @@ export function migratePersisted(state: unknown, fromVersion: number): Record<st
     delete s.keySkin;
     s.profile = p;
   }
+  if (fromVersion < 2 && typeof s.tourSeen !== 'boolean') {
+    // Saves from before the welcome tour: someone who has already played trials, found secrets or
+    // run a tournament knows their way round the Hub, so they are not shown the first-visit tour
+    // (they can still replay it). Everyone else sees it once. The new volumes and jukebox track
+    // are filled from the store defaults by the persist merge.
+    s.tourSeen = hasPlayedBefore(s);
+  }
   s.profile = normalizeProfile(s.profile);
   return s;
+}
+
+/** Evidence in an older save that the player has already been round the Hub. */
+function hasPlayedBefore(s: Record<string, unknown>): boolean {
+  const nonEmpty = (v: unknown) => (Array.isArray(v) ? v.length > 0 : !!v && typeof v === 'object' && Object.keys(v).length > 0);
+  return nonEmpty(s.records) || nonEmpty(s.secretsFound) || nonEmpty(s.tournamentHistory) || nonEmpty(s.tournamentWins);
 }

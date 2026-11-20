@@ -23,6 +23,9 @@ import { leaveOnline, leaveOnlineByChoice } from '../net/client';
 import { closeAccountSheet, useAccount } from '../net/account';
 import { AccountSettingsRow, AccountSheet } from './AccountUI';
 import { HubLobbyAlert, LobbiesButton, LobbyList, OnlineLeaderboard } from './LobbyUI';
+import { JukeboxList, WelcomeUI } from './WelcomeUI';
+import { useWelcome } from '../game/welcome';
+import { HubPlayHud } from './HubPlayHud';
 
 // ---------------------------------------------------------------- HUD
 function Prompt() {
@@ -180,6 +183,8 @@ function Hud() {
   const touch = useGame((s) => s.touchUI);
   const paintName = itemById(useGame((s) => s.profile.loadout.paint))?.name ?? '';
   const cogs = useGame((s) => s.profile.wallet.cogs);
+  // Pipwick's tour (or a chat with her) owns the screen: the movement controls step aside.
+  const welcoming = useWelcome((s) => s.mode !== null);
   return (
     <>
       <div className="hud-sign">
@@ -194,13 +199,15 @@ function Hud() {
       </div>
       <CogCount value={cogs} testId="hud-cogs" className="hud-cogs" />
       <Prompt />
+      <HubPlayHud />
       <OnlineChip />
       <LobbiesButton />
       <HubLobbyAlert />
       <Tickets />
-      {touch ? <TouchControls /> : <Controls />}
+      {!welcoming && (touch ? <TouchControls /> : <Controls />)}
       <BoostMeter />
-      {touch ? <LookHint /> : !locked && <div className="look-hint">Click the scene to look around</div>}
+      {!welcoming && (touch ? <LookHint /> : !locked && <div className="look-hint">Click the scene to look around</div>)}
+      <WelcomeUI />
       <Fps />
     </>
   );
@@ -323,6 +330,7 @@ function Panel() {
             <LobbyList />
           </>
         )}
+        {panel.kind === 'jukebox' && <JukeboxList />}
         {panel.kind === 'scoreboard' && <OnlineLeaderboard />}
         {panel.kind === 'scoreboard' && (
           <div className="scoreboard">

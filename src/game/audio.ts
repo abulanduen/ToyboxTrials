@@ -16,6 +16,8 @@ let musicOut: GainNode | null = null;
 let musicActive = false;
 const MUSIC_LEVEL = 0.8;
 let noiseBuf: AudioBuffer | null = null;
+/** The shared output stage (compressor → speakers) that every bus feeds. */
+let outStage: DynamicsCompressorNode | null = null;
 
 function ensure(): AudioContext | null {
   if (ctx) return ctx;
@@ -25,6 +27,7 @@ function ensure(): AudioContext | null {
   const comp = ctx.createDynamicsCompressor();
   comp.threshold.value = -14;
   comp.ratio.value = 4;
+  outStage = comp;
   master = ctx.createGain();
   master.connect(comp).connect(ctx.destination);
   musicOut = ctx.createGain();
@@ -52,6 +55,16 @@ useGame.subscribe((s, p) => {
 export function unlockAudio() {
   const c = ensure();
   if (c && c.state === 'suspended') void c.resume();
+}
+
+/**
+ * The running AudioContext and the shared output stage, for the background music and voice lines
+ * (src/game/music.ts, src/game/voice.ts), which keep their own buses. Null until the first user
+ * gesture has unlocked audio (and wherever Web Audio is unavailable).
+ */
+export function audioOut(): { ctx: AudioContext; out: AudioNode } | null {
+  if (!ctx || ctx.state !== 'running' || !outStage) return null;
+  return { ctx, out: outStage };
 }
 
 function live(): AudioContext | null {
@@ -108,7 +121,7 @@ const now = () => (ctx ? ctx.currentTime + 0.005 : 0);
 const jitter = (v: number, amt: number) => v * (1 + (Math.random() * 2 - 1) * amt);
 
 /** Short material sounds for busy action games; never changes Copycat's instrument voices. */
-export type ToyCue = 'puff' | 'fan' | 'marble' | 'bubble' | 'ribbon' | 'storm' | 'stitch' | 'button' | 'charge' | 'hit' | 'out' | 'warning' | 'count';
+export type ToyCue = 'puff' | 'fan' | 'marble' | 'bubble' | 'ribbon' | 'storm' | 'stitch' | 'button' | 'charge' | 'hit' | 'out' | 'warning' | 'count' | 'chime';
 export function playToyCue(cue: ToyCue, volume = 1) {
   if (!live()) return;
   const t = now(), k = Math.max(0, Math.min(1, volume));
@@ -127,6 +140,39 @@ export function playToyCue(cue: ToyCue, volume = 1) {
     case 'out': tone(350,t,.09*k,.23,'sine',.012,130); noise(t+.08,.035*k,.065,700,.5,'lowpass'); break;
     case 'warning': tone(660,t,.09*k,.14,'sine',.01); tone(440,t+.17,.07*k,.14,'sine',.01); break;
     case 'count': tone(400,t,.06*k,.055,'sine',.008,300); break;
+    // A soft, short muted chime for rapid auto-fire (Toybox Siege's Chime Burst): a rounded low tine
+    // that dies in a tenth of a second, a faint fifth above, no long bell ring or bright partials.
+    case 'chime': tone(jitter(698,.02),t,.042*k,.1,'sine',.006,660); tone(1047,t+.012,.012*k,.06,'sine',.005); break;
+  }
+}
+
+/**
+ * Hub play cues: the shared marble (football) and the basketball (src/hubplay/). `volume` is the
+ * mix gain (0–1): the caller makes distant ones quieter.
+ */
+export type HubCue = 'kick' | 'push' | 'clack' | 'goal' | 'swish' | 'rim' | 'board' | 'bounce' | 'grab' | 'throw';
+export function playHubCue(cue: HubCue, volume = 1) {
+  if (!live()) return;
+  const t = now(), k = Math.max(0, Math.min(1, volume));
+  if (k < 0.02) return;
+  switch (cue) {
+    case 'kick': // a wooden toe on glass: low thock, then the marble's clink
+      tone(jitter(170, .04), t, .2*k, .09, 'sine', .003, 95); noise(t, .1*k, .04, 900, .7, 'lowpass'); tone(jitter(1900, .03), t+.01, .05*k, .09, 'sine', .002); break;
+    case 'push': tone(jitter(240, .05), t, .08*k, .06, 'sine', .004, 160); tone(jitter(2100, .03), t, .025*k, .06, 'sine', .002); break;
+    case 'clack': tone(jitter(2400, .04), t, .07*k, .07, 'sine', .002); noise(t, .05*k, .025, 3200, 1.5); break;
+    case 'goal': // music-box fanfare over a little crowd of clicking toys
+      [784, 988, 1175, 1568].forEach((f, i) => tine(f, t + i * .09, .15*k, .55));
+      tine(2093, t + .4, .12*k, .9);
+      noise(t + .05, .07*k, .7, 1400, .6);
+      for (let i = 0; i < 8; i++) noise(t + .08 + i * .06 + Math.random() * .03, .05*k, .02, 2600 + i * 120, 4);
+      break;
+    case 'swish': // the ball through the net, then a bell
+      noise(t, .12*k, .22, 3400, .8, 'bandpass'); noise(t + .04, .06*k, .18, 1800, .6, 'bandpass'); tine(2093, t + .12, .12*k, .7); tine(2637, t + .22, .09*k, .8); break;
+    case 'rim': tone(jitter(640, .03), t, .11*k, .32, 'triangle', .002); tone(jitter(1290, .03), t, .04*k, .2, 'sine', .002); break;
+    case 'board': tone(jitter(210, .04), t, .13*k, .09, 'sine', .003, 140); noise(t, .08*k, .05, 800, .8, 'lowpass'); break;
+    case 'bounce': tone(jitter(330, .05), t, .13*k, .09, 'sine', .004, 190); noise(t, .05*k, .03, 600, .6, 'lowpass'); break;
+    case 'grab': tone(520, t, .08*k, .07, 'sine', .006, 760); noise(t, .04*k, .03, 1200, .7, 'lowpass'); break;
+    case 'throw': noise(t, .1*k, .2, 1100, .7, 'bandpass'); tone(380, t, .05*k, .16, 'sine', .01, 620); break;
   }
 }
 

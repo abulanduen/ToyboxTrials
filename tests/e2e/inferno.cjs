@@ -23,12 +23,13 @@ async function stickUntil(page, [dx, dy], until, arg) {
       const page = await browser.newPage({ viewport: mobile ? { width: 390, height: 844 } : { width: 1280, height: 800 }, hasTouch: mobile, isMobile: mobile });
       page.setDefaultTimeout(60000);
       const errors = []; page.on('pageerror', e => errors.push(e.message));
-      await page.addInitScript(() => localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { quality: 'low', tutorials: false }, version: 0 })));
+      await page.addInitScript(() => localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { tourSeen: true, quality: 'low', tutorials: false }, version: 0 })));
       await page.goto((process.env.BASE_URL || 'http://localhost:4173/') + '?debug#play');
       await page.waitForSelector('.loading', { state: 'detached' });
       await page.evaluate(() => window.__toybox.hub.goTo('pavilion'));
       await page.waitForSelector('.prompt');
       if (mobile) await page.locator('.prompt').tap(); else await page.keyboard.press('KeyE');
+      await page.getByTestId('practice-group-party').click(); // the practice list opens by section
       await page.getByTestId('practice-inferno-escape').click();
       // Match buttons ignore taps for 0.7 s after they appear, and the module loads lazily.
       await page.getByTestId('match-start').waitFor({ state: 'visible' });

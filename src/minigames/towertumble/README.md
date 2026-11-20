@@ -256,8 +256,9 @@ play it like any build phase. `damageCheck: false` in the config skips it.
 
 Placement order: **waves survived** (cleared), then **lives left**, then **score** (damage dealt / 10,
 plus the final boss's 500 bounty). Equal on all three shares a place. Clearing wave 20 is a win; if
-several boards clear it, lives and score separate them. The record unit is *waves*. Not in
-tournaments (too long), like Toy Squad.
+several boards clear it, lives and score separate them. The record unit is *waves*. A strategy
+trial (owner decision 20 Nov 2026), like Toy Squad and Toybox Siege: never in Blitz, and only ever
+the finale of a Normal or Treasure tournament.
 
 ## The player rail, knockout and spectating
 

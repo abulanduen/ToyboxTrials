@@ -6,7 +6,7 @@ const P = (v: unknown) => parseClientMessage(JSON.stringify(v));
 const S = (v: unknown) => parseServerMessage(JSON.stringify(v));
 
 describe('lobby and match messages (protocol v3)', () => {
-  it('is protocol version 3', () => expect(PROTOCOL_VERSION).toBe(3));
+  it('is protocol version 4 (lobbies arrived in v3)', () => expect(PROTOCOL_VERSION).toBe(4));
 
   it('accepts every lobby action with valid fields', () => {
     expect(P({ t: 'lobby', a: 'create', settings: LOBBY_DEFAULTS })).toEqual({ t: 'lobby', a: 'create', settings: LOBBY_DEFAULTS });
@@ -15,6 +15,7 @@ describe('lobby and match messages (protocol v3)', () => {
     expect(P({ t: 'lobby', a: 'settings', settings: { mode: 'single', game: 'toy-squad' } })).toEqual({ t: 'lobby', a: 'settings', settings: { mode: 'single', game: 'toy-squad' } });
     expect(P({ t: 'lobby', a: 'kick', id: 'p3' })).toEqual({ t: 'lobby', a: 'kick', id: 'p3' });
     expect(P({ t: 'lobby', a: 'ready', ready: true })).toEqual({ t: 'lobby', a: 'ready', ready: true });
+    expect(P({ t: 'lobby', a: 'ready', ready: true, phase: 'reveal' })).toEqual({ t: 'lobby', a: 'ready', ready: true, phase: 'reveal' });
     expect(P({ t: 'lobby', a: 'watch', id: 'bot-2' })).toEqual({ t: 'lobby', a: 'watch', id: 'bot-2' });
     for (const a of ['leave', 'start']) expect(P({ t: 'lobby', a })).toEqual({ t: 'lobby', a });
   });
@@ -38,6 +39,7 @@ describe('lobby and match messages (protocol v3)', () => {
     expect(P({ t: 'lobby', a: 'kick', id: '<script>' })).toBeNull();
     expect(P({ t: 'lobby', a: 'timescale', k: 1e9 })).toBeNull();
     expect(P({ t: 'lobby', a: 'explode' })).toBeNull();
+    expect(P({ t: 'lobby', a: 'ready', ready: true, phase: 'lunch' })).toBeNull();
   });
 
   it('match inputs: flat objects of plain values only, at most MAX_INPUTS_PER_MSG', () => {

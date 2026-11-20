@@ -32,6 +32,7 @@ import { exposeDebug } from '../game/debug';
 import { netLink } from './link';
 import { onLobbies, onLobbyAlert, onLobbyErr, onLobbyState, onMatchState, resetLobbies } from './lobby';
 import { accountToken } from './account';
+import { onHubPlayEvents, onHubPlaySnap, setHubPlayOnline } from '../hubplay/runtime';
 
 /** Give up on a room that hasn't welcomed us by then. */
 const WELCOME_TIMEOUT_MS = 12_000;
@@ -179,6 +180,7 @@ function reset() {
   sentActivity = undefined;
   sentLook = '';
   sent.x = NaN;
+  setHubPlayOnline(false);
 }
 
 /** Give up: back to offline play, with a message. */
@@ -241,6 +243,7 @@ const handlers: { [K in ServerMsg['t']]: (m: Extract<ServerMsg, { t: K }>) => vo
     if (m.room.kind === 'private' && m.room.code) joinReq = { kind: 'code', code: m.room.code };
     remotes.clear();
     netClock.reset();
+    setHubPlayOnline(true);
     // A fresh slot (not a resume) has no lobby: leave any lobby screen we were on.
     if (!m.resumed) resetLobbies('fresh');
     // Signed in: link the account so finished lobby matches go on the leaderboard by username.
@@ -295,6 +298,7 @@ const handlers: { [K in ServerMsg['t']]: (m: Extract<ServerMsg, { t: K }>) => vo
       r.activity = p.a;
       r.off = p.off === 1;
     }
+    if (m.hp) onHubPlaySnap(m.now, m.hp);
   },
   emote(m) {
     const r = remotes.get(m.id);
@@ -320,6 +324,7 @@ const handlers: { [K in ServerMsg['t']]: (m: Extract<ServerMsg, { t: K }>) => vo
   lobby: onLobbyState,
   lobbyErr: onLobbyErr,
   ms: onMatchState,
+  play: (m) => onHubPlayEvents(m.e),
 };
 
 // ---------------------------------------------------------------- outgoing intent

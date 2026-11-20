@@ -87,6 +87,8 @@ textarea,
   font: 700 0.85em/1 var(--font-display);
   color: var(--ink-deep);
   transform: translateY(-2px);
+  /* A key chip is one label: never broken across lines (its row wraps between chips instead). */
+  white-space: nowrap;
 }
 .keycap--wide {
   min-width: 3em;
@@ -768,6 +770,27 @@ textarea,
 }
 .touch-stick--on {
   opacity: 1;
+}
+/* Floating mode: the whole bottom half is the zone; the stick shows only under a finger. */
+.touch-stick-zone.touch-stick-zone--half,
+.mv-touch .touch-stick-zone.touch-stick-zone--half {
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 50%;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+.touch-stick--float {
+  opacity: 0;
+  visibility: hidden;
+  transition: none;
+}
+.touch-stick--float.touch-stick--on {
+  opacity: 1;
+  visibility: visible;
 }
 .touch-stick__ring {
   position: absolute;
@@ -1504,6 +1527,13 @@ textarea,
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  max-width: 100%;
+}
+.intro-controls__item .keycap {
+  flex: none;
+}
+.intro-controls__action {
+  min-width: 0;
 }
 .intro-options {
   display: grid;
@@ -4050,6 +4080,94 @@ textarea,
   opacity: 0.75;
 }
 
+/* The pickers' sections: party games and strategy games, each folded away until opened. */
+.game-group {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.game-group__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  width: 100%;
+  padding: 8px 12px;
+  text-align: left;
+  border-radius: 14px;
+  border: 2.5px solid var(--ink-deep);
+  background: var(--paper);
+  box-shadow: 0 4px 0 rgba(43, 36, 51, 0.35);
+  color: var(--ink-deep);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.game-group--strategy .game-group__head {
+  background: color-mix(in srgb, var(--sage) 22%, var(--paper));
+}
+.game-group__head:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 rgba(43, 36, 51, 0.35);
+}
+.game-group__chev {
+  flex: none;
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 10px solid var(--ink-deep);
+  transform: rotate(-90deg);
+  transition: transform 0.15s;
+}
+.game-group.open .game-group__chev {
+  transform: none;
+}
+.game-group__words {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.game-group__words strong {
+  font: 700 1rem var(--font-display);
+}
+.game-group__count {
+  opacity: 0.6;
+}
+.game-group__blurb {
+  font: 600 0.75rem var(--font-body);
+  opacity: 0.75;
+}
+.game-group__tag {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--honey);
+  border: 2px solid var(--ink-deep);
+  font: 700 0.7rem var(--font-body);
+}
+.game-picked {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 6px;
+  border-radius: 14px;
+  border: 2.5px solid var(--ink-deep);
+  background: #fff3d6;
+  outline: 4px solid var(--honey);
+  outline-offset: 1px;
+  margin: 4px 0 6px;
+}
+.game-picked__words {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.game-picked__words strong {
+  font: 700 1rem var(--font-display);
+}
+
 /* Hub: the lobby alert, the Lobbies button, lists. */
 .lobby-alert {
   position: absolute;
@@ -4373,5 +4491,349 @@ textarea,
   .lobby-kick,
   .lobby-card .toy-btn {
     min-height: 56px;
+  }
+}
+
+/* ---------------------------------------------------------------- Welcome: Pipwick, greeters, jukebox */
+.welcome-card {
+  position: absolute;
+  left: 50%;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  width: min(780px, calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas: 'who text actions';
+  align-items: center;
+  gap: 4px 14px;
+  padding: 10px 12px;
+  border-radius: 18px;
+  border: 3px solid var(--ink-deep);
+  background: var(--paper);
+  box-shadow: var(--shadow);
+  pointer-events: auto;
+  animation: prompt-pop 0.25s cubic-bezier(0.2, 1.8, 0.4, 1) both;
+}
+.welcome-card__who {
+  grid-area: who;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.welcome-card__who strong {
+  font: 600 1.05rem var(--font-display);
+  color: var(--coral);
+}
+.welcome-card__step {
+  display: block;
+  text-align: center;
+  font: 700 0.75rem var(--font-body);
+  color: var(--ink);
+  letter-spacing: 0.05em;
+}
+.pipwick-badge {
+  flex: none;
+  border-radius: 50%;
+  border: 3px solid var(--ink-deep);
+  background: var(--cream);
+}
+.welcome-card__who .pipwick-badge {
+  width: 52px;
+  height: 52px;
+}
+.welcome-card__text {
+  grid-area: text;
+  margin: 0;
+  font: 600 1.02rem/1.35 var(--font-body);
+  transition: opacity 0.25s;
+}
+.welcome-card__text--wait {
+  opacity: 0.35;
+}
+.welcome-card__actions {
+  grid-area: actions;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.welcome-card__actions .toy-btn {
+  min-height: 56px;
+  min-width: 56px;
+}
+.welcome-card__actions .toy-btn > span {
+  padding: 0.7em 1.2em;
+  white-space: nowrap;
+}
+.welcome-card--chat {
+  grid-template-columns: auto 1fr;
+  grid-template-areas: 'who text' 'actions actions';
+}
+.welcome-card--chat .welcome-card__actions {
+  flex-direction: row;
+  justify-content: flex-end;
+}
+.welcome-card__actions--three .toy-btn > span {
+  padding: 0.55em 1em;
+}
+.welcome-card__keys {
+  grid-column: 2 / 4;
+  font: 600 0.75rem var(--font-body);
+  color: var(--ink);
+  text-align: right;
+}
+@media (max-width: 620px) {
+  /* portrait phones: badge and name on top, the line, then the buttons side by side */
+  .welcome-card {
+    grid-template-columns: auto 1fr;
+    grid-template-areas: 'who text' 'actions actions';
+    gap: 8px 10px;
+  }
+  .welcome-card__text {
+    font-size: 0.95rem;
+  }
+  .welcome-card__actions {
+    flex-direction: row;
+  }
+  .welcome-card__actions .toy-btn {
+    flex: 1 1 0;
+  }
+  .welcome-card__actions .toy-btn > span {
+    white-space: normal;
+  }
+  .welcome-card__keys {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-height: 460px) and (min-width: 621px) {
+  /* phone landscape: one short strip */
+  .welcome-card {
+    padding: 6px 10px;
+  }
+  .welcome-card__who .pipwick-badge {
+    width: 40px;
+    height: 40px;
+  }
+  .welcome-card__text {
+    font-size: 0.92rem;
+  }
+  .welcome-card__actions {
+    gap: 6px;
+  }
+}
+
+.greeter-bubble {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(calc(var(--bx, -999px) - 50%), calc(var(--by, -999px) - 100% - 10px));
+  width: max-content;
+  max-width: min(300px, 76vw);
+  padding: 9px 13px 10px;
+  border-radius: 16px;
+  border: 3px solid var(--ink-deep);
+  background: var(--paper);
+  box-shadow: 0 4px 0 rgba(43, 36, 51, 0.35);
+  font: 600 0.95rem/1.3 var(--font-body);
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.greeter-bubble::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -12px;
+  width: 18px;
+  height: 18px;
+  transform: translateX(-50%) rotate(45deg);
+  background: var(--paper);
+  border-right: 3px solid var(--ink-deep);
+  border-bottom: 3px solid var(--ink-deep);
+}
+.greeter-bubble strong {
+  display: inline-block;
+  margin-bottom: 3px;
+  padding: 1px 8px;
+  border-radius: 6px;
+  border: 2px solid var(--ink-deep);
+  background: var(--accent);
+  font: 600 0.85rem var(--font-display);
+}
+.greeter-bubble span {
+  display: block;
+}
+
+.jukebox__list {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 8px;
+}
+.jukebox__track {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 56px;
+  padding: 9px 14px;
+  border-radius: 12px;
+  border: 3px solid var(--ink-deep);
+  background: var(--paper);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: var(--ink-deep);
+}
+.jukebox__track strong {
+  display: block;
+  font: 600 1.05rem var(--font-display);
+}
+.jukebox__track span {
+  display: block;
+  font: 600 0.88rem var(--font-body);
+  color: var(--ink);
+}
+.jukebox__track--on {
+  background: var(--honey);
+}
+.jukebox__now {
+  display: block;
+  margin-top: 4px;
+  font: 700 0.75rem var(--font-body);
+  font-style: normal;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.jukebox__hint,
+.jukebox__note {
+  margin: 4px 0 8px;
+  font: 600 0.85rem var(--font-body);
+  color: var(--ink);
+}
+.jukebox__hint {
+  color: var(--coral);
+}
+.howto__tour {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 0.4rem 0 1rem;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 249, 238, 0.6);
+  border: 2px dashed rgba(110, 82, 54, 0.5);
+  font: 600 0.95rem var(--font-body);
+}
+.howto__tour span {
+  flex: 1 1 200px;
+
+/* ---------------------------------------------------------------- hub play (marble football, basketball) */
+.hubplay-score {
+  position: absolute;
+  top: calc(64px + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  border: 2.5px solid var(--ink-deep);
+  background: var(--paper);
+  box-shadow: 0 3px 0 rgba(43, 36, 51, 0.3);
+  font: 600 0.92rem var(--font-display);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.hubplay-score strong {
+  font-size: 1.05rem;
+}
+.hubplay-score em {
+  font-style: normal;
+  color: var(--wood-dark);
+}
+.hubplay-score__team {
+  padding: 1px 8px;
+  border-radius: 999px;
+  color: var(--paper);
+  font-size: 0.8rem;
+}
+.hubplay-score__team--coral {
+  background: var(--coral);
+}
+.hubplay-score__team--blue {
+  background: var(--blue);
+}
+.hubplay-score__sep {
+  width: 2px;
+  height: 1.1em;
+  background: var(--ink-deep);
+  opacity: 0.25;
+}
+.hubplay-meter {
+  position: absolute;
+  left: 50%;
+  bottom: calc(13% + 70px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 14px;
+  border: 2.5px solid var(--ink-deep);
+  background: var(--cream);
+  box-shadow: 0 3px 0 rgba(43, 36, 51, 0.3);
+  font: 700 0.85rem var(--font-display);
+  pointer-events: none;
+}
+.hubplay-meter__bar {
+  width: 160px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid var(--ink-deep);
+  background: var(--paper);
+  overflow: hidden;
+}
+.hubplay-meter__fill {
+  width: 100%;
+  height: 100%;
+  transform-origin: left center;
+  transform: scaleX(0);
+  background: linear-gradient(90deg, var(--sage), var(--honey) 60%, var(--coral));
+}
+@media (max-width: 700px), (max-height: 500px) {
+  .hubplay-score {
+    font-size: 0.8rem;
+    padding: 4px 10px;
+    gap: 6px;
+  }
+  .hubplay-meter__bar {
+    width: 120px;
+  }
+}
+/* phones in landscape: the top centre is free (the HUD sign is top left, the gear top right) */
+@media (max-height: 500px) {
+  .hubplay-score {
+    top: calc(12px + env(safe-area-inset-top));
+  }
+}
+/* phones in portrait: a compact two-line chip under the gear, clear of the left-hand HUD */
+@media (max-width: 700px) and (min-height: 501px) {
+  .hubplay-score {
+    top: calc(84px + env(safe-area-inset-top));
+    left: auto;
+    right: calc(12px + env(safe-area-inset-right));
+    transform: none;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 170px;
+    border-radius: 14px;
+    row-gap: 2px;
+  }
+  .hubplay-score__sep {
+    display: none;
   }
 }

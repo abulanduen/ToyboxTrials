@@ -10,7 +10,7 @@ const out = path.join(__dirname,'output'); fs.mkdirSync(out,{recursive:true});
       const mobile = layout !== 'desktop', viewport = layout === 'portrait' ? {width:390,height:844} : layout === 'landscape' ? {width:844,height:390} : {width:1280,height:800};
       const page = await browser.newPage({viewport,hasTouch:mobile,isMobile:mobile}); page.setDefaultTimeout(300000);
       const errors = []; page.on('pageerror',e=>errors.push(e.message)); page.on('console',m=>{if(m.type()==='error') errors.push(m.text());});
-      await page.addInitScript(()=>localStorage.setItem('toybox-trials:prototype:v1',JSON.stringify({state:{quality:'low',tutorials:false},version:0})));
+      await page.addInitScript(()=>localStorage.setItem('toybox-trials:prototype:v1',JSON.stringify({state:{tourSeen:true,quality:'low',tutorials:false},version:0})));
       const state = () => page.evaluate(()=>window.__toybox.match.state());
       const click = async id => {const b=page.getByTestId(id); if(mobile) await b.tap(); else await b.click();};
       const drag = async (from,toX,toZ) => {
@@ -64,6 +64,7 @@ const out = path.join(__dirname,'output'); fs.mkdirSync(out,{recursive:true});
       await page.goto((process.env.BASE_URL||'http://localhost:4173/')+'?debug#play');
       await page.waitForSelector('.loading',{state:'detached'}); await page.evaluate(()=>window.__toybox.hub.goTo('pavilion'));
       await page.waitForSelector('.prompt'); if(mobile) await page.locator('.prompt').tap(); else await page.keyboard.press('KeyE');
+      await click('practice-group-strategy'); // the practice list opens by section
       await click('practice-toy-squad');
       // Lazy module load + 0.7 s tap guard on match buttons; then fast-forward the countdown (slow software GL).
       await page.getByTestId('match-start').waitFor({state:'visible'}); await page.waitForTimeout(900);

@@ -44,6 +44,8 @@ you until you're back ("in the Workshop" and "at the Odds & Ends shop" work the 
 | `src/character/RemotePlayers.tsx` | Remote toys: `WindupBot` with each player's paint, hat, key and accessories, DOM name tags. |
 | `src/game/cosmetics.ts`, `src/game/emotes.ts` | The shared cosmetics catalogue and gesture list. The server validates looks and emotes against them (docs/ECONOMY.md). |
 | `src/ui/OnlineUI.tsx` | Play online sheet, HUD chip, touch Emote menu. |
+| `src/game/hubPlay.ts`, `src/game/hubPlaySim.ts`, `src/game/hubSolids.ts` | Hub play (the shared marble, football nets, basketball hoop): where things are, the **pure physics** both sides run, and the hub's solid props as data (generated from the layout). |
+| `src/hubplay/runtime.ts`, `src/scene/HubPlay.tsx`, `src/ui/HubPlayHud.tsx` | Hub play in the browser: offline physics or the server's state (interpolated), controls, sounds, celebrations; the 3D objects; the score chip and throw meter. |
 
 ### Rooms
 
@@ -79,6 +81,57 @@ you until you're back ("in the Workshop" and "at the Odds & Ends shop" work the 
   that exist in the shared catalogue (each accessory in its own slot) and replaces anything else
   with the default. A modified client could wear or play items it hasn't unlocked.
 
+### Hub play: the shared marble and basketball
+
+Every Hub room has **one marble** and **one basketball** that everyone in it sees and plays with.
+The server is the authority: `server/hubRoom.ts` steps the pure, deterministic physics in
+`src/game/hubPlaySim.ts` in fixed 1/60 s steps on the room clock (caught up on each 15 Hz
+snapshot tick and before applying a kick or a throw), and puts the result in every snapshot. Offline,
+the browser runs the very same code with your toy as the only body, so single-player behaves alike.
+
+- **Where:** the marble starts where it always was, on the spawn table (it is still a playroom
+  secret). The pitch is the green inside the trials table's loop road: a net at each end, just inside
+  the road, with the end arches (Inferno Escape, Spellbox Showdown) behind them across the road, so
+  nothing blocks a net's mouth. The hoop stands on the pitch's north edge, east of the Siege fort; the
+  ball waits on a chalk ring in front of it. Numbers in `src/game/hubPlay.ts`, re-exported by
+  `src/scene/layout.ts`, whose colliders include the nets and the hoop's pole.
+- **Physics:** the marble rolls in 2D with felt drag, bounces off the hub's solid props
+  (`HUB_SOLIDS`: every collider of `hubColliders()`, as data the server can import; a unit test fails
+  if it falls out of step with the layout, `UPDATE_HUB_SOLIDS=1 npx vitest run
+  tests/unit/hub-solids.test.ts` regenerates it) and off toys (where the server has them), stays on
+  walkable ground, and rolls over the domino bridge (its mouths gently gather a marble rolling at
+  them, like a shallow gutter). The ball is 3D: thrown at 60° with a speed from the charged power,
+  under gravity, bouncing on the table, props, the backboard and the rim; it scores when it drops
+  through the rim. Left alone 30 s (or stuck on top of something) it goes back to its spot.
+- **Kicks and pushes** (`kick {dx, dz, p}`): Interact kicks at power 1; walking into the marble
+  sends pushes (power 0.45, 0.62 running) at most every 200 ms while you press into it. The server
+  checks the player is in the hub (not in a trial), within reach of the marble where the **server**
+  has them (3.6 cm centre to centre, plus 1.5 cm for move lag), not kicking it backwards through
+  themselves, and not kicking again within 120 ms (extras are dropped).
+- **The ball** (`ball {a: grab}` / `ball {a: throw, yaw, p}`): a pick-up needs the ball within
+  3.2 cm (+1.5) of where the server has you and nobody holding it; only the holder can throw, from
+  where the server has them. A holder who disconnects, leaves or goes into a trial or the Workshop
+  drops it. At most one ball action per player per 150 ms.
+- **Scoring:** a marble wholly over a goal line scores for the other team (Coral attacks the east
+  net, Blue the west), sits in the net 1.6 s, then goes back to the centre spot. Baskets are counted
+  for the room; the browser also counts your own this session. The room's score lives as long as
+  the room (a server restart resets it).
+- **Snapshots** carry `hp` (marble position and velocity, in-net flag, ball position and velocity,
+  holder, goals, baskets); **`play`** messages carry the events since the last snapshot (kicks, goals,
+  baskets, rim/board/floor bounces, pick-ups, throws, drops; at most 12 per tick). Clients draw the
+  marble and ball 100 ms behind the newest snapshot like remote toys, but blend with **cubic Hermite**
+  interpolation using the velocities, so a thrown ball follows its arc between 15 Hz snapshots; a
+  jump the velocities can't explain (back to the centre after a goal) is drawn as a jump. Events
+  play their sounds, confetti and tickets 100 ms late, in step with the drawing.
+- **Your own actions** feel immediate: the kick and throw sounds play on the press; a ball you pick
+  up is in your hands at once (if the server refuses, it goes back within 0.8 s); your own throw is
+  drawn from a local prediction with the same physics until it comes to rest (at most 2.6 s), then
+  blends into the server's ball. Kicks are not predicted: the marble starts rolling one network
+  trip plus the 100 ms buffer after the press.
+- **Test servers only** (`MATCH_DEBUG=1`): `hpdebug {x, z}` puts the marble somewhere (the e2e test
+  uses it to stage a goal). Ignored by real servers.
+- The toy train does not stop the marble (its position isn't shared between clients).
+
 ### Reconnects and limits
 
 - The welcome message carries a secret resume token. If a connection drops, the player's slot is
@@ -103,8 +156,9 @@ online"). The other choice in both places is the existing **practice with bots**
   locked the lobby or it is at its cap.
 - **Host controls** (`server/lobby.ts` checks every one: only the host's are accepted): kick a
   player (they can't rejoin that lobby), player cap 2–8, lock/unlock, bot fill on/off, bot skill,
-  and the mode: **one trial** (picked from a card grid of all trials) or a **tournament**
-  (Blitz 3, Normal 5, Treasure 8 trials, as locally), then **Start**. When the host leaves, the
+  and the mode: **one trial** (picked from two folded sections, Party games and Strategy games,
+  with the pick shown compactly) or a **tournament** (Blitz 3, Normal 5, Treasure 8 trials, as
+  locally: Normal and Treasure end with a strategy finale), then **Start**. When the host leaves, the
   longest-present member becomes host; when the last member leaves, the lobby closes.
 - **The lobby screen** lists the members (host, ready, reconnecting) and shows the settings to
   everyone; non-hosts press "I'm ready". At most 8 lobbies per Hub room; a player may host a new
@@ -116,12 +170,17 @@ online"). The other choice in both places is the existing **practice with bots**
 
 ### How a match runs on the server
 
-- `server/lobbyMatch.ts` runs the phases: reveal (4.5 s) → countdown (3 s) → playing → results
-  (9 s) → standings (8 s, tournaments) → … → final table (15 s) → back to the lobby. Everyone
-  pressing Continue skips results, standings and the final table.
-- **The server owns the seed** and picks the tournament's trials with the same `selectGames` as
-  local tournaments, from the format's pool (`poolForFormat`: Toy Squad only in Normal and
-  Treasure). Bots (`makeBots`, the same bot policies as practice) fill the empty seats up to the
+- `server/lobbyMatch.ts` runs the phases: reveal (the trial's intro card, up to 30 s) → countdown
+  (3 s) → playing → results (9 s) → standings (8 s, tournaments) → … → final table (15 s) → back to
+  the lobby. The intro card is the same as in practice: the How to play steps (opening by
+  themselves when the player's tutorial setting is on), the field, and **Ready**. Everyone seated
+  pressing Ready starts the countdown at once; everyone pressing Continue skips results, standings
+  and the final table. A `ready` carries the phase it was pressed in, and the server drops one
+  whose phase has passed (a late "Next trial" never counts as Ready on the next intro).
+- **The server owns the seed** and picks the tournament's trials with the same `selectTournament`
+  as local tournaments, from the format's pool (`poolForFormat`): Blitz draws party trials only;
+  Normal and Treasure draw party trials, then exactly one strategy trial (Toy Squad, Toybox Siege or
+  Toy Tower Tumble) as the finale. Bots (`makeBots`, the same bot policies as practice) fill the empty seats up to the
   cap when the host turned bot fill on; if players leave and a trial would have fewer toys than it
   needs, bots top it up even with bot fill off.
 - `server/matchRunner.ts` steps the **same pure rules cores** (`src/minigames/<game>/rules.ts`)
@@ -208,9 +267,10 @@ online"). The other choice in both places is the existing **practice with bots**
 - **In the game:** the Hub Scoreboard panel shows the top ten per format above your local records
   (which stay on this device), and the TV beside it has a "Leaderboard" channel (Blitz).
 
-## Protocol (version 3)
+## Protocol (version 4)
 
-Version 3 (lobbies): adds the lobby, match and account-link messages below. Version 2 (the shop)
+Version 4 (hub play): adds `kick`, `ball` and the test-only `hpdebug`, the snapshot's `hp` and the
+`play` events. Version 3 (lobbies): adds the lobby, match and account-link messages below. Version 2 (the shop)
 added the accessory slots `back`, `face` and `neck`, ten emote ids and the `shop` activity.
 Clients on an older version get the "refresh the page" message.
 
@@ -228,13 +288,18 @@ Client → server:
 | `activity` | `a` | A minigame id, `workshop`, `shop`, or null. |
 | `look` | `look` | Cosmetics changed (at most twice a second). |
 | `leave` | | Leaving on purpose (frees the slot at once). |
-| `lobby` | `a`: `create {settings}`, `join {id}`, `leave`, `kick {id}`, `settings {settings}` (any subset), `ready {ready}`, `start`, `watch {id}`, `timescale {k, hold?}` | Lobby actions. Settings: `mode` (single, tournament), `game`, `format` (blitz, normal, treasure), `cap` 2–8, `locked`, `botFill`, `difficulty`. `timescale` (speed, 0 = frozen; `hold`: freeze on reaching that phase) is only honoured by a test server (`MATCH_DEBUG=1`). |
+| `lobby` | `a`: `create {settings}`, `join {id}`, `leave`, `kick {id}`, `settings {settings}` (any subset), `ready {ready, phase?}`, `start`, `watch {id}`, `timescale {k, hold?}` | Lobby actions. Settings: `mode` (single, tournament), `game`, `format` (blitz, normal, treasure), `cap` 2–8, `locked`, `botFill`, `difficulty`. `timescale` (speed, 0 = frozen; `hold`: freeze on reaching that phase) is only honoured by a test server (`MATCH_DEBUG=1`). |
 | `in` | `m` (match sequence), `i` (inputs) | Match inputs as the game's `readLocalInput` produces them; at most 32, each a flat object of plain values. |
 | `auth` | `token` | Links a signed-in account (leaderboard name). At most 5 per connection. |
+| `kick` | `dx, dz` (direction, each within ±2), `p` (power 0–1) | Kick or push the room's marble (v4). Checked for reach and rate (above). |
+| `ball` | `a`: `grab`, or `throw {yaw, p}` (yaw within ±10, power 0–1) | Pick up or throw the room's basketball (v4). |
+| `hpdebug` | `x, z` | Test servers only (`MATCH_DEBUG=1`): put the marble at (x, z). |
 
 Server → client: `welcome` (your id, resume token, room, roster, spawn point, server time),
-`joined`, `left`, `room` (host changed), `snap` (`now`, players: `id x y z r s g e es a off`),
-`emote`, `look`, and `error` (`code`, `message`, `fatal`). The error codes are
+`joined`, `left`, `room` (host changed), `snap` (`now`, players: `id x y z r s g e es a off`, and
+from v4 `hp`: `m` marble `[x, z, vx, vz]`, `n` in a net, `b` ball `[x, y, z, vx, vy, vz]`, `h` holder,
+`s` goals `[Coral, Blue]`, `k` baskets), `play` (`e`: hub play events `{k, by?, net?, score?, total?,
+p?, v?}`), `emote`, `look`, and `error` (`code`, `message`, `fatal`). The error codes are
 `version_mismatch`, `room_full`, `no_such_room`, `bad_request`, `not_joined`, `replaced`,
 `server_full` and `shutting_down`.
 
@@ -368,7 +433,7 @@ npm test                                   # includes online-hub and online-prot
 VITE_SERVER_URL=ws://localhost:2567 npx vite build --outDir /tmp/online-dist
 npx vite preview --outDir /tmp/online-dist --port 4190 --strictPort &
 npm run server:build
-BASE_URL=http://localhost:4190/ node tests/e2e/online.cjs   # starts the server itself on 2567 (SERVER_PORT changes it)
+BASE_URL=http://localhost:4190/ node tests/e2e/online.cjs   # starts the server itself on 2567 (SERVER_PORT changes it), with MATCH_DEBUG=1 for the hub play goal
 # accounts: the client build must point at port 2570
 VITE_SERVER_URL=ws://localhost:2570 npx vite build --outDir /tmp/acct-dist
 npx vite preview --outDir /tmp/acct-dist --port 4198 --strictPort &
@@ -448,6 +513,11 @@ Railway pushes a new server on every commit to the branch it watches. The client
 - Remote toys are always full `WindupBot`s. The planned fallback to `MiniContender` for distant
   players in a crowded room is not built.
 - Remote toys don't collide with the local toy.
+- Hub play was tested with unit tests (physics and room logic) and real browsers against the built
+  server on localhost only. Kicks are not predicted on the client, so on a real connection the
+  marble starts rolling a network trip plus 100 ms after the press; nobody has played it over a real
+  network or measured how it feels. Two players kicking the marble in the same instant are applied
+  in arrival order.
 - One server process holds all rooms in memory, so a restart or redeploy empties every room.
   Clients then reconnect into a fresh room; private room codes are lost.
 - No chat, moderation, reporting or blocking. Nickname filtering is a short word list.
