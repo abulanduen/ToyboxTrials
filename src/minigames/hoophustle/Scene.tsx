@@ -404,7 +404,9 @@ interface Pose {
 function cameraPose(x: number, z: number, aspect: number): Pose {
   const theta = Math.atan2(x, z);
   const r = Math.hypot(x, z);
-  const phi = theta + (theta > 0.12 ? -SIDE_OFFSET : SIDE_OFFSET);
+  // Less off to the side on tall screens, where width is short.
+  const side = aspect < 1 ? SIDE_OFFSET * 0.55 : SIDE_OFFSET;
+  const phi = theta + (theta > 0.12 ? -side : side);
   const elev = (aspect < 1 ? 34 : 25) * (Math.PI / 180);
   const targetR = r * 0.5;
   const targetY = 5;

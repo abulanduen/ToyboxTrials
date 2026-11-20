@@ -57,7 +57,11 @@ function ThrowButton({ gold, ready }: { gold: boolean; ready: boolean }) {
         if (e.button !== 0) return;
         e.preventDefault();
         unlockAudio();
-        e.currentTarget.setPointerCapture?.(e.pointerId);
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId);
+        } catch {
+          // (a pointer that is not active, e.g. a synthetic event: the button still holds until pointer-up)
+        }
         held.current = e.pointerId;
         setDown(true);
         pressVirtual('slot1');

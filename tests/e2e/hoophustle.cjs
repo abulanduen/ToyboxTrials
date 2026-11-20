@@ -178,13 +178,19 @@ const boxesOverlap = (a, b) => a && b && a.x < b.x + b.width && b.x < a.x + a.wi
 
       // ----- pause drops a charge: no throw on resume, and the clock stops
       const shots = (await me()).shots;
-      if (mobile) await page.getByTestId('hh-throw').dispatchEvent('pointerdown', { button: 0, pointerId: 9, pointerType: 'touch', isPrimary: true });
-      else await page.keyboard.down('Space');
+      let finger = null;
+      if (mobile) {
+        // A real finger on the Throw button (CDP touch), lifted while the pause sheet is up.
+        finger = await page.context().newCDPSession(page);
+        const b = await page.getByTestId('hh-throw').boundingBox();
+        await finger.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: b.x + b.width / 2, y: b.y + b.height / 2, id: 5 }] });
+      } else await page.keyboard.down('Space');
       await page.waitForFunction(() => !!document.querySelector('.hh-meter.is-charging'));
       await page.getByRole('button', { name: 'Pause', exact: true }).click();
       await page.waitForSelector('.pause');
       // (Let go of Space with nothing focused, so the key-up can't press a button on the pause sheet.)
       if (!mobile) { await page.evaluate(() => document.activeElement?.blur()); await page.keyboard.up('Space'); }
+      else { await finger.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await finger.detach(); }
       const t = (await state()).t;
       await page.waitForTimeout(300);
       assert.equal((await state()).t, t, 'paused');
