@@ -158,7 +158,7 @@ export function RoomDog() {
         perch: (early = 0.5) => {
           st.current.offset = dogArrivalTime('perch')! - early - performance.now() / 1000;
         },
-        visit: () => ({ ...dogVisit, hearts: dogVisit.hearts.length }),
+        visit: () => ({ ...dogVisit, hearts: dogVisit.hearts.length, offset: st.current.offset }),
         /** Tests on a slow software renderer: how long it waits after the last pet (s; normally 10). */
         patience: (sec: number) => {
           DOG_VISIT.stay = sec;
@@ -199,8 +199,9 @@ export function RoomDog() {
       }
     }
     if (p.action === 'perch') {
-      // (never wind back past its arrival: a longer stay is held a frame at a time)
-      const stay = Math.min(DOG_SPOTS.perch.hold, perchStay(nowS, p.holdLeft));
+      // (never wind back to or past its arrival, where rounding could read it as still walking up:
+      // a longer stay is held a frame at a time)
+      const stay = Math.min(DOG_SPOTS.perch.hold - 0.05, perchStay(nowS, p.holdLeft));
       if (stay > p.holdLeft) {
         s.offset -= stay - p.holdLeft;
         t = nowS + s.offset;

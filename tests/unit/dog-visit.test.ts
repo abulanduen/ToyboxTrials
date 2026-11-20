@@ -25,6 +25,11 @@ describe('the dog stands up at the spawn table', () => {
     const dog = INTERACTABLES.find((i) => i.id === 'dog')!;
     expect(dog).toMatchObject({ verb: 'Pet', label: 'the dog' });
   });
+  it('reads as up at the table from just after it arrives (a pet keeps it there, never back at the boundary)', () => {
+    const t0 = dogArrivalTime('perch')!;
+    expect(dogPose(t0 + 0.05).action).toBe('perch');
+    expect(dogPose(t0 - 0.05).action).toBe('walk');
+  });
   it('then strolls on after its 10 s visit', () => {
     const t0 = dogArrivalTime('perch')!;
     expect(dogPose(t0 + DOG_SPOTS.perch.hold + 0.5).action).toBe('walk');
