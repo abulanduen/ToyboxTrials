@@ -270,10 +270,10 @@ export function PlayerController() {
     const a = anim.current;
     const g = useGame.getState();
     const playing = g.screen === 'playing';
-    const blocked = inputBlocked(g);
+    const blocked = inputBlocked(g) || tourFlag.ate;
 
     // ---------- pause toggle (Esc / P) ----------
-    if (playing && wasPressed('pause') && !tourFlag.active) {
+    if (playing && wasPressed('pause') && !tourFlag.active && !tourFlag.ate) {
       if (g.panel) g.closePanel();
       else g.togglePause();
     }

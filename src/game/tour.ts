@@ -29,7 +29,7 @@ const front = (o: { x: number; z: number; rot: number }, d: number, side = 0) =>
 
 /** The tour, in order: the plaza's sights, across the bridge to the trials, back for the shops. */
 export const TOUR_STOPS: TourStop[] = [
-  { id: 'hello', mascot: { x: 2.6, z: 16.5 }, cam: [-3.5, 5.5, 29], look: [1.8, 2.6, 16.5] },
+  { id: 'hello', mascot: { x: 2.6, z: 16.5 }, cam: [11, 5, 24], look: [1.6, 2.2, 18] },
   {
     id: 'scoreboard',
     mascot: { x: (SCOREBOARD.x + TV.x) / 2 + 1, z: SCOREBOARD.z + 6 },
@@ -37,11 +37,11 @@ export const TOUR_STOPS: TourStop[] = [
     look: [-6.5, 5.5, SCOREBOARD.z],
   },
   { id: 'pavilion', mascot: front(PAVILION, PAVILION.d / 2 + 3.2, -3), cam: [12, 8.5, 6], look: [PAVILION.x - 3, 5, PAVILION.z] },
-  { id: 'trials', mascot: { x: BRIDGE_X + 3, z: -113 }, cam: [BRIDGE_X - 2, 38, -88], look: [BRIDGE_X + 10, 0, -132] },
+  { id: 'trials', mascot: { x: BRIDGE_X + 3, z: -121 }, cam: [BRIDGE_X - 4, 26, -100], look: [BRIDGE_X + 6, 0, -136] },
   { id: 'jukebox', mascot: front(JUKEBOX, JUKEBOX.d / 2 + 2.6, -4.2), cam: [JUKEBOX.x - 2, 8, JUKEBOX.z + 22], look: [JUKEBOX.x - 1.5, 3.4, JUKEBOX.z] },
   { id: 'workshop', mascot: front(WORKSHOP, WORKSHOP.d / 2 + 2.6, 3.6), cam: [-16, 8, 9], look: [WORKSHOP.x + 2, 4, WORKSHOP.z + 1] },
   { id: 'shop', mascot: front(SHOP, SHOP.d / 2 + 6.2, -3.8), cam: [-21, 8, 25], look: [SHOP.x + 4, 4, SHOP.z + 1] },
-  { id: 'online', mascot: { x: -6.5, z: 6.5 }, cam: [2, 26, 40], look: [-2, 0, -2] },
+  { id: 'online', mascot: { x: 5, z: 6 }, cam: [-4, 24, 38], look: [1, 0, -2] },
   { id: 'bye', mascot: { x: PIPWICK_HOME.x, z: PIPWICK_HOME.z }, cam: [-2.5, 6, 30], look: [5.5, 2.6, 15] },
 ];
 

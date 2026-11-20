@@ -220,7 +220,7 @@ const GREETER_LEFT: readonly MinigameId[] = ['toybox-siege'];
 export const greeterSpot = (g: { x: number; z: number; rot: number; game: MinigameId }) => gateLocal(g, GREETER_LEFT.includes(g.game) ? -GREETER.lx : GREETER.lx, GREETER.lz);
 
 /** Where Pipwick, the welcome mascot, waits between tours: by the plaza, ahead-right of spawn. */
-export const PIPWICK_HOME = { x: 7, z: 15, r: 1.0, top: 3.2, yaw: Math.PI + 0.5 };
+export const PIPWICK_HOME = { x: 7, z: 15, r: 1.2, top: 3.8, yaw: Math.PI + 0.5 };
 /**
  * The Jukebox (src/scene/Jukebox.tsx): on the gates table's north row, just east of the Music Box
  * Rhythm gate, facing the road like the arches. Picks the Hub's background track.

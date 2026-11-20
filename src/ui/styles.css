@@ -4391,6 +4391,8 @@ canvas {
   color: var(--coral);
 }
 .welcome-card__step {
+  display: block;
+  text-align: center;
   font: 700 0.75rem var(--font-body);
   color: var(--ink);
   letter-spacing: 0.05em;
@@ -4427,6 +4429,14 @@ canvas {
 .welcome-card__actions .toy-btn > span {
   padding: 0.7em 1.2em;
   white-space: nowrap;
+}
+.welcome-card--chat {
+  grid-template-columns: auto 1fr;
+  grid-template-areas: 'who text' 'actions actions';
+}
+.welcome-card--chat .welcome-card__actions {
+  flex-direction: row;
+  justify-content: flex-end;
 }
 .welcome-card__actions--three .toy-btn > span {
   padding: 0.55em 1em;
@@ -4523,12 +4533,14 @@ canvas {
   margin: 0 0 10px;
   padding: 0;
   display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   gap: 8px;
 }
 .jukebox__track {
   position: relative;
   display: block;
   width: 100%;
+  height: 100%;
   min-height: 56px;
   padding: 9px 14px;
   border-radius: 12px;
@@ -4552,9 +4564,8 @@ canvas {
   background: var(--honey);
 }
 .jukebox__now {
-  position: absolute;
-  top: 8px;
-  right: 10px;
+  display: block;
+  margin-top: 4px;
   font: 700 0.75rem var(--font-body);
   font-style: normal;
   text-transform: uppercase;

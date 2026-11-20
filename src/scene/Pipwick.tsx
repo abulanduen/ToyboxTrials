@@ -21,12 +21,14 @@ import { PIPWICK_HOME } from './layout';
 import { Kit } from './kit';
 import { blobShadowTexture } from './textures';
 
+/** A little bigger than a contender, so she reads from across the table during the tour. */
+const SCALE = 1.2;
 const BODY = PALETTE.coral;
 const BELLY = PALETTE.cream;
 const WING = PALETTE.toyBlue;
 const CAP = PALETTE.inkPurple;
 
-/** The merged static body, built once (≈ 3.4 cm tall to the top of the cap). */
+/** The merged static body, built once (≈ 3.5 cm tall to the top of the cap, before SCALE). */
 let bodyGeo: THREE.BufferGeometry | null = null;
 function pipwickBody() {
   if (bodyGeo) return bodyGeo;
@@ -89,6 +91,7 @@ export function Pipwick() {
   // (priority −1), which clears the frame's presses at its end. Keys pressed on a focused DOM
   // button are left to the button (no double step).
   useFrame(() => {
+    tourFlag.ate = false;
     if (!tourFlag.active) return;
     const el = document.activeElement as HTMLElement | null;
     if (el && el.tagName === 'BUTTON') return;
@@ -96,7 +99,12 @@ export function Pipwick() {
     if (mode === 'tour') {
       if (wasPressed('pause')) tourSkipPressed();
       else if (wasPressed('interact') || wasPressed('jump')) tourNextPressed();
-    } else if (mode === 'chat' && wasPressed('pause')) chatChoose('bye');
+      else return;
+      tourFlag.ate = true;
+    } else if (mode === 'chat' && wasPressed('pause')) {
+      chatChoose('bye');
+      tourFlag.ate = true;
+    }
   }, -1);
 
   useFrame((state, rawDt) => {
@@ -153,7 +161,7 @@ export function Pipwick() {
     const flapA = flying || s.hop > 0 ? 0.35 + Math.sin(s.flap) * 0.6 : 0.12 + Math.sin(t * 1.3) * 0.03;
     root.current.position.set(s.x, s.y, s.z);
     root.current.rotation.y = s.yaw;
-    bird.current.position.y = hopY + 0.08 + (flying ? 0 : Math.sin(t * 2.4) * 0.04);
+    bird.current.position.y = hopY * SCALE + 0.08 + (flying ? 0 : Math.sin(t * 2.4) * 0.04);
     bird.current.rotation.x = flying ? 0.25 : 0;
     wingL.current.rotation.z = flapA;
     wingR.current.rotation.z = -flapA;
@@ -167,7 +175,7 @@ export function Pipwick() {
   return (
     <>
       <group ref={root} position={[PIPWICK_HOME.x, 0, PIPWICK_HOME.z]}>
-        <group ref={bird}>
+        <group ref={bird} scale={SCALE}>
           <mesh geometry={geo} material={mats.body} castShadow />
           <mesh ref={wingL} geometry={wingGeo} material={mats.wing} position={[0.9, 2.05, -0.05]} castShadow />
           <mesh ref={wingR} geometry={wingGeo} material={mats.wing} position={[-0.9, 2.05, -0.05]} castShadow />

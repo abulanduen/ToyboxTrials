@@ -56,16 +56,18 @@ function TourCard() {
         {TOUR_LINES[id]}
       </p>
       <div className="welcome-card__actions">
-        <ToyButton tone="ink" onClick={tourSkipPressed} className="welcome-card__skip" testId="tour-skip">
-          Skip tour
-        </ToyButton>
+        {!last && (
+          <ToyButton tone="ink" onClick={tourSkipPressed} className="welcome-card__skip" testId="tour-skip">
+            Skip tour
+          </ToyButton>
+        )}
         <ToyButton onClick={tourNextPressed} className="welcome-card__next" testId="tour-next">
           {last ? 'Thanks, Pipwick!' : 'Next'}
         </ToyButton>
       </div>
       {!touch && (
         <span className="welcome-card__keys">
-          <KeyCap k="E" /> next · <KeyCap k="Esc" wide /> skip
+          <KeyCap k="E" /> next{!last && <> · <KeyCap k="Esc" wide /> skip</>}
         </span>
       )}
     </div>
@@ -76,7 +78,7 @@ function ChatCard() {
   const chat = useWelcome((s) => s.chat);
   const text = chat === 'hello' ? CHAT_LINES.hello : chat === 'bye' ? CHAT_LINES.bye : CHAT_LINES.idle[chat];
   return (
-    <div className="welcome-card" role="dialog" aria-label="Talking to Pipwick" data-testid="chat-card">
+    <div className="welcome-card welcome-card--chat" role="dialog" aria-label="Talking to Pipwick" data-testid="chat-card">
       <div className="welcome-card__who">
         <PipwickBadge />
         <div>

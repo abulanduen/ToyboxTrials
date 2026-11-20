@@ -17,7 +17,7 @@ import { Gates } from './Gates';
 import { DustMotes, Fingerpost } from './Ambience';
 import { hubFence, hubPathTiles, TILE_SIZE } from './paths';
 import { JackInTheBox, KeyTower, Marble, MusicBox, PencilLog, Train, TrainTrack } from './Interactive';
-import { BLOCKS, BLOCK_SIZE, BRIDGE, GATES, GATE_STAND, PAVILION, SCOREBOARD, SHOP, TREES, TV, WORKSHOP, frontOf, gateLocal, registerHubColliders } from './layout';
+import { BLOCKS, BLOCK_SIZE, BRIDGE, GATES, GATE_STAND, JUKEBOX, PAVILION, PIPWICK_HOME, SCOREBOARD, SHOP, TREES, TV, WORKSHOP, frontOf, gateLocal, registerHubColliders } from './layout';
 import { exposeDebug } from '../game/debug';
 import { HubWelcome } from './HubWelcome';
 
@@ -90,7 +90,7 @@ function DominoFence() {
 function facingTarget(id: string): { x: number; z: number } | null {
   const g = GATES.find((x) => x.id === id);
   if (g) return g;
-  const b: Record<string, { x: number; z: number }> = { pavilion: PAVILION, workshop: WORKSHOP, shop: SHOP, scoreboard: SCOREBOARD, tv: TV };
+  const b: Record<string, { x: number; z: number }> = { pavilion: PAVILION, workshop: WORKSHOP, shop: SHOP, scoreboard: SCOREBOARD, tv: TV, pipwick: PIPWICK_HOME, jukebox: JUKEBOX };
   return b[id] ?? null;
 }
 

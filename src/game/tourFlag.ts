@@ -7,4 +7,9 @@ export const tourFlag = {
   active: false,
   /** The tour's camera is in charge (the player camera cuts back behind the toy afterwards). */
   camera: false,
+  /**
+   * The tour used this frame's key presses (Next / Skip). The tour can end within the same frame,
+   * so the player controller also ignores the frame's input: an Esc that skips must not pause too.
+   */
+  ate: false,
 };
