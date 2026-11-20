@@ -204,7 +204,7 @@ export function HoopHud({ getState: rawGet, contestants }: MinigameSceneProps<Ho
             <div className="hh-meter__zone" ref={zone} />
             <div className="hh-meter__fill" ref={fill} />
           </div>
-          <span className="hh-meter__label">{me.holding ? (me.gold ? 'Gold ball · let go in the gold zone' : 'Let go in the gold zone') : me.move ? 'Hopping…' : 'Next ball…'}</span>
+          <span className="hh-meter__label">{me.holding ? 'Let go in the gold zone' : me.move ? 'Hopping…' : 'Next ball…'}</span>
         </div>
       )}
 

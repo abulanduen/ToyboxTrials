@@ -53,7 +53,7 @@
 .hh-meter__fill { position:absolute; left:0; top:0; bottom:0; width:100%; transform-origin:left center; transform:scaleX(0); background:rgba(231,107,98,.75); }
 .hh-meter.is-perfect .hh-meter__fill { background:rgba(200,151,58,.9); }
 .hh-meter.is-perfect .hh-meter__bar { border-color:#C8973A; }
-.hh-meter__label { display:inline-block; margin-top:5px; padding:1px 8px; border-radius:7px; background:#FFF9EE; font:700 12px Nunito,sans-serif; }
+.hh-meter__label { display:inline-block; margin-top:5px; padding:1px 8px; border-radius:7px; background:#FFF9EE; font:700 12px Nunito,sans-serif; white-space:nowrap; }
 
 /* Touch: joystick (aim) bottom-left, hold-to-throw bottom-right */
 .hh-stick .touch-stick-zone { width:48%; height:44%; }
@@ -98,9 +98,10 @@
   .hh-top { top:max(8px,env(safe-area-inset-top)); left:50%; transform:translateX(-50%); }
   .hh-clock { font-size:18px; }
   .hh-score b { font-size:20px; }
-  .hh-banner { top:calc(max(8px,env(safe-area-inset-top)) + 50px); width:min(380px,calc(100% - 360px)); min-width:240px; padding:4px 10px; }
-  .hh-banner strong { font-size:15px; }
-  .hh-banner span { font-size:11px; }
+  /* one short line, clear of the backboard */
+  .hh-banner { top:calc(max(8px,env(safe-area-inset-top)) + 48px); width:auto; max-width:calc(100% - 340px); padding:2px 12px; white-space:nowrap; }
+  .hh-banner strong { font-size:14px; }
+  .hh-banner span { display:none; }
   .hh-throw { width:104px; height:104px; }
   .hh-meter--touch { bottom:calc(max(16px,env(safe-area-inset-bottom)) + 112px); width:200px; }
   .hh-pop { top:40%; font-size:36px; }
