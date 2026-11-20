@@ -1,11 +1,13 @@
 /**
  * Toybox Siege bots: kite the swarm, hoover up gems, and pick upgrades that build towards an
- * evolution. Pure (reads the shared state, returns inputs); randomness only from the host's
+ * evolution. In the prep window they take their cards and stand still; in the final arena they
+ * hold a range that suits their weapons, circle their nearest rival, dodge summoned bosses and
+ * blow the Rally Horn when it is ready. Pure (reads the shared state, returns inputs); randomness only from the host's
  * per-bot seeded RNG, so a whole bot match replays exactly from its seed.
  */
 import type { BotPolicy } from '../types';
 import {
-  ARENA_HALF, BIGS, CLASS_IDS, WEAPONS, len, passiveLevel, reviveCost, standings,
+  ARENA_HALF, BIGS, CLASS_IDS, FINALE, WEAPONS, len, passiveLevel, reviveCost, standings,
   type Option, type SiegeInput, type SiegePlayer, type SiegeState,
 } from './rules';
 
@@ -58,7 +60,7 @@ export function createSiegeBot(): BotPolicy<SiegeState, SiegeInput> {
         const keen = skill === 'easy' ? rng() < 0.5 : true;
         return [keen && p.points >= reviveCost(s.runT) ? { type: 'revive' } : { type: 'giveup' }];
       }
-      if (p.status === 'ghost' || p.status === 'victor') return [];
+      if (p.status === 'ghost' || p.status === 'picking') return [];
       if (p.choice) {
         const at = think.get(p.id) ?? 0;
         if (s.t < at) return [];
@@ -79,6 +81,14 @@ export function createSiegeBot(): BotPolicy<SiegeState, SiegeInput> {
       }
       if (s.t < (plan.get(p.id) ?? 0)) return [];
       plan.set(p.id, s.t + PLAN_MS * (skill === 'easy' ? 2 : 1));
+      if (p.status === 'prep') return p.ax || p.ay ? [{ type: 'move', x: 0, y: 0 }] : [];
+      if (p.status === 'arena') {
+        const out: SiegeInput[] = [arenaSteer(s, p, skill, rng)];
+        const mine = s.arena?.bigs.some((g) => g.on && g.from === p.id);
+        if (p.horn && !mine && s.arenaT >= p.horn.readyAt && rng() < (skill === 'easy' ? 0.1 : 0.5)) out.push({ type: 'skill' });
+        return out;
+      }
+      if (p.status !== 'alive') return [];
       const out: SiegeInput[] = [steer(p, skill, rng)];
       if (p.horn && s.runT >= p.horn.readyAt && s.runT >= p.sendReadyAt && rng() < (skill === 'easy' ? 0.05 : 0.3)) out.push({ type: 'skill' });
       return out;
@@ -140,3 +150,41 @@ function steer(p: SiegePlayer, skill: 'easy' | 'normal' | 'hard', rng: () => num
   return { type: 'move', x: vx / l, y: -vz / l };
 }
 
+
+/** Arena: keep a range that suits the weapons (close for sweeps and yo-yos), circle the nearest rival, dodge summoned bosses and their bullets, stay off the ropes. */
+function arenaSteer(s: SiegeState, p: SiegePlayer, skill: 'easy' | 'normal' | 'hard', rng: () => number): SiegeInput {
+  let t: SiegePlayer | null = null, best = Infinity;
+  for (const q of s.players) if (q !== p && q.status === 'arena') { const d = (q.x - p.x) ** 2 + (q.z - p.z) ** 2; if (d < best) { best = d; t = q; } }
+  let vx = 0, vz = 0;
+  if (t) {
+    const top = p.weapons.reduce((a, w) => (w.evolved ? w.level + 2 : w.level) > (a.evolved ? a.level + 2 : a.level) ? w : a, p.weapons[0]);
+    const close = top && (top.id === 'sweep' || top.id === 'yoyo');
+    const want = close ? 4 : skill === 'easy' ? 8 : 11;
+    const dx = t.x - p.x, dz = t.z - p.z, d = len(dx, dz) || 1;
+    const push = Math.max(-1, Math.min(1, (d - want) / 4));
+    // A per-bot circling direction, from its id, so two bots do not mirror each other.
+    const side = p.id.charCodeAt(p.id.length - 1) % 2 ? 1 : -1;
+    vx += (dx / d) * push + (-dz / d) * side * 0.7; vz += (dz / d) * push + (dx / d) * side * 0.7;
+  }
+  const a = s.arena;
+  if (a) {
+    for (const g of a.bigs) {
+      if (!g.on || g.from === p.id) continue;
+      const dx = p.x - g.x, dz = p.z - g.z, d = len(dx, dz) || 1;
+      if (g.mode === 1 && skill !== 'easy') { const sd = g.aimX * dz - g.aimZ * dx > 0 ? 1 : -1; vx += -g.aimZ * sd * 3; vz += g.aimX * sd * 3; }
+      if (d < 9) { const k = (9 - d) / 9; vx += (dx / d) * 2.5 * k; vz += (dz / d) * 2.5 * k; }
+    }
+    if (skill !== 'easy') for (const sh of a.shots) {
+      if (!sh.on || s.players[sh.own] === p) continue;
+      const dx = p.x - sh.x, dz = p.z - sh.z, d2 = dx * dx + dz * dz;
+      if (d2 < 25) { const w = 1 / (d2 + 1); vx += dx * w * 4; vz += dz * w * 4; }
+    }
+  }
+  const edge = FINALE.half - 5;
+  if (p.x > edge) vx -= (p.x - edge) * 0.4; if (p.x < -edge) vx += (-edge - p.x) * 0.4;
+  if (p.z > edge) vz -= (p.z - edge) * 0.4; if (p.z < -edge) vz += (-edge - p.z) * 0.4;
+  if (skill === 'easy') { vx += (rng() - 0.5) * 0.8; vz += (rng() - 0.5) * 0.8; }
+  const l = len(vx, vz);
+  if (l < 0.05) return { type: 'move', x: 0, y: 0 };
+  return { type: 'move', x: vx / l, y: -vz / l };
+}

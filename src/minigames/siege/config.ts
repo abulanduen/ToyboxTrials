@@ -109,7 +109,7 @@ export const PASSIVES: Record<PassiveId, PassiveDef> = {
 };
 export const PASSIVE_PER_LEVEL = { armour: 1, hp: 12, dmg: 0.1, cd: 0.08, area: 0.1, speed: 0.08, projSpeed: 0.1, pickup: 0.35, xp: 0.04 } as const;
 
-export const HORN = { name: 'Rally Horn', blurb: 'Active skill: send an elite to a rival’s board.', cooldowns: [75000, 60000, 45000], firstReadyMs: 8000, offerChance: 0.4, offerFromLevel: 4 };
+export const HORN = { name: 'Rally Horn', blurb: 'Active skill: send an elite to a rival’s board. In the final arena it summons a boss to fight for you.', cooldowns: [75000, 60000, 45000], firstReadyMs: 8000, offerChance: 0.4, offerFromLevel: 4 };
 
 // ---------------------------------------------------------------- the swarm
 
@@ -176,11 +176,55 @@ export const POINTS = { levelUp: 5, victory: 300 } as const;
 /** Revive: once per run, paid from your points. */
 export const reviveCost = (runMs: number) => 100 + Math.floor(runMs / 1000);
 
+// ---------------------------------------------------------------- the finale
+
+/**
+ * The finale (owner request, 20 Nov 2026). Slaying the Boiler Baron drops BOSS_CHESTS chests,
+ * pulls every gem and chest on the board to the toy and clears the board; the toy then has
+ * `prepMs` to take its cards. At `durationMs` (5:00) everyone still fighting is pulled out the
+ * same way (no chests). The arena opens for every toy still in once all of them have finished
+ * their prep, and at the latest `prepMs` after 5:00. There, all the toys fight each other with
+ * their builds; the last toy standing wins. Every number is provisional.
+ */
+export const FINALE = {
+  /** Treasure chests the boss drops. */
+  bossChests: 3,
+  /** How fast gems and chests fly to the toy after the boss falls (cm/s). */
+  vacuumSpeed: 60,
+  /** The arena is a square of this half-size (cm), smaller than a board so rivals meet. */
+  half: 22,
+  /** Toys start on a ring of this radius, facing the middle. */
+  startRadius: 14,
+  /** Weapon damage against toys and summoned bosses is the run damage times this. */
+  weaponMul: 0.013,
+  /** Each point of armour takes this fraction off arena damage, up to `armourCap`. */
+  armourPct: 0.04, armourCap: 0.4,
+  /** Overtime: from `overtimeFrom` ms into the arena, all damage grows by +100% every `overtimeRamp` ms. */
+  overtimeFrom: 40000, overtimeRamp: 10000,
+  /** Points for knocking a rival out of the arena, and for being the last toy standing. */
+  koPoints: 150, championPoints: 300,
+  /** The Rally Horn's summoned Boiler Baron, by horn level (1–3). */
+  ally: {
+    hp: [70, 100, 135], speed: 5.5, scale: 0.6, r: 2.2,
+    /** Contact damage (per touch, 0.5 s apart per toy) and its bullet rings. */
+    contact: 6, ringEvery: 2600, ringCount: 12, ringSpeed: 12, ringDmg: 2,
+    dashEvery: 6500, windup: 900, dashMs: 650, dashSpeed: 28,
+    firstReadyMs: 2000, cooldowns: [32000, 26000, 20000],
+  },
+} as const;
+
+/** Arena damage multiplier at `arenaT` ms (1 before overtime). */
+export const overtime = (arenaT: number) => 1 + Math.max(0, arenaT - FINALE.overtimeFrom) / FINALE.overtimeRamp;
+
 // ---------------------------------------------------------------- the match
 
 export interface SiegeConfig {
-  /** Run length after the class pick (the clock players see). */
+  /** Run length after the class pick (the clock players see): toys still fighting are pulled out at this time. */
   durationMs: number;
+  /** After the boss falls (or at the end of the run), how long a toy has to take its cards before the arena. */
+  prepMs: number;
+  /** The final arena's hard time limit (overtime makes it rarely matter). */
+  arenaMs: number;
   /** How long a downed toy has to choose to revive. */
   reviveWindowMs: number;
   /** 0 = untimed class pick (the default). A server can set a limit; the first class is then picked. */
@@ -207,6 +251,8 @@ export interface SiegeConfig {
 
 export const DEFAULT_CONFIG: SiegeConfig = {
   durationMs: 300000,
+  prepMs: 15000,
+  arenaMs: 90000,
   reviveWindowMs: 12000,
   pickTimeoutMs: 0,
   choiceTimeoutMs: 0,

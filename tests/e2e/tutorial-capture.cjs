@@ -22,7 +22,7 @@ fs.mkdirSync(OUT, { recursive: true });
     await page.waitForFunction(() => window.__toybox?.match && !document.querySelector('.loading'));
     const games = await page.evaluate(async () => {
       const { TUTORIALS } = await import('/src/minigames/tutorials.ts');
-      // Diagram-only tutorials (e.g. newly added Siege) retain their existing visual provider.
+      // Diagram-only tutorials (none today) keep their code-drawn pictures.
       return Object.entries(TUTORIALS).filter(([, steps]) => steps.every(step => step.image))
         .map(([id, steps]) => ({ id, count: steps.length }));
     });
@@ -150,6 +150,59 @@ fs.mkdirSync(OUT, { recursive: true });
               useTumbleUI.setState({ selected: null, panel: null });
               s.players.forEach(q => { q.ready = true; }); step({}, 16);
               for (let n = 0; n < 180; n++) step({}, 16);
+            }
+          } else if (id === 'toybox-siege') {
+            // Toys and mobs pop in over the first moments of any phase: every shot steps the rules
+            // a little before it is taken, so the picture is never an empty board.
+            const others = s.players.filter(q => q !== p);
+            const kit = (q, weapons, passives = []) => {
+              q.weapons = weapons.map(([wid, level, evolved = false]) => ({ id: wid, level, evolved, cd: 200, aux: 0 }));
+              q.passives = passives.map(([pid, level]) => ({ id: pid, level }));
+            };
+            const cards = q => { for (let n = 0; n < 200 && (q.choice || q.pendingLevels || q.pendingChests); n++) step(q.choice ? { [q.id]: [{ type: 'choose', index: 0 }] } : {}, 16); };
+            if (i === 0) {
+              // The class card, with the bots already locked in.
+              step({ [others[0].id]: [{ type: 'class', cls: 'warrior' }], [others[1].id]: [{ type: 'class', cls: 'mage' }] });
+            }
+            if (i === 1) {
+              step({ [p.id]: [{ type: 'class', cls: 'ranger' }], [others[2].id]: [{ type: 'class', cls: 'ranger' }] });
+              for (const q of s.players) { q.invuln = 1e12; q.xpNext = 1e9; }
+              kit(p, [['popgun', 4], ['chime', 2]], [['gears', 1]]);
+              for (let n = 0; n < 500; n++) step({}, 16); // 8 s: the first dust bunnies arrive and fall
+              p.xp = 0; p.xpNext = 3;
+              const g = p.board.gems.find(x => !x.on);
+              Object.assign(g, { on: true, kind: 0, v: 3, x: p.x, z: p.z, pull: true });
+              step({}, 16);
+              // A card that shows every kind of label: a level change that unlocks the secret upgrade
+              // (the Pop-Gun's partner is owned), a new passive that pairs with the Chime Burst, a new weapon.
+              p.choice.options = [{ kind: 'weapon', id: 'popgun', level: 5 }, { kind: 'passive', id: 'magnifier', level: 1 }, { kind: 'weapon', id: 'marbles', level: 1 }];
+            }
+            if (i === 2) {
+              step({ [p.id]: [{ type: 'choose', index: 0 }] });
+              cards(p);
+              p.xpNext = 1e9;
+              // A middling kit, so the swarm is not wiped out before the photo.
+              kit(p, [['popgun', 3], ['chime', 2], ['yoyo', 2], ['marbles', 2]], [['gears', 1], ['magnifier', 1]]);
+              s.runT = 38000;
+              for (let n = 0; n < 1450; n++) { step({}, 16); cards(p); } // the swarm builds; the Rag Bear arrives at 1:00
+              const bear = p.board.bigs.find(b => b.on);
+              if (bear) { bear.x = p.x + 9; bear.z = p.z - 6; bear.mode = 0; bear.dashT = 1e9; bear.hp = bear.maxHp; }
+              for (let n = 0; n < 24; n++) step({}, 16);
+            }
+            if (i === 3) {
+              // Every toy pulled out at 5:00, a moment of prep, then the arena with every build and a summoned Baron.
+              kit(others[0], [['sweep', 5, true], ['yoyo', 4]], [['plating', 3]]);
+              kit(others[1], [['chime', 5, true], ['marbles', 4]], [['magnifier', 3]]);
+              kit(others[2], [['popgun', 5], ['planes', 4]], [['gears', 2]]);
+              p.horn = { level: 2, readyAt: 0 };
+              s.players.forEach((q, k) => { q.level = 24 + 2 * k; });
+              s.runT = s.config.durationMs - 16; step({}, 16);
+              for (const q of s.players) cards(q);
+              s.runT = s.config.durationMs + s.config.prepMs; step({}, 16);
+              if (s.phase !== 'arena') throw Error('no arena');
+              for (let n = 0; n < 140; n++) step({}, 16);
+              local([{ type: 'skill' }]);
+              for (let n = 0; n < 90; n++) step({}, 16);
             }
           }
         }, { id, i });

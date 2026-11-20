@@ -1,4 +1,6 @@
-/* Milestones 4–5: minigame host, Copycat Conductor, Jack-in-the-Box and the tournament flow (desktop).
+/* Milestones 4–5: minigame host, Copycat Conductor, Jack-in-the-Box and the tournament flow (desktop):
+   a Blitz tournament, then a Normal one that ends with a strategy finale (SKIP_NORMAL=1 skips it;
+   NORMAL_PIN picks another repeatable draw).
    Find the Original has its own suite (tests/e2e/findoriginal.cjs); here it only appears in the tournament.
    Run: BASE_URL=http://localhost:4173/ node tests/e2e/minigame.cjs */
 const { chromium } = require('playwright');
@@ -9,6 +11,8 @@ fs.mkdirSync(OUT, { recursive: true });
 const BASE = process.env.BASE_URL || 'http://localhost:4173/';
 const res = [];
 const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? '  — ' + d : ''}`);
+// Waits for lazy-loaded cards: generous, since a shared machine's software GL can stall for a minute.
+const SLOW = +process.env.E2E_TIMEOUT || 240000;
 const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
 
 (async () => {
@@ -66,7 +70,7 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   await page.waitForFunction((t) => document.querySelector('.prompt')?.textContent.includes(t), 'Copycat', { timeout: 120000 }).catch(() => null);
   check('gate prompt says Play Copycat Conductor', (await page.textContent('.prompt'))?.includes('Play'));
   await page.keyboard.press('KeyE');
-  await page.waitForSelector('.match-intro', { timeout: 60000 });
+  await page.waitForSelector('.match-intro', { timeout: SLOW });
   await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
   check('gate opens the Copycat intro card (lazy-loaded module)', (await page.textContent('.match-intro h2')).includes('Copycat'));
   // Quick tutorial: opens by itself, pages through, and can be turned off.
@@ -130,7 +134,7 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   await page.waitForTimeout(800);
   check('Esc pauses the match', await page.isVisible('.pause'));
   await page.click('.pause__actions .toy-btn >> nth=1');
-  await page.waitForSelector('.hud-sign', { timeout: 60000 });
+  await page.waitForSelector('.hud-sign', { timeout: SLOW });
   await page.waitForTimeout(1500);
   const pos = await page.evaluate(() => window.__toybox.state());
   const cc = await page.evaluate(() => window.__toybox.hub.gates().find((g) => g.game === 'copycat-conductor'));
@@ -154,10 +158,10 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   const freshAnswer = (j) => j.tiers[0].split(',').map((e) => e.split('|')[0].trim()).find((a) => !j.said.includes(a));
   await page.evaluate((id) => { const g = window.__toybox.hub.gates().find((x) => x.game === id); window.__toybox.teleport(g.standX, g.standZ, g.yaw); }, 'jack-in-the-box');
   // The prompt updates on the next rendered frames: wait for it rather than a fixed delay (slow software GL).
-  await page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Jack-in-the-Box'), null, { timeout: 60000 }).catch(() => null);
+  await page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Jack-in-the-Box'), null, { timeout: SLOW }).catch(() => null);
   check('coral gate prompt says Play Jack-in-the-Box', (await page.textContent('.prompt'))?.includes('Jack-in-the-Box'), await page.textContent('.prompt'));
   await page.keyboard.press('KeyE');
-  await page.waitForSelector('.match-intro', { timeout: 60000 });
+  await page.waitForSelector('.match-intro', { timeout: SLOW });
   await page.waitForTimeout(900);
   check('gate opens the Jack-in-the-Box intro card', (await page.textContent('.match-intro h2')).includes('Jack'));
   check('with tutorials off the intro skips the tutorial but still offers How to play', !(await page.isVisible('[data-testid=tutorial]')) && (await page.isVisible('[data-testid=tutorial-open]')));
@@ -202,7 +206,7 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   const jrec = await page.evaluate(() => JSON.parse(localStorage.getItem('toybox-trials:prototype:v1')).state.records['jack-in-the-box']);
   check('Jack record saved (answers given)', jrec?.best >= 1 && jrec?.plays === 1, JSON.stringify(jrec));
   await page.click('[data-testid=results-leave]');
-  await page.waitForSelector('.hud-sign', { timeout: 60000 });
+  await page.waitForSelector('.hud-sign', { timeout: SLOW });
   await page.waitForTimeout(1200);
 
   // --- The blue gate opens Wind-Up Dash (the race itself is covered by tests/e2e/movement.cjs)
@@ -210,38 +214,17 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   await page.waitForFunction((t) => document.querySelector('.prompt')?.textContent.includes(t), 'Wind-Up Dash', { timeout: 120000 }).catch(() => null);
   check('blue gate prompt says Play Wind-Up Dash', (await page.textContent('.prompt'))?.includes('Wind-Up Dash'), await page.textContent('.prompt'));
   await page.keyboard.press('KeyE');
-  await page.waitForSelector('.match-intro', { timeout: 60000 });
+  await page.waitForSelector('.match-intro', { timeout: SLOW });
   await page.waitForTimeout(900);
   check('blue gate opens the Wind-Up Dash intro card', (await page.textContent('.match-intro h2')).includes('Dash'));
   await page.click('[data-testid=match-leave]');
-  await page.waitForSelector('.hud-sign', { timeout: 60000 });
+  await page.waitForSelector('.hud-sign', { timeout: SLOW });
   await page.waitForTimeout(1200);
 
-  // --- Tournament (Blitz, 1 easy bot): lose each trial on purpose to exercise the flow
-  await page.evaluate(() => window.__toybox.hub.goTo('pavilion'));
-  await page.waitForTimeout(2500);
-  await page.keyboard.press('KeyE');
-  await page.waitForSelector('.formats', { timeout: 30000 });
-  check('pavilion opens the tournament picker', true);
-  await page.screenshot({ path: `${OUT}/m4-05-picker.png` });
-  await page.click('[data-testid=format-blitz]');
-  await page.click('.intro-options .segmented >> nth=0 >> button >> nth=0'); // 1 bot
-  await page.click('.intro-options .segmented >> nth=1 >> button >> nth=0'); // easy
-  // A repeatable draw covers both combat modules and Copycat; Jack practice is checked above.
-  await page.evaluate(() => { Math.random = () => 15 / 4294967296; });
-  await page.click('[data-testid=tournament-start]');
-  const games = [];
-  for (let round = 1; round <= 3; round++) {
-    await page.waitForSelector('.reveal-ticket', { timeout: 60000 });
-    await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
-    if (round === 1) await page.screenshot({ path: `${OUT}/m4-06-reveal.png` });
-    check(`trial ${round}: reveal ticket`, (await page.textContent('.reveal-ticket__round')).includes(`Trial ${round} of 3`));
-    await page.click('[data-testid=reveal-go]');
-    await page.waitForSelector('[data-testid=match-start]', { timeout: 60000 });
-    await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
-    const game = (await page.textContent('.match-intro h2')).trim();
-    games.push(game);
-    await page.click('[data-testid=match-start]');
+  // --- Tournaments (1 easy bot): lose each party trial on purpose to exercise the flow.
+  const STRATEGY = ['Toy Squad', 'Toybox Siege', 'Toy Tower Tumble'];
+  /** Lose the current trial (party games), or let a strategy finale run out at speed. */
+  const playTrial = async (game) => {
     // Lose on purpose. Copycat: play a wrong note. Jack: never answer, and the jack pops on us.
     // The races (Red Light Green Light, Wind-Up Dash): never leave the start line.
     // Find the Original: never pick, and the bot outscores us.
@@ -274,31 +257,109 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
       await page.waitForFunction(() => window.__toybox.match.phase() === 'playing', null, { timeout: 120000 });
       await page.evaluate(() => { const s = window.__toybox.match.state(); if (s.kind === 'spellbox-showdown') s.players.forEach((p) => { p.ready = true; }); s.players[0].alive = false; s.players[0].outAt = s.t; });
     }
-    await page.waitForSelector('.results', { timeout: 600000 });
-    await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
-    const rows = await page.$$eval('.results-list li', (els) => els.map((e) => e.textContent));
-    check(`trial ${round}: results list both contestants with points`, rows.length === 2 && rows.some((r) => r.includes('+10')) && rows.some((r) => r.includes('+8')), rows.join(' | '));
-    if (round === 1) await page.screenshot({ path: `${OUT}/m4-07-results-tournament.png` });
-    await page.click('[data-testid=results-next]');
-    if (round < 3) {
-      await page.waitForSelector('.standings', { timeout: 30000 });
-      await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
-      if (round === 1) await page.screenshot({ path: `${OUT}/m4-08-standings.png` });
-      await page.click('[data-testid=standings-next]');
+    if (STRATEGY.some((t) => game.includes(t))) {
+      // The strategy finale: every one of them runs on its own timers (Toy Squad's ten build and
+      // battle phases, Tower Tumble's build phases and capped waves, Siege's 5:00 run), so an idle
+      // player still reaches the results. Siege first needs a class: pick the first one.
+      await page.waitForFunction(() => window.__toybox.match.phase() === 'playing', null, { timeout: 120000 });
+      if (game.includes('Siege')) {
+        await page.waitForSelector('[data-testid^=siege-class-]:not([disabled])', { timeout: 120000 });
+        await page.click('[data-testid^=siege-class-] >> nth=0');
+      }
+      await page.evaluate(() => window.__toybox.match.timeScale(60));
     }
+  };
+
+  const runTournament = async (format, trials, pin, tutorials) => {
+    await page.evaluate(() => window.__toybox.hub.goTo('pavilion'));
+    await page.waitForTimeout(2500);
+    await page.keyboard.press('KeyE');
+    await page.waitForSelector('.formats', { timeout: 30000 });
+    check(`${format}: pavilion opens the tournament picker`, true);
+    await page.click(`[data-testid=format-${format}]`);
+    const rule = await page.textContent('[data-testid=format-rule]');
+    check(`${format}: the picker says what the format deals`, format === 'blitz' ? /three quick party trials/.test(rule) : /party trials, then a strategy finale/.test(rule), rule);
+    if (format === 'blitz') {
+      await page.screenshot({ path: `${OUT}/m4-05-picker.png` });
+      // The practice list is folded into its two sections until one is opened.
+      check('practice list starts folded (no cards, two sections)', (await page.$$('.practice-list .game-card')).length === 0 && !!(await page.$('[data-testid=practice-group-party]')) && !!(await page.$('[data-testid=practice-group-strategy]')));
+      await page.click('[data-testid=practice-group-strategy]');
+      const strat = await page.$$eval('.practice-list .game-card', (els) => els.map((e) => e.dataset.testid).sort());
+      check('the strategy section holds the three strategy games', strat.join() === 'practice-toy-squad,practice-toy-tower-tumble,practice-toybox-siege', strat.join());
+      await page.screenshot({ path: `${OUT}/m4-05b-practice-strategy.png` });
+      await page.click('[data-testid=practice-group-strategy]');
+    }
+    await page.click('.intro-options .segmented >> nth=0 >> button >> nth=0'); // 1 bot
+    await page.click('.intro-options .segmented >> nth=1 >> button >> nth=0'); // easy
+    // A repeatable draw (Blitz: covers both combat modules and Copycat; Jack practice is checked above).
+    await page.evaluate((p) => { Math.random = () => p / 4294967296; }, pin);
+    await page.click('[data-testid=tournament-start]');
+    const games = [];
+    for (let round = 1; round <= trials; round++) {
+      await page.waitForSelector('.reveal-ticket', { timeout: SLOW });
+      await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
+      if (round === 1 && format === 'blitz') await page.screenshot({ path: `${OUT}/m4-06-reveal.png` });
+      check(`${format} trial ${round}: reveal ticket`, (await page.textContent('.reveal-ticket__round')).includes(`Trial ${round} of ${trials}`));
+      await page.click('[data-testid=reveal-go]');
+      await page.waitForSelector('[data-testid=match-start]', { timeout: SLOW });
+      await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
+      const game = (await page.textContent('.match-intro h2')).trim();
+      games.push(game);
+      // The player's tutorial setting decides, exactly as in practice: on, the How to play steps
+      // open by themselves; off (the Copycat check above pressed "Don't show again"), the plain
+      // card offers How to play.
+      if (tutorials) check(`${format} trial ${round}: the intro opens How to play (${game})`, !!(await page.$('[data-testid=tutorial]')));
+      else check(`${format} trial ${round}: tutorials off, the intro offers How to play (${game})`, !(await page.$('[data-testid=tutorial]')) && !!(await page.$('[data-testid=tutorial-open]')));
+      if (round === trials && format !== 'blitz') {
+        check(`${format}: the last trial is a strategy finale`, STRATEGY.some((t) => game.includes(t)) && (await page.textContent('.match-intro .info-panel__sub')).includes('the finale'), game);
+        await page.screenshot({ path: `${OUT}/m4-06b-finale-intro.png` });
+      } else if (round === 1) await page.screenshot({ path: `${OUT}/m4-06a-${format}-intro-tutorial.png` });
+      await page.click('[data-testid=match-start]');
+      await playTrial(game);
+      await page.waitForSelector('.results', { timeout: 900000 });
+      await page.evaluate(() => window.__toybox.match.timeScale(4));
+      await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
+      const rows = await page.$$eval('.results-list li', (els) => els.map((e) => e.textContent));
+      const finale = STRATEGY.some((t) => game.includes(t));
+      // Party trials are lost on purpose (+8 to us, +10 to the bot); the finale is scored as it fell.
+      check(`${format} trial ${round}: results list both contestants with points`, rows.length === 2 && (finale ? rows.every((r) => /\+\d+/.test(r)) : rows.some((r) => r.includes('+10')) && rows.some((r) => r.includes('+8'))), rows.join(' | '));
+      if (round === 1 && format === 'blitz') await page.screenshot({ path: `${OUT}/m4-07-results-tournament.png` });
+      await page.click('[data-testid=results-next]');
+      if (round < trials) {
+        await page.waitForSelector('.standings', { timeout: 30000 });
+        await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
+        if (round === 1 && format === 'blitz') await page.screenshot({ path: `${OUT}/m4-08-standings.png` });
+        await page.click('[data-testid=standings-next]');
+      }
+    }
+    await page.waitForSelector('.final', { timeout: 30000 });
+    await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
+    const title = await page.textContent('.final h2');
+    check(`${format}: final standings for both toys`, / of 2/.test(title) || title.includes('champion'), title);
+    if (format === 'blitz') check('final standings: placed 2nd of 2 after losing every trial', title.includes('2nd of 2'), title);
+    check(`${format}: ${trials} different trials`, new Set(games).size === trials, games.join(', '));
+    if (format !== 'blitz') check(`${format}: party trials first, strategy only at the end`, !games.slice(0, -1).some((g) => STRATEGY.some((t) => g.includes(t))), games.join(', '));
+    await page.waitForTimeout(2500);
+    await page.screenshot({ path: `${OUT}/m4-09-final-${format}.png` });
+    const hist = await page.evaluate(() => JSON.parse(localStorage.getItem('toybox-trials:prototype:v1')).state.tournamentHistory);
+    check(`${format}: tournament history saved`, hist?.[0]?.format === format && hist[0].games.length === trials && (format !== 'blitz' || hist[0].place === 2));
+    await page.click('[data-testid=final-leave]');
+    await page.waitForSelector('.hud-sign', { timeout: SLOW });
+    check(`${format}: back to the Playroom after the tournament`, true);
+    await page.waitForTimeout(1200);
+  };
+
+  await runTournament('blitz', 3, 15, false);
+  if (process.env.SKIP_NORMAL !== '1') {
+    // Tutorials back on (Settings, from the pause sheet) for the Normal tournament.
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('[data-testid=setting-tutorials]', { timeout: SLOW });
+    if (!(await page.isChecked('[data-testid=setting-tutorials]'))) await page.click('[data-testid=setting-tutorials]');
+    check('Settings turns game tutorials back on', await page.isChecked('[data-testid=setting-tutorials]'));
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('[data-testid=setting-tutorials]', { state: 'detached', timeout: SLOW });
+    await runTournament('normal', 5, Number(process.env.NORMAL_PIN) || 7, true);
   }
-  await page.waitForSelector('.final', { timeout: 30000 });
-  await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
-  const title = await page.textContent('.final h2');
-  check('final standings: placed 2nd of 2 after losing every trial', title.includes('2nd of 2'), title);
-  check('tournament plays three different trials', new Set(games).size === 3, games.join(', '));
-  await page.waitForTimeout(2500);
-  await page.screenshot({ path: `${OUT}/m4-09-final.png` });
-  const hist = await page.evaluate(() => JSON.parse(localStorage.getItem('toybox-trials:prototype:v1')).state.tournamentHistory);
-  check('tournament history saved', hist?.[0]?.format === 'blitz' && hist[0].place === 2 && hist[0].games.length === 3);
-  await page.click('[data-testid=final-leave]');
-  await page.waitForSelector('.hud-sign', { timeout: 60000 });
-  check('back to the Playroom after the tournament', true);
 
   check('no console/page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
   console.log(res.join('\n'));

@@ -1,6 +1,7 @@
 /**
- * Touch controls for movement minigames: the hub's floating joystick (bottom-left) and a Jump
- * button (bottom-right). Both feed the shared action layer, exactly like the hub's controls.
+ * Touch controls for movement minigames: the hub's floating joystick (bottom-left, or anywhere in
+ * the bottom half with `zone="half"`) and a Jump button (bottom-right). Both feed the shared
+ * action layer, exactly like the hub's controls.
  */
 import { useEffect, useState } from 'react';
 import { pressVirtual, releaseVirtual } from '../../game/input';
@@ -8,7 +9,7 @@ import { unlockAudio } from '../../game/audio';
 import { useGame } from '../../game/store';
 import { Joystick } from '../../ui/TouchControls';
 
-export function MoveTouch({ jump = true }: { jump?: boolean }) {
+export function MoveTouch({ jump = true, zone = 'thumb' }: { jump?: boolean; zone?: 'thumb' | 'half' }) {
   const touch = useGame((s) => s.touchUI);
   const [down, setDown] = useState(false);
   useEffect(() => () => releaseVirtual('jump'), []);
@@ -19,7 +20,7 @@ export function MoveTouch({ jump = true }: { jump?: boolean }) {
   };
   return (
     <div className="touch-controls mv-touch">
-      <Joystick />
+      <Joystick zone={zone} />
       {jump && (
         <div className="touch-buttons">
           <button

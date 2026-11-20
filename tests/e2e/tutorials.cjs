@@ -2,7 +2,8 @@
  * Tutorial pictures: every minigame's intro card, every "How to play" step, desktop and phone.
  * Opens each game's practice card through the ?debug hook, steps through the tutorial checking a
  * real gameplay photo or SVG on every page (touch diagrams on phones where provided), checks the
- * thumbnail row on the plain card and that Start stays on screen, then the main menu's Hub sheet.
+ * thumbnail row on the plain card, that every key chip on it keeps its label on one line, and that
+ * Start stays on screen, then the main menu's Hub sheet.
  * Screenshots go to TUT_SHOTS (default: the system temp folder), never the repo.
  *
  *   BASE_URL=http://localhost:4205/ node tests/e2e/tutorials.cjs
@@ -111,6 +112,7 @@ async function checkStartVisible(page, viewport, where) {
       // Every game's intro card, opened straight from the previous one through the ?debug hook.
       page = await open('#play');
       let touchPictures = 0;
+      let keyChips = 0;
       for (const id of GAMES) {
         await page.evaluate((g) => window.__toybox.match.practice(g), id);
         await page.waitForFunction(() => window.__toybox.match.phase() === 'intro', null, { timeout: 600000 });
@@ -141,6 +143,20 @@ async function checkStartVisible(page, viewport, where) {
         await checkArt(page, '[data-testid="intro-art-row"]', 'intro-art', 60); // thumbnails
         if (mobile) touchPictures += await row.locator('[data-art$="-touch"]').count();
         await checkStartVisible(page, viewport, `${id} plain card`);
+        // The controls row: every key chip keeps its label on one line and stays inside the card.
+        const chips = await page.getByTestId('intro-controls').evaluate((row) => {
+          const box = row.getBoundingClientRect();
+          return [...row.querySelectorAll('.keycap')].map((k) => {
+            const range = document.createRange();
+            range.selectNodeContents(k);
+            const lines = new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size;
+            const r = k.getBoundingClientRect();
+            return { label: k.textContent, lines, inside: r.left >= box.left - 1 && r.right <= box.right + 1 };
+          });
+        });
+        for (const c of chips) assert.ok(c.lines === 1 && c.inside, `${id}: key chip "${c.label}" breaks or overflows (${JSON.stringify(c)})`);
+        if (!mobile) assert.ok(chips.length > 0, `${id}: no key chips on the desktop card`);
+        keyChips += chips.length;
         await page.evaluate(() => { document.querySelector('.match-intro').scrollTop = 0; });
         await shot(page, `tut-${layout}-${id}-card.png`);
         if (id === 'copycat-conductor' || id === 'toy-tower-tumble') {
@@ -158,7 +174,7 @@ async function checkStartVisible(page, viewport, where) {
       await page.close();
       await browser.close();
       browser = null;
-      console.log(`tutorials ${layout}: ok`);
+      console.log(`tutorials ${layout}: ok (${keyChips} key chips on one line each)`);
     }
     console.log(`tutorials: ${pages} tutorial pages checked; screenshots in ${out}`);
   } finally {

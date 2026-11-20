@@ -45,7 +45,7 @@ describe('server match runner: every trial runs headless with bots', () => {
       expect(r.placements.map((p) => p.contestantId).sort()).toEqual(run.seats.map((c) => c.id).sort());
       expect(Math.min(...r.placements.map((p) => p.place))).toBe(1);
       expect(ms).toBeGreaterThan(0);
-    });
+    }, 30000); // the longer trials (Toybox Siege's run and arena, Toy Squad) simulate several minutes
   }
 
   it('is deterministic: the same seed and inputs give the same result', () => {
@@ -323,12 +323,14 @@ describe('lobby tournaments on the server', () => {
   });
 });
 
-describe('tournament format pool (owner decision: Toy Squad only in Normal and Treasure)', () => {
-  it('Blitz never draws Toy Squad; Normal and Treasure can', () => {
+describe('tournament format pool (owner decisions: the strategy trials only in Normal and Treasure)', () => {
+  it('Blitz never draws a strategy trial; Normal and Treasure can (as their finale, see tournament.test.ts)', () => {
     for (const games of [MINIGAMES, onlineGames()]) {
-      expect(poolForFormat('blitz', games).map((g) => g.id)).not.toContain('toy-squad');
-      expect(poolForFormat('normal', games).map((g) => g.id)).toContain('toy-squad');
-      expect(poolForFormat('treasure', games).map((g) => g.id)).toContain('toy-squad');
+      for (const id of ['toy-squad', 'toybox-siege', 'toy-tower-tumble']) {
+        expect(poolForFormat('blitz', games).map((g) => g.id)).not.toContain(id);
+        expect(poolForFormat('normal', games).map((g) => g.id)).toContain(id);
+        expect(poolForFormat('treasure', games).map((g) => g.id)).toContain(id);
+      }
     }
   });
 
@@ -343,6 +345,7 @@ describe('tournament format pool (owner decision: Toy Squad only in Normal and T
       const f = GAME_FACTS[g.id];
       if (!f) continue; // a newer trial that isn't online yet
       expect(f.category, g.id).toBe(g.category);
+      expect(f.group ?? 'party', g.id).toBe(g.group ?? 'party');
       expect(f.players, g.id).toEqual(g.players);
       expect(f.durationSec, g.id).toEqual(g.durationSec);
       expect(f.eligibility.tournament, g.id).toBe(g.eligibility.tournament);

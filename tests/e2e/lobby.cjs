@@ -33,9 +33,10 @@ const shot = (page, name) => page.screenshot({ path: path.join(OUT, name), timeo
   for (let i = 0; i < 100; i++) { try { if ((await fetch(`${HTTP}/health`)).ok) break; } catch {} await sleep(100); }
   const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   const errors = [];
-  const open = async (name, ctxOpts = { viewport: { width: 800, height: 500 } }) => {
+  // `tutorials`: the player's "Game tutorials" setting (B keeps it on to see the How to play steps online).
+  const open = async (name, ctxOpts = { viewport: { width: 800, height: 500 } }, tutorials = false) => {
     const ctx = await browser.newContext(ctxOpts);
-    await ctx.addInitScript((n) => { if (!sessionStorage.getItem('s')) { sessionStorage.setItem('s', '1'); localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { tourSeen: true, quality: 'low', tutorials: false, contenderName: n }, version: 1 })); } }, name);
+    await ctx.addInitScript(([n, tut]) => { if (!sessionStorage.getItem('s')) { sessionStorage.setItem('s', '1'); localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { tourSeen: true, quality: 'low', tutorials: tut, contenderName: n }, version: 1 })); } }, [name, tutorials]);
     const page = await ctx.newPage();
     page.setDefaultTimeout(T);
     page.on('pageerror', (e) => errors.push(`${name}: ${e.message}`));
@@ -80,7 +81,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(OUT, name), timeo
   const waitLobby = (p, f, arg, timeout = T) => p.waitForFunction(f, arg, { timeout, polling: 250 });
   try {
     const A = await open('Ticker');
-    const B = await open('Bobbin');
+    const B = await open('Bobbin', undefined, true);
     const C = await wsClient('Clank');
     const rooms = await Promise.all([A, B].map((p) => p.evaluate(() => window.__toybox.net.room())));
     const roomC = C.msgs.find((m) => m.t === 'welcome').room;
@@ -133,14 +134,38 @@ const shot = (page, name) => page.screenshot({ path: path.join(OUT, name), timeo
 
     // 4. One trial: Copycat Conductor, picked from the card grid. A short authoritative match.
     await A.click('[data-testid=lobby-mode-single]');
+    // The trials sit in two folded sections (party, strategy); the picked one shows compactly.
+    await A.waitForSelector('[data-testid=pick-group-party]');
+    check('the host picker starts folded: no trial cards until a section is opened', (await A.$$('.game-card')).length === 0 && !!(await A.$('[data-testid=pick-group-strategy]')));
+    await A.click('[data-testid=pick-group-party]');
     await A.waitForSelector('[data-testid=pick-copycat-conductor]');
+    check('the party section lists party trials only', !(await A.$('[data-testid=pick-toy-squad]')) && !!(await A.$('[data-testid=pick-wind-up-dash]')));
     await A.click('[data-testid=pick-copycat-conductor]');
+    await A.waitForFunction(() => document.querySelector('[data-testid=pick-selected]')?.dataset.game === 'copycat-conductor' && !document.querySelector('.game-card'), null, { timeout: T, polling: 250 });
+    check('picking folds the list and shows the pick compactly', true);
     await waitLobby(B, () => window.__toybox.lobby.current()?.settings.mode === 'single' && window.__toybox.lobby.current()?.settings.game === 'copycat-conductor');
     check('B sees the host switch to one trial (Copycat Conductor)', true);
     // Half speed: Copycat's input window must outlast a slow software-rendered page's polling.
     await A.evaluate(() => window.__toybox.lobby.timeScale(0.5));
     await A.click('[data-testid=lobby-start]');
+    // The trial's intro card: B (tutorials on) gets the How to play steps, A (off) the plain card.
+    await Promise.all([A, B].map((p) => p.waitForSelector('[data-testid=online-intro-ready]', { timeout: T })));
+    await B.waitForSelector('[data-testid=tutorial]', { timeout: T });
+    check('online intro: How to play opens for a player with tutorials on', true);
+    check('online intro: the plain card (pictures, How to play button) with tutorials off', !(await A.$('[data-testid=tutorial]')) && !!(await A.$('[data-testid=intro-art-row]')) && !!(await A.$('[data-testid=tutorial-open]')));
+    const left = await A.textContent('[data-testid=online-intro-left]');
+    check('online intro: a server time limit long enough to read (≥ 20 s at full speed)', /in \d+ s/.test(left) && Number(left.match(/in (\d+) s/)[1]) >= 20, left);
+    await shot(B, 'lobby-04a-online-intro-tutorial.png');
+    // Ready from both: the server starts the countdown at once instead of waiting out the card.
+    // The test server holds the match when play begins, so two slow pages both see it start.
+    await A.evaluate(() => window.__toybox.lobby.timeScale(0.5, 'playing'));
+    await A.waitForTimeout(800); // match buttons ignore taps for 0.7 s after appearing
+    await A.click('[data-testid=online-intro-ready]');
+    await B.waitForFunction(() => document.querySelector('[data-testid=intro-seat-Ticker] .lobby-tag--ready'), null, { timeout: T, polling: 250 });
+    check('B sees A marked ready on the intro card', true);
+    await B.click('[data-testid=online-intro-ready]');
     await Promise.all([waitPhase(A, 'playing'), waitPhase(B, 'playing')]);
+    await A.evaluate(() => window.__toybox.lobby.timeScale(0.5));
     check('both clients enter the server-run match', true);
     // A plays a note once the server opens the input phase: the press must reach the server.
     await A.waitForFunction(() => window.__toybox.match.state()?.phase === 'input', null, { timeout: T, polling: 100 });
@@ -181,7 +206,8 @@ const shot = (page, name) => page.screenshot({ path: path.join(OUT, name), timeo
     await A.evaluate(() => window.__toybox.lobby.timeScale(25, 'final'));
     await A.click('[data-testid=lobby-start]');
     const games = await A.waitForFunction(() => window.__toybox.lobby.current()?.match?.tournament?.games, null, { timeout: T, polling: 250 }).then((h) => h.jsonValue());
-    check('the server picks three Blitz trials (never Toy Squad)', games.length === 3 && !games.includes('toy-squad'), games.join(', '));
+    const STRATEGY = ['toy-squad', 'toybox-siege', 'toy-tower-tumble'];
+    check('the server picks three Blitz trials (never a strategy game)', games.length === 3 && !games.some((g) => STRATEGY.includes(g)), games.join(', '));
     await Promise.all([A, B].map((p) => p.waitForFunction(() => window.__toybox.lobby.current()?.match?.phase === 'final', null, { timeout: T * 2, polling: 500 })));
     const fin = await A.evaluate(() => window.__toybox.lobby.current().match.tournament);
     check('the tournament completes: three trials scored for all four toys', fin.standings.length === 4 && fin.standings.every((s) => s.rounds.length === 3), JSON.stringify(fin.standings.map((s) => s.rounds)));
@@ -221,6 +247,8 @@ const shot = (page, name) => page.screenshot({ path: path.join(OUT, name), timeo
     await D.waitForFunction(() => !document.querySelector('[data-testid=online-match]'), null, { timeout: T, polling: 250 });
     await D.evaluate(() => window.__toybox.lobby.host({ mode: 'single', game: 'wind-up-dash', format: 'blitz', cap: 6, locked: false, botFill: true, difficulty: 'normal' }));
     await waitPhase(D, 'lobby', T);
+    await D.waitForSelector('[data-testid=pick-selected][data-game=wind-up-dash]');
+    await D.tap('[data-testid=pick-group-party]');
     await D.waitForSelector('[data-testid=pick-wind-up-dash]');
     // Layout height (offsetHeight): the card's entrance animation scales its bounding box for a moment.
     const short = await D.$$eval('[data-testid^=lobby-cap-], [data-testid^=pick-], [data-testid=lobby-start], [data-testid=lobby-leave]', (els) => els.filter((e) => e.offsetHeight > 0 && e.offsetHeight < 56).map((e) => `${e.dataset.testid}:${e.offsetHeight}`));
@@ -229,6 +257,22 @@ const shot = (page, name) => page.screenshot({ path: path.join(OUT, name), timeo
     await shot(D, 'lobby-09-phone-host-controls.png');
     await D.evaluate(() => document.querySelector('[data-testid=pick-wind-up-dash]').scrollIntoView());
     await shot(D, 'lobby-10-phone-game-grid.png');
+    await D.tap('[data-testid=pick-group-party]');
+    await D.tap('[data-testid=pick-group-strategy]');
+    await D.waitForSelector('[data-testid=pick-toy-tower-tumble]');
+    check('the phone picker opens the strategy section with the three strategy games', (await D.$$eval('.game-group--strategy .game-card', (els) => els.map((e) => e.dataset.testid))).sort().join() === 'pick-toy-squad,pick-toy-tower-tumble,pick-toybox-siege');
+    await D.evaluate(() => document.querySelector('[data-testid=pick-group-strategy]').scrollIntoView());
+    await shot(D, 'lobby-11-phone-strategy-section.png');
+
+    // 8. A Normal lobby (a protocol client hosts it): the server deals party trials, then a strategy finale.
+    const E = await wsClient('Cog');
+    E.send({ t: 'lobby', a: 'create', settings: { mode: 'tournament', game: 'copycat-conductor', format: 'normal', cap: 4, locked: false, botFill: true, difficulty: 'normal' } });
+    await E.waitFor((m) => m.t === 'lobby' && m.lobby?.hostId === E.you);
+    E.send({ t: 'lobby', a: 'start' });
+    const normal = (await E.waitFor((m) => m.t === 'lobby' && m.lobby?.match?.tournament)).lobby.match.tournament.games;
+    check('a Normal lobby: four party trials, then one strategy finale', normal.length === 5 && STRATEGY.includes(normal[4]) && !normal.slice(0, 4).some((g) => STRATEGY.includes(g)), normal.join(', '));
+    E.send({ t: 'lobby', a: 'leave' });
+    E.ws.close();
   } catch (e) {
     check('flow completed', false, e.message.split('\n')[0]);
   } finally {

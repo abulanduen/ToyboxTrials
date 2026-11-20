@@ -7,7 +7,7 @@ import { drainSiegeInput } from './local';
 import { SiegeScene } from './Scene';
 import { SiegeHud } from './Hud';
 
-/** WASD / arrows move. Space: Rally Horn, or revive when down, or the next board as a ghost. 1–4 pick a card. Q / E: previous / next board. */
+/** WASD / arrows move. Space: Rally Horn (in the arena: summon the Baron), or revive when down, or watch the next board when out. 1–4 pick a card. Q / E: previous / next board. */
 const BINDINGS: Record<Action, string[]> = {
   forward: ['KeyW', 'ArrowUp'], back: ['KeyS', 'ArrowDown'], left: ['KeyA', 'ArrowLeft'], right: ['KeyD', 'ArrowRight'],
   slot1: ['Space'], slot2: ['Digit1', 'Numpad1'], slot3: ['Digit2', 'Numpad2'], slot4: ['Digit3', 'Numpad3'], run: ['Digit4', 'Numpad4'],
@@ -32,13 +32,14 @@ const game: MinigameModule<SiegeState, SiegeInput> = {
     for (const action of presses) {
       const card = CARD_KEYS[action];
       if (card !== undefined && me.choice) out.push({ type: 'choose', index: card });
+      const watcher = me.status === 'ghost' || (me.status === 'prep' && !me.choice);
       if (action === 'slot1') {
         if (me.status === 'downed') out.push({ type: 'revive' });
-        else if (me.status === 'ghost' || me.status === 'victor') out.push({ type: 'watch', dir: 1 });
+        else if (watcher) out.push({ type: 'watch', dir: 1 }); // the first press starts watching the others
         else if (!me.choice) out.push({ type: 'skill' });
       }
-      if (action === 'jump' && (me.status === 'ghost' || me.status === 'victor')) out.push({ type: 'watch', dir: 1 });
-      if (action === 'interact' && (me.status === 'ghost' || me.status === 'victor')) out.push({ type: 'watch', dir: -1 });
+      if (action === 'jump' && watcher) out.push({ type: 'watch', dir: 1 });
+      if (action === 'interact' && watcher) out.push({ type: 'watch', dir: -1 });
     }
     return out;
   },

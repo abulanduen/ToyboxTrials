@@ -1,14 +1,15 @@
 /**
  * Toybox Siege renderer. Presentation only: reads the rules state every frame, never writes it.
  *
- * Only one board is drawn: your own, or (as a ghost or after a win) the board you are watching.
+ * Only one board is drawn: your own, or (once out, if you choose to) the board you are watching. In the
+ * final arena that board is the shared arena, with every toy still fighting on it.
  * Everything that comes in numbers is an InstancedMesh sized to the gameplay cap, so the cost is
  * bounded: one draw call per swarm kind, projectile kind, gem kind and effect shape. The engine is
  * a plain object built once (`SiegeView`) and driven from one `useFrame`; nothing is allocated per
  * frame and nothing touches React state. Effect shapes and toy geometry come from Toy Squad
  * (`fxShapeGeometry`, `bakeParts`, `toyGeometry`), so both games share one look.
  */
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { PALETTE } from '../../game/palette';
@@ -19,10 +20,10 @@ import { matchBus, useMatch } from '../session';
 import type { MinigameSceneProps } from '../types';
 import { fxShapeGeometry } from '../toysquad/Fx';
 import { TOY_MATERIAL, UNLIT_VERTEX_MATERIAL, bakeParts, toyGeometry } from '../toysquad/toys';
-import { ARENA_HALF, BIGS, boardCounts, viewedPlayer, weaponStats, yoyoAt, type Board, type SiegePlayer, type SiegeState } from './rules';
+import { ARENA_HALF, BIGS, FINALE, boardCounts, viewedBoard, viewedPlayer, weaponStats, yoyoAt, type Board, type SiegePlayer, type SiegeState } from './rules';
 import { BIG_MODEL, CHEST_PARTS, CLASS_PARTS, MOB_PARTS, SNACK_PARTS } from './models';
-import { ARENA, CLASS_COLOUR, FX, HURT_TINT, SHOT_COLOUR, WEAPON_COLOUR, gemColour } from './look';
-import { CueLimiter, eventCue, type SiegeCue } from './sounds';
+import { ARENA, CLASS_COLOUR, FX, HURT_TINT, RING, SHOT_COLOUR, WEAPON_COLOUR, gemColour } from './look';
+import { CueLimiter, WEAPON_GAIN, eventCue, type SiegeCue } from './sounds';
 import type { ClassId } from './config';
 
 const H = Math.PI / 2;
@@ -108,6 +109,12 @@ class SiegeView {
   private readonly pickupRing = new THREE.Mesh(RING_GEOMETRY, fade(0.16, PALETTE.cream));
   private readonly bigs: { mesh: THREE.Mesh; back: THREE.Mesh; fill: THREE.Mesh; line: THREE.Mesh; shadow: THREE.Mesh }[] = [];
   private readonly ghosts: THREE.Mesh[] = [];
+  /** Arena: the other toys still fighting, each with a class-coloured ring and a health bar. */
+  private readonly rivals: { mesh: THREE.Mesh; ring: THREE.Mesh; shadow: THREE.Mesh; back: THREE.Mesh; fill: THREE.Mesh }[] = [];
+  /** Under a summoned boss: its owner's colour. */
+  private readonly allyRings: THREE.Mesh[] = [];
+  private readonly heroBack = new THREE.Mesh(BAR_GEOMETRY, BAR_BACK);
+  private readonly heroFill = new THREE.Mesh(BAR_GEOMETRY, BAR_FILL);
   private readonly particles: Particle[];
   private cursor = 0;
   // Per-slot memory to spot defeated enemies and fresh blasts (reset when the board on screen changes).
@@ -115,6 +122,8 @@ class SiegeView {
   private board: Board | null = null;
   readonly cam = { x: 0, z: 0, ready: false };
   readonly sounds: SiegeCue[] = [];
+  /** The arena is on screen (the Scene swaps the quilt for the ring). */
+  arena = false;
   private kills = 0;
 
   constructor(caps: { mobs: number; projs: number; shots: number; gems: number; blasts: number; chests: number; bigs: number }, private readonly low: boolean) {
@@ -127,7 +136,7 @@ class SiegeView {
     this.corks = instanced(fxShapeGeometry('bolt'), UNLIT_VERTEX_MATERIAL, caps.projs, 'siege-corks');
     this.planes = instanced(fxShapeGeometry('dart'), UNLIT_VERTEX_MATERIAL, caps.projs, 'siege-planes');
     this.shots = instanced(fxShapeGeometry('orb'), UNLIT_VERTEX_MATERIAL, caps.shots, 'siege-shots');
-    this.yoyos = instanced(fxShapeGeometry('disc'), UNLIT_VERTEX_MATERIAL, 8, 'siege-yoyos');
+    this.yoyos = instanced(fxShapeGeometry('disc'), UNLIT_VERTEX_MATERIAL, 48, 'siege-yoyos');
     this.marbles = instanced(fxShapeGeometry('orb'), UNLIT_VERTEX_MATERIAL, caps.blasts, 'siege-marbles');
     this.rings = instanced(RING_GEOMETRY, FX_FLAT, caps.blasts + caps.bigs, 'siege-rings');
     this.arcs = instanced(ARC_GEOMETRY, FX_FLAT, caps.blasts, 'siege-arcs');
@@ -149,12 +158,30 @@ class SiegeView {
       for (const m of Object.values(slot)) { m.visible = false; m.raycast = () => {}; this.group.add(m); }
       this.bigs.push(slot);
     }
-    for (let i = 0; i < 7; i++) { const g = new THREE.Mesh(undefined, GHOST_MATERIAL); g.visible = false; g.raycast = () => {}; this.group.add(g); this.ghosts.push(g); }
+    for (let i = 0; i < 8; i++) { const g = new THREE.Mesh(undefined, GHOST_MATERIAL); g.visible = false; g.raycast = () => {}; this.group.add(g); this.ghosts.push(g); }
+    for (let i = 0; i < 8; i++) {
+      const r = { mesh: new THREE.Mesh(undefined, TOY_MATERIAL), ring: new THREE.Mesh(RING_GEOMETRY, fade(0.7, PALETTE.honey)), shadow: new THREE.Mesh(DISC_GEOMETRY, SHADOW), back: new THREE.Mesh(BAR_GEOMETRY, BAR_BACK), fill: new THREE.Mesh(BAR_GEOMETRY, BAR_FILL) };
+      for (const m of Object.values(r)) { m.visible = false; m.raycast = () => {}; this.group.add(m); }
+      this.rivals.push(r);
+    }
+    for (let i = 0; i < caps.bigs; i++) { const m = new THREE.Mesh(RING_GEOMETRY, fade(0.8, PALETTE.honey)); m.visible = false; m.raycast = () => {}; this.group.add(m); this.allyRings.push(m); }
+    for (const m of [this.heroBack, this.heroFill]) { m.visible = false; m.raycast = () => {}; this.group.add(m); }
   }
 
   dispose() {
     for (const o of this.group.children) if ((o as THREE.InstancedMesh).isInstancedMesh) (o as THREE.InstancedMesh).dispose();
     for (const b of this.bigs) b.line.geometry.dispose();
+    for (const m of [...this.rivals.map((r) => r.ring), ...this.allyRings]) (m.material as THREE.Material).dispose();
+  }
+
+  /** A toy's health bar over its head (arena only). */
+  private bar(back: THREE.Mesh, fill: THREE.Mesh, x: number, z: number, k: number, on: boolean) {
+    back.visible = fill.visible = on;
+    if (!on) return;
+    const top = 4.6, wide = 3;
+    k = Math.min(1, Math.max(0, k));
+    back.position.set(x, top, z); back.scale.set(wide, 1, 1);
+    fill.position.set(x - (wide * (1 - k)) / 2, top + 0.02, z + 0.02); fill.scale.set(Math.max(0.001, wide * k), 1.15, 1.15);
   }
 
   private burst(x: number, y: number, z: number, n: number, colour: string, shape: number, speed = 9, size = 0.32) {
@@ -180,7 +207,7 @@ class SiegeView {
   frame(s: SiegeState | null, localId: string, dt: number) {
     this.sounds.length = 0;
     const viewed = s && s.kind === 'toybox-siege' ? viewedPlayer(s, localId) : undefined;
-    const b = viewed?.board ?? null;
+    const b = s && viewed ? viewedBoard(s, viewed) : null;
     if (!s || !viewed || !b) { this.group.visible = false; return; }
     this.group.visible = true;
     const switched = b !== this.board;
@@ -190,22 +217,27 @@ class SiegeView {
       for (const p of this.particles) p.on = false;
       this.cam.ready = false;
     }
-    const bt = b.bt, sec = bt / 1000, obj = this.obj;
+    const bt = b.bt, sec = bt / 1000, obj = this.obj, inArena = b === s.arena;
+    this.arena = inArena;
     // ---------------- the toy on screen
     const hero = viewed.cls ? geometryFor(viewed.cls) : null;
     this.hero.visible = !!hero;
     if (hero) {
       this.hero.geometry = hero;
-      const moving = Math.hypot(viewed.ax, viewed.ay) > 0.1 && viewed.status === 'alive' && !viewed.choice;
+      const moving = Math.hypot(viewed.ax, viewed.ay) > 0.1 && (viewed.status === 'alive' || viewed.status === 'arena' || viewed.status === 'prep') && !viewed.choice;
       const blink = viewed.status === 'alive' && bt < viewed.invuln && Math.floor(bt / 80) % 2 === 0;
+      const fallen = viewed.status === 'downed' || viewed.status === 'ghost';
       this.hero.position.set(viewed.x, moving ? Math.abs(Math.sin(sec * 11)) * 0.25 : 0, viewed.z);
-      this.hero.rotation.set(viewed.status === 'downed' || viewed.status === 'ghost' ? -H * 0.9 : 0, Math.atan2(viewed.fx, viewed.fz), moving ? Math.sin(sec * 11) * 0.08 : 0);
-      this.hero.visible = !blink && viewed.status !== 'ghost';
+      this.hero.rotation.set(fallen ? -H * 0.9 : 0, Math.atan2(viewed.fx, viewed.fz), moving ? Math.sin(sec * 11) * 0.08 : 0);
+      // A toy out of the run lies where it fell on its own board (its ghost hovers above); in the arena it is gone.
+      this.hero.visible = !blink && !(inArena && viewed.status === 'ghost');
+      this.hero.material = inArena && bt - viewed.hurtAt < 110 && Math.floor(bt / 70) % 2 === 0 ? HURT_MATERIAL : TOY_MATERIAL;
     }
+    this.bar(this.heroBack, this.heroFill, viewed.x, viewed.z, Math.max(0, viewed.hp / viewed.stat.maxHp), inArena && viewed.status === 'arena');
     this.heroShadow.position.set(viewed.x, 0.09, viewed.z);
     this.heroRing.position.set(viewed.x, 0.1, viewed.z);
     (this.heroRing.material as THREE.MeshBasicMaterial).color.set(viewed.cls ? CLASS_COLOUR[viewed.cls] : PALETTE.honey);
-    this.heroRing.visible = viewed.status === 'alive' || viewed.status === 'downed';
+    this.heroRing.visible = viewed.status === 'alive' || viewed.status === 'downed' || viewed.status === 'prep' || viewed.status === 'arena';
     this.pickupRing.visible = viewed.status === 'alive';
     this.pickupRing.position.set(viewed.x, 0.08, viewed.z); this.pickupRing.scale.setScalar(viewed.stat.pickup);
 
@@ -235,6 +267,8 @@ class SiegeView {
       if (was && (!g.on || g.serial !== was)) { this.burst(this.prevBigX[i], 2, this.prevBigZ[i], this.low ? 8 : 18, PALETTE.honey, 1, 14, 0.5); this.sounds.push('kill'); }
       this.prevBig[i] = g.on ? g.serial : 0;
       for (const m of Object.values(slot)) m.visible = g.on;
+      const ring = this.allyRings[i];
+      if (ring) ring.visible = g.on && inArena;
       if (!g.on) return;
       this.prevBigX[i] = g.x; this.prevBigZ[i] = g.z;
       const look = BIG_MODEL[g.type], d = BIGS[g.type];
@@ -243,15 +277,21 @@ class SiegeView {
       const shake = g.mode === 1 ? Math.sin(bt / 25) * 0.15 : 0;
       slot.mesh.position.set(g.x + shake, g.mode === 2 ? 0.4 : Math.abs(Math.sin(sec * 4)) * 0.2, g.z);
       slot.mesh.rotation.set(0, g.mode ? Math.atan2(g.aimX, g.aimZ) : Math.atan2(viewed.x - g.x, viewed.z - g.z), 0);
-      slot.mesh.scale.setScalar(look.scale);
+      const scale = look.scale * (inArena ? FINALE.ally.scale : 1);
+      slot.mesh.scale.setScalar(scale);
+      if (ring && inArena) {
+        const owner = s.players.find((q) => q.id === g.from);
+        (ring.material as THREE.MeshBasicMaterial).color.set(owner?.cls ? CLASS_COLOUR[owner.cls] : PALETTE.honey);
+        ring.position.set(g.x, 0.11, g.z); ring.scale.setScalar(g.r * 1.25);
+      }
       slot.shadow.position.set(g.x, 0.09, g.z); slot.shadow.scale.setScalar(g.r * 1.1);
-      const top = 3.6 * look.scale + 0.8, wide = g.r * 1.8;
+      const top = 3.6 * scale + 0.8, wide = g.r * 1.8;
       slot.back.position.set(g.x, top, g.z); slot.back.scale.set(wide, 1, 1);
       const k = Math.max(0, g.hp / g.maxHp);
       slot.fill.position.set(g.x - (wide * (1 - k)) / 2, top + 0.02, g.z + 0.02); slot.fill.scale.set(Math.max(0.001, wide * k), 1.15, 1.15);
       slot.line.visible = g.mode === 1;
       if (g.mode === 1) {
-        const length = (d.dashSpeed * d.dashMs) / 1000 + g.r;
+        const length = inArena ? (FINALE.ally.dashSpeed * FINALE.ally.dashMs) / 1000 + g.r : (d.dashSpeed * d.dashMs) / 1000 + g.r;
         slot.line.position.set(g.x, 0.12, g.z); slot.line.rotation.set(0, Math.atan2(g.aimX, g.aimZ), 0); slot.line.scale.set(g.r * 2, 1, length);
       }
     });
@@ -281,10 +321,13 @@ class SiegeView {
       else { obj.rotation.set(0, Math.atan2(q.vx, q.vz), Math.sin(sec * 8) * 0.3); obj.scale.setScalar(1.3); this.put(this.planes, np++, tint(WEAPON_COLOUR.planes)); }
     }
     for (const sh of b.shots) { if (!sh.on) continue; obj.position.set(sh.x, 1.2, sh.z); obj.rotation.set(0, 0, 0); obj.scale.setScalar(sh.r * 1.6); this.put(this.shots, nb++, tint(SHOT_COLOUR)); }
-    if (viewed.status === 'alive') for (const w of viewed.weapons) {
-      if (w.id !== 'yoyo') continue;
-      const st = weaponStats(w);
-      for (let k = 0; k < st.count && ny < 8; k++) { yoyoAt(viewed, w, k, this.obj.position); obj.position.y = 1.3; obj.rotation.set(0, sec * 9, 0); obj.scale.setScalar(w.evolved ? 1.2 : 0.95); this.put(this.yoyos, ny++, tint(k % 2 ? PALETTE.honey : WEAPON_COLOUR.yoyo)); }
+    for (const q of s.players) {
+      if (inArena ? q.status !== 'arena' : q !== viewed || q.status !== 'alive') continue;
+      for (const w of q.weapons) {
+        if (w.id !== 'yoyo') continue;
+        const st = weaponStats(w);
+        for (let k = 0; k < st.count && ny < 48; k++) { yoyoAt(q, w, k, this.obj.position); obj.position.y = 1.3; obj.rotation.set(0, sec * 9, 0); obj.scale.setScalar(w.evolved ? 1.2 : 0.95); this.put(this.yoyos, ny++, tint(k % 2 ? PALETTE.honey : WEAPON_COLOUR.yoyo)); }
+      }
     }
     this.finish(this.corks, nk); this.finish(this.planes, np); this.finish(this.shots, nb); this.finish(this.yoyos, ny);
 
@@ -318,13 +361,32 @@ class SiegeView {
     // ---------------- ghosts watching this board (you can see the other ghosts)
     let gi = 0;
     for (const q of s.players) {
-      if (q.status !== 'ghost' || q.watching !== viewed.id || !q.cls || gi >= this.ghosts.length) continue;
+      // Ghosts watching this board; and a ghost on its own board (it has not chosen to watch others) hovers over its toy.
+      if (inArena || q.status !== 'ghost' || !q.cls || gi >= this.ghosts.length || (q.watching !== viewed.id && !(q === viewed && !q.watching))) continue;
       const g = this.ghosts[gi++];
       g.visible = true; g.geometry = geometryFor(q.cls);
       g.position.set(viewed.x + q.gx + (gi - 4) * 0.01, 3.2 + Math.sin(sec * 2 + gi) * 0.5, viewed.z + q.gz);
       g.rotation.set(0, Math.sin(sec + gi) * 0.6, Math.sin(sec * 1.5 + gi) * 0.12);
     }
     for (; gi < this.ghosts.length; gi++) this.ghosts[gi].visible = false;
+
+    // ---------------- arena: every other toy still fighting
+    let ri = 0;
+    if (inArena) for (const q of s.players) {
+      if (q === viewed || q.status !== 'arena' || !q.cls || ri >= this.rivals.length) continue;
+      const r = this.rivals[ri++];
+      const moving = Math.hypot(q.ax, q.ay) > 0.1;
+      r.mesh.visible = r.ring.visible = r.shadow.visible = true;
+      r.mesh.geometry = geometryFor(q.cls);
+      r.mesh.material = bt - q.hurtAt < 110 && Math.floor(bt / 70) % 2 === 0 ? HURT_MATERIAL : TOY_MATERIAL;
+      r.mesh.position.set(q.x, moving ? Math.abs(Math.sin(sec * 11 + ri)) * 0.25 : 0, q.z);
+      r.mesh.rotation.set(0, Math.atan2(q.fx, q.fz), moving ? Math.sin(sec * 11 + ri) * 0.08 : 0);
+      (r.ring.material as THREE.MeshBasicMaterial).color.set(CLASS_COLOUR[q.cls]);
+      r.ring.position.set(q.x, 0.1, q.z); r.ring.scale.setScalar(1.4);
+      r.shadow.position.set(q.x, 0.09, q.z); r.shadow.scale.setScalar(1.3);
+      this.bar(r.back, r.fill, q.x, q.z, Math.max(0, q.hp / q.stat.maxHp), true);
+    }
+    for (; ri < this.rivals.length; ri++) { const r = this.rivals[ri]; r.mesh.visible = r.ring.visible = r.shadow.visible = r.back.visible = r.fill.visible = false; }
 
     // ---------------- particles (simulation-time when paused? they settle in real time; cosmetic only)
     let nchip = 0, nstar = 0;
@@ -367,12 +429,51 @@ function Arena() {
   </group>;
 }
 
+let ringTexture: THREE.CanvasTexture | null = null;
+/** The final arena's floor: a code-drawn felt ring mat (original pattern, palette colours). */
+function ringMat(): THREE.CanvasTexture | null {
+  if (ringTexture || typeof document === 'undefined') return ringTexture;
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d');
+  if (!g) return null;
+  g.fillStyle = RING.mat; g.fillRect(0, 0, 256, 256);
+  g.strokeStyle = RING.band; g.lineWidth = 14; g.strokeRect(12, 12, 232, 232);
+  g.strokeStyle = RING.stitch; g.lineWidth = 2; g.setLineDash([7, 6]); g.strokeRect(24, 24, 208, 208); g.strokeRect(4, 4, 248, 248);
+  g.setLineDash([]); g.fillStyle = RING.centre; g.beginPath(); g.arc(128, 128, 34, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = RING.stitch; g.setLineDash([5, 5]); g.beginPath(); g.arc(128, 128, 40, 0, Math.PI * 2); g.stroke();
+  ringTexture = new THREE.CanvasTexture(c);
+  ringTexture.colorSpace = THREE.SRGBColorSpace;
+  ringTexture.anisotropy = 4;
+  return ringTexture;
+}
+
+/** The final arena: a felt ring mat with cotton-reel corner posts and elastic-band ropes. */
+function Ring() {
+  const tex = useMemo(() => ringMat(), []);
+  const half = FINALE.half, size = half * 2, post = half + 0.8;
+  const ropes: [number, string][] = [[1.1, RING.ropeLow], [2.2, RING.ropeHigh]];
+  return <group>
+    <mesh position={[0, -0.2, 0]} receiveShadow><boxGeometry args={[size + 5, 0.4, size + 5]} /><meshStandardMaterial color={ARENA.railDark} roughness={0.9} /></mesh>
+    <mesh rotation={[-H, 0, 0]} position={[0, 0.03, 0]} receiveShadow><planeGeometry args={[size, size]} /><meshStandardMaterial map={tex} color={tex ? PALETTE.white : RING.mat} roughness={0.95} /></mesh>
+    {([[-1, -1], [1, -1], [-1, 1], [1, 1]] as const).map(([x, z], i) => (
+      <group key={i} position={[x * post, 0, z * post]}>
+        <mesh position={[0, 1.6, 0]} castShadow><cylinderGeometry args={[1.1, 1.1, 3.2, 16]} /><meshStandardMaterial color={RING.thread[i]} roughness={0.8} /></mesh>
+        {[0.15, 3.05].map((y) => <mesh key={y} position={[0, y, 0]} castShadow><cylinderGeometry args={[1.5, 1.5, 0.3, 16]} /><meshStandardMaterial color={PALETTE.woodLight} roughness={0.6} /></mesh>)}
+      </group>
+    ))}
+    {ropes.flatMap(([y, colour]) => ([[0, -1], [0, 1], [-1, 0], [1, 0]] as const).map(([x, z], i) => (
+      <mesh key={`${y}-${i}`} position={[x * post, y, z * post]}><boxGeometry args={[x ? 0.25 : size + 1.6, 0.25, z ? 0.25 : size + 1.6]} /><meshStandardMaterial color={colour} roughness={0.5} /></mesh>
+    )))}
+  </group>;
+}
+
 const PLAY: Record<SiegeCue, () => void> = {
-  kill: () => playToyCue('puff', 0.45), sweep: () => playToyCue('fan', 0.5), pop: () => playToyCue('button', 0.5), chime: () => sfx.bell(undefined, 0.07),
-  marble: () => playToyCue('marble', 0.55), plane: () => playToyCue('ribbon', 0.4), hurt: () => playToyCue('hit', 0.8), level: () => sfx.promptIn(), card: () => sfx.click(),
+  kill: () => playToyCue('puff', 0.45), sweep: () => playToyCue('fan', WEAPON_GAIN.sweep), pop: () => playToyCue('button', WEAPON_GAIN.pop), chime: () => playToyCue('chime', WEAPON_GAIN.chime),
+  marble: () => playToyCue('marble', WEAPON_GAIN.marble), plane: () => playToyCue('ribbon', WEAPON_GAIN.plane), hurt: () => playToyCue('hit', 0.8), level: () => sfx.promptIn(), card: () => sfx.click(),
   elite: () => playToyCue('warning'), boss: () => { playToyCue('warning'); sfx.windUp(12); }, chest: () => sfx.purchase(), evolve: () => sfx.musicBoxTune(),
   downed: () => playToyCue('out'), revive: () => sfx.windUp(9), ghost: () => sfx.eliminate(), victory: () => sfx.reward(), sent: () => playToyCue('storm'),
   incoming: () => playToyCue('warning'), blocked: () => sfx.reject(), start: () => sfx.bell(),
+  arena: () => { sfx.windUp(12); playToyCue('stitch'); }, ally: () => { playToyCue('storm'); sfx.windUp(8); }, ko: () => playToyCue('out', 0.6),
 };
 
 export function SiegeScene({ getState, localId }: MinigameSceneProps<SiegeState>) {
@@ -380,7 +481,9 @@ export function SiegeScene({ getState, localId }: MinigameSceneProps<SiegeState>
   const { camera } = useThree();
   const view = useMemo(() => {
     const c = getState()?.config;
-    return new SiegeView({ mobs: c?.mobCap ?? 150, projs: c?.projectileCap ?? 96, shots: c?.shotCap ?? 64, gems: c?.gemCap ?? 160, blasts: c?.blastCap ?? 40, chests: c?.chestCap ?? 4, bigs: c?.bigCap ?? 4 }, low);
+    // Sized for the busier of a board and the arena (twice the projectile pools, one summoned boss per toy).
+    const players = getState()?.players.length ?? 8;
+    return new SiegeView({ mobs: c?.mobCap ?? 150, projs: 2 * (c?.projectileCap ?? 96), shots: 2 * (c?.shotCap ?? 64), gems: c?.gemCap ?? 160, blasts: 2 * (c?.blastCap ?? 40), chests: c?.chestCap ?? 4, bigs: Math.max(c?.bigCap ?? 4, players) }, low);
   }, [getState, low]);
   const limiter = useMemo(() => new CueLimiter(), []);
   useEffect(() => () => view.dispose(), [view]);
@@ -394,23 +497,27 @@ export function SiegeScene({ getState, localId }: MinigameSceneProps<SiegeState>
   }), [getState, localId, limiter, view]);
   useEffect(() => {
     exposeDebug({ siege: {
-      counts: () => { const s = getState(); const v = s && viewedPlayer(s, localId); return v ? boardCounts(v.board) : null; },
+      counts: () => { const s = getState(); const v = s && viewedPlayer(s, localId); return s && v ? boardCounts(viewedBoard(s, v)) : null; },
       viewed: () => { const s = getState(); return s ? viewedPlayer(s, localId)?.id ?? null : null; },
     } });
   }, [getState, localId]);
+  const quiltRef = useRef<THREE.Group>(null), ringRef = useRef<THREE.Group>(null);
   useFrame((_, dt) => {
     const s = getState();
     view.frame(s, localId, dt);
+    if (quiltRef.current) quiltRef.current.visible = !view.arena;
+    if (ringRef.current) ringRef.current.visible = view.arena;
     if (s && !useMatch.getState().paused) for (const cue of view.sounds) if (limiter.allow(cue, s.t)) PLAY[cue]();
     const persp = camera as THREE.PerspectiveCamera;
     // About 50 cm across in landscape and 20 cm across (40 cm tall) in portrait, centred on the toy,
     // so a 3.5 cm toy still reads on a phone; enemies arrive (25–29 cm out) beyond the edge of the view.
-    const distance = Math.max(34, 21 / persp.aspect);
+    const distance = Math.max(34, 21 / persp.aspect) * (view.arena ? 1.12 : 1);
     camera.position.set(view.cam.x, distance, view.cam.z + distance * 0.42);
     camera.lookAt(view.cam.x, 0, view.cam.z - 1.5);
   });
   return <group>
-    <Arena />
+    <group ref={quiltRef}><Arena /></group>
+    <group ref={ringRef} visible={false}><Ring /></group>
     <primitive object={view.group} />
   </group>;
 }
