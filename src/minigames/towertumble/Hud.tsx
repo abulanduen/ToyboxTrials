@@ -83,8 +83,8 @@ function QuestArt({ s, q }: { s: TdState; q: QuestId }) {
 }
 
 /**
- * Float `ref` beside `cell`'s square on screen, inside `.td-pop-bounds` (the board's space plus the
- * quest column: the safe area less the bar, the player rail and the dock, so those stay reachable),
+ * Float `ref` beside `cell`'s square on screen, inside `.td-pop-bounds` (the board's space, plus the
+ * quest strip on a phone in landscape; never the bar, the player rail or the dock, which stay reachable),
  * never over the square if there is room. Runs after every render (the HUD re-renders ten times a
  * second), so it follows the board when it is panned or zoomed. Absolutely positioned: nothing moves.
  */

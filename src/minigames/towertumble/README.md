@@ -334,7 +334,7 @@ selected square has a white ring and its same-tier partners glow gold. With a mo
 glowing partner (or dragging onto it) also merges; on touch it only selects the pair (see Merge).
 The sheet is a **floating popover** (`shared/popover.ts`, pure and unit-tested): it sits beside its
 square (above or below it in portrait, left or right in landscape and on desktop), clamped inside
-the board's space widened over the quest column (never over the bar, the player rail or the dock,
+the board's space (in phone landscape also over the quest strip; never over the bar, the player rail or the dock,
 which stay reachable; panels such as Odds open above it), and follows the square when the board is
 panned. Nothing else moves: the board, the
 columns and the dock keep their places (the browser test compares their boxes). With a mouse,
