@@ -351,13 +351,14 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
         await cp.tap('[data-testid=chat-send]');
         const echoed = await cp.waitForFunction((t) => window.__toybox.net.chat().lines.some((l) => l.text === t), `hello from the ${label} phone`, { timeout: 30000, polling: 200 }).then(() => true, () => false);
         check(`chat (${label}): Send posts the message (the server echoes it into the log)`, echoed && (await cp.isVisible('[data-testid=chat-sheet]')));
-        await cp.screenshot({ path: `${OUT}/mobile-10-chat-sheet-${label}.png` });
+        await cp.screenshot({ path: `${OUT}/mobile-13-chat-sheet-${label}.png` });
         // An on-screen keyboard shrinks the visual viewport: the sheet must follow and keep the box in view.
         await cp.setViewportSize({ width: w, height: Math.round(h * (label === 'portrait' ? 0.55 : 0.5)) });
-        await cp.waitForTimeout(600);
+        // (the sheet follows visualViewport resize events; a slow software-rendered page can take a moment)
+        await cp.waitForFunction(() => { const vv = window.visualViewport; const e = document.querySelector('[data-testid=chat-input]'); return !!vv && !!e && e.getBoundingClientRect().bottom <= vv.offsetTop + vv.height + 0.5; }, null, { timeout: 20000, polling: 200 }).catch(() => null);
         L = await lay();
         check(`chat (${label}): with the viewport shrunk as by a keyboard, the text box and Send stay visible`, inView(L.sheet, L) && inView(L.input, L) && inView(L.send, L), JSON.stringify(L));
-        await cp.screenshot({ path: `${OUT}/mobile-11-chat-sheet-${label}-keyboard.png` });
+        await cp.screenshot({ path: `${OUT}/mobile-14-chat-sheet-${label}-keyboard.png` });
         await cp.setViewportSize({ width: w, height: h });
         await cp.waitForTimeout(400);
         await cp.tap('[data-testid=chat-close]');
@@ -374,7 +375,7 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
         check(`Who Am I? (${label}): the box deals a card; the chip fits on screen with ≥ 56 px buttons`, cb.length === 3 && cb.every((b) => b.x >= 0 && b.r <= w && b.y >= 0 && b.b <= h) && cb.slice(1).every((b) => b.h >= 56 && b.w >= 56), JSON.stringify(cb));
         await cp.evaluate(() => window.__toybox.aim(Math.PI / 2, 0.3));
         await cp.waitForTimeout(1500);
-        await cp.screenshot({ path: `${OUT}/mobile-12-whoami-chip-${label}.png` });
+        await cp.screenshot({ path: `${OUT}/mobile-15-whoami-chip-${label}.png` });
         if (chip) {
           await cp.tap('[data-testid=whoami-peel]');
           await cp.waitForSelector('[data-testid=whoami-chip]', { state: 'detached', timeout: 30000 }).catch(() => null);

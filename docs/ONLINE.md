@@ -513,6 +513,9 @@ VITE_SERVER_URL=ws://localhost:2567 npx vite build --outDir /tmp/online-dist
 npx vite preview --outDir /tmp/online-dist --port 4190 --strictPort &
 npm run server:build
 BASE_URL=http://localhost:4190/ node tests/e2e/online.cjs   # starts the server itself on 2567 (SERVER_PORT changes it), with MATCH_DEBUG=1 for the hub play goal
+# (SKIP_HUBPLAY=1 skips the long marble/basketball part; chat and Who Am I? always run)
+# the phone chat sheet and Who Am I? chip: a plain build for BASE_URL plus this online build
+BASE_URL=http://localhost:4173/ CHAT_BASE_URL=http://localhost:4190/ CHAT_SERVER_PORT=2567 node tests/e2e/mobile.cjs
 # accounts: the client build must point at port 2570
 VITE_SERVER_URL=ws://localhost:2570 npx vite build --outDir /tmp/acct-dist
 npx vite preview --outDir /tmp/acct-dist --port 4198 --strictPort &
