@@ -4,7 +4,7 @@
  *
  * Each stop has a spot for Pipwick to land on, a camera position and the point it looks at. Between
  * stops Pipwick flies along an arc and the camera glides along a raised arc of its own (high above
- * the table, so it never sweeps through the player's toy), then holds while she talks. With a
+ * the table, so it never sweeps through the player's toy), then holds while he talks. With a
  * recording, the tour moves on by itself shortly after each line ends (welcome.ts); Next moves on at
  * any time and Skip ends it. Without one, it waits for Next.
  */
@@ -19,7 +19,7 @@ export interface TourStop {
   id: TourStopId;
   /** Where Pipwick lands (table top, y from `y`). */
   mascot: { x: number; z: number; y?: number };
-  /** Camera position and look-at point while she talks there. */
+  /** Camera position and look-at point while he talks there. */
   cam: Vec3;
   look: Vec3;
 }

@@ -97,7 +97,7 @@ describe('tour stops', () => {
     for (const s of TOUR_STOPS) expect(TOUR_LINES[s.id].length).toBeGreaterThan(20);
   });
 
-  it('Pipwick lands on walkable ground, clear of anything solid (her own home excepted)', () => {
+  it('Pipwick lands on walkable ground, clear of anything solid (his own home excepted)', () => {
     for (const s of TOUR_STOPS) {
       expect(isWalkable(s.mascot.x, s.mascot.z, 0.8), s.id).toBe(true);
       const hits = solid.filter((c) => c.id !== 'pipwick' && overlaps(c, s.mascot.x, s.mascot.z, 0.9)).map((c) => c.id);
@@ -142,7 +142,7 @@ describe('greeters, Pipwick and the jukebox in the Hub layout', () => {
     }
   });
 
-  it('Pipwick waits near spawn but off the approach; her prompt and the jukebox prompt are reachable', () => {
+  it('Pipwick waits near spawn but off the approach; his prompt and the jukebox prompt are reachable', () => {
     const d = Math.hypot(PIPWICK_HOME.x - HUB_SPAWN.x, PIPWICK_HOME.z - HUB_SPAWN.z);
     expect(d).toBeGreaterThan(6);
     expect(d).toBeLessThan(14);

@@ -1,8 +1,8 @@
 /**
  * Pipwick, the Hub's welcome mascot: a small wind-up tin songbird in a postman's cap with a brass
- * key in her back (original design, code-built in the chunky toy style). She waits by the plaza
+ * key in his back (original design, code-built in the chunky toy style). He waits by the plaza
  * (layout.ts PIPWICK_HOME), turns to watch you when you come near, and on your first visit flies
- * you round the Hub (src/game/welcome.ts). Talking to her replays the tour.
+ * you round the Hub (src/game/welcome.ts). Talking to him replays the tour.
  *
  * Cheap: the static body is one merged mesh; the two wings and the key are separate so they can
  * flap and turn. Also drives the tour each frame, and reads the tour's Next/Skip keys through the
@@ -21,7 +21,7 @@ import { PIPWICK_HOME } from './layout';
 import { Kit } from './kit';
 import { blobShadowTexture } from './textures';
 
-/** A little bigger than a contender, so she reads from across the table during the tour. */
+/** A little bigger than a contender, so he reads from across the table during the tour. */
 const SCALE = 1.2;
 const BODY = PALETTE.coral;
 const BELLY = PALETTE.cream;

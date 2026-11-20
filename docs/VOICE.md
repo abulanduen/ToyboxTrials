@@ -22,10 +22,10 @@ the `at` times in `TOUR_CAPTIONS` (seconds into each clip where each caption sta
 ## Who speaks
 
 - **Pipwick** (the Hub's welcome mascot): a small wind-up tin songbird in a postman's cap, coral
-  with a cream belly, blue wings and a brass key in her back. Self-appointed "official Welcomer of
-  the Playroom": bright, quick, a little officious, proud of her polished tin. She waits by the
+  with a cream belly, blue wings and a brass key in his back. Self-appointed "official Welcomer of
+  the Playroom": bright, quick, a little officious, proud of his polished tin. He waits by the
   fountain plaza, flies new players round the Hub on their first visit, and replays the tour when
-  you talk to her. Code: `src/scene/Pipwick.tsx`, `src/game/welcome.ts`, `src/game/tour.ts`.
+  you talk to him. Code: `src/scene/Pipwick.tsx`, `src/game/welcome.ts`, `src/game/tour.ts`.
 - **The gate greeters**: one small peg-doll toy by each of the 14 trial arches, dressed for its
   game (Maestro Tibbs the conductor by Copycat, Jangles the jester by Jack-in-the-Box, Sir Rally the
   knight by the Siege fort, and so on). Each says hello, pitches its game in a sentence or two and
@@ -56,7 +56,7 @@ the same string, so a recording must match it word for word (or change both toge
 
 Playback (`src/game/voice.ts`) goes through Web Audio: volume is master × **Voice volume**
 (Settings), which also works on iOS; the background music ducks while a line plays; one line at a
-time. Greeters speak when you walk up (not again for 25 s); Pipwick speaks each tour stop as she
+time. Greeters speak when you walk up (not again for 25 s); Pipwick speaks each tour stop as he
 lands, and the tour card follows the recording caption by caption.
 
 ## Background music

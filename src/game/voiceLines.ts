@@ -31,7 +31,7 @@ export const PIPWICK: Speaker = {
   id: 'pipwick',
   name: 'Pipwick',
   direction:
-    'A small wind-up tin songbird, the self-appointed official Welcomer of the Playroom. Bright, quick and chirpy, proud of her polished tin and a little officious, but warm. Short breathy pauses as if her spring needs a turn.',
+    "A small wind-up tin songbird, the self-appointed official Welcomer of the Playroom. Bright, quick and chirpy, proud of his polished tin and a little officious, but warm. Short breathy pauses as if his spring needs a turn. The tour is voiced by ElevenLabs' Brian (Calm, Collected and Steady), a man's voice: Pipwick is he.",
 };
 
 /** The gate greeters: one small wind-up toy by each trial's arch (src/scene/Greeters.tsx). */

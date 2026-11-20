@@ -187,7 +187,7 @@ function Hud() {
   const touch = useGame((s) => s.touchUI);
   const paintName = itemById(useGame((s) => s.profile.loadout.paint))?.name ?? '';
   const cogs = useGame((s) => s.profile.wallet.cogs);
-  // Pipwick's tour (or a chat with her) owns the screen: the movement controls step aside.
+  // Pipwick's tour (or a chat with him) owns the screen: the movement controls step aside.
   const welcoming = useWelcome((s) => s.mode !== null);
   return (
     <>
