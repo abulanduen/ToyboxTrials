@@ -17,7 +17,7 @@
 .player-rail .rail-row__detail { grid-column:2 / span 2; font:600 11px Nunito,sans-serif; opacity:.85; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .player-rail .rail-row .rail-mark { position:absolute; right:-5px; top:-6px; }
 .player-rail .rail-row.is-you button { background:#FFF9EE; border-color:#574D69; }
-.player-rail .rail-row.is-shown button { border-color:#6BA7C8; box-shadow:inset 0 0 0 2px #6BA7C8; }
+.player-rail .rail-row.is-shown button,.player-rail .rail-row button[aria-pressed=true] { background:#FFF9EE; border-color:#6BA7C8; box-shadow:inset 0 0 0 2px #6BA7C8; }
 .player-rail .rail-row.is-out button { opacity:.55; }
 /* Still going this round: a honey glow and a pulsing dot. */
 .player-rail .rail-row.is-busy button { background:color-mix(in srgb,#EFAE45 55%,#F4E8CE); border-color:#EFAE45; }

@@ -228,7 +228,7 @@ function Enemies() {
       const y = 0.3 + groundY(e.x, e.z) + (e.flying ? FLY_HEIGHT + (reduced.current ? 0 : Math.sin(now * 3 + e.id) * 0.2) : reduced.current ? 0 : Math.abs(Math.sin(now * 9 + e.id)) * 0.08);
       // Slowed enemies tint blue, burning ones orange, marked ones coral.
       c.set(e.burnUntil > sNow ? TOY_COLOURS.orange : e.slowUntil > sNow ? TOY_COLOURS.glass : e.markUntil > sNow ? TOY_COLOURS.pink : '#FFFFFF');
-      badges.add(enemyStatus(e, sNow, wave), x, y + (e.boss ? (e.check ? 9.4 : 8.6) : 3.1), z);
+      badges.add(enemyStatus(e, sNow, wave), x, y + (e.boss ? (e.check ? 11 : 8.6) : 3.1), z);
       if (e.boss) {
         const model = e.check ? DAMAGE_CHECK.model : BOSSES[wave]?.model ?? 'ratchet-rhino';
         if (shownBoss.current !== model) { shownBoss.current = model; boss.geometry = toyGeometry(model); }
@@ -236,7 +236,7 @@ function Enemies() {
         boss.position.set(x, y, z); boss.rotation.set(0, yaw, wobble * 0.5); boss.scale.setScalar(ENEMY_SCALE.boss * (e.check ? 1.15 : 1));
         bossRing.visible = true; bossRing.position.set(x, 0.3, z); bossRing.scale.setScalar(2.2);
         // The damage check has no health bar: a sign above it counts the damage it has taken.
-        if (e.check) sign.show(b.checkDamage, x, y + 11.6, z);
+        if (e.check) sign.show(b.checkDamage, x, y + 8.6, z);
       } else {
         const k = ENEMY_KINDS.indexOf(e.kind as Exclude<EnemyKind, 'boss'>), mesh = meshes[k];
         if (counts[k] >= ENEMY_CAP) continue;
@@ -273,7 +273,7 @@ class CheckSign {
     this.texture = new THREE.CanvasTexture(this.canvas); this.texture.colorSpace = THREE.SRGBColorSpace;
     this.sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.texture, depthTest: false, depthWrite: false, toneMapped: false }));
     this.sprite.renderOrder = 22; this.sprite.visible = false; this.sprite.raycast = () => {};
-    this.sprite.scale.set(9.6, 3, 1);
+    this.sprite.scale.set(8, 2.5, 1);
   }
   show(damage: number, x: number, y: number, z: number) {
     this.sprite.visible = true; this.sprite.position.set(x, y, z);

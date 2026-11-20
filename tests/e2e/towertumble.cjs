@@ -214,8 +214,8 @@ async function frames(page, n) {
         await page.waitForFunction(() => window.__toybox.tumbleView.get().zoom > 1.5);
       }
       const zoomed = await page.evaluate(() => window.__toybox.tumbleView.get());
-      // A drag that starts on an empty square pans and does not select it.
-      const felt = await square(57, 0.3);
+      // A drag that does not start on one of your towers pans, and does not select anything.
+      const felt = await square(35, 0.3); // a path square near the zoom centre (on screen whatever the zoom)
       if (mobile) {
         const cdp = await context.newCDPSession(page);
         await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ ...felt, id: 1 }] });
@@ -235,13 +235,13 @@ async function frames(page, n) {
       log(`zoomed to ${zoomed.zoom.toFixed(2)}, panned, reset`);
 
       // ── fast-forward waves; look at the board mid-wave ──
-      // The five quest towers go again; a slowing, armour-shredding Silk Spinner and a burning Paint-pot Howitzer
-      // put badges on the walkers. One bot board has no towers and lots of lives, so it is still going after yours clears.
+      // The five quest towers go again; a slowing Band Slinger and a burning Crayon Mortar (weak enough that walkers
+      // live to wear their badges). One bot board has no towers and lots of lives, so it is still going after yours clears.
       await state(() => {
         const s = window.__toybox.match.state(), p = s.players[0];
         p.gold = 0; p.towers = p.towers.filter(t => t.id < 90000);
-        p.towers.push({ id: 92000, def: 'silk-spinner', cell: 2, cd: 0, shots: 0, dealt: 0, bornAt: s.t, how: 'build', auraDamage: 0, auraSpeed: 0 },
-          { id: 92001, def: 'paint-howitzer', cell: 18, cd: 0, shots: 0, dealt: 0, bornAt: s.t, how: 'build', auraDamage: 0, auraSpeed: 0 });
+        p.towers.push({ id: 92000, def: 'band-slinger', cell: 2, cd: 0, shots: 0, dealt: 0, bornAt: s.t, how: 'build', auraDamage: 0, auraSpeed: 0 },
+          { id: 92001, def: 'crayon-mortar', cell: 18, cd: 0, shots: 0, dealt: 0, bornAt: s.t, how: 'build', auraDamage: 0, auraSpeed: 0 });
         p.auraDirty = true;
         const slow = s.players[1]; slow.towers = []; slow.lives = 99; slow.auraDirty = true;
       });
@@ -249,9 +249,9 @@ async function frames(page, n) {
       // so nothing is missed at 1–3 fps. Freeze time for the photo.
       await click('td-next');
       await until("s.phase === 'wave'");
-      await page.waitForFunction(() => window.__toybox.tumbleStatus.shown() > 0);
-      await page.evaluate(() => window.__toybox.match.timeScale(0));
-      const badges = await page.evaluate(() => window.__toybox.tumbleStatus.byKind());
+      // Freeze in the same frame the first badge is drawn (walkers on wave 1 do not live long).
+      await page.waitForFunction(() => { if (window.__toybox.tumbleStatus.shown() === 0) return false; window.__tdBadges = window.__toybox.tumbleStatus.byKind(); window.__toybox.match.timeScale(0); return true; });
+      const badges = await page.evaluate(() => window.__tdBadges);
       assert.ok(badges.slow || badges.burn, `status badges over enemies: ${JSON.stringify(badges)}`);
       await frames(page, 2);
       await sample(); await shot('wave');
