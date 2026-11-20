@@ -17,7 +17,13 @@ import { TouchEmotes } from './OnlineUI';
 
 const STICK_RADIUS = 52; // px the knob can travel
 
-export function Joystick() {
+/**
+ * `zone`: `thumb` (default) is the hub's bottom-left thumb zone, where the stick rests visibly.
+ * `half` makes the whole bottom half of the screen the zone: the stick appears under the finger
+ * wherever it lands, drags from there, and hides again on release. Buttons painted above the zone
+ * (later in the DOM) still take their own taps.
+ */
+export function Joystick({ zone: mode = 'thumb' }: { zone?: 'thumb' | 'half' }) {
   const zone = useRef<HTMLDivElement>(null);
   const base = useRef<HTMLDivElement>(null);
   const knob = useRef<HTMLDivElement>(null);
@@ -50,7 +56,9 @@ export function Joystick() {
   return (
     <div
       ref={zone}
-      className="touch-stick-zone"
+      className={`touch-stick-zone${mode === 'half' ? ' touch-stick-zone--half' : ''}`}
+      data-zone={mode}
+      onContextMenu={(e) => e.preventDefault()}
       onPointerDown={(e) => {
         if (active.current) return;
         unlockAudio();
@@ -80,7 +88,7 @@ export function Joystick() {
       onPointerUp={(e) => active.current?.id === e.pointerId && reset()}
       onPointerCancel={(e) => active.current?.id === e.pointerId && reset()}
     >
-      <div ref={base} className={`touch-stick${engaged ? ' touch-stick--on' : ''}`} aria-hidden>
+      <div ref={base} className={`touch-stick${engaged ? ' touch-stick--on' : ''}${mode === 'half' ? ' touch-stick--float' : ''}`} aria-hidden>
         <div className="touch-stick__ring" />
         <div ref={knob} className="touch-stick__knob" />
       </div>

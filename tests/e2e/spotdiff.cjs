@@ -94,6 +94,7 @@ async function openFromPavilion(page, mobile) {
   await page.waitForSelector('.prompt', { timeout: 120000 });
   if (mobile) await page.locator('.prompt').tap();
   else await page.keyboard.press('KeyE');
+  await page.getByTestId('practice-group-party').click(); // the practice list opens by section
   const entry = page.getByTestId('practice-odd-page-out');
   await entry.waitFor({ state: 'visible', timeout: 120000 });
   if (mobile) await entry.tap();

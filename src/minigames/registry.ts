@@ -251,14 +251,21 @@ export const MINIGAMES: MinigameDefinition[] = [
     tagline: 'A pocket-sized auto-battler.',
     description: 'Ten rounds of toy auto-battles. Buy from a level-weighted shop, merge matching copies up to three stars, deploy your squad, and choose passives on rounds 3, 6 and 9.',
     category: 'strategy',
+    group: 'strategy',
     accent: PALETTE.sage,
     players: { min: 1, max: 8 },
     durationSec: [300, 630],
-    // Owner decision (19 Nov 2026): the full 5–10 minute game, in the longer formats only (never Blitz).
+    // Owner decisions (19 and 20 Nov 2026): the full 5–10 minute game, in the longer formats only
+    // (never Blitz), and as a strategy trial only ever their finale.
     eligibility: { tournament: true, ranked: false, casual: true, formats: ['normal', 'treasure'] },
     scoring: 'score',
     tieBreak: 'Remaining unit health',
-    controls: [{ keys: 'Drag / Click / Tab + Enter', action: 'Buy or reroll; drag matching equal-star toys together to merge. Formation drawer manages reserves and keyboard placement.' }],
+    // One chip per way of playing, so no chip is long enough to break across lines on the intro card.
+    controls: [
+      { keys: 'Click', action: 'Buy or reroll' },
+      { keys: 'Drag', action: 'Drag matching equal-star toys together to merge' },
+      { keys: 'Tab + Enter', action: 'Keyboard play: the Formation drawer manages reserves and placement' },
+    ],
     inputs: ['keyboard', 'mouse', 'touch'], bots: 'available', recordUnit: 'points',
     touch: { movement: 'none', look: 'none', orientation: 'any',
       buttons: [{ id: 'buy', label: 'Shop offer' }, { id: 'reroll', label: 'Reroll' }, { id: 'place', label: 'Formation square' }, { id: 'merge', label: 'Merge pair' }, { id: 'bench', label: 'Reserve slot' }, { id: 'passive', label: 'Passive choice' }, { id: 'sell', label: 'Sell' }, { id: 'ready', label: 'Ready' }],
@@ -352,12 +359,14 @@ export const MINIGAMES: MinigameDefinition[] = [
     description:
       'Every player defends their own 8×8 board. Build pays for a random tower, and any two towers of the same tier merge into a random tower one tier up, all the way to tier 7. Level your builder for better odds, finish quick quests for gold, and beat the bosses on waves 5, 10, 15 and 20 for free towers. Leaks cost lives; knocked-out players watch the other boards. Survive the most waves to win.',
     category: 'strategy',
+    group: 'strategy',
     accent: PALETTE.honey,
     players: { min: 1, max: 8 },
     durationSec: [300, 600],
     inputs: ['keyboard', 'mouse', 'touch'],
     bots: 'available',
-    eligibility: { tournament: false, ranked: false, casual: true },
+    // Owner decision (20 Nov 2026): a strategy finale for Normal and Treasure tournaments only.
+    eligibility: { tournament: true, ranked: false, casual: true, formats: ['normal', 'treasure'] },
     scoring: 'progress',
     tieBreak: 'Waves survived, then lives left, then damage score',
     recordUnit: 'waves',
@@ -388,25 +397,30 @@ export const MINIGAMES: MinigameDefinition[] = [
   {
     id: 'toybox-siege',
     title: 'Toybox Siege',
-    tagline: 'Five minutes. Endless dust bunnies. One wind-up hero per board.',
+    tagline: 'Five minutes of dust bunnies, then one arena for every toy left.',
     description:
-      'Pick a Tin Soldier, a Pop-Gun Ranger or a Clockwork Wizard and hold out on your own patch of the table. Your weapons fire on their own: you only move. Swarms of dust bunnies, wind-up mice, marbles and paper planes close in, an elite arrives every minute and the Boiler Baron at 4:00. Level up, max a weapon, crack an elite’s chest to evolve it, or skip the chest to send an elite to a rival. Beat the boss to win; otherwise the toy that lasts longest wins.',
+      'Pick a Tin Soldier, a Pop-Gun Ranger or a Clockwork Wizard and hold out on your own patch of the table. Your weapons fire on their own: you only move. Swarms of dust bunnies, wind-up mice, marbles and paper planes close in, an elite arrives every minute and the Boiler Baron at 4:00. Level up, max a weapon, crack a chest to evolve it, or skip one to send an elite to a rival. Beat the boss for three chests; at 5:00 every toy still standing is pulled into one arena to fight with its build. Last toy standing wins.',
     category: 'survival',
+    group: 'strategy',
     accent: PALETTE.honey,
     players: { min: 1, max: 8 },
-    durationSec: [240, 330],
+    // The run is 5:00, then up to 15 s of upgrades and an arena of about 15–45 s with bots (90 s at most), plus the untimed class pick.
+    durationSec: [300, 390],
     inputs: ['keyboard', 'mouse', 'touch'],
     bots: 'available',
-    // Provisional: a five-minute run is long for a tournament round (like Toy Squad), so practice only for now.
-    eligibility: { tournament: false, ranked: false, casual: true },
+    // The class pick is the game's own untimed opening card: no 3-2-1 before it.
+    skipStartCountdown: true,
+    // Owner decision (20 Nov 2026): a five-minute run is long for a tournament round, so like Toy
+    // Squad it is a strategy trial: only ever the finale of a Normal or Treasure tournament.
+    eligibility: { tournament: true, ranked: false, casual: true, formats: ['normal', 'treasure'] },
     scoring: 'time',
-    tieBreak: 'Boss slain first (earlier is better), then survival time, then knockouts, then points',
+    tieBreak: 'Arena survival (last toy standing first), then boss slain (earlier is better), then survival time, then knockouts, then points',
     recordUnit: 'points',
     controls: [
       { keys: 'WASD / arrows', action: 'Move (weapons fire on their own)' },
       { keys: '1 – 4 / click', action: 'Pick a level-up or treasure card' },
-      { keys: 'Space', action: 'Rally Horn: send an elite (once you have it) · revive when down' },
-      { keys: 'Q / E', action: 'Ghost: previous / next board' },
+      { keys: 'Space', action: 'Rally Horn: send an elite (in the arena: summon the Baron) · revive when down · watch others when out' },
+      { keys: 'Q / E', action: 'When out: previous / next board' },
     ],
     touch: {
       movement: 'joystick',
@@ -415,10 +429,10 @@ export const MINIGAMES: MinigameDefinition[] = [
         { id: 'skill', label: 'Rally Horn', colour: PALETTE.honey },
         { id: 'card', label: 'Upgrade card' },
         { id: 'revive', label: 'Revive' },
-        { id: 'watch', label: 'Prev / Next board' },
+        { id: 'watch', label: 'Watch other players · Prev / Next board' },
       ],
       orientation: 'any',
-      notes: 'Steer with the floating joystick (left thumb); weapons fire on their own. Tap a card to level up. The big Rally Horn button (right thumb) sends an elite once you own it. When down, tap Revive; as a ghost, tap Prev / Next to inspect other boards.',
+      notes: 'Steer with the floating joystick: touch anywhere in the bottom half and drag. Weapons fire on their own. Tap a card to level up. The big Rally Horn button (right thumb) sends an elite once you own it, or summons the Baron in the arena. When down, tap Revive; when out, a popup offers Watch other players, then Prev / Next.',
     },
     status: 'playable',
     load: () => import('./siege').then((m) => m.default),
@@ -432,3 +446,4 @@ export const tournamentPool = (format?: TournamentFormat) =>
   format ? poolForFormat(format, MINIGAMES) : MINIGAMES.filter((g) => g.status === 'playable' && g.eligibility.tournament);
 
 export { lengthClassOf, durationLabel, durationChip } from './length';
+export { groupOf, isStrategy } from './tournament';

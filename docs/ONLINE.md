@@ -156,8 +156,9 @@ online"). The other choice in both places is the existing **practice with bots**
   locked the lobby or it is at its cap.
 - **Host controls** (`server/lobby.ts` checks every one: only the host's are accepted): kick a
   player (they can't rejoin that lobby), player cap 2–8, lock/unlock, bot fill on/off, bot skill,
-  and the mode: **one trial** (picked from a card grid of all trials) or a **tournament**
-  (Blitz 3, Normal 5, Treasure 8 trials, as locally), then **Start**. When the host leaves, the
+  and the mode: **one trial** (picked from two folded sections, Party games and Strategy games,
+  with the pick shown compactly) or a **tournament** (Blitz 3, Normal 5, Treasure 8 trials, as
+  locally: Normal and Treasure end with a strategy finale), then **Start**. When the host leaves, the
   longest-present member becomes host; when the last member leaves, the lobby closes.
 - **The lobby screen** lists the members (host, ready, reconnecting) and shows the settings to
   everyone; non-hosts press "I'm ready". At most 8 lobbies per Hub room; a player may host a new
@@ -169,12 +170,17 @@ online"). The other choice in both places is the existing **practice with bots**
 
 ### How a match runs on the server
 
-- `server/lobbyMatch.ts` runs the phases: reveal (4.5 s) → countdown (3 s) → playing → results
-  (9 s) → standings (8 s, tournaments) → … → final table (15 s) → back to the lobby. Everyone
-  pressing Continue skips results, standings and the final table.
-- **The server owns the seed** and picks the tournament's trials with the same `selectGames` as
-  local tournaments, from the format's pool (`poolForFormat`: Toy Squad only in Normal and
-  Treasure). Bots (`makeBots`, the same bot policies as practice) fill the empty seats up to the
+- `server/lobbyMatch.ts` runs the phases: reveal (the trial's intro card, up to 30 s) → countdown
+  (3 s) → playing → results (9 s) → standings (8 s, tournaments) → … → final table (15 s) → back to
+  the lobby. The intro card is the same as in practice: the How to play steps (opening by
+  themselves when the player's tutorial setting is on), the field, and **Ready**. Everyone seated
+  pressing Ready starts the countdown at once; everyone pressing Continue skips results, standings
+  and the final table. A `ready` carries the phase it was pressed in, and the server drops one
+  whose phase has passed (a late "Next trial" never counts as Ready on the next intro).
+- **The server owns the seed** and picks the tournament's trials with the same `selectTournament`
+  as local tournaments, from the format's pool (`poolForFormat`): Blitz draws party trials only;
+  Normal and Treasure draw party trials, then exactly one strategy trial (Toy Squad, Toybox Siege or
+  Toy Tower Tumble) as the finale. Bots (`makeBots`, the same bot policies as practice) fill the empty seats up to the
   cap when the host turned bot fill on; if players leave and a trial would have fewer toys than it
   needs, bots top it up even with bot fill off.
 - `server/matchRunner.ts` steps the **same pure rules cores** (`src/minigames/<game>/rules.ts`)
@@ -282,7 +288,7 @@ Client → server:
 | `activity` | `a` | A minigame id, `workshop`, `shop`, or null. |
 | `look` | `look` | Cosmetics changed (at most twice a second). |
 | `leave` | | Leaving on purpose (frees the slot at once). |
-| `lobby` | `a`: `create {settings}`, `join {id}`, `leave`, `kick {id}`, `settings {settings}` (any subset), `ready {ready}`, `start`, `watch {id}`, `timescale {k, hold?}` | Lobby actions. Settings: `mode` (single, tournament), `game`, `format` (blitz, normal, treasure), `cap` 2–8, `locked`, `botFill`, `difficulty`. `timescale` (speed, 0 = frozen; `hold`: freeze on reaching that phase) is only honoured by a test server (`MATCH_DEBUG=1`). |
+| `lobby` | `a`: `create {settings}`, `join {id}`, `leave`, `kick {id}`, `settings {settings}` (any subset), `ready {ready, phase?}`, `start`, `watch {id}`, `timescale {k, hold?}` | Lobby actions. Settings: `mode` (single, tournament), `game`, `format` (blitz, normal, treasure), `cap` 2–8, `locked`, `botFill`, `difficulty`. `timescale` (speed, 0 = frozen; `hold`: freeze on reaching that phase) is only honoured by a test server (`MATCH_DEBUG=1`). |
 | `in` | `m` (match sequence), `i` (inputs) | Match inputs as the game's `readLocalInput` produces them; at most 32, each a flat object of plain values. |
 | `auth` | `token` | Links a signed-in account (leaderboard name). At most 5 per connection. |
 | `kick` | `dx, dz` (direction, each within ±2), `p` (power 0–1) | Kick or push the room's marble (v4). Checked for reach and rate (above). |
