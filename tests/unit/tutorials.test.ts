@@ -54,8 +54,8 @@ describe('minigame tutorials', () => {
     }
   });
 
-  it('preserves all 42 captured tutorial photos', () => {
-    expect(Object.values(TUTORIALS).flatMap(steps => steps ?? []).filter(step => step.image)).toHaveLength(42);
+  it('preserves all 46 captured tutorial photos', () => {
+    expect(Object.values(TUTORIALS).flatMap(steps => steps ?? []).filter(step => step.image)).toHaveLength(46);
   });
 
   it('keeps literal text safe and chooses overlapping phrases first', () => {

@@ -1,4 +1,4 @@
-/* The shared host's start countdown, and the `skipStartCountdown` opt-in (Spellbox Showdown's draft). */
+/* The shared host's start countdown, and the `skipStartCountdown` opt-in (Spellbox Showdown's draft, Toybox Siege's class pick). */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { beginCountdown, getMatchState, matchBus, pauseMatch, quitMatch, setMatchTimeScale, tickMatch, useMatch } from '../../src/minigames/session';
 import { MINIGAMES, gameById } from '../../src/minigames/registry';
@@ -27,9 +27,15 @@ matchBus.on('countdown', ({ n }) => counts.push(n));
 beforeEach(() => { quitMatch(); setMatchTimeScale(1); counts = []; });
 
 describe('host start countdown', () => {
-  it('only Spellbox Showdown opts out; every other game keeps the 3-2-1', () => {
+  it('only Spellbox Showdown and Toybox Siege (their own untimed opening cards) opt out; every other game keeps the 3-2-1', () => {
     expect(gameById('spellbox-showdown').skipStartCountdown).toBe(true);
-    expect(MINIGAMES.filter((g) => g.skipStartCountdown).map((g) => g.id)).toEqual(['spellbox-showdown']);
+    expect(gameById('toybox-siege').skipStartCountdown).toBe(true);
+    expect(MINIGAMES.filter((g) => g.skipStartCountdown).map((g) => g.id)).toEqual(['spellbox-showdown', 'toybox-siege']);
+  });
+  it('goes straight to Toybox Siege\'s class pick', () => {
+    open('toybox-siege');
+    expect(phase()).toBe('playing');
+    expect(counts).toEqual([]);
   });
   it('runs 3-2-1 before play for an ordinary game, stepping no rules until it ends, and pauses', () => {
     open('copycat-conductor');

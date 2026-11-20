@@ -388,25 +388,28 @@ export const MINIGAMES: MinigameDefinition[] = [
   {
     id: 'toybox-siege',
     title: 'Toybox Siege',
-    tagline: 'Five minutes. Endless dust bunnies. One wind-up hero per board.',
+    tagline: 'Five minutes of dust bunnies, then one arena for every toy left.',
     description:
-      'Pick a Tin Soldier, a Pop-Gun Ranger or a Clockwork Wizard and hold out on your own patch of the table. Your weapons fire on their own: you only move. Swarms of dust bunnies, wind-up mice, marbles and paper planes close in, an elite arrives every minute and the Boiler Baron at 4:00. Level up, max a weapon, crack an elite’s chest to evolve it, or skip the chest to send an elite to a rival. Beat the boss to win; otherwise the toy that lasts longest wins.',
+      'Pick a Tin Soldier, a Pop-Gun Ranger or a Clockwork Wizard and hold out on your own patch of the table. Your weapons fire on their own: you only move. Swarms of dust bunnies, wind-up mice, marbles and paper planes close in, an elite arrives every minute and the Boiler Baron at 4:00. Level up, max a weapon, crack a chest to evolve it, or skip one to send an elite to a rival. Beat the boss for three chests; at 5:00 every toy still standing is pulled into one arena to fight with its build. Last toy standing wins.',
     category: 'survival',
     accent: PALETTE.honey,
     players: { min: 1, max: 8 },
-    durationSec: [240, 330],
+    // The run is 5:00, then up to 15 s of upgrades and an arena of about 15–45 s with bots (90 s at most), plus the untimed class pick.
+    durationSec: [300, 390],
     inputs: ['keyboard', 'mouse', 'touch'],
     bots: 'available',
+    // The class pick is the game's own untimed opening card: no 3-2-1 before it.
+    skipStartCountdown: true,
     // Provisional: a five-minute run is long for a tournament round (like Toy Squad), so practice only for now.
     eligibility: { tournament: false, ranked: false, casual: true },
     scoring: 'time',
-    tieBreak: 'Boss slain first (earlier is better), then survival time, then knockouts, then points',
+    tieBreak: 'Arena survival (last toy standing first), then boss slain (earlier is better), then survival time, then knockouts, then points',
     recordUnit: 'points',
     controls: [
       { keys: 'WASD / arrows', action: 'Move (weapons fire on their own)' },
       { keys: '1 – 4 / click', action: 'Pick a level-up or treasure card' },
-      { keys: 'Space', action: 'Rally Horn: send an elite (once you have it) · revive when down' },
-      { keys: 'Q / E', action: 'Ghost: previous / next board' },
+      { keys: 'Space', action: 'Rally Horn: send an elite (in the arena: summon the Baron) · revive when down · watch others when out' },
+      { keys: 'Q / E', action: 'When out: previous / next board' },
     ],
     touch: {
       movement: 'joystick',
@@ -415,10 +418,10 @@ export const MINIGAMES: MinigameDefinition[] = [
         { id: 'skill', label: 'Rally Horn', colour: PALETTE.honey },
         { id: 'card', label: 'Upgrade card' },
         { id: 'revive', label: 'Revive' },
-        { id: 'watch', label: 'Prev / Next board' },
+        { id: 'watch', label: 'Watch other players · Prev / Next board' },
       ],
       orientation: 'any',
-      notes: 'Steer with the floating joystick (left thumb); weapons fire on their own. Tap a card to level up. The big Rally Horn button (right thumb) sends an elite once you own it. When down, tap Revive; as a ghost, tap Prev / Next to inspect other boards.',
+      notes: 'Steer with the floating joystick: touch anywhere in the bottom half and drag. Weapons fire on their own. Tap a card to level up. The big Rally Horn button (right thumb) sends an elite once you own it, or summons the Baron in the arena. When down, tap Revive; when out, a popup offers Watch other players, then Prev / Next.',
     },
     status: 'playable',
     load: () => import('./siege').then((m) => m.default),

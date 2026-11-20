@@ -28,7 +28,7 @@ export interface GameFacts {
    * keeps walking; an empty batch lets go).
    */
   heldInputs?: boolean;
-  /** Mirrors the registry's `skipStartCountdown`: the trial opens with its own phase (Spellbox's draft). */
+  /** Mirrors the registry's `skipStartCountdown`: the trial opens with its own phase (Spellbox's draft, Siege's class pick). */
   skipStartCountdown?: boolean;
 }
 
@@ -57,7 +57,7 @@ export const GAME_FACTS: Partial<Record<MinigameId, GameFacts>> = {
   'odd-page-out': f('odd-page-out', 'observation', 1, [60, 145]),
   'toy-tower-tumble': f('toy-tower-tumble', 'strategy', 1, [300, 600], { tournament: false }),
   // A five-minute run: casual and practice only for now (registry decision, see siege/README.md).
-  'toybox-siege': f('toybox-siege', 'survival', 1, [240, 330], { tournament: false }),
+  'toybox-siege': { ...f('toybox-siege', 'survival', 1, [300, 390], { tournament: false }), skipStartCountdown: true },
 };
 
 /** Every trial the online server can run. */
