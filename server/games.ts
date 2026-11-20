@@ -42,6 +42,8 @@ import { createTumbleBot } from '../src/minigames/towertumble/bot';
 import { createJackBot } from '../src/minigames/jackbox/bot';
 import { siegeRules, CLASS_IDS as SIEGE_CLASSES } from '../src/minigames/siege/rules';
 import { createSiegeBot } from '../src/minigames/siege/bot';
+import { hoopRules } from '../src/minigames/hoophustle/rules';
+import { createHoopBot } from '../src/minigames/hoophustle/bot';
 
 type Obj = Record<string, unknown>;
 
@@ -316,6 +318,31 @@ const GAMES: ServerGame[] = [
     // The finale needs no extra timer: the prep window settles its own cards after 15 s, the arena
     // opens 15 s after 5:00 at the latest, and the arena itself ends by 90 s.
     config: { pickTimeoutMs: 60_000, choiceTimeoutMs: 20_000 },
+  },
+  {
+    id: 'hoop-hustle',
+    rules: hoopRules as RulesCoreAny,
+    createBot: createHoopBot as () => BotPolicy,
+    validate(i) {
+      switch (i.type) {
+        case 'aim':
+          return num(i.yaw, 100) ? { type: 'aim', yaw: i.yaw } : null;
+        case 'charge':
+        case 'cancel':
+          return { type: i.type };
+        case 'throw':
+          // Power and facing as the player let go, and when (the rules honour at most a short lag).
+          if (!opt(i.power, (x): x is number => num(x, 1) && x >= 0) || !opt(i.yaw, (x): x is number => num(x, 100)) || !opt(i.at, (x): x is number => num(x, 1e7))) return null;
+          return { type: 'throw', ...(i.power !== undefined ? { power: i.power } : {}), ...(i.yaw !== undefined ? { yaw: i.yaw } : {}), ...(i.at !== undefined ? { at: i.at } : {}) };
+        default:
+          return null;
+      }
+    },
+    // The seed deals every toy's next spot; queued inputs are nobody else's business.
+    publicView(v) {
+      hideSeed(v);
+      v.pending = {};
+    },
   },
 ];
 

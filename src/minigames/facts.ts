@@ -61,6 +61,7 @@ export const GAME_FACTS: Partial<Record<MinigameId, GameFacts>> = {
   'jack-in-the-box': f('jack-in-the-box', 'knowledge', 2, [60, 240]),
   'odd-page-out': f('odd-page-out', 'observation', 1, [60, 145]),
   'toy-tower-tumble': { ...f('toy-tower-tumble', 'strategy', 1, [300, 600], FINALE), group: 'strategy' },
+  'hoop-hustle': f('hoop-hustle', 'reflex', 2, [75, 80]),
   'toybox-siege': { ...f('toybox-siege', 'survival', 1, [300, 390], FINALE), group: 'strategy', skipStartCountdown: true },
 };
 

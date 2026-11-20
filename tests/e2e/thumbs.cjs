@@ -27,6 +27,8 @@ const MOMENT = {
   'jack-in-the-box': 7000,
   'odd-page-out': 6000,
   'toy-tower-tumble': 26000,
+  // Staged (STAGE below): bots shooting, your charge held in the gold zone.
+  'hoop-hustle': 0,
   // Staged (STAGE below): the class pick, then the swarm with every elite and the boss at 4:01.
   'toybox-siege': 0,
 };
@@ -37,6 +39,11 @@ const MOMENT = {
  * the boss and let the swarm, the elites and the Boiler Baron arrive with every weapon firing.
  */
 const STAGE = {
+  'hoop-hustle': async (page) => {
+    await page.evaluate(() => window.__toybox.match.timeScale(4));
+    await page.waitForFunction(() => window.__toybox.match.state().t >= 5200 && window.__toybox.match.state().players.find((p) => p.id === 'you').holding, null, { polling: 100 });
+    await page.evaluate(() => { window.__toybox.match.timeScale(0); window.__toybox.hoop.charge(window.__toybox.hoop.perfect()); });
+  },
   'toybox-siege': async (page) => {
     await page.click('[data-testid=siege-class-ranger]');
     await page.waitForFunction(() => window.__toybox.match.state()?.phase === 'run', null, { polling: 200 });

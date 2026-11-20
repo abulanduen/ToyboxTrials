@@ -104,6 +104,26 @@ fs.mkdirSync(OUT, { recursive: true });
               // Hit the first thirty notes through the rules to earn the actual x4 multiplier.
               for (const n of s.chart.slice(1, 31)) { s.t = n.t - 16; local([{ lane: n.lane, t: n.t }]); }
             }
+          } else if (id === 'hoop-hustle') {
+            // Bots shooting from their spots; then your charge held in the gold zone (the arc glows);
+            // then the sliding hoop with gold balls in the last 15 seconds.
+            const { perfectPowerAt } = await import('/src/minigames/hoophustle/rules.ts');
+            // Two rivals let go at the perfect power, a moment ago: their balls are in the air.
+            const rivalsShoot = (frames) => {
+              const inputs = {};
+              for (const q of s.players.slice(1, 3)) inputs[q.id] = [{ type: 'throw', power: perfectPowerAt(s.config, s.spots[q.spot], s.t) ?? 0.5 }];
+              step(inputs, 16);
+              for (let n = 0; n < frames; n++) step({}, 16);
+            };
+            if (i === 0) { for (let n = 0; n < 60; n++) step({}, 16); rivalsShoot(24); }
+            if (i === 1) { for (let n = 0; n < 120; n++) step({}, 16); window.__toybox.hoop.charge(window.__toybox.hoop.perfect()); }
+            if (i === 2) {
+              window.__toybox.hoop.charge(null);
+              // Late in the match: the hoop resting at one end of its track, and gold balls.
+              const k = Math.round((s.config.durationMs - 14300) / (1000 / 60)); s.tick = k; s.t = (k * 1000) / 60;
+              for (let n = 0; n < 40; n++) step({}, 16);
+              rivalsShoot(20);
+            }
           } else if (id === 'blink-duel') {
             if (i === 0) s.players.forEach((q, n) => Object.assign(q, { x: (n % 2 ? 1 : -1) * 5, z: n < 2 ? -3 : 5 }));
             if (i === 1) { p.angle = Math.PI / 2; local([{ type: 'blink' }]); step({}, 80); }

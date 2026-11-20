@@ -1,0 +1,109 @@
+/* Hoop Hustle HUD. Colours are palette.ts values: cream F4E8CE, honey EFAE45, coral E76B62, toy blue 6BA7C8,
+   sage 89B78A, ink purple 574D69, ink 2B2433, white FFF9EE, ball orange E8893F, cardboard C9A57A. */
+.hh-hud { position:absolute; inset:0; pointer-events:none; color:#2B2433; font:14px Nunito,sans-serif; }
+
+/* Top: clock, your points, your spot */
+.hh-top { position:absolute; top:max(12px,env(safe-area-inset-top)); left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:8px; }
+.hh-clock,.hh-score,.hh-spot { background:#FFF9EE; border:3px solid #574D69; border-radius:12px; box-shadow:0 3px 0 #574D69; padding:3px 10px; white-space:nowrap; }
+.hh-clock { font:600 22px Fredoka,sans-serif; min-width:58px; text-align:center; }
+.hh-clock.is-urgent { background:#EFAE45; }
+.hh-score b { font:600 24px Fredoka,sans-serif; }
+.hh-score small { font:700 12px Nunito,sans-serif; margin-left:3px; }
+.hh-spot { display:flex; align-items:center; gap:6px; font:700 13px Nunito,sans-serif; border-color:var(--hh-spot,#574D69); }
+.hh-pips { display:inline-flex; gap:3px; }
+.hh-pips i { width:10px; height:10px; border-radius:50%; background:var(--hh-spot); border:2px solid #2B2433; }
+
+/* Announcements */
+.hh-banner { position:absolute; top:calc(max(12px,env(safe-area-inset-top)) + 58px); left:50%; transform:translateX(-50%); width:min(440px,calc(100% - 140px)); box-sizing:border-box; padding:8px 14px; text-align:center;
+  background:#F4E8CE; border:3px solid #574D69; border-radius:12px; box-shadow:0 3px 0 #574D69; animation:hh-in .3s ease-out; }
+.hh-banner strong { display:block; font:600 20px Fredoka,sans-serif; }
+.hh-banner span { display:block; font:700 13px Nunito,sans-serif; margin-top:2px; }
+.hh-banner--warn { background:#FBE1DB; border-color:#E76B62; }
+.hh-banner--slide { background:#D9EAF3; border-color:#6BA7C8; }
+.hh-banner--gold { background:#EFAE45; }
+.hh-banner--buzz { background:#E76B62; color:#FFF9EE; }
+@keyframes hh-in { from { transform:translateX(-50%) scale(.7); opacity:0; } to { transform:translateX(-50%) scale(1); opacity:1; } }
+
+/* "+2!" and "Short!" */
+.hh-pop { position:absolute; left:50%; top:36%; transform:translate(-50%,-50%); font:700 44px Fredoka,sans-serif; color:#FFF9EE; text-shadow:0 3px 0 #574D69,0 0 2px #574D69; -webkit-text-stroke:2px #574D69; animation:hh-pop 1.25s ease-out forwards; }
+.hh-pop small { display:block; font-size:20px; text-align:center; }
+.hh-pop.is-gold { color:#EFAE45; font-size:52px; }
+.hh-pop.is-miss { font-size:28px; color:#F4E8CE; animation-duration:.9s; }
+@keyframes hh-pop { 0% { transform:translate(-50%,-30%) scale(.6); opacity:0; } 15% { transform:translate(-50%,-50%) scale(1.1); opacity:1; } 70% { opacity:1; } 100% { transform:translate(-50%,-90%) scale(1); opacity:0; } }
+.hh-moving { position:absolute; left:50%; top:46%; transform:translateX(-50%); padding:4px 10px; border-radius:9px; background:#FFF9EE; border:2px solid #574D69; font:700 13px Nunito,sans-serif; }
+
+/* Standings rail */
+.hh-rail { position:absolute; top:max(14px,env(safe-area-inset-top)); left:max(14px,env(safe-area-inset-left)); width:178px; margin:0; padding:6px; list-style:none; display:grid; gap:3px;
+  background:#FFF9EE; border:3px solid #C9A57A; border-radius:12px; box-shadow:0 3px 0 #574D69; box-sizing:border-box; }
+.hh-rail li { position:relative; display:grid; grid-template-columns:20px minmax(0,1fr) auto auto; align-items:center; gap:6px; padding:3px 6px; border-radius:8px; background:#F4E8CE; }
+.hh-rail li.is-you { background:#FFF9EE; box-shadow:inset 0 0 0 2px #574D69; }
+.hh-rail li.is-fresh { background:#F7D9A0; }
+.hh-rail__rank { display:grid; place-items:center; width:20px; height:20px; border-radius:50%; background:#FFF9EE; border:2px solid #574D69; font:600 11px Fredoka,sans-serif; box-sizing:border-box; }
+.hh-rail__name { font:600 14px Fredoka,sans-serif; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.hh-rail__pts { font:600 17px Fredoka,sans-serif; }
+.hh-rail__plus { font:800 12px Nunito,sans-serif; color:#3F7A41; }
+.hh-rail__plus:empty { display:none; }
+.hh-rail__plus.is-gold { color:#A86F12; }
+
+/* Charge meter */
+.hh-meter { position:absolute; left:50%; bottom:calc(46px + env(safe-area-inset-bottom)); transform:translateX(-50%); width:min(340px,70%); text-align:center; opacity:.8; }
+.hh-meter.is-charging { opacity:1; }
+.hh-meter__bar { position:relative; height:18px; border-radius:10px; background:#F4E8CE; border:3px solid #574D69; overflow:hidden; box-shadow:0 3px 0 #574D69; }
+.hh-meter__zone { position:absolute; top:0; bottom:0; background:repeating-linear-gradient(45deg,#EFAE45 0 6px,#F7D9A0 6px 12px); border-left:2px solid #C8973A; border-right:2px solid #C8973A; box-sizing:border-box; }
+.hh-meter__fill { position:absolute; left:0; top:0; bottom:0; width:100%; transform-origin:left center; transform:scaleX(0); background:rgba(231,107,98,.75); }
+.hh-meter.is-perfect .hh-meter__fill { background:rgba(200,151,58,.9); }
+.hh-meter.is-perfect .hh-meter__bar { border-color:#C8973A; }
+.hh-meter__label { display:inline-block; margin-top:5px; padding:1px 8px; border-radius:7px; background:#FFF9EE; font:700 12px Nunito,sans-serif; white-space:nowrap; }
+
+/* Touch: joystick (aim) bottom-left, hold-to-throw bottom-right */
+.hh-stick .touch-stick-zone { width:48%; height:44%; }
+.hh-actions { position:absolute; right:max(14px,env(safe-area-inset-right)); bottom:max(16px,env(safe-area-inset-bottom)); pointer-events:auto; }
+.hh-throw { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0; width:118px; height:118px; border-radius:50%; border:4px solid #574D69; background:#E8893F; color:#2B2433;
+  box-shadow:0 5px 0 #574D69; font:600 17px Fredoka,sans-serif; touch-action:none; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; cursor:pointer; }
+.hh-throw small { font:700 10px Nunito,sans-serif; }
+.hh-throw.is-gold { background:#EFAE45; }
+.hh-throw.is-down { transform:translateY(4px); box-shadow:0 1px 0 #574D69; }
+.hh-throw.is-waiting { filter:saturate(.45); }
+.hh-throw:focus-visible { outline:3px solid #6BA7C8; outline-offset:3px; }
+.hh-meter--touch { left:auto; right:max(14px,env(safe-area-inset-right)); bottom:calc(max(16px,env(safe-area-inset-bottom)) + 128px); transform:none; width:min(230px,52vw); }
+
+.hh-hint { position:absolute; left:50%; transform:translateX(-50%); bottom:calc(10px + env(safe-area-inset-bottom)); padding:3px 10px; border-radius:8px; background:#F4E8CE; font:700 12px Nunito,sans-serif; white-space:nowrap; }
+
+/* Phones in portrait: the rail becomes two rows of chips under the top bar. */
+@media (max-width:600px) {
+  .hh-top { left:max(10px,env(safe-area-inset-left)); transform:none; gap:5px; }
+  .hh-clock { font-size:18px; min-width:46px; padding:2px 6px; }
+  .hh-score { padding:2px 7px; }
+  .hh-score b { font-size:20px; }
+  .hh-spot { font-size:11px; padding:2px 6px; }
+  .hh-spot > span:last-child { max-width:96px; white-space:normal; line-height:1.1; }
+  .hh-rail { top:calc(max(12px,env(safe-area-inset-top)) + 62px); left:8px; right:8px; width:auto; grid-template-columns:repeat(4,minmax(0,1fr)); padding:3px; gap:3px; border-width:2px; }
+  .hh-rail li { grid-template-columns:auto minmax(0,1fr) auto auto; gap:3px; padding:2px 4px; }
+  .hh-rail__rank { width:16px; height:16px; font-size:9px; border-width:1px; }
+  .hh-rail__name { font-size:11px; }
+  .hh-rail__pts { font-size:13px; }
+  .hh-rail__plus { font-size:10px; }
+  .hh-banner { top:calc(max(12px,env(safe-area-inset-top)) + 124px); width:calc(100% - 24px); padding:6px 10px; }
+  .hh-banner strong { font-size:16px; }
+  .hh-banner span { font-size:11px; }
+  .hh-pop { top:42%; font-size:38px; }
+}
+/* Short screens (phones in landscape): a slim rail on the left, clear of the joystick zone. */
+@media (max-height:500px) {
+  .hh-rail { top:max(8px,env(safe-area-inset-top)); left:max(8px,env(safe-area-inset-left)); right:auto; width:150px; grid-template-columns:none; padding:3px; gap:2px; border-width:2px; }
+  .hh-rail li { padding:1px 5px; grid-template-columns:16px minmax(0,1fr) auto auto; }
+  .hh-rail__rank { width:16px; height:16px; font-size:9px; border-width:1px; }
+  .hh-rail__name { font-size:12px; }
+  .hh-rail__pts { font-size:13px; }
+  .hh-top { top:max(8px,env(safe-area-inset-top)); left:50%; transform:translateX(-50%); }
+  .hh-clock { font-size:18px; }
+  .hh-score b { font-size:20px; }
+  /* one short line, clear of the backboard */
+  .hh-banner { top:calc(max(8px,env(safe-area-inset-top)) + 48px); width:auto; max-width:calc(100% - 340px); padding:2px 12px; white-space:nowrap; }
+  .hh-banner strong { font-size:14px; }
+  .hh-banner span { display:none; }
+  .hh-throw { width:104px; height:104px; }
+  .hh-meter--touch { bottom:calc(max(16px,env(safe-area-inset-bottom)) + 112px); width:200px; }
+  .hh-pop { top:40%; font-size:36px; }
+}
+@media (prefers-reduced-motion: reduce) { .hh-pop,.hh-banner { animation:none; } }

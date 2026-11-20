@@ -177,6 +177,27 @@ export function playHubCue(cue: HubCue, volume = 1) {
 }
 
 /**
+ * Hoop Hustle's own cues (the ball itself uses the Hub's: swish, rim, board, bounce, throw). A toy
+ * scoreboard buzzer, the gold-ball chime and the hoop's wind-up track ratcheting before it slides.
+ */
+export type HoopCue = 'buzzer' | 'gold' | 'windup' | 'charge';
+export function playHoopCue(cue: HoopCue, volume = 1) {
+  if (!live()) return;
+  const t = now(), k = Math.max(0, Math.min(1, volume));
+  switch (cue) {
+    case 'buzzer': // a fat, slightly sour two-reed toy buzzer
+      tone(196, t, .07*k, .75, 'square', .01); tone(207.7, t, .05*k, .75, 'sawtooth', .01); noise(t, .04*k, .6, 500, .7, 'lowpass'); break;
+    case 'gold': // a bright music-box run up to a sparkle
+      [1047, 1319, 1568, 2093].forEach((f, i) => tine(f, t + i * .07, .11*k, .5)); tine(2637, t + .3, .08*k, .8); break;
+    case 'windup': // the track's key ratchets round, clicks getting quicker
+      for (let i = 0, at = t, dt = .12; i < 10; i++, at += dt, dt *= .9) { noise(at, .16*k, .018, 2900 + i * 110, 5); tone(1500 + i * 45, at, .03*k, .015, 'square'); }
+      tone(660, t + .95, .08*k, .3, 'sine', .004, 990); break;
+    case 'charge': // the throw button goes down: a soft spring creak
+      tone(300, t, .04*k, .12, 'triangle', .01, 420); break;
+  }
+}
+
+/**
  * Arena spell cues (Spellbox Showdown). Fuller and punchier than the soft ToyCue set, at levels
  * comparable to Copycat's instruments and Blink Duel's spring sounds, but still rounded (low-passed
  * noise, sine/triangle bodies, no harsh clicks). `volume` is the mix gain (0–1, the caller attenuates

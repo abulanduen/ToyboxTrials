@@ -781,6 +781,21 @@
       "license": "Original work of this project (captured from the game itself; no third-party content)."
     },
     {
+      "id": "thumb-hoop-hustle",
+      "file": "thumbs/hoop-hustle.webp",
+      "status": "original-capture",
+      "type": "ui-thumbnail",
+      "subject": "hoop-hustle: gameplay thumbnail for the trial card grid",
+      "width": 480,
+      "height": 270,
+      "aspect": "16:9",
+      "bytes": 9388,
+      "transparency": false,
+      "intendedUse": "Game cards in the Pavilion practice grid and the online lobby trial picker (src/ui/LobbyUI.tsx)",
+      "source": "Screenshot of this game running in the browser (practice with bots, software rendering, DOM overlay hidden; your throw held in the gold zone with the ?debug hooks so the arc preview shows), tests/e2e/thumbs.cjs, 2026-11-20",
+      "license": "Original work of this project (captured from the game itself; no third-party content)."
+    },
+    {
       "id": "thumb-wind-up-dash",
       "file": "thumbs/wind-up-dash.webp",
       "status": "original-capture",
@@ -801,12 +816,12 @@
       "status": "production",
       "directory": "ui/tutorials/",
       "naming": "<minigame-id>-<step-number>.webp",
-      "count": 46,
+      "count": 49,
       "width": 960,
       "height": 540,
       "transparency": false,
       "where": "src/minigames/tutorials.ts lists every game/step and its exact image URL, caption and emphasis",
-      "intendedUse": "Visual aid beside each of the 46 quick tutorial steps across 14 minigames",
+      "intendedUse": "Visual aid beside each of the 49 quick tutorial steps across 15 minigames",
       "source": "Toybox Trials gameplay, captured 2026-11-20 with tests/e2e/tutorial-capture.cjs (seed 1978); existing rules stage reproducible examples",
       "license": "Project-owned gameplay screenshots",
       "notes": "Real game rendering, not AI artwork. Keyboard and touch copy share the photo. Regeneration instructions: ui/tutorials/README.md."

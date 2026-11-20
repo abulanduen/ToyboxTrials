@@ -145,6 +145,7 @@ export const GAME_MOODS: Record<MinigameId, { mood: keyof typeof MOODS; playing:
   'odd-page-out': { mood: 'storybook', playing: 0.7 },
   'toy-tower-tumble': { mood: 'thoughtful', playing: 0.8 },
   'toybox-siege': { mood: 'gallant', playing: 0.6 },
+  'hoop-hustle': { mood: 'breezy', playing: 0.5 },
 };
 
 export const ALL_STYLES: MusicStyle[] = [...HUB_TRACKS.map((t) => t.style), ...Object.values(MOODS)];

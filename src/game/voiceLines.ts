@@ -114,6 +114,12 @@ export const GREETERS: Record<MinigameId, Speaker & { line: string }> = {
     direction: 'A builder toy in a hard hat carrying a block. Cheerful, practical, a little gruff.',
     line: 'Hiya! Build random toy towers, merge them up a tier, and hold the line for twenty waves. Want to have a go?',
   },
+  'hoop-hustle': {
+    id: 'greeter-hoop-hustle',
+    name: 'Coach Dribble',
+    direction: 'A toy basketball coach with a whistle and a cap. Upbeat, sporty, a little bit of a cheerleader.',
+    line: 'Hey, hotshot! Hold to charge, let go to shoot, and wait for the arc to glow gold. Far spots score three! Want to have a go?',
+  },
   'toybox-siege': {
     id: 'greeter-toybox-siege',
     name: 'Sir Rally',
