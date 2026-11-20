@@ -11,7 +11,7 @@
  *     bots' arena, watched;
  * → results → back to the hub. No page errors. Screenshots land in tests/e2e/output/siege-*.png.
  *
- *   BASE_URL=http://localhost:4198/ node tests/e2e/siege.cjs        (ONLY=desktop|portrait|landscape)
+ *   BASE_URL=http://localhost:4198/ node tests/e2e/siege.cjs        (ONLY=desktop|portrait|landscape, E2E_TIMEOUT=ms)
  *
  * Software GL renders at 1–3 fps here, so the test waits on conditions, never on fixed frame
  * counts, and uses the ?debug match hooks to fast-forward and to set up a few moments (a full
@@ -24,7 +24,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const out = path.join(__dirname, 'output');
 fs.mkdirSync(out, { recursive: true });
-const SHOT_TIMEOUT = 240000;
+// E2E_TIMEOUT (ms) raises the screenshot and wait timeouts on a loaded machine.
+const SHOT_TIMEOUT = Number(process.env.E2E_TIMEOUT) || 240000;
+const WAIT_TIMEOUT = Math.max(600000, Number(process.env.E2E_TIMEOUT) || 0);
 const VIEWS = {
   desktop: { viewport: { width: 1280, height: 800 }, touch: false, cls: 'ranger', finale: 'arena' },
   portrait: { viewport: { width: 390, height: 844 }, touch: true, cls: 'warrior', finale: 'ghost' },
@@ -51,7 +53,7 @@ async function run(name) {
   try {
     const context = await browser.newContext({ viewport: v.viewport, hasTouch: v.touch, isMobile: v.touch });
     const page = await context.newPage();
-    page.setDefaultTimeout(600000); // software GL under heavy load can take tens of seconds per frame
+    page.setDefaultTimeout(WAIT_TIMEOUT); // software GL under heavy load can take tens of seconds per frame
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
     // Phones keep the layout shots; desktop takes every moment.
