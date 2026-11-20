@@ -103,8 +103,8 @@ async function openPage(browser, name, ctxOpts, url = BASE + '?debug') {
       sessionStorage.setItem('seeded', '1');
       const [paintIndex, hat, keySkin] = look;
       const save = profile
-        ? { state: { quality: 'low', tutorials: false, contenderName: n, profile }, version: 1 }
-        : { state: { quality: 'low', tutorials: false, contenderName: n, paintIndex, hat, keySkin }, version: 0 };
+        ? { state: { tourSeen: true, quality: 'low', tutorials: false, contenderName: n, profile }, version: 1 }
+        : { state: { tourSeen: true, quality: 'low', tutorials: false, contenderName: n, paintIndex, hat, keySkin }, version: 0 };
       localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify(save));
     }
   }, [name, LOOKS[name] ?? LOOKS.Alpha, name === 'Bravo' ? BRAVO_PROFILE : null]);

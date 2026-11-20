@@ -32,7 +32,7 @@ async function match(browser, cfg, n, errors) {
   page.on('pageerror', (e) => errors.push(`${cfg.tag}: ${e.message}`));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(`${cfg.tag}: ${m.text()}`); });
   await page.addInitScript((q) => {
-    localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { quality: q, tutorials: false }, version: 0 }));
+    localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { tourSeen: true, quality: q, tutorials: false }, version: 0 }));
   }, cfg.quality);
   const F = () =>
     page.evaluate(() => {

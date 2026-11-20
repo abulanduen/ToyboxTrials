@@ -21,7 +21,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const errors = [];
   const open = async (name, hash, extra = {}) => {
     const ctx = await browser.newContext({ viewport: { width: 960, height: 600 } });
-    await ctx.addInitScript(([n, extra]) => { if (!sessionStorage.getItem('s')) { sessionStorage.setItem('s', '1'); localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { quality: 'low', tutorials: false, contenderName: n, ...extra }, version: 1 })); } }, [name, extra]);
+    await ctx.addInitScript(([n, extra]) => { if (!sessionStorage.getItem('s')) { sessionStorage.setItem('s', '1'); localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { tourSeen: true, quality: 'low', tutorials: false, contenderName: n, ...extra }, version: 1 })); } }, [name, extra]);
     const page = await ctx.newPage();
     page.setDefaultTimeout(T);
     page.on('pageerror', (e) => errors.push(`${name}: ${e.message}`));

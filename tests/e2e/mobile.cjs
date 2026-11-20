@@ -22,6 +22,8 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
   const touch = (type, points) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: points.map(([x, y, id = 0]) => ({ x, y, id })) });
   const st = () => page.evaluate(() => window.__toybox.state());
 
+  // Pipwick's first-visit Hub tour has its own suite (welcome.cjs); this one starts as a returning player.
+  await page.addInitScript(() => { if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { tourSeen: true }, version: 2 })); } });
   await page.goto(BASE + '?debug');
   await page.waitForTimeout(4000);
   check('main menu shows on touch device', await page.isVisible('[data-testid=menu-play]'));

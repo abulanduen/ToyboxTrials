@@ -41,7 +41,7 @@ async function run(browser, dev) {
   await ctx.addInitScript((key) => {
     if (sessionStorage.getItem('seeded')) return;
     sessionStorage.setItem('seeded', '1');
-    localStorage.setItem(key, JSON.stringify({ state: { quality: 'low', tutorials: false, contenderName: 'Shopper', paintIndex: 1, hat: 'acorn', keySkin: 'star', secretsFound: ['musicbox', 'marble', 'jack', 'key'] }, version: 0 }));
+    localStorage.setItem(key, JSON.stringify({ state: { tourSeen: true, quality: 'low', tutorials: false, contenderName: 'Shopper', paintIndex: 1, hat: 'acorn', keySkin: 'star', secretsFound: ['musicbox', 'marble', 'jack', 'key'] }, version: 0 }));
   }, KEY);
   const page = await ctx.newPage();
   page.setDefaultTimeout(T);

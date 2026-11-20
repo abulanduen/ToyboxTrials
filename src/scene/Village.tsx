@@ -19,6 +19,7 @@ import { hubFence, hubPathTiles, TILE_SIZE } from './paths';
 import { JackInTheBox, KeyTower, Marble, MusicBox, PencilLog, Train, TrainTrack } from './Interactive';
 import { BLOCKS, BLOCK_SIZE, BRIDGE, GATES, GATE_STAND, PAVILION, SCOREBOARD, SHOP, TREES, TV, WORKSHOP, frontOf, gateLocal, registerHubColliders } from './layout';
 import { exposeDebug } from '../game/debug';
+import { HubWelcome } from './HubWelcome';
 
 function roundedRectShape(minX: number, minZ: number, maxX: number, maxZ: number, r: number) {
   const s = new THREE.Shape();
@@ -151,6 +152,7 @@ export function Village() {
       <JackInTheBox />
       <KeyTower />
       <PencilLog />
+      <HubWelcome />
       {/* trees and blocks are instanced: a handful of draws for all of them */}
       <FeltTrees trees={TREES} />
       <Blocks items={BLOCKS.map((b) => ({ ...b, size: (b.s ?? 1) * BLOCK_SIZE }))} />

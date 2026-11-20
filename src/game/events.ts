@@ -20,6 +20,10 @@ export type GameEvents = {
   'prop:jack-pop': void;
   'prop:musicbox-play': void;
   'prop:key-collected': void;
+  /** The player talked to Pipwick, the welcome mascot (src/game/welcome.ts). */
+  'pipwick:talk': void;
+  /** Someone cranked the Hub jukebox (it plays a little flourish). */
+  'prop:jukebox-crank': void;
   'gate:open': { id: string };
   /** The hub TV beside the Scoreboard changes channel. */
   'tv:next': void;

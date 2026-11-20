@@ -4358,3 +4358,229 @@ canvas {
     min-height: 56px;
   }
 }
+
+/* ---------------------------------------------------------------- Welcome: Pipwick, greeters, jukebox */
+.welcome-card {
+  position: absolute;
+  left: 50%;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  width: min(780px, calc(100vw - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas: 'who text actions';
+  align-items: center;
+  gap: 4px 14px;
+  padding: 10px 12px;
+  border-radius: 18px;
+  border: 3px solid var(--ink-deep);
+  background: var(--paper);
+  box-shadow: var(--shadow);
+  pointer-events: auto;
+  animation: prompt-pop 0.25s cubic-bezier(0.2, 1.8, 0.4, 1) both;
+}
+.welcome-card__who {
+  grid-area: who;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.welcome-card__who strong {
+  font: 600 1.05rem var(--font-display);
+  color: var(--coral);
+}
+.welcome-card__step {
+  font: 700 0.75rem var(--font-body);
+  color: var(--ink);
+  letter-spacing: 0.05em;
+}
+.pipwick-badge {
+  flex: none;
+  border-radius: 50%;
+  border: 3px solid var(--ink-deep);
+  background: var(--cream);
+}
+.welcome-card__who .pipwick-badge {
+  width: 52px;
+  height: 52px;
+}
+.welcome-card__text {
+  grid-area: text;
+  margin: 0;
+  font: 600 1.02rem/1.35 var(--font-body);
+  transition: opacity 0.25s;
+}
+.welcome-card__text--wait {
+  opacity: 0.35;
+}
+.welcome-card__actions {
+  grid-area: actions;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.welcome-card__actions .toy-btn {
+  min-height: 56px;
+  min-width: 56px;
+}
+.welcome-card__actions .toy-btn > span {
+  padding: 0.7em 1.2em;
+  white-space: nowrap;
+}
+.welcome-card__actions--three .toy-btn > span {
+  padding: 0.55em 1em;
+}
+.welcome-card__keys {
+  grid-column: 2 / 4;
+  font: 600 0.75rem var(--font-body);
+  color: var(--ink);
+  text-align: right;
+}
+@media (max-width: 620px) {
+  /* portrait phones: badge and name on top, the line, then the buttons side by side */
+  .welcome-card {
+    grid-template-columns: auto 1fr;
+    grid-template-areas: 'who text' 'actions actions';
+    gap: 8px 10px;
+  }
+  .welcome-card__text {
+    font-size: 0.95rem;
+  }
+  .welcome-card__actions {
+    flex-direction: row;
+  }
+  .welcome-card__actions .toy-btn {
+    flex: 1 1 0;
+  }
+  .welcome-card__actions .toy-btn > span {
+    white-space: normal;
+  }
+  .welcome-card__keys {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-height: 460px) and (min-width: 621px) {
+  /* phone landscape: one short strip */
+  .welcome-card {
+    padding: 6px 10px;
+  }
+  .welcome-card__who .pipwick-badge {
+    width: 40px;
+    height: 40px;
+  }
+  .welcome-card__text {
+    font-size: 0.92rem;
+  }
+  .welcome-card__actions {
+    gap: 6px;
+  }
+}
+
+.greeter-bubble {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translate(calc(var(--bx, -999px) - 50%), calc(var(--by, -999px) - 100% - 10px));
+  width: max-content;
+  max-width: min(300px, 76vw);
+  padding: 9px 13px 10px;
+  border-radius: 16px;
+  border: 3px solid var(--ink-deep);
+  background: var(--paper);
+  box-shadow: 0 4px 0 rgba(43, 36, 51, 0.35);
+  font: 600 0.95rem/1.3 var(--font-body);
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.greeter-bubble::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -12px;
+  width: 18px;
+  height: 18px;
+  transform: translateX(-50%) rotate(45deg);
+  background: var(--paper);
+  border-right: 3px solid var(--ink-deep);
+  border-bottom: 3px solid var(--ink-deep);
+}
+.greeter-bubble strong {
+  display: inline-block;
+  margin-bottom: 3px;
+  padding: 1px 8px;
+  border-radius: 6px;
+  border: 2px solid var(--ink-deep);
+  background: var(--accent);
+  font: 600 0.85rem var(--font-display);
+}
+.greeter-bubble span {
+  display: block;
+}
+
+.jukebox__list {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.jukebox__track {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-height: 56px;
+  padding: 9px 14px;
+  border-radius: 12px;
+  border: 3px solid var(--ink-deep);
+  background: var(--paper);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: var(--ink-deep);
+}
+.jukebox__track strong {
+  display: block;
+  font: 600 1.05rem var(--font-display);
+}
+.jukebox__track span {
+  display: block;
+  font: 600 0.88rem var(--font-body);
+  color: var(--ink);
+}
+.jukebox__track--on {
+  background: var(--honey);
+}
+.jukebox__now {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  font: 700 0.75rem var(--font-body);
+  font-style: normal;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.jukebox__hint,
+.jukebox__note {
+  margin: 4px 0 8px;
+  font: 600 0.85rem var(--font-body);
+  color: var(--ink);
+}
+.jukebox__hint {
+  color: var(--coral);
+}
+.howto__tour {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 0.4rem 0 1rem;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 249, 238, 0.6);
+  border: 2px dashed rgba(110, 82, 54, 0.5);
+  font: 600 0.95rem var(--font-body);
+}
+.howto__tour span {
+  flex: 1 1 200px;
+}

@@ -209,6 +209,24 @@ export const GATE_DECOR = {
   side: { lx: 6.8, lz: -0.3, r: 1.8, top: 3.2 },
 };
 
+/**
+ * The gate greeters (src/scene/Greeters.tsx): a small toy at the front of every arch, to the
+ * right of its path as you walk up, in front of the gate's low prop. Gate-local cm. Solid, but
+ * clear of the arch, the gate's stub path, the loop road and the spot where you stand to play.
+ */
+export const GREETER = { lx: 5.0, lz: 2.6, r: 0.9, top: 3 };
+/** Gates whose greeter stands on the other side (the Siege fort's right-hand side is on the loop road). */
+const GREETER_LEFT: readonly MinigameId[] = ['toybox-siege'];
+export const greeterSpot = (g: { x: number; z: number; rot: number; game: MinigameId }) => gateLocal(g, GREETER_LEFT.includes(g.game) ? -GREETER.lx : GREETER.lx, GREETER.lz);
+
+/** Where Pipwick, the welcome mascot, waits between tours: by the plaza, ahead-right of spawn. */
+export const PIPWICK_HOME = { x: 7, z: 15, r: 1.0, top: 3.2, yaw: Math.PI + 0.5 };
+/**
+ * The Jukebox (src/scene/Jukebox.tsx): on the gates table's north row, just east of the Music Box
+ * Rhythm gate, facing the road like the arches. Picks the Hub's background track.
+ */
+export const JUKEBOX = { x: 73, z: -150, rot: 0, w: 5, d: 3.4, h: 6.6 };
+
 // ------------------------------------------------------------------ household objects and props
 
 /** Big household objects on the spawn table that reach into the play area. */
@@ -327,7 +345,11 @@ export function hubColliders(): Collider[] {
       const p = gateLocal(g, d.lx, d.lz);
       list.push({ kind: 'circle', id: `${g.id}-${k}`, x: p.x, z: p.z, r: d.r, top: d.top });
     }
+    const gr = greeterSpot(g);
+    list.push({ kind: 'circle', id: `${g.id}-greeter`, x: gr.x, z: gr.z, r: GREETER.r, top: GREETER.top });
   }
+  list.push({ kind: 'circle', id: 'pipwick', x: PIPWICK_HOME.x, z: PIPWICK_HOME.z, r: PIPWICK_HOME.r, top: PIPWICK_HOME.top });
+  list.push({ kind: 'box', id: 'jukebox', x: JUKEBOX.x, z: JUKEBOX.z, hx: JUKEBOX.w / 2, hz: JUKEBOX.d / 2, rot: JUKEBOX.rot, top: JUKEBOX.h });
   const t = TOWER;
   for (const [id, b] of Object.entries(t)) list.push({ kind: 'box', id: `tower-${id}`, x: b.x, z: b.z, hx: b.hx, hz: b.hz, rot: 0, top: b.top });
   list.push({ kind: 'box', id: 'pencil', x: PENCIL.x, z: PENCIL.z, hx: PENCIL.length / 2, hz: PENCIL.r, rot: PENCIL.rot, top: PENCIL.r * 2 });

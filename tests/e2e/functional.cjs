@@ -11,7 +11,7 @@ const check = (name, ok, detail = '') => { results.push(`${ok ? 'PASS' : 'FAIL'}
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  await page.addInitScript(() => localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { quality: 'low' }, version: 0 })));
+  await page.addInitScript(() => localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { tourSeen: true, quality: 'low' }, version: 0 })));
   await page.goto('' + (process.env.BASE_URL || 'http://localhost:4173/') + '?debug');
   await page.waitForTimeout(4000);
   const T = (fn, ...a) => page.evaluate(fn, ...a);

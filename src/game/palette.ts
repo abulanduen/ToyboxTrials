@@ -23,6 +23,10 @@ export const PALETTE = {
   white: '#FFF9EE',
   /** Knocked-out toys (MiniContender greys them) and other dull tin. */
   tinGrey: '#8E8A93',
+  /** Painted cheeks and tutus (Pipwick, the gate greeters). */
+  blush: '#EE9A8E',
+  /** Polished steel (the greeter knight's helmet, fencing foils). */
+  steel: '#C9CED6',
 
   // Room scale (muted, slightly desaturated so the toy layer reads first)
   roomWall: '#B7A99A',

@@ -39,8 +39,12 @@ Build one complete, testable system at a time.
   dog). They must be GLB, compressed, lazy-loaded after the hub is interactive, skipped or simplified
   on the Low tier, and recorded in `public/assets/asset-manifest.json` with source and licence.
 - **Original work only.** No recreated characters, levels, art or sounds from reference games.
-  All sound effects are synthesised (`src/game/audio.ts`). Music for Music Box Rhythm is the only exception
-  (composed, commissioned or licensed, and recorded in the manifest). No emoji or icon packs for important visuals.
+  All sound effects are synthesised (`src/game/audio.ts`). Music for Music Box Rhythm may be composed,
+  commissioned or licensed (recorded in the manifest). The owner has also allowed calm background music
+  for the Hub and the trials: it must stay original and synthesised in code (`src/game/musicScore.ts`,
+  `src/game/music.ts`), and it is silent in Music Box Rhythm. Voice lines (Pipwick, the gate greeters)
+  are scripted in `src/game/voiceLines.ts`; recordings go in `public/assets/audio/voice/` and the manifest
+  (`docs/VOICE.md`). No emoji or icon packs for important visuals.
 - **Honesty.** Don't claim performance or behaviour that hasn't been measured. This container has
   no GPU, so headless frame rates mean nothing.
 
@@ -88,6 +92,7 @@ node tests/e2e/rhythm.cjs       # Music Box Rhythm, desktop + phone portrait/lan
 node tests/e2e/tutorials.cjs    # every game's How to play pictures + intro thumbnails + Hub sheet, desktop + phone (LAYOUTS=, GAMES=; shots to $TMPDIR)
 node tests/e2e/spotdiff.cjs     # Odd Page Out (spot the difference), desktop + phone portrait/landscape (ONLY=desktop|portrait|landscape)
 node tests/e2e/towertumble.cjs  # Toy Tower Tumble, desktop + phone portrait/landscape (arg: desktop,portrait,landscape)
+node tests/e2e/welcome.cjs      # Pipwick's first-visit Hub tour, greeters, jukebox, music/voice settings (desktop + phone portrait)
 node tests/e2e/siege.cjs        # Toybox Siege, desktop + phone portrait/landscape (ONLY=desktop|portrait|landscape; slow under software GL)
 npm test                        # vitest unit tests for rules cores, scoring, tournament selection
 npm run server:dev              # online Hub server on ws://localhost:2567, rebuilt on change (dev builds connect to it)
@@ -95,6 +100,10 @@ npm run server:build            # typecheck + esbuild bundle → server-dist/ind
 npm run server:start            # run the built server (PORT, ALLOWED_ORIGINS)
 node tests/e2e/online.cjs       # online Hub: build with VITE_SERVER_URL=ws://localhost:2567, serve on a port, server:build; starts the server itself
 ```
+
+Welcome and music: `tourSeen` (persisted, store v2) gates Pipwick's first-visit tour. Browser suites that
+start in the Hub as a returning player seed `tourSeen: true` in their saved state; only `welcome.cjs` tests
+the tour itself. See `docs/VOICE.md` for the voice-line script and the background music.
 
 Online Hub (Railway + `ws`; see `docs/ONLINE.md`): the protocol lives in `src/net/protocol.ts` (shared, no DOM),
 the pure room logic in `server/hubRoom.ts` and `server/hubDirectory.ts`; `server/index.ts` is only the socket
