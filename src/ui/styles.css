@@ -37,6 +37,23 @@ canvas {
   display: block;
   touch-action: none;
 }
+/* Phones: a long press must never start text selection, the magnifier loupe or the callout menu
+   (Safari doesn't reliably inherit these from body). Typing fields stay selectable. */
+*,
+*::before,
+*::after {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+input,
+textarea,
+[contenteditable='true'] {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
 
 .app {
   position: fixed;

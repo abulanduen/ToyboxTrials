@@ -795,6 +795,24 @@
       "source": "Toybox Trials gameplay, captured 2026-11-20 with tests/e2e/tutorial-capture.cjs (seed 1978); existing rules stage reproducible examples",
       "license": "Project-owned gameplay screenshots",
       "notes": "Real game rendering, not AI artwork. Keyboard and touch copy share the photo. Regeneration instructions: ui/tutorials/README.md."
+    },
+    {
+      "id": "app-icons",
+      "type": "app-icon-set",
+      "status": "production",
+      "directory": "../icons/",
+      "files": [
+        "icon.svg",
+        "icon-192.png",
+        "icon-512.png",
+        "icon-maskable-512.png",
+        "apple-touch-icon.png"
+      ],
+      "where": "public/manifest.webmanifest and index.html (Add to Home Screen / install)",
+      "intendedUse": "Home Screen and install icon: a toy box with a wind-up key",
+      "source": "Original SVG drawn for Toybox Trials, rendered to PNG with Playwright on 2026-11-20",
+      "license": "Project-owned",
+      "notes": "The maskable icon keeps the artwork inside the 80% safe zone."
     }
   ],
   "codeGenerated": [

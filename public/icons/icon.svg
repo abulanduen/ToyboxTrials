@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs><radialGradient id="bg" cx="50%" cy="38%" r="70%"><stop offset="0" stop-color="#4A3D57"/><stop offset="1" stop-color="#2B2433"/></radialGradient></defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <g transform="translate(256 270) scale(1) translate(-256 -270)" stroke="#2B2433" stroke-width="14" stroke-linejoin="round">
+    <!-- wind-up key -->
+    <rect x="238" y="96" width="36" height="92" rx="8" fill="#E8B44C"/>
+    <ellipse cx="200" cy="96" rx="58" ry="48" fill="#E8B44C"/>
+    <ellipse cx="312" cy="96" rx="58" ry="48" fill="#E8B44C"/>
+    <ellipse cx="200" cy="96" rx="20" ry="16" fill="#2B2433" stroke="none"/>
+    <ellipse cx="312" cy="96" rx="20" ry="16" fill="#2B2433" stroke="none"/>
+    <!-- the toy box -->
+    <rect x="104" y="232" width="304" height="196" rx="26" fill="#F4E6CC"/>
+    <rect x="86" y="182" width="340" height="70" rx="22" fill="#E2685E"/>
+    <rect x="226" y="182" width="60" height="70" fill="#E8B44C" stroke="none"/>
+    <path d="M226 182 v70 M286 182 v70" fill="none"/>
+    <circle cx="190" cy="330" r="34" fill="#6FA3C9"/>
+    <rect x="262" y="298" width="66" height="66" rx="10" fill="#8DB580"/>
+  </g>
+</svg>
