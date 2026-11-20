@@ -119,7 +119,7 @@ async function frames(page, n) {
         await page.mouse.up();
       } else if (layout === 'portrait') {
         await tapSquare(a);
-        await page.getByTestId(`td-merge-${b}`).waitFor(); // twin found: the sheet offers it, the board highlights it
+        await page.getByTestId(`td-merge-${b}`).waitFor({ timeout: 90000 }).catch(async (e) => { log(`merge sheet missing: ${JSON.stringify(await me('({ towers: p.towers.map(t => [t.cell, t.def]), sel: document.querySelector("[data-testid=td-sheet-name]")?.textContent })'))} a=${a} b=${b}`); await shot('merge-failed'); throw e; }); // twin found: the sheet offers it, the board highlights it
         await tapSquare(b);
       } else {
         const from = await square(a, 1.4), to = await square(b, 0.3), cdp = await context.newCDPSession(page);
