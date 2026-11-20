@@ -302,6 +302,17 @@
   70%, 100% { transform: translate(var(--dx, 0), var(--dy, 0)); opacity: 0; }
 }
 
+/* left and right along a track, resting at each end (Hoop Hustle's sliding hoop) */
+.ta-sway {
+  animation: ta-sway var(--t, 3s) var(--d, 0s) ease-in-out infinite;
+}
+@keyframes ta-sway {
+  0%, 10% { transform: translateX(0); }
+  25%, 40% { transform: translateX(var(--dx, 30px)); }
+  60%, 75% { transform: translateX(calc(var(--dx, 30px) * -1)); }
+  90%, 100% { transform: translateX(0); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ta *,
   .ta *::before,

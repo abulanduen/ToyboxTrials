@@ -154,6 +154,8 @@ const GATE_SPOTS: Record<MinigameId, { x: number; z: number; rot: number; distri
   // inside the loop, east of the avenue, facing it: a fort in the middle of the table (both
   // south-row spots beside the bridge landing are taken)
   'toybox-siege': { x: 46, z: -127, rot: -Math.PI / 2, district: 'east', short: 'Siege' },
+  // its mirror west of the avenue, facing it: a little basketball court gate
+  'hoop-hustle': { x: 2, z: -131, rot: Math.PI / 2, district: 'west', short: 'Hoops' },
 };
 
 const CATEGORY_LABEL: Record<string, string> = { pvp: 'Versus' };

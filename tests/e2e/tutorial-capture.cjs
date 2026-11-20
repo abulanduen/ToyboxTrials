@@ -104,6 +104,16 @@ fs.mkdirSync(OUT, { recursive: true });
               // Hit the first thirty notes through the rules to earn the actual x4 multiplier.
               for (const n of s.chart.slice(1, 31)) { s.t = n.t - 16; local([{ lane: n.lane, t: n.t }]); }
             }
+          } else if (id === 'hoop-hustle') {
+            // Bots shooting from their spots; then your charge held in the gold zone (the arc glows);
+            // then the sliding hoop with gold balls in the last 15 seconds.
+            if (i === 0) { for (let n = 0; n < 260; n++) step({}, 16); }
+            if (i === 1) { step({}, 16); window.__toybox.hoop.charge(window.__toybox.hoop.perfect()); }
+            if (i === 2) {
+              window.__toybox.hoop.charge(null);
+              const k = Math.round((s.config.durationMs - 14500) / (1000 / 60)); s.tick = k; s.t = (k * 1000) / 60;
+              for (let n = 0; n < 75; n++) step({}, 16);
+            }
           } else if (id === 'blink-duel') {
             if (i === 0) s.players.forEach((q, n) => Object.assign(q, { x: (n % 2 ? 1 : -1) * 5, z: n < 2 ? -3 : 5 }));
             if (i === 1) { p.angle = Math.PI / 2; local([{ type: 'blink' }]); step({}, 80); }

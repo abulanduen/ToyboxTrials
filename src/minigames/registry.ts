@@ -179,6 +179,37 @@ export const MINIGAMES: MinigameDefinition[] = [
     status: 'playable', load: () => import('./blink').then(m => m.default),
   },
   {
+    id: 'hoop-hustle',
+    title: 'Hoop Hustle',
+    tagline: 'One hoop, 75 seconds, everybody shooting.',
+    description:
+      'A shootout at one shared hoop on a toy-sized court. Every toy shoots from its own spot on the taped arc: near spots score 1, middle 2 and far 3. Hold to charge, let go to throw, and watch the arc turn gold when it will drop. Sink one and you hop to a new spot. At half time the hoop starts sliding on its wind-up track, and in the last 15 seconds your next ball is gold and worth double. Most points wins.',
+    category: 'reflex',
+    accent: PALETTE.ballOrange,
+    players: { min: 2, max: 8 },
+    // 75 s on the clock, plus any shot still in the air at the buzzer.
+    durationSec: [75, 80],
+    inputs: ['keyboard', 'mouse', 'touch'],
+    bots: 'available',
+    eligibility: { tournament: true, ranked: true, casual: true },
+    scoring: 'score',
+    tieBreak: 'More baskets made, then a shared place',
+    recordUnit: 'points',
+    controls: [
+      { keys: 'A / D or mouse', action: 'Aim around your spot (it bends onto the hoop when you face it)' },
+      { keys: 'Hold Space / E / click', action: 'Charge the throw; let go to shoot. Gold arc: it goes in' },
+    ],
+    touch: {
+      movement: 'joystick',
+      look: 'none',
+      buttons: [{ id: 'slot1', label: 'Throw', colour: PALETTE.ballOrange, hold: true }],
+      orientation: 'any',
+      notes: 'The floating joystick (lower left) aims around your spot. Hold the big Throw button (right thumb) to charge and let go to shoot: let go while the meter is in its gold zone and the arc turns gold. The button works while your other thumb holds the stick.',
+    },
+    status: 'playable',
+    load: () => import('./hoophustle').then((m) => m.default),
+  },
+  {
     id: 'wind-up-dash',
     title: 'Wind-Up Dash',
     tagline: 'A new road and new traps every race. First home wins.',

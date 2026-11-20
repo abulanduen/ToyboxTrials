@@ -559,7 +559,41 @@ const siege: Theme = (k) => {
   for (let i = 0; i < 4; i++) k.box(1.05, 0.04, 1.05, -5.7 + (i % 2) * 1.1, DECAL_Y, 2.0 + Math.floor(i / 2) * 1.1, [P.sage, P.honey, P.coral, P.toyBlue][i]);
 };
 
+const hoopHustle: Theme = (k) => {
+  // hero: a toy basketball stand: weighted base, pole, backboard, rim and net, a ball on the base
+  k.push(H.lx, 0, H.lz);
+  k.cyl(1.5, 1.7, 0.6, 0, 0.3, -0.2, P.inkPurple, 16);
+  k.cyl(0.18, 0.22, 5.6, 0, 3.4, -0.6, P.toyBlue, 10);
+  k.block(2.6, 1.8, 0.22, 0, 6.1, -0.4, P.white, {}, 0.06);
+  k.box(1.0, 0.08, 0.05, 0, 5.85, -0.27, P.coral);
+  k.box(0.08, 0.7, 0.05, -0.46, 6.15, -0.27, P.coral);
+  k.box(0.08, 0.7, 0.05, 0.46, 6.15, -0.27, P.coral);
+  k.box(0.2, 0.1, 0.6, 0, 5.4, 0.0, P.coral);
+  k.torus(0.62, 0.07, 0, 5.4, 0.62, P.coral, { rx: Math.PI / 2 }, Math.PI * 2, 18);
+  k.cyl(0.6, 0.4, 0.7, 0, 5.03, 0.62, P.white, 10, {}, true);
+  k.ball(0.55, 0.85, 1.15, 0.55, P.ballOrange, 14);
+  k.with('detail', () => {
+    k.torus(0.556, 0.03, 0.85, 1.15, 0.55, P.ink, {}, Math.PI * 2, 16);
+    k.torus(0.556, 0.03, 0.85, 1.15, 0.55, P.ink, { ry: Math.PI / 2 }, Math.PI * 2, 16);
+  });
+  k.pop();
+  // side: a little rack of three balls
+  k.push(S.lx, 0, S.lz, 0.2);
+  k.block(2.4, 0.5, 1.1, 0, 0.25, 0, P.woodMid, {}, 0.1);
+  for (const [x, c] of [[-0.75, P.ballOrange], [0, P.honey], [0.75, P.ballOrange]] as const) {
+    k.ball(0.42, x, 0.92, 0, c, 12);
+    k.with('detail', () => k.torus(0.425, 0.025, x, 0.92, 0, P.ink, { ry: Math.PI / 2 }, Math.PI * 2, 14));
+  }
+  k.pop();
+  // a little painted half-court on the felt, with a taped arc and the three spot colours (on the
+  // right: both roads to this gate come in on its left)
+  k.disc(1.7, 6.4, DECAL_Y, 3.3, P.woodLight, { rx: -Math.PI / 2 }, 20, 0, Math.PI);
+  k.add(new THREE.RingGeometry(1.1, 1.25, 20, 1, 0, Math.PI), P.white, 6.4, DECAL_Y + 0.03, 3.3, { rx: -Math.PI / 2 });
+  for (const [x, c] of [[5.6, P.sage], [6.4, P.toyBlue], [7.2, P.coral]] as const) k.disc(0.2, x, DECAL_Y + 0.04, 3.95, c, { rx: -Math.PI / 2 }, 10);
+};
+
 export const GATE_THEMES: Record<MinigameId, Theme> = {
+  'hoop-hustle': hoopHustle,
   'toybox-siege': siege,
   'copycat-conductor': copycat,
   'jack-in-the-box': jack,

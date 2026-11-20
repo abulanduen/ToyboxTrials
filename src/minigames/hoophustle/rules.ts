@@ -312,6 +312,7 @@ function hopToNewSpot(s: HoopState, p: Shooter) {
   const to = options[Math.floor(rng() * options.length)];
   p.move = { from: p.spot, to, at: s.t, until: s.t + s.config.moveMs };
   p.spot = to;
+  p.yaw = yawToHoop(s.spots[to].x, s.spots[to].z, hoopXAt(s.config, s.t));
   p.charging = false;
   emit(s, { type: 'hh-move', id: p.id, from: p.move.from, to, value: s.spots[to].value });
 }
@@ -480,7 +481,7 @@ export const hoopRules: RulesCore<HoopState, HoopInput, HoopConfig> & { forfeit(
     while (s.remainder + 1e-6 >= STEP_MS) {
       s.remainder -= STEP_MS;
       tick(s);
-      if (s.phase === 'over') break;
+      if ((s.phase as string) === 'over') break;
     }
     return s;
   },

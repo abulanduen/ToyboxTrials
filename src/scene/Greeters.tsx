@@ -160,6 +160,15 @@ const OUTFITS: Record<MinigameId, Outfit> = {
     k.cyl(0.62, 0.62, 0.06, 0, 2.12, 0.04, P.honey, 14);
     k.block(0.55, 0.55, 0.55, 0.85, 1.25, 0.35, P.coral); // a building block
   },
+  'hoop-hustle': (k) => {
+    pegDoll(k, P.ballOrange, P.white);
+    k.ball(0.5, 0, 2.2, -0.02, P.toyBlue, 12, { s: [1, 0.62, 1] }); // cap
+    k.box(0.62, 0.06, 0.45, 0, 2.27, 0.55, P.toyBlue, { rx: -0.15 }); // peak
+    k.torus(0.42, 0.02, 0, 1.75, 0.08, P.white, { rx: Math.PI / 2 + 0.4 }, Math.PI * 2, 12); // whistle cord
+    k.cyl(0.07, 0.07, 0.2, 0.08, 1.42, 0.5, P.brass, 8, { rz: Math.PI / 2 }); // whistle
+    k.ball(0.32, 0.86, 1.32, 0.42, P.ballOrange, 12); // a basketball
+    k.torus(0.322, 0.02, 0.86, 1.32, 0.42, P.ink, { ry: Math.PI / 2 }, Math.PI * 2, 12);
+  },
   'toybox-siege': (k) => {
     pegDoll(k, P.toyBlue, P.honey);
     k.ball(0.5, 0, 2.12, 0, P.steel, 12); // helmet

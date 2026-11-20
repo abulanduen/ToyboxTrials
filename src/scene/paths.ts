@@ -120,6 +120,7 @@ export function hubPathLines(): PathLine[] {
   lines.push({ id: 'avenue-gates', pts: [landing, [BRIDGE.x, GATE_LOOP.north]] });
   const loop: Pt[] = [
     landing,
+    roadPoint(gate('hoop-hustle')), // a short detour inside the loop to the court gate facing the avenue
     roadPoint(gate('odd-page-out')),
     roadPoint(gate('midnight-hunger')),
     roadPoint(gate('find-the-original')),
