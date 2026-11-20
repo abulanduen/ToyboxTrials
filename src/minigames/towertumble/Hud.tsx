@@ -83,14 +83,14 @@ function QuestArt({ s, q }: { s: TdState; q: QuestId }) {
 }
 
 /**
- * Float `ref` beside `cell`'s square on screen, inside the board's own space (`.td-board-slot`: the
- * safe area less the bar, the quest column, the player rail and the dock, so those stay reachable),
+ * Float `ref` beside `cell`'s square on screen, inside `.td-pop-bounds` (the board's space plus the
+ * quest column: the safe area less the bar, the player rail and the dock, so those stay reachable),
  * never over the square if there is room. Runs after every render (the HUD re-renders ten times a
  * second), so it follows the board when it is panned or zoomed. Absolutely positioned: nothing moves.
  */
 function useFloatAt(ref: RefObject<HTMLElement | null>, cell: number | null) {
   useLayoutEffect(() => {
-    const el = ref.current, hud = el?.closest('.td-hud'), slot = hud?.querySelector('.td-board-slot');
+    const el = ref.current, hud = el?.closest('.td-hud'), slot = hud?.querySelector('.td-pop-bounds');
     const anchor = cell === null ? null : tumbleScreen.cellRect?.(cell);
     if (!el || !hud || !slot || !anchor) return;
     const h = hud.getBoundingClientRect(), b = slot.getBoundingClientRect();
@@ -320,6 +320,7 @@ export function TumbleHud({ getState, localId, contestants }: MinigameSceneProps
 
   return <div className={`td-hud${me.out ? ' is-out' : ''}${showQuests ? '' : ' no-quests'}${readOnly ? ' is-viewing' : ''}`} data-testid="td-hud" data-viewing={readOnly ? board.id : undefined}>
     <div className="td-board-slot" aria-hidden />
+    <div className="td-pop-bounds" aria-hidden />
     <header className={`td-bar${flash ? ' is-hit' : ''}${check ? ' is-check' : ''}`} data-testid="td-bar">
       <span className="td-bar__wave" data-testid="td-wave"><b>{check ? 'Bonus' : `Wave ${Math.min(s.wave, s.config.waves)}/${s.config.waves}`}</b>{boss && <i className="td-boss-tag">Boss</i>}</span>
       <span className="td-bar__phase" data-testid="td-phase">{phaseText}<small>{s.phase === 'build' ? waveKinds : ''}</small></span>

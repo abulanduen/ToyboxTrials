@@ -69,8 +69,9 @@
 .td-hud .td-view-reset { position:absolute; top:calc(var(--top) + var(--bar) + 8px); right:calc(var(--r) + var(--right) + 8px); background:#FFF9EE; font-size:13px; padding:4px 10px; opacity:.92; }
 
 /* The selected square's sheet and the mouse's hover tip: popovers floating beside their square. The HUD sets left/top
-   (and the size limits) so they stay inside .td-board-slot: they never cover the bar, the quests, the rail or the dock,
-   and never take space from them. The Odds, Board and Quests panels open above them. */
+   (and the size limits) so they stay inside .td-pop-bounds (the board slot widened over the quest column): they never
+   cover the bar, the rail or the dock, and never take space from anything. The Odds, Board and Quests panels open above them. */
+.td-pop-bounds { position:absolute; top:calc(var(--top) + var(--bar) + var(--gap)); bottom:calc(var(--bottom) + var(--dock) + var(--gap)); left:var(--l); right:calc(var(--r) + var(--right) + var(--gap)); pointer-events:none; visibility:hidden; }
 .td-sheet { position:absolute; z-index:2; pointer-events:auto; left:calc(var(--l) + var(--left) + 8px); top:calc(var(--top) + var(--bar) + 8px); width:min(276px,calc(100% - var(--l) - var(--r))); box-sizing:border-box; max-height:calc(100% - var(--top) - var(--bar) - 4px - var(--bottom)); overflow:auto; overscroll-behavior:contain; background:#FFF9EE; border:3px solid var(--tier,#574D69); border-radius:12px; padding:8px; box-shadow:0 4px 0 #574D69,0 6px 18px rgba(43,36,51,.28); }
 .td-tip { pointer-events:none; width:min(250px,calc(100% - var(--l) - var(--r))); padding:6px 8px; }
 .td-sheet__owner { display:block; font:700 11px Nunito,sans-serif; color:#574D69; margin:-2px 0 4px; }
