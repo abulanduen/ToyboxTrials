@@ -311,9 +311,12 @@ revive). The game counts as long (`durationSec` [300, 390], see the finale).
   A full gem pool folds new experience into existing gems, so nothing is lost.
 - **Allocation:** every pool is allocated once at init and recycled through an `on` flag. The board
   step is split into one small function per entity kind with indexed loops (no `for…of`, closures or
-  helper calls the JIT cannot inline in the hot loops): a late-game step of eight full boards and
-  seven bots allocates about 2 KB (it was 79 KB, iterator results and boxed numbers) and takes about
-  0.2 ms instead of 0.47 ms (node, same harness; see the performance notes in the branch report).
+  helper calls the JIT cannot inline in the hot loops), and pooled number fields start as fractions
+  (`D` in `rules.ts`) so the shared hidden classes never deprecate: a late-game step of eight full
+  boards and seven bots allocates about 2.4 KB (it was 79 KB: iterator results, boxed numbers and an
+  optimise/deoptimise loop in the bots' steering). Time per step, old and new rules run back to back
+  in the same harness and under the same (heavy) load: 0.84–0.98 ms before, 0.34–0.39 ms after,
+  new weapons included (node; timings on a shared machine are rough, the allocation is not).
 - **Collisions:** a uniform spatial hash (4 cm cells) is rebuilt per board per step from scratch
   typed arrays held outside the state. Mob separation checks at most six neighbours in the mob's
   own cell.
