@@ -368,8 +368,8 @@ async function run(name) {
       const first = await state(() => window.__toybox.siege.viewed());
       await tap(page.getByTestId('siege-watch-next'));
       await page.waitForFunction((was) => window.__toybox.siege.viewed() !== was, first);
-      // The joystick from the other side of the bottom half drifts the ghost.
-      await stickUntil(page, [0, -1], new Function(`return ${me}.gz < -2`), undefined, [0.75, 0.3]);
+      // The joystick from another spot in the bottom half (clear of the HUD buttons) drifts the ghost.
+      await stickUntil(page, [0, -1], new Function(`return ${me}.gz < -2`), undefined, [0.3, 0.88]); // clear of the spectate panel's buttons
       await page.waitForTimeout(1200);
       await step('12-watching');
       await shot('12-watching');

@@ -8,7 +8,7 @@ import {
   type SiegeConfig, type SiegeInput, type SiegePlayer, type SiegeState,
 } from '../../src/minigames/siege/rules';
 import { createSiegeBot } from '../../src/minigames/siege/bot';
-import { CueLimiter, MAX_VOICES } from '../../src/minigames/siege/sounds';
+import { CUE_GAP, CueLimiter, MAX_VOICES, WEAPON_GAIN } from '../../src/minigames/siege/sounds';
 
 const STEP = 1000 / 60;
 const person = (id: string, bot?: BotDifficulty): Contestant => ({ id, name: id, paint: PAINT_JOBS[0], hat: 'none', keySkin: 'classic', isLocal: id === 'you', bot });
@@ -705,6 +705,19 @@ describe('Toybox Siege: performance guards', () => {
     let many = 0;
     for (let t = 1000; t < 1250; t += 1) for (const cue of ['kill', 'sweep', 'pop', 'chime', 'marble', 'plane'] as const) if (l.allow(cue, t)) many++;
     expect(many).toBeLessThanOrEqual(MAX_VOICES * 2);
+  });
+
+  it('a Grand Carillon (four bursts every 1.15 s) and a Cork Gatling play one sound per volley at most, mixed below the event cues', () => {
+    const l = new CueLimiter();
+    let chimes = 0, pops = 0;
+    // Ten seconds: an evolved chime rings 4 bursts (40 ms apart) every 1150 ms; corks fly every 230 ms.
+    for (let t = 0; t < 10000; t += 10) {
+      if (t % 1150 < 160 && (t % 1150) % 40 === 0 && l.allow('chime', t)) chimes++;
+      if (t % 230 === 0 && l.allow('pop', t)) pops++;
+    }
+    expect(chimes).toBeLessThanOrEqual(Math.ceil(10000 / 1150));
+    expect(pops).toBeLessThanOrEqual(Math.ceil(10000 / CUE_GAP.pop));
+    for (const g of Object.values(WEAPON_GAIN)) expect(g).toBeLessThanOrEqual(0.5);
   });
 
   it('runs a full match of eight bots (the run, the prep and the arena) headless in reasonable CPU time', () => {
