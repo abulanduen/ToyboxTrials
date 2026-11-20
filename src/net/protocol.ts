@@ -276,7 +276,12 @@ export type LobbyAction =
   | { a: 'leave' }
   | { a: 'kick'; id: string }
   | { a: 'settings'; settings: Partial<LobbySettings> }
-  | { a: 'ready'; ready: boolean }
+  /**
+   * `phase`: the match phase the button was pressed in (intro, results, standings, final). The
+   * server ignores a ready that arrives after its phase has moved on, so a late "Next trial" can't
+   * count as Ready on the next trial's intro card.
+   */
+  | { a: 'ready'; ready: boolean; phase?: MatchPhaseWire }
   | { a: 'start' }
   /** Spectators: whose view to follow. */
   | { a: 'watch'; id: string }
@@ -668,7 +673,9 @@ function parseLobbyAction(m: Obj): LobbyMsg | null {
       return settings && Object.keys(settings).length ? { t: 'lobby', a: 'settings', settings } : null;
     }
     case 'ready':
-      return typeof m.ready === 'boolean' ? { t: 'lobby', a: 'ready', ready: m.ready } : null;
+      if (typeof m.ready !== 'boolean') return null;
+      if (m.phase === undefined) return { t: 'lobby', a: 'ready', ready: m.ready };
+      return (MATCH_PHASES as readonly unknown[]).includes(m.phase) ? { t: 'lobby', a: 'ready', ready: m.ready, phase: m.phase as MatchPhaseWire } : null;
     case 'start':
       return { t: 'lobby', a: 'start' };
     case 'watch':

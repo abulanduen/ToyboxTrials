@@ -70,6 +70,8 @@ canvas {
   font: 700 0.85em/1 var(--font-display);
   color: var(--ink-deep);
   transform: translateY(-2px);
+  /* A key chip is one label: never broken across lines (its row wraps between chips instead). */
+  white-space: nowrap;
 }
 .keycap--wide {
   min-width: 3em;
@@ -1487,6 +1489,13 @@ canvas {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  max-width: 100%;
+}
+.intro-controls__item .keycap {
+  flex: none;
+}
+.intro-controls__action {
+  min-width: 0;
 }
 .intro-options {
   display: grid;
@@ -4031,6 +4040,94 @@ canvas {
 .game-card__sub {
   font: 600 0.72rem var(--font-body);
   opacity: 0.75;
+}
+
+/* The pickers' sections: party games and strategy games, each folded away until opened. */
+.game-group {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.game-group__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  width: 100%;
+  padding: 8px 12px;
+  text-align: left;
+  border-radius: 14px;
+  border: 2.5px solid var(--ink-deep);
+  background: var(--paper);
+  box-shadow: 0 4px 0 rgba(43, 36, 51, 0.35);
+  color: var(--ink-deep);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.game-group--strategy .game-group__head {
+  background: color-mix(in srgb, var(--sage) 22%, var(--paper));
+}
+.game-group__head:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 rgba(43, 36, 51, 0.35);
+}
+.game-group__chev {
+  flex: none;
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 10px solid var(--ink-deep);
+  transform: rotate(-90deg);
+  transition: transform 0.15s;
+}
+.game-group.open .game-group__chev {
+  transform: none;
+}
+.game-group__words {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.game-group__words strong {
+  font: 700 1rem var(--font-display);
+}
+.game-group__count {
+  opacity: 0.6;
+}
+.game-group__blurb {
+  font: 600 0.75rem var(--font-body);
+  opacity: 0.75;
+}
+.game-group__tag {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--honey);
+  border: 2px solid var(--ink-deep);
+  font: 700 0.7rem var(--font-body);
+}
+.game-picked {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 6px;
+  border-radius: 14px;
+  border: 2.5px solid var(--ink-deep);
+  background: #fff3d6;
+  outline: 4px solid var(--honey);
+  outline-offset: 1px;
+  margin: 4px 0 6px;
+}
+.game-picked__words {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.game-picked__words strong {
+  font: 700 1rem var(--font-display);
 }
 
 /* Hub: the lobby alert, the Lobbies button, lists. */

@@ -14,7 +14,7 @@ import { netLink } from './link';
 import { useNet } from './store';
 import { endOnlineMatch, onMatchState, remoteDebug, syncLobby, watchSeat } from '../minigames/remote';
 import { useMatch } from '../minigames/session';
-import type { LobbiesMsg, LobbyAlertMsg, LobbyErrMsg, LobbySettings, LobbyState, LobbyStateMsg, LobbySummary } from './protocol';
+import type { LobbiesMsg, LobbyAlertMsg, LobbyErrMsg, LobbySettings, LobbyState, LobbyStateMsg, LobbySummary, MatchPhaseWire } from './protocol';
 
 export interface LobbyStore {
   /** Open lobbies in this Hub room. */
@@ -69,7 +69,8 @@ export function leaveLobby() {
 
 export const kickFromLobby = (id: string) => netLink.send({ t: 'lobby', a: 'kick', id });
 export const changeLobby = (settings: Partial<LobbySettings>) => netLink.send({ t: 'lobby', a: 'settings', settings });
-export const setLobbyReady = (ready: boolean) => netLink.send({ t: 'lobby', a: 'ready', ready });
+/** `phase`: during a match, the phase the button belongs to (the server drops a ready that arrives late). */
+export const setLobbyReady = (ready: boolean, phase?: MatchPhaseWire) => netLink.send({ t: 'lobby', a: 'ready', ready, ...(phase ? { phase } : {}) });
 export const startLobby = () => netLink.send({ t: 'lobby', a: 'start' });
 /** The Lobbies list, as a Hub panel (blocks the toy's controls like the other panels). */
 export const openLobbiesSheet = () => {

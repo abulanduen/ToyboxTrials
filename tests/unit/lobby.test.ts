@@ -240,6 +240,51 @@ describe('lobby: starting', () => {
     expect(board.flowOf(A.id)?.phase).toBe('results'); // frozen until everyone continues
   });
 
+  it("the trial's intro card (reveal) lasts long enough to read the tutorial, and ends once everyone seated is ready", () => {
+    const { board } = setup();
+    let now = 0;
+    const { id } = create(board, A, now, { mode: 'tournament', format: 'normal', botFill: true, cap: 4 });
+    board.handle(B, { t: 'lobby', a: 'join', id }, (now += 10));
+    board.handle(A, { t: 'lobby', a: 'start' }, (now += 10));
+    const flow = board.flowOf(A.id)!;
+    // Real time, nobody ready: still on the intro card after 20 seconds.
+    for (let i = 0; i < 400; i++) board.tick((now += 50));
+    expect(flow.phase).toBe('reveal');
+    expect(flow.info(now).endsAt! - now).toBeGreaterThan(5000);
+    // A is ready: B still reading.
+    board.handle(A, { t: 'lobby', a: 'ready', ready: true, phase: 'reveal' }, (now += 10));
+    board.tick((now += 50));
+    expect(flow.phase).toBe('reveal');
+    // B is ready too: the countdown starts at once.
+    board.handle(B, { t: 'lobby', a: 'ready', ready: true, phase: 'reveal' }, (now += 10));
+    board.tick((now += 50));
+    expect(flow.phase).toBe('countdown');
+    // Ready flags start fresh for the next card.
+    expect(board.lobbyOf(A.id, now)!.members.every((m) => !m.ready)).toBe(true);
+  });
+
+  it('nobody waits forever on the intro: the time limit moves on without anyone ready', () => {
+    const { board } = setup();
+    let now = 0;
+    create(board, A, now, { mode: 'single', game: 'wind-up-dash', cap: 3 });
+    board.handle(A, { t: 'lobby', a: 'start' }, (now += 10));
+    for (let i = 0; i < 2000 && board.flowOf(A.id)?.phase === 'reveal'; i++) board.tick((now += 50));
+    expect(board.flowOf(A.id)!.phase).toBe('countdown');
+    expect(now).toBeGreaterThan(20_000);
+  });
+
+  it("a ready pressed in a phase the match has left is dropped (a late Next trial can't skip the intro)", () => {
+    const { board } = setup();
+    let now = 0;
+    const { id } = create(board, A, now, { mode: 'tournament', format: 'blitz', botFill: true, cap: 4 });
+    board.handle(B, { t: 'lobby', a: 'join', id }, (now += 10));
+    board.handle(A, { t: 'lobby', a: 'start' }, (now += 10));
+    board.handle(A, { t: 'lobby', a: 'ready', ready: true, phase: 'standings' }, (now += 10));
+    expect(board.lobbyOf(A.id, now)!.members.find((m) => m.id === A.id)!.ready).toBe(false);
+    board.handle(A, { t: 'lobby', a: 'ready', ready: true, phase: 'reveal' }, (now += 10));
+    expect(board.lobbyOf(A.id, now)!.members.find((m) => m.id === A.id)!.ready).toBe(true);
+  });
+
   it('ignores the time-scale action unless the server allows it (test servers only)', () => {
     const { board, at } = setup(false);
     create(board, A, at());

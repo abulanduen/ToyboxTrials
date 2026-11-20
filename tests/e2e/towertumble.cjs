@@ -60,6 +60,7 @@ async function frames(page, n) {
       await page.evaluate(() => window.__toybox.hub.goTo('pavilion'));
       await page.waitForSelector('.prompt');
       if (mobile) await page.locator('.prompt').tap(); else await page.keyboard.press('KeyE');
+      await click('practice-group-strategy'); // the practice list opens by section
       await click('practice-toy-tower-tumble');
       await page.getByTestId('match-start').waitFor({ state: 'visible' });
       await page.waitForTimeout(900); // the intro buttons' tap guard

@@ -29,6 +29,7 @@ async function stickUntil(page, [dx, dy], until, arg) {
       await page.evaluate(() => window.__toybox.hub.goTo('pavilion'));
       await page.waitForSelector('.prompt');
       if (mobile) await page.locator('.prompt').tap(); else await page.keyboard.press('KeyE');
+      await page.getByTestId('practice-group-party').click(); // the practice list opens by section
       await page.getByTestId('practice-inferno-escape').click();
       // Match buttons ignore taps for 0.7 s after they appear, and the module loads lazily.
       await page.getByTestId('match-start').waitFor({ state: 'visible' });

@@ -4,6 +4,9 @@
  *
  *   reveal → countdown → playing → results → (tournament) standings → reveal … → final → done
  *
+ * `reveal` is the trial's intro card (the local host's reveal + intro): the How to play steps,
+ * then Ready. It lasts until every seated human is ready, or PHASE_MS.reveal at most.
+ *
  * The server owns the seed, picks the tournament's trials from the format's pool (the same
  * `selectTournament` as local play: Normal and Treasure end with one strategy finale), seats the field (humans, then bots when the host turned bot fill on),
  * steps the rules (GameRun), keeps the standings, and decides results and placements. Players who
@@ -27,8 +30,12 @@ import type { LeaderboardResult } from '../src/net/leaderboardProtocol';
 import type { LobbyDifficulty, LobbySettings, Look, MatchEventWire, MatchInfo, MatchPhaseWire, MatchSeat, MatchStateMsg } from '../src/net/protocol';
 import { GameRun } from './matchRunner';
 
-/** How long each between-trial phase lasts (ms of match time; `continue` from everyone skips results, standings and final). */
-export const PHASE_MS = { reveal: 4500, countdown: 3000, results: 9000, standings: 8000, final: 15000 } as const;
+/**
+ * How long each between-trial phase lasts at most (ms of match time). `ready` from every seated
+ * human ends `reveal` (the trial's intro card, with its How to play steps), `results`, `standings`
+ * and `final` early. The reveal is long enough to read a tutorial; nobody waits once all are ready.
+ */
+export const PHASE_MS = { reveal: 30000, countdown: 3000, results: 9000, standings: 8000, final: 15000 } as const;
 /** A trial that hasn't ended by itself after this long is stopped and scored as it stands. */
 export const MAX_TRIAL_MS = 15 * 60_000;
 export const MAX_FIELD = 8;
@@ -155,7 +162,6 @@ export class MatchFlow {
     } else {
       this.tournament = null;
       this.game = settings.game;
-      this.phaseLeft = PHASE_MS.reveal - 1500;
     }
   }
 
@@ -222,7 +228,8 @@ export class MatchFlow {
 
     switch (this.phase) {
       case 'reveal':
-        if ((this.phaseLeft -= dt) <= 0) {
+        // The intro card: on until everyone seated has pressed Ready, or the time is up.
+        if ((this.phaseLeft -= dt) <= 0 || allReady) {
           this.startTrial(members);
           out.changed = true;
         }
