@@ -329,10 +329,10 @@ const shot = (p, file) => p.screenshot({ path: path.join(OUT, file), timeout: T 
     hb = await hp(B.page);
     check('A holds E and lets go: the ball is thrown, and B sees it fly', !(await hp(A.page)).holding && hb.newest.h === null, JSON.stringify(hb.newest?.b));
     await B.page.waitForFunction(() => { const n = window.__toybox.hubplay.state().newest; return n && !n.h && n.b[3] === 0 && n.b[4] === 0 && n.b[5] === 0; }, null, { timeout: 120000, polling: 250 }).catch(() => null);
-    const lb = (await hp(B.page)).newest.b;
+    const restB = (await hp(B.page)).newest.b;
     // stand 2 cm from where it lies, on the side of its spot (always on the pitch)
-    const toSpot = Math.hypot(76 - lb[0], -128 - lb[2]) || 1;
-    await travel(A, B, [[lb[0] + ((76 - lb[0]) / toSpot) * 2, lb[2] + ((-128 - lb[2]) / toSpot) * 2]], Math.atan2(lb[0] - 76, lb[2] + 128));
+    const toSpot = Math.hypot(76 - restB[0], -128 - restB[2]) || 1;
+    await travel(A, B, [[restB[0] + ((76 - restB[0]) / toSpot) * 2, restB[2] + ((-128 - restB[2]) / toSpot) * 2]], Math.atan2(restB[0] - 76, restB[2] + 128));
     await A.page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Pick up'), null, { timeout: 60000 }).catch(() => null);
     await A.page.keyboard.press('KeyE');
     await B.page.waitForFunction((id) => window.__toybox.hubplay.state().newest?.h === id, aId, { timeout: 60000, polling: 100 }).catch(() => null);
