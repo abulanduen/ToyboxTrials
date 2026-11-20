@@ -33,6 +33,8 @@ import { netLink } from './link';
 import { onLobbies, onLobbyAlert, onLobbyErr, onLobbyState, onMatchState, resetLobbies } from './lobby';
 import { accountToken } from './account';
 import { onHubPlayEvents, onHubPlaySnap, setHubPlayOnline } from '../hubplay/runtime';
+import { onCard, onCards, onChat, onChatNote, resetChat, useChat } from './chat';
+import { DEBUG } from '../game/debug';
 
 /** Give up on a room that hasn't welcomed us by then. */
 const WELCOME_TIMEOUT_MS = 12_000;
@@ -171,6 +173,7 @@ export function leaveOnline(quiet = false) {
 
 function reset() {
   resetLobbies('offline');
+  resetChat(true);
   window.clearTimeout(welcomeTimer);
   window.clearTimeout(retryTimer);
   session = null;
@@ -224,9 +227,16 @@ function onDrop() {
 }
 
 // ---------------------------------------------------------------- messages
+/** ?debug only: the last messages this page was sent (not snapshots or match state), for tests. */
+const received: string[] = [];
+
 function onMessage(raw: unknown) {
   const msg = validateServerMessage(raw);
   if (!msg) return;
+  if (DEBUG && msg.t !== 'snap' && msg.t !== 'ms' && msg.t !== 'play') {
+    received.push(JSON.stringify(raw));
+    if (received.length > 400) received.splice(0, received.length - 400);
+  }
   lastMsgAt = performance.now();
   handlers[msg.t](msg as never);
 }
@@ -244,6 +254,8 @@ const handlers: { [K in ServerMsg['t']]: (m: Extract<ServerMsg, { t: K }>) => vo
     remotes.clear();
     netClock.reset();
     setHubPlayOnline(true);
+    // Who wears a card comes next (a `cards` message, only when someone does).
+    useChat.getState().set({ cards: {} });
     // A fresh slot (not a resume) has no lobby: leave any lobby screen we were on.
     if (!m.resumed) resetLobbies('fresh');
     // Signed in: link the account so finished lobby matches go on the leaderboard by username.
@@ -325,6 +337,10 @@ const handlers: { [K in ServerMsg['t']]: (m: Extract<ServerMsg, { t: K }>) => vo
   lobbyErr: onLobbyErr,
   ms: onMatchState,
   play: (m) => onHubPlayEvents(m.e),
+  chat: onChat,
+  chatNote: onChatNote,
+  card: onCard,
+  cards: onCards,
 };
 
 // ---------------------------------------------------------------- outgoing intent
@@ -429,6 +445,12 @@ export function installNet() {
             emoteEvents: r.emoteEvents,
           };
         }),
+      /** Raw messages received (not snapshots, match state or hub play), newest last. */
+      received: () => received.slice(),
+      chat: () => {
+        const c = useChat.getState();
+        return { open: c.open, lines: c.lines.map((l) => ({ id: l.id, name: l.name, text: l.text, kind: l.kind, masked: !!l.masked })), cards: c.cards, muted: c.muted, unread: c.unread };
+      },
       /** Simulate a dropped connection (no leave message): the client should resume. */
       drop: () => {
         closeSocket();

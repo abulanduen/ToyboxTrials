@@ -48,12 +48,14 @@ The build output in `dist/` is a static folder with relative paths. Host it anyw
 | **Mouse** | Click the scene to capture the mouse and look around (or drag) |
 | **Esc** / **P** | Pause and settings (volume, quality, mouse sensitivity, invert Y, FPS meter) |
 | **H** | Show/hide the controls card |
+| **Enter** / **T** | Online Hub: open the chat box (Enter sends, Esc closes). While an interaction prompt is showing, Enter interacts as before |
 
 **On phones and tablets** (works in both portrait and landscape):
 - Put your left thumb anywhere on the lower-left to bring up the joystick. Push it to the rim to run.
 - Drag anywhere else to look around.
 - Tap **Jump**, or the red action button that appears next to things. You can also tap the prompt itself.
 - The gear button pauses.
+- In the online Hub, the **Chat** button opens the chat sheet (the log, the People list for muting, and a text box that stays above the on-screen keyboard).
 
 Things to find in the Playroom:
 - **Copycat Conductor gate** (honey arch): play Copycat Conductor solo or against bots.
@@ -62,6 +64,8 @@ Things to find in the Playroom:
 - **Workshop** (pencil case): opens the Workshop screen. Name your contender and pick a paint job, hat and key skin. Secrets unlock extra items.
 - **Scoreboard** (domino wall): tracks secrets.
 - **Four hidden secrets.** Look behind the pavilion, near the fountain, behind the workshop, and on top of the book tower (jump: domino → book → eraser → block).
+- **Online Hub** (see [`docs/ONLINE.md`](docs/ONLINE.md)): walk around with other players, wave, kick the shared marble, shoot hoops, host lobbies, and **chat** (text, with a word filter, per-player mute and a Text chat switch in Settings).
+- **Who Am I?** (online Hub only): open the suspicious box and the jack slaps a paper card on your toy's face. Everyone else can read it; you can't. Ask the others, then guess the everyday thing (an animal, a job, a food or an object) in chat. Guess right and it falls off with confetti (and a few cogs, at most three times an hour); or peel it off to give up. Offline the box springs its old ambush.
 
 ## What's in the box
 

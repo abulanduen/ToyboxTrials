@@ -6,6 +6,8 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { WindupBot } from './WindupBot';
+import { FaceCard } from './FaceCard';
+import { useChat } from '../net/chat';
 import { createToyAnim, ELIM_DURATION, INTERACT_DURATION, RESPAWN_DURATION, startEmote, stepEmote, type ToyAnim } from './anim';
 import { addMouseDelta, consumeMouseDelta, endFrame, getMoveAxis, isDown, stickRunning, wasPressed, clearInput, EMOTE_ACTIONS } from '../game/input';
 import { HUB_MOTION } from '../game/hubMotion';
@@ -172,8 +174,9 @@ export function PlayerController() {
       const locked = document.pointerLockElement === el;
       const s = useGame.getState();
       s.set({ pointerLocked: locked });
-      // Browser consumes Escape to leave pointer lock — treat that as "pause" (but not when Alt freed the cursor).
-      if (!locked && !altHeld && s.screen === 'playing' && !s.paused && !s.panel) {
+      // Browser consumes Escape to leave pointer lock — treat that as "pause" (but not when Alt freed
+      // the cursor, or the chat box opened: it lets go of the pointer so the player can type).
+      if (!locked && !altHeld && !useChat.getState().open && s.screen === 'playing' && !s.paused && !s.panel) {
         s.togglePause(true);
         clearInput();
       }
@@ -607,7 +610,7 @@ export function PlayerController() {
   return (
     <>
       <group ref={root}>
-        <WindupBot anim={anim} paint={paint} hat={look.hat} keySkin={look.keySkin} accessories={accessories} />
+        <WindupBot anim={anim} paint={paint} hat={look.hat} keySkin={look.keySkin} accessories={accessories} faceStuck={<FaceCard who="self" />} />
       </group>
       <mesh ref={shadow} rotation={[-Math.PI / 2, 0, 0]} renderOrder={1}>
         <planeGeometry args={[1, 1]} />

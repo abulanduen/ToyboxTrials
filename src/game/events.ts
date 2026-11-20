@@ -18,6 +18,8 @@ export type GameEvents = {
   'player:teleport': { x: number; z: number; yaw: number };
   'prop:marble-push': { dirX: number; dirZ: number };
   'prop:jack-pop': void;
+  /** The jack pops to slap a Who Am I? card on someone (online): the same pop, no ambush. */
+  'prop:jack-card': void;
   'prop:musicbox-play': void;
   'prop:key-collected': void;
   /** The player talked to Pipwick, the welcome mascot (src/game/welcome.ts). */

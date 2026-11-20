@@ -284,12 +284,12 @@ function Confetti() {
     const dt = Math.min(rawDt, 1 / 20);
     while (fxQueue.length) {
       const f = fxQueue.shift()!;
-      // a burst: half of the pieces, from the net's mouth or the rim
+      // a burst: half of the pieces, from the net's mouth, the rim or a guessed Who Am I? card
       let k = 0;
       for (const p of parts) {
         if (p.life > 0 && k < n / 2) continue;
         const a = Math.random() * Math.PI * 2;
-        const up = f.kind === 'hoop' ? 14 : 20;
+        const up = f.kind === 'goal' ? 20 : 14;
         Object.assign(p, { x: f.x, y: f.y, z: f.z, vx: Math.cos(a) * (4 + Math.random() * 8), vy: up + Math.random() * 10, vz: Math.sin(a) * (4 + Math.random() * 8), r: Math.random() * 6, life: 1.4 + Math.random() * 0.6 });
         if (++k >= n / 2) break;
       }

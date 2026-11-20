@@ -46,6 +46,9 @@ you until you're back ("in the Workshop" and "at the Odds & Ends shop" work the 
 | `src/ui/OnlineUI.tsx` | Play online sheet, HUD chip, touch Emote menu. |
 | `src/game/hubPlay.ts`, `src/game/hubPlaySim.ts`, `src/game/hubSolids.ts` | Hub play (the shared marble, football nets, basketball hoop): where things are, the **pure physics** both sides run, and the hub's solid props as data (generated from the layout). |
 | `src/hubplay/runtime.ts`, `src/scene/HubPlay.tsx`, `src/ui/HubPlayHud.tsx` | Hub play in the browser: offline physics or the server's state (interpolated), controls, sounds, celebrations; the 3D objects; the score chip and throw meter. |
+| `server/hubChat.ts` | **Pure** per-room text chat and Who Am I? cards: cleaning, rate limits, the word filter, dealing, guessing, per-recipient messages (owned by `hubRoom.ts`). |
+| `src/net/chatFilter.ts`, `src/game/whoAmI.ts`, `src/game/whoAmICards.ts` | Shared and pure: chat text cleaning and the word filter; the box's spot, answer matching and anti-spoiler masking; the deck of everyday things. |
+| `src/net/chat.ts`, `src/ui/ChatUI.tsx`, `src/character/FaceCard.tsx` | Client: the chat store and message handlers; the chat log, phone sheet, name-tag bubbles and the Who Am I? chip; the paper card drawn on a toy's face. |
 
 ### Rooms
 
@@ -131,6 +134,70 @@ the browser runs the very same code with your toy as the only body, so single-pl
 - **Test servers only** (`MATCH_DEBUG=1`): `hpdebug {x, z}` puts the marble somewhere (the e2e test
   uses it to stage a goal). Ignored by real servers.
 - The toy train does not stop the marble (its position isn't shared between clients).
+
+### Text chat
+
+Online Hub rooms (public and private) have a text chat. Nothing of it exists offline.
+
+- **Server** (`server/hubChat.ts`): relays each message to everyone connected in the room, the
+  sender included (the client shows its own line when it comes back). The text is cleaned
+  (`cleanChatText`: control, zero-width and bidi characters and private-use characters removed,
+  combining marks limited, whitespace collapsed, trimmed, at most **120 characters**), then
+  filtered (`filterChat`: an original word list of swear words and slurs, matched per word after
+  undoing letter swaps such as "5h1t", repeated letters and spaced-out letters, masked with stars).
+  The sender's name comes from the server's roster (the message carries no name). **Rate limit:**
+  a burst of 3, then one every 1.5 s per player; a refused message gets a `chatNote` (`slow`),
+  shown in the log. (The socket's general limit of 45 messages a second still applies.)
+- **Desktop:** the log sits bottom-left above the controls card; lines fade after about 12 s and
+  come back while the chat is open. **Enter** or **T** opens the box (Enter keeps interacting
+  while an interaction prompt is showing, so it never steals the toy's key), Enter sends, Esc
+  closes. Opening lets go of the pointer lock without pausing; sending with Enter asks for it back
+  (if the browser refuses, a click takes it back as usual). The game's key handler ignores keys
+  typed into a text box (`isTypingTarget` in `src/game/input.ts`), and opening the box clears any
+  held key, so the toy never walks while you type.
+- **Phones:** a **Chat** button (64 px, above Emote, with an unread count) opens a sheet: the log,
+  a **People** list (Mute / Unmute per player), the text box, **Send** and **Close** (all ≥ 56 px).
+  The sheet is sized to the visual viewport, so the on-screen keyboard pushes it up instead of
+  covering the box.
+- **Speech bubbles:** each message also shows for a few seconds above the speaker's toy, inside
+  their name tag (plain DOM that the remote-player frame loop already positions).
+- **Settings:** "Text chat (online Hub)" off hides the log, the bubbles, the button and the box.
+  **Mute** (click a name in the open log on desktop, or People on phones) hides that player's
+  messages and bubbles for this session.
+
+### Who Am I? (the suspicious box)
+
+Online, the jack-in-the-box in the Playroom plays **Who Am I?**. Opening it pops the jack (the
+first open still finds the secret and pays out as before) and the jack slaps a paper card on your
+toy's face, with an everyday thing on it: an animal, a job, a food or an object (172 cards in
+`src/game/whoAmICards.ts`). Everyone else can read it, on the card and under your name tag; you
+see a blank card with "?" and a chip: "Something's stuck to your face! Ask the others, then guess
+in chat." Offline the box springs its old ambush (elimination and rewind) and a ticket says that
+Who Am I? needs other players.
+
+- **Server-authoritative.** The client sends `card {a: deal}`; the server checks the player is in
+  the Hub (not in a trial, the Workshop or the shop), within 6.4 cm of the box's spot (where the
+  server has them), wears no card, and hasn't had one in the last 4 s. It deals a card nobody in
+  the room wears and that the player hasn't had in their last 12, with the room's CSPRNG-backed
+  random. The holder is told only that a card went on (`card {k: on}` without `w`); everyone else
+  gets the word. A player arriving later gets `cards`, built for them.
+- **Guessing:** every chat message from a holder is checked against their card first: the name,
+  its aliases (`also`), regular plurals, with case, accents, spacing, hyphens, "a/an/the" and
+  phrasings such as "am I a …?" or "is it …" ignored. Right: the card comes off, no chat line is
+  posted, and everyone (the holder included) gets `card {k: solved, w, ar}`: the log shows
+  "Ticker guessed it: a penguin!", confetti bursts over the toy and a paper-flutter sound plays.
+  Wrong guesses are posted like any message.
+- **Cogs:** a right guess pays 5 cogs (`EARN.whoAmI`), client-side like every other reward, at
+  most 3 times in any hour and only for a card worn at least 8 s (`rewardWhoAmI`).
+- **Anti-spoiler:** when someone else's message contains a holder's answer (or an alias, a plural,
+  a word starting with a long answer, or the answer spelled out letter by letter), that holder's
+  copy has it masked ("p******", `m: 1`); everyone else sees the message as written.
+- **Peel it off** (`card {a: peel}`) gives up: the answer is revealed to everyone, the holder too.
+  The card also falls off, unrevealed to the holder, on leaving the room, going into a trial, the
+  Workshop or the shop, or disconnecting. One card per player at a time; opening the box while
+  wearing one says so.
+- **Privacy:** the holder's own word is never in any message sent to them while the card is on
+  (unit test `tests/unit/hub-chat.test.ts`, and the browser test checks every message A received).
 
 ### Reconnects and limits
 
@@ -267,8 +334,9 @@ online"). The other choice in both places is the existing **practice with bots**
 - **In the game:** the Hub Scoreboard panel shows the top ten per format above your local records
   (which stay on this device), and the TV beside it has a "Leaderboard" channel (Blitz).
 
-## Protocol (version 4)
+## Protocol (version 5)
 
+Version 5 (chat and Who Am I?): adds `chat` (both ways), `chatNote`, `card` (both ways) and `cards`.
 Version 4 (hub play): adds `kick`, `ball` and the test-only `hpdebug`, the snapshot's `hp` and the
 `play` events. Version 3 (lobbies): adds the lobby, match and account-link messages below. Version 2 (the shop)
 added the accessory slots `back`, `face` and `neck`, ten emote ids and the `shop` activity.
@@ -294,6 +362,8 @@ Client → server:
 | `kick` | `dx, dz` (direction, each within ±2), `p` (power 0–1) | Kick or push the room's marble (v4). Checked for reach and rate (above). |
 | `ball` | `a`: `grab`, or `throw {yaw, p}` (yaw within ±10, power 0–1) | Pick up or throw the room's basketball (v4). |
 | `hpdebug` | `x, z` | Test servers only (`MATCH_DEBUG=1`): put the marble at (x, z). |
+| `chat` | `text` (at most 300 characters as sent) | Say something in the room (v5). Cleaned to at most 120 characters, filtered, rate-limited (3, then 1 per 1.5 s). |
+| `card` | `a`: `deal` or `peel` | Who Am I? at the suspicious box (v5): ask for a card, or give up on yours. |
 
 Server → client: `welcome` (your id, resume token, room, roster, spawn point, server time),
 `joined`, `left`, `room` (host changed), `snap` (`now`, players: `id x y z r s g e es a off`, and
@@ -302,6 +372,15 @@ from v4 `hp`: `m` marble `[x, z, vx, vz]`, `n` in a net, `b` ball `[x, y, z, vx,
 p?, v?}`), `emote`, `look`, and `error` (`code`, `message`, `fatal`). The error codes are
 `version_mismatch`, `room_full`, `no_such_room`, `bad_request`, `not_joined`, `replaced`,
 `server_full` and `shutting_down`.
+
+Chat and Who Am I? (v5), built per recipient:
+
+| `t` | Fields | Notes |
+| --- | --- | --- |
+| `chat` | `id` (sender), `name` (from the roster), `text`, `n` (room message number), `m?` | `m: 1` when this copy had the recipient's Who Am I? answer masked. |
+| `chatNote` | `code`, `message`, `wait?` | Only to the player concerned: `slow` (rate limit, `wait` ms), `card_busy`, `card_far`, `card_wait`, `card_none`, `card_away`. |
+| `card` | `k`: `on` \| `solved` \| `peeled` \| `off`, `id` (holder), `name`, `w?` (word), `ar?` (article) | `on` carries `w` for everyone except the holder; `solved` and `peeled` reveal `w` to everyone; `off` (left, trial, Workshop, shop, disconnect) carries `w` for the others only. |
+| `cards` | `c`: `[{id, w?}]` | Who wears a card, sent to a player arriving in a room where someone does; their own entry (none on arrival) would have no `w`. |
 
 Lobbies (v3): `lobbies` (the room's list, on joining and on every change), `lobbyAlert` (someone
 started hosting), `lobby` (your lobby: members, settings, and the running match's phase, field,
@@ -520,7 +599,17 @@ Railway pushes a new server on every commit to the branch it watches. The client
   in arrival order.
 - One server process holds all rooms in memory, so a restart or redeploy empties every room.
   Clients then reconnect into a fresh room; private room codes are lost.
-- No chat, moderation, reporting or blocking. Nickname filtering is a short word list.
+- Text chat has a short, original word filter (masking, not blocking) and per-player mute for the
+  session. There is no reporting, no moderation tools, no blocking across sessions, no chat
+  history on the server, and no filtering of other languages or determined spelling tricks.
+  Nickname filtering is a short word list.
+- Who Am I? and chat were tested with unit tests and real browsers (two desktop pages, and phone
+  emulation for the chat sheet) against the built server on localhost. Not verified: a real
+  on-screen keyboard (emulated phones have none, so the keyboard-safe layout is checked against the
+  visual viewport only), iOS Safari, IME/composition input (Chinese, Japanese, Korean), screen
+  readers, and how readable the card is on real phone screens. The anti-spoiler mask catches the
+  answer, its aliases, plurals and spelled-out letters, not paraphrases or other languages. The
+  cog reward is client-side like all rewards, so a modified client could award itself.
 - Unlock state and the cog wallet are client-side, so a modified client could wear a cosmetic or
   play a gesture it hasn't bought. Only catalogue ids are accepted. Accounts save the profile but
   don't make it trustworthy: the wallet has only a soft cap (docs/ECONOMY.md).

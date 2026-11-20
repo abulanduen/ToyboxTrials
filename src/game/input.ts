@@ -103,7 +103,8 @@ const stick = { x: 0, y: 0 };
 /** Joystick push beyond this counts as running. */
 export const STICK_RUN_THRESHOLD = 0.92;
 
-function isTypingTarget(t: EventTarget | null): boolean {
+/** A text box, text area, select or editable element has the key (the game ignores it; so must other key handlers). */
+export function isTypingTarget(t: EventTarget | null): boolean {
   const el = t as HTMLElement | null;
   if (!el) return false;
   const tag = el.tagName;

@@ -198,21 +198,29 @@ export function MusicBox() {
   );
 }
 
-// ---------------- Jack-in-the-box (eliminates you!) ----------------
+// ---------------- Jack-in-the-box (eliminates you offline; online it deals Who Am I? cards) ----------------
 export function JackInTheBox() {
   const jack = useRef<THREE.Group>(null!);
   const lid = useRef<THREE.Group>(null!);
   const st = useRef({ t: -1 });
-  useEffect(
-    () =>
-      events.on('prop:jack-pop', () => {
-        if (st.current.t >= 0) return;
-        st.current.t = 0;
-        sfx.jump();
-        window.setTimeout(() => events.emit('player:eliminate', { reason: 'jack' }), 280);
-      }),
-    [],
-  );
+  useEffect(() => {
+    const offPop = events.on('prop:jack-pop', () => {
+      if (st.current.t >= 0) return;
+      st.current.t = 0;
+      sfx.jump();
+      window.setTimeout(() => events.emit('player:eliminate', { reason: 'jack' }), 280);
+    });
+    // Online: the same pop, but the jack slaps a card on someone instead of springing an ambush.
+    const offCard = events.on('prop:jack-card', () => {
+      if (st.current.t >= 0) return;
+      st.current.t = 0;
+      sfx.jump();
+    });
+    return () => {
+      offPop();
+      offCard();
+    };
+  }, []);
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 1 / 20);
     const s = st.current;

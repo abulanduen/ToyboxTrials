@@ -50,6 +50,7 @@ import {
 } from '../src/net/protocol';
 import { sanitizeLook, sanitizeNickname, uniqueName, type CleanLook } from './sanitize';
 import { LobbyBoard, type LobbyOut, type LobbyPlayer } from './lobby';
+import { HubChat, type ChatPlayer } from './hubChat';
 import type { LeaderboardResult } from '../src/net/leaderboardProtocol';
 
 /**
@@ -169,6 +170,8 @@ export class HubRoom {
   private playEpoch: number | null = null;
   private playEvents: PlayEvent[] = [];
   private readonly matchDebug: boolean;
+  /** Text chat and Who Am I? cards (hubChat.ts). */
+  private readonly chat: HubChat;
 
   /** Throws for an id that is neither `public-<n>` nor a valid room code. */
   constructor(opts: RoomOptions) {
@@ -183,6 +186,7 @@ export class HubRoom {
     this.open = s.kind === 'public';
     this.lobbies = new LobbyBoard({ random: opts.random, debug: opts.matchDebug });
     this.matchDebug = !!opts.matchDebug;
+    this.chat = new HubChat(opts.random, () => [...this.players.values()].map((p) => this.chatPlayer(p)));
   }
 
   // ------------------------------------------------------------ inspection (directory, tests)
@@ -221,6 +225,10 @@ export class HubRoom {
   get lobbyBoard() {
     return this.lobbies;
   }
+  /** The room's chat and Who Am I? cards (tests). */
+  get hubChat(): HubChat {
+    return this.chat;
+  }
   /** The shared marble and basketball (tests). */
   get hubPlay(): Readonly<HubPlayState> {
     return this.play;
@@ -250,7 +258,7 @@ export class HubRoom {
     p.emote = null;
     this.letGoOfBall(p, now);
     this.updateEmpty(now);
-    return this.fromLobby(this.lobbies.playerDropped(p.id, now));
+    return [...this.fromLobby(this.lobbies.playerDropped(p.id, now)), ...this.fromLobby(this.chat.drop(this.chatPlayer(p)))];
   }
 
   /** Link a signed-in account (the socket layer has checked the token). */
@@ -281,8 +289,13 @@ export class HubRoom {
         if (msg.a) {
           p.speed = 0;
           this.letGoOfBall(p, now);
+          return this.fromLobby(this.chat.drop(this.chatPlayer(p)));
         }
         return [];
+      case 'chat':
+        return this.fromLobby(this.chat.say(this.chatPlayer(p), msg.text, now));
+      case 'card':
+        return this.fromLobby(msg.a === 'deal' ? this.chat.deal(this.chatPlayer(p), now) : this.chat.peel(this.chatPlayer(p)));
       case 'kick':
         return this.kick(p, msg, now);
       case 'ball':
@@ -412,7 +425,7 @@ export class HubRoom {
     if (this.kind === 'private' && !this.host) this.host = p.id;
     this.emptySince = null;
 
-    const out: Outgoing[] = [this.welcome(p, false, now)];
+    const out: Outgoing[] = [this.welcome(p, false, now), ...this.cardsFor(p)];
     if (others.length) out.push({ kind: 'send', to: others, msg: { t: 'joined', player: this.playerInfo(p) } });
     out.push(...this.fromLobby(this.lobbies.playerArrived(this.lobbyPlayer(p), now)));
     return out;
@@ -425,7 +438,7 @@ export class HubRoom {
     p.budgetAt = now;
     this.byConn.set(conn, p);
     this.emptySince = null;
-    return [this.welcome(p, true, now), ...this.fromLobby(this.lobbies.playerArrived(this.lobbyPlayer(p), now))];
+    return [this.welcome(p, true, now), ...this.cardsFor(p), ...this.fromLobby(this.lobbies.playerArrived(this.lobbyPlayer(p), now))];
   }
 
   private refuse(conn: string, code: ErrorCode): Outgoing[] {
@@ -510,7 +523,7 @@ export class HubRoom {
     if (p.conn) this.byConn.delete(p.conn);
     p.conn = null;
     this.byToken.delete(p.resume);
-    const out: Outgoing[] = this.fromLobby(this.lobbies.playerGone(p.id, now));
+    const out: Outgoing[] = [...this.fromLobby(this.lobbies.playerGone(p.id, now)), ...this.fromLobby(this.chat.forget(p.id, p.name))];
     const others = this.conns();
     if (others.length) out.push({ kind: 'send', to: others, msg: { t: 'left', id: p.id } });
     if (this.host === p.id) {
@@ -525,6 +538,7 @@ export class HubRoom {
 
   private closeRoom() {
     this.lobbies.clear();
+    this.chat.clear();
     this.players.clear();
     this.byConn.clear();
     this.byToken.clear();
@@ -653,6 +667,16 @@ export class HubRoom {
       a: p.activity,
       off: p.conn ? 0 : 1,
     };
+  }
+
+  private chatPlayer(p: Player): ChatPlayer {
+    return { id: p.id, name: p.name, connected: !!p.conn, away: !!p.activity, x: p.x, z: p.z };
+  }
+
+  /** Who wears a Who Am I? card, for a player arriving (only sent when someone does). */
+  private cardsFor(p: Player): Outgoing[] {
+    if (!this.chat.cardCount || !p.conn) return [];
+    return [{ kind: 'send', to: [p.conn], msg: this.chat.view(p.id) }];
   }
 
   private lobbyPlayer(p: Player): LobbyPlayer {
