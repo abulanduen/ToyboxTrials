@@ -73,7 +73,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(OUT, name), timeo
         }
       });
       ws.on('error', reject);
-      ws.on('open', () => c.send({ t: 'hello', v: 3, name, look: { paint: 2, hat: 'none', keySkin: 'classic', back: 'none', face: 'none', neck: 'none' }, join: { kind: 'public' } }));
+      ws.on('open', () => c.send({ t: 'hello', v: 4, name, look: { paint: 2, hat: 'none', keySkin: 'classic', back: 'none', face: 'none', neck: 'none' }, join: { kind: 'public' } }));
     });
   const lobby = (p) => p.evaluate(() => window.__toybox.lobby.current());
   const phase = (p) => p.evaluate(() => document.querySelector('[data-testid=online-match]')?.getAttribute('data-phase') ?? null);

@@ -25,6 +25,7 @@ import { AccountSettingsRow, AccountSheet } from './AccountUI';
 import { HubLobbyAlert, LobbiesButton, LobbyList, OnlineLeaderboard } from './LobbyUI';
 import { JukeboxList, WelcomeUI } from './WelcomeUI';
 import { useWelcome } from '../game/welcome';
+import { HubPlayHud } from './HubPlayHud';
 
 // ---------------------------------------------------------------- HUD
 function Prompt() {
@@ -198,6 +199,7 @@ function Hud() {
       </div>
       <CogCount value={cogs} testId="hud-cogs" className="hud-cogs" />
       <Prompt />
+      <HubPlayHud />
       <OnlineChip />
       <LobbiesButton />
       <HubLobbyAlert />

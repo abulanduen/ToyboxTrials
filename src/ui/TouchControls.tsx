@@ -102,6 +102,9 @@ function HoldButton({ action, className, label, children }: { action: Action; cl
     setDown(false);
     releaseVirtual(action);
   };
+  // The button can vanish under a thumb (Interact's prompt goes when a kicked marble rolls away):
+  // let go of the action then, or it stays held and the next press is never seen.
+  useEffect(() => () => releaseVirtual(action), [action]);
   return (
     <button
       className={`${className}${down ? ' is-down' : ''}`}

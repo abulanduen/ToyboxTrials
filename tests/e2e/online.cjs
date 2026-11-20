@@ -5,7 +5,8 @@
      npm run server:build
      BASE_URL=http://localhost:4190/ node tests/e2e/online.cjs
    Desktop: A hosts a private room, B joins with the code, C through a #room= link; name tags,
-   movement, emotes, reconnect, leave, errors, public Hub. B's save owns shop items (a cape, a
+   movement, emotes, hub play (B sees the marble A kicks; A picks up, throws and sinks the
+   basketball; a goal), reconnect, leave, errors, public Hub. B's save owns shop items (a cape, a
    monocle and the Dance gesture on key 4): A must see B's accessories and B's bought gesture. Phones (portrait + landscape, touch):
    join the public Hub and use the Emote menu. Raw-socket checks: health, origin, version, limits.
    Software rendering is slow: page loads wait up to LOAD_TIMEOUT (default 10 min). */
@@ -32,7 +33,7 @@ const check = (n, ok, d = '') => {
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /** The protocol version this test expects (src/net/protocol.ts PROTOCOL_VERSION). */
-const PROTO = 3; // v3: lobbies and server-run matches
+const PROTO = 4; // v4: hub play (the shared marble and basketball)
 
 // ---------------------------------------------------------------- server
 async function startServer() {
@@ -42,7 +43,8 @@ async function startServer() {
   } catch (e) {
     if (String(e.message).includes('already in use')) throw e;
   }
-  const child = spawn(process.execPath, [path.join(__dirname, '../../server-dist/index.cjs')], { env: { ...process.env, PORT: String(PORT) }, stdio: ['ignore', 'pipe', 'pipe'] });
+  // MATCH_DEBUG: a test server (lets the hub play test place the marble in front of a net)
+  const child = spawn(process.execPath, [path.join(__dirname, '../../server-dist/index.cjs')], { env: { ...process.env, PORT: String(PORT), MATCH_DEBUG: '1' }, stdio: ['ignore', 'pipe', 'pipe'] });
   const log = [];
   child.stdout.on('data', (d) => log.push(String(d)));
   child.stderr.on('data', (d) => log.push(String(d)));
@@ -281,6 +283,90 @@ const shot = (p, file) => p.screenshot({ path: path.join(OUT, file), timeout: T 
     const bLocal = await B.page.evaluate(() => window.__toybox.state().anim.emote);
     check('keys 4 and 3 pressed together: exactly one emote is played and sent', bAfter.emoteEvents === evBefore + 1 && ['dance', 'spin'].includes(bAfter.lastEmote) && bLocal === bAfter.lastEmote, `events +${bAfter.emoteEvents - evBefore}, sent ${bAfter.lastEmote}, B plays ${bLocal}`);
 
+    // ------------------------------------------------------------ hub play: one shared marble, ball and score per room
+    const hp = (p) => p.evaluate(() => window.__toybox.hubplay.state());
+    /** Teleport a toy through waypoints, waiting each time until `watcher` sees it there (the server limits travel speed). */
+    const travel = async (P, watcher, pts, yaw) => {
+      for (const [x, z] of pts) {
+        await P.page.evaluate(([x, z, y]) => window.__toybox.teleport(x, z, y), [x, z, yaw]);
+        await watcher.page.waitForFunction(([n, x, z]) => { const r = window.__toybox.net.remotes().find((q) => q.name === n); return r && r.x !== null && Math.hypot(r.x - x, r.z - z) < 0.3; }, [P.name, x, z], { timeout: 120000, polling: 250 }).catch(() => null);
+      }
+    };
+    const TRIALS = [[20, 10], [24, -40], [24, -108]];
+    await Promise.all([A, B].map((P) => P.page.waitForFunction(() => window.__toybox.hubplay.state().newest !== null, null, { timeout: 60000, polling: 250 }).catch(() => null)));
+    let ha = await hp(A.page);
+    let hb = await hp(B.page);
+    check('A and B are each sent the room\'s one marble (online, server state)', ha.mode === 'remote' && hb.mode === 'remote' && ha.newest && hb.newest && Math.abs(ha.newest.m[0] - hb.newest.m[0]) < 0.01 && Math.abs(ha.newest.m[1] - hb.newest.m[1]) < 0.01, JSON.stringify([ha.newest?.m, hb.newest?.m]));
+    const m0 = ha.newest.m;
+    await travel(A, B, [[m0[0] + 2.3, m0[1]]], -Math.PI / 2);
+    await A.page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Kick'), null, { timeout: 60000 }).catch(() => null);
+    await A.page.keyboard.press('KeyE');
+    await B.page.waitForFunction((x) => { const n = window.__toybox.hubplay.state().newest; return n && n.m[0] < x - 4; }, m0[0], { timeout: 60000, polling: 100 }).catch(() => null);
+    await shot(B.page, 'online-07-B-sees-A-kick-the-marble.png');
+    await B.page.waitForFunction(() => { const n = window.__toybox.hubplay.state().newest; return n && n.m[2] === 0 && n.m[3] === 0; }, null, { timeout: 60000, polling: 250 }).catch(() => null);
+    await A.page.waitForFunction(() => { const n = window.__toybox.hubplay.state().newest; return n && n.m[2] === 0 && n.m[3] === 0; }, null, { timeout: 60000, polling: 250 }).catch(() => null);
+    ha = await hp(A.page);
+    hb = await hp(B.page);
+    check('A kicks the marble (E); B sees the same marble roll and stop in the same place', hb.newest.m[0] < m0[0] - 4 && Math.hypot(ha.newest.m[0] - hb.newest.m[0], ha.newest.m[1] - hb.newest.m[1]) < 0.01 && Math.hypot(hb.marble.x - hb.newest.m[0], hb.marble.z - hb.newest.m[1]) < 0.5, `x ${m0[0]} → ${hb.newest.m[0]} (A ${ha.newest.m[0]}, B draws ${hb.marble.x.toFixed(2)})`);
+
+    // basketball: A picks it up by the hoop (B watches from the pitch), throws it (hold E), then sinks one
+    await travel(B, A, [...TRIALS, [62, -118]], -2.4);
+    await travel(A, B, [...TRIALS, [76, -125.6]], Math.PI);
+    await A.page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Pick up'), null, { timeout: 60000 }).catch(() => null);
+    await A.page.keyboard.press('KeyE');
+    const aId = await net(A.page, 'selfId');
+    await B.page.waitForFunction((id) => window.__toybox.hubplay.state().newest?.h === id, aId, { timeout: 60000, polling: 100 }).catch(() => null);
+    await B.page.waitForFunction(() => window.__toybox.hubplay.state().ball.held, null, { timeout: 60000, polling: 100 }).catch(() => null);
+    hb = await hp(B.page);
+    check('A picks up the ball (E); B sees A holding it', (await hp(A.page)).holding && hb.newest.h === aId && hb.ball.held && hb.ball.holder === aId, JSON.stringify(hb.ball));
+    await B.page.evaluate(() => window.__toybox.aim(-2.4 + Math.PI, 0.15));
+    await sleep(800);
+    await shot(B.page, 'online-08-B-sees-A-hold-the-ball.png');
+    await A.page.keyboard.down('KeyE');
+    await A.page.waitForFunction(() => (window.__toybox.hubplay.state().charge ?? 0) > 0.35, null, { timeout: 60000, polling: 50 }).catch(() => null);
+    await A.page.keyboard.up('KeyE');
+    await B.page.waitForFunction(() => { const n = window.__toybox.hubplay.state().newest; return n && n.h === null && Math.hypot(n.b[3], n.b[4], n.b[5]) > 1; }, null, { timeout: 60000, polling: 50 }).catch(() => null);
+    hb = await hp(B.page);
+    check('A holds E and lets go: the ball is thrown, and B sees it fly', !(await hp(A.page)).holding && hb.newest.h === null, JSON.stringify(hb.newest?.b));
+    await B.page.waitForFunction(() => { const n = window.__toybox.hubplay.state().newest; return n && !n.h && n.b[3] === 0 && n.b[4] === 0 && n.b[5] === 0; }, null, { timeout: 120000, polling: 250 }).catch(() => null);
+    const restB = (await hp(B.page)).newest.b;
+    // stand 2 cm from where it lies, on the side of its spot (always on the pitch)
+    const toSpot = Math.hypot(76 - restB[0], -128 - restB[2]) || 1;
+    await travel(A, B, [[restB[0] + ((76 - restB[0]) / toSpot) * 2, restB[2] + ((-128 - restB[2]) / toSpot) * 2]], Math.atan2(restB[0] - 76, restB[2] + 128));
+    await A.page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Pick up'), null, { timeout: 60000 }).catch(() => null);
+    await A.page.keyboard.press('KeyE');
+    await B.page.waitForFunction((id) => window.__toybox.hubplay.state().newest?.h === id, aId, { timeout: 60000, polling: 100 }).catch(() => null);
+    const shotYaw = Math.atan2(76 - 72, -137.2 + 125);
+    await travel(A, B, [[72, -125]], shotYaw);
+    const sol = await A.page.evaluate(() => window.__toybox.hubplay.solve());
+    await A.page.evaluate(([y, p]) => window.__toybox.hubplay.throw(y, p), [sol.yaw, sol.power]);
+    await B.page.waitForFunction(() => window.__toybox.hubplay.state().hoops >= 1, null, { timeout: 60000, polling: 100 }).catch(() => null);
+    await A.page.waitForFunction(() => window.__toybox.hubplay.state().mine >= 1, null, { timeout: 60000, polling: 100 }).catch(() => null);
+    await sleep(300);
+    await shot(B.page, 'online-09-B-sees-A-score-a-basket.png');
+    ha = await hp(A.page);
+    hb = await hp(B.page);
+    check('A sinks a basket: the room tally is 1 for both, and it counts as A\'s', ha.hoops === 1 && hb.hoops === 1 && ha.mine === 1 && hb.mine === 0, `power ${sol.power}; A ${ha.hoops}/${ha.mine}, B ${hb.hoops}/${hb.mine}`);
+    check('…and both HUDs show it', ((await A.page.textContent('[data-testid=hubplay-baskets]').catch(() => '')) || '').includes('Baskets 1') && ((await B.page.textContent('[data-testid=hubplay-baskets]').catch(() => '')) || '').includes('Baskets 1'));
+
+    // a goal: the test server lets A put the marble in front of the east net (hpdebug), then A kicks it in
+    await A.page.evaluate(() => window.__toybox.hubplay.place(101 - 11.8, -126));
+    await travel(A, B, [[101 - 14.2, -126]], Math.PI / 2);
+    await A.page.waitForFunction(() => { const n = window.__toybox.hubplay.state().newest; return n && Math.abs(n.m[0] - 89.2) < 0.05; }, null, { timeout: 60000, polling: 100 }).catch(() => null);
+    await A.page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Kick'), null, { timeout: 60000 }).catch(() => null);
+    await A.page.keyboard.press('KeyE');
+    await B.page.waitForFunction(() => window.__toybox.hubplay.state().score[0] === 1, null, { timeout: 60000, polling: 100 }).catch(() => null);
+    await B.page.evaluate(() => window.__toybox.aim(-Math.PI / 2 + 0.3, 0.2));
+    await sleep(500);
+    await shot(B.page, 'online-10-B-sees-the-goal.png');
+    ha = await hp(A.page);
+    hb = await hp(B.page);
+    check('A kicks the marble into the east net: a goal for Coral, 1 – 0 for both', ha.score.join() === '1,0' && hb.score.join() === '1,0' && ((await B.page.textContent('[data-testid=hubplay-goals]').catch(() => '')) || '').replace(/\s/g, '') === '1–0', `A ${ha.score} B ${hb.score}`);
+    await B.page.waitForFunction(() => { const n = window.__toybox.hubplay.state().newest; return n && n.n === 0 && Math.abs(n.m[0] - 26) < 0.01; }, null, { timeout: 60000, polling: 250 }).catch(() => null);
+    check('…and the marble goes back to the centre spot', Math.abs((await hp(B.page)).newest.m[0] - 26) < 0.01);
+    // back to spawn (the rest of the test stands there)
+    await travel(A, B, [[24, -108], [24, -40], [5, 21.5]], Math.PI);
+
     // Reconnect: C's socket drops without a leave; C resumes the same slot.
     const cId = await net(C.page, 'selfId');
     await net(C.page, 'drop');
@@ -341,6 +427,17 @@ const shot = (p, file) => p.screenshot({ path: path.join(OUT, file), timeout: T 
     check('…and closes the menu', !(await P.page.isVisible('[data-testid=emote-menu]')));
     await C.page.waitForFunction(() => window.__toybox.net.remotes().find((r) => r.name === 'Delta')?.lastEmote === 'cheer', null, { timeout: 20000, polling: 100 }).catch(() => null);
     check("C sees the phone's cheer", (await remoteBy(C.page, 'Delta'))?.lastEmote === 'cheer');
+    // touch: the phone's Interact button kicks the public room's marble, and C sees it roll
+    await P.page.waitForFunction(() => window.__toybox.hubplay.state().newest !== null, null, { timeout: 60000, polling: 250 }).catch(() => null);
+    const pm = (await hp(P.page)).newest.m;
+    await travel(P, C, [[pm[0] + 2.3, pm[1]]], -Math.PI / 2);
+    const kickBtn = await P.page.waitForSelector('.touch-btn--interact', { timeout: 60000 }).catch(() => null);
+    // layout size (the button pops in with a scale animation)
+    const kb = kickBtn ? await kickBtn.evaluate((e) => ({ width: e.offsetWidth, height: e.offsetHeight })) : null;
+    check('phone: next to the marble the touch Interact button reads Kick, ≥ 56 px', !!kb && kb.width >= 56 && kb.height >= 56 && ((await kickBtn.textContent()) || '').includes('Kick'), JSON.stringify(kb));
+    if (kickBtn) await P.page.tap('.touch-btn--interact');
+    await C.page.waitForFunction((x) => { const n = window.__toybox.hubplay.state().newest; return n && n.m[0] < x - 3; }, pm[0], { timeout: 60000, polling: 100 }).catch(() => null);
+    check('phone: tapping Kick kicks the shared marble, and C sees it roll', (await hp(C.page)).newest.m[0] < pm[0] - 3, `x ${pm[0]} → ${(await hp(C.page)).newest.m[0]}`);
 
     await P.page.setViewportSize({ width: 195, height: 422 });
     const L = await openPage(browser, 'Echo', phone(844, 390));

@@ -27,6 +27,8 @@ export const PALETTE = {
   blush: '#EE9A8E',
   /** Polished steel (the greeter knight's helmet, fencing foils). */
   steel: '#C9CED6',
+  /** The hub's basketball (src/scene/HubPlay.tsx). */
+  ballOrange: '#E8893F',
 
   // Room scale (muted, slightly desaturated so the toy layer reads first)
   roomWall: '#B7A99A',

@@ -15,6 +15,18 @@ import { clampToBounds } from '../src/game/collision';
 import { HUB_MAX_SPEED, HUB_MAX_Y, HUB_MOTION, HUB_SPAWN } from '../src/game/hubMotion';
 import { EMOTE_COOLDOWN, EMOTE_DURATION, type EmoteId } from '../src/game/emotes';
 import {
+  REACH_SLACK,
+  advanceHubPlay,
+  createHubPlay,
+  dropBall,
+  grabBall,
+  kickMarble,
+  throwBall,
+  type HubPlayState,
+  type PlayBody,
+  type PlayEvent,
+} from '../src/game/hubPlaySim';
+import {
   ERROR_TEXT,
   PRIVATE_ROOM_CAP,
   PRIVATE_ROOM_IDLE_MS,
@@ -25,7 +37,10 @@ import {
   type Activity,
   type ClientMsg,
   type ErrorCode,
+  type BallMsg,
   type HelloMsg,
+  type HubPlayWire,
+  type KickMsg,
   type Look,
   type MoveMsg,
   type PlayerInfo,
@@ -64,6 +79,12 @@ export const MOVE_BUDGET_SECONDS = 1;
 export const RESPAWN_SNAP_RADIUS = 1;
 /** Minimum gap between look (cosmetics) changes from one player (ms). */
 export const LOOK_COOLDOWN_MS = 500;
+/** Minimum gap between two marble kicks or pushes from one player (ms); faster ones are dropped. */
+export const KICK_COOLDOWN_MS = 120;
+/** Minimum gap between two basketball actions (pick up, throw) from one player (ms). */
+export const BALL_COOLDOWN_MS = 150;
+/** Most hub play events sent per snapshot (bounces and rattles beyond this are dropped). */
+export const MAX_PLAY_EVENTS = 12;
 
 const ALLOWED_SPEED = HUB_MAX_SPEED * MOVE_SPEED_TOLERANCE;
 
@@ -107,6 +128,8 @@ interface Player extends PlayerRecord {
   emoteUntil: number;
   lastEmoteAt: number;
   lastLookAt: number;
+  lastKickAt: number;
+  lastBallAt: number;
   /** Moves that had to be clamped (speed or bounds): diagnostics only. */
   clamped: number;
 }
@@ -140,6 +163,12 @@ export class HubRoom {
   private readonly byToken = new Map<string, Player>();
   /** Tournament lobbies hosted in this room (lobby.ts). */
   private readonly lobbies: LobbyBoard;
+  /** The room's shared marble and basketball (src/game/hubPlaySim.ts), stepped on the room clock. */
+  private play: HubPlayState = createHubPlay();
+  /** Room clock (ms) at hub play sim time 0; re-anchored when the room wakes from empty. */
+  private playEpoch: number | null = null;
+  private playEvents: PlayEvent[] = [];
+  private readonly matchDebug: boolean;
 
   /** Throws for an id that is neither `public-<n>` nor a valid room code. */
   constructor(opts: RoomOptions) {
@@ -153,6 +182,7 @@ export class HubRoom {
     this.random = opts.random;
     this.open = s.kind === 'public';
     this.lobbies = new LobbyBoard({ random: opts.random, debug: opts.matchDebug });
+    this.matchDebug = !!opts.matchDebug;
   }
 
   // ------------------------------------------------------------ inspection (directory, tests)
@@ -191,6 +221,10 @@ export class HubRoom {
   get lobbyBoard() {
     return this.lobbies;
   }
+  /** The shared marble and basketball (tests). */
+  get hubPlay(): Readonly<HubPlayState> {
+    return this.play;
+  }
   /** Is this resume token one of this room's players? */
   hasToken(token: string) {
     return this.byToken.has(token);
@@ -214,6 +248,7 @@ export class HubRoom {
     p.disconnectedAt = now;
     p.speed = 0;
     p.emote = null;
+    this.letGoOfBall(p, now);
     this.updateEmpty(now);
     return this.fromLobby(this.lobbies.playerDropped(p.id, now));
   }
@@ -243,7 +278,21 @@ export class HubRoom {
         return this.emote(p, msg.id, now);
       case 'activity':
         p.activity = msg.a;
-        if (msg.a) p.speed = 0;
+        if (msg.a) {
+          p.speed = 0;
+          this.letGoOfBall(p, now);
+        }
+        return [];
+      case 'kick':
+        return this.kick(p, msg, now);
+      case 'ball':
+        return this.ball(p, msg, now);
+      case 'hpdebug':
+        if (this.matchDebug) {
+          this.advancePlay(now);
+          Object.assign(this.play.marble, { x: msg.x, z: msg.z, vx: 0, vz: 0, inNet: null });
+          clampToBounds(this.play.marble, 1.3);
+        }
         return [];
       case 'look':
         return this.setLook(p, msg.look, now);
@@ -272,6 +321,7 @@ export class HubRoom {
       return out;
     }
     if (!this.byConn.size) return out;
+    this.advancePlay(now);
     const to: string[] = [];
     const states: PlayerState[] = [];
     for (const p of this.players.values()) {
@@ -279,7 +329,11 @@ export class HubRoom {
       if (p.conn) to.push(p.conn);
       states.push(this.state(p));
     }
-    out.push({ kind: 'send', to, msg: { t: 'snap', now, p: states } });
+    if (this.playEvents.length) {
+      out.push({ kind: 'send', to, msg: { t: 'play', e: this.playEvents.slice(0, MAX_PLAY_EVENTS) } });
+      this.playEvents = [];
+    }
+    out.push({ kind: 'send', to, msg: { t: 'snap', now, p: states, hp: this.hubPlayWire() } });
     return out;
   }
 
@@ -344,6 +398,8 @@ export class HubRoom {
       emoteUntil: 0,
       lastEmoteAt: -Infinity,
       lastLookAt: -Infinity,
+      lastKickAt: -Infinity,
+      lastBallAt: -Infinity,
       activity: null,
       disconnectedAt: null,
       account: null,
@@ -448,7 +504,9 @@ export class HubRoom {
   }
 
   private removePlayer(p: Player, now: number): Outgoing[] {
-    if (!this.players.delete(p.id)) return [];
+    if (!this.players.has(p.id)) return [];
+    this.letGoOfBall(p, now);
+    this.players.delete(p.id);
     if (p.conn) this.byConn.delete(p.conn);
     p.conn = null;
     this.byToken.delete(p.resume);
@@ -473,11 +531,85 @@ export class HubRoom {
     this.open = false;
     this.host = null;
     this.emptySince = null;
+    this.play = createHubPlay();
+    this.playEpoch = null;
+    this.playEvents = [];
   }
 
   private updateEmpty(now: number) {
     if (this.byConn.size) this.emptySince = null;
     else this.emptySince ??= now;
+  }
+
+  // ------------------------------------------------------------ hub play: the shared marble and basketball
+  /**
+   * Step the shared marble and ball (fixed STEP sub-steps) up to `now` on the room clock. The toys
+   * are the connected players walking the hub, where the server has them (their validated moves).
+   * While nobody is connected the sim pauses; it carries on from where it was when someone returns.
+   */
+  private advancePlay(now: number) {
+    const t = this.playEpoch === null ? null : (now - this.playEpoch) / 1000;
+    if (t === null || t < this.play.t - 0.5 || t > this.play.t + 1) {
+      // first use, or the room slept: re-anchor the sim clock here
+      this.playEpoch = now - this.play.t * 1000;
+      return;
+    }
+    advanceHubPlay(this.play, t, this.playBodies(), this.playEvents, 90);
+    if (this.playEvents.length > 4 * MAX_PLAY_EVENTS) this.playEvents.splice(0, this.playEvents.length - 4 * MAX_PLAY_EVENTS);
+  }
+
+  private playBodies(): PlayBody[] {
+    const out: PlayBody[] = [];
+    for (const p of this.players.values()) if (p.conn && !p.activity) out.push(this.body(p));
+    return out;
+  }
+
+  private body(p: Player): PlayBody {
+    return { id: p.id, x: p.x, y: p.y, z: p.z, yaw: p.yaw };
+  }
+
+  /**
+   * A kick (or a push, at a lower power). Checked: the player is in the hub (not in a trial), within
+   * reach of the marble where the server has them (plus REACH_SLACK for the time their last move
+   * took to arrive), not kicking it backwards through themselves, and not faster than
+   * KICK_COOLDOWN_MS (extra kicks are dropped).
+   */
+  private kick(p: Player, m: KickMsg, now: number): Outgoing[] {
+    if (p.activity || now - p.lastKickAt < KICK_COOLDOWN_MS) return [];
+    p.lastKickAt = now;
+    this.advancePlay(now);
+    kickMarble(this.play, this.body(p), m.dx, m.dz, m.p, REACH_SLACK, this.playEvents);
+    return [];
+  }
+
+  /** Pick up the basketball (in reach, nobody holding it) or throw it (only its holder). */
+  private ball(p: Player, m: BallMsg, now: number): Outgoing[] {
+    if (p.activity || now - p.lastBallAt < BALL_COOLDOWN_MS) return [];
+    p.lastBallAt = now;
+    this.advancePlay(now);
+    if (m.a === 'grab') grabBall(this.play, this.body(p), REACH_SLACK, this.playEvents);
+    else throwBall(this.play, this.body(p), m.yaw, m.p, this.playEvents);
+    return [];
+  }
+
+  /** A holder who leaves, drops or goes into a trial lets go: the ball falls from their hands. */
+  private letGoOfBall(p: Player, now: number) {
+    if (this.play.ball.holder !== p.id) return;
+    this.advancePlay(now);
+    dropBall(this.play, p.id, this.body(p), this.playEvents);
+  }
+
+  private hubPlayWire(): HubPlayWire {
+    const { marble: m, ball: b } = this.play;
+    const r = (v: number) => Math.round(v * 100) / 100;
+    return {
+      m: [r(m.x), r(m.z), r(m.vx), r(m.vz)],
+      n: m.inNet ? 1 : 0,
+      b: [r(b.x), r(b.y), r(b.z), r(b.vx), r(b.vy), r(b.vz)],
+      h: b.holder,
+      s: [this.play.score[0], this.play.score[1]],
+      k: this.play.hoops,
+    };
   }
 
   // ------------------------------------------------------------ message builders
