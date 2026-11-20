@@ -19,6 +19,12 @@ import { SiegeIcon, type SiegeIconId } from './icons';
 import { clearSiegeInput, queueSiegeInput } from './local';
 import './siege.css';
 
+/**
+ * A bar's fill as a horizontal scale (0–1), not a width: the HUD refreshes ten times a second and the
+ * fill eases between values, and a scale animates on the compositor where a width would lay the page
+ * out again on every frame of the ease.
+ */
+const fill = (v: number, of: number): CSSProperties => ({ transform: `scaleX(${of > 0 ? Math.min(1, Math.max(0, v / of)).toFixed(3) : 0})` });
 const clock = (ms: number) => { const t = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
 const BLOCK_TEXT = { self: 'That is you', out: 'Already out', cooldown: 'You sent one recently', protected: 'Just received one', full: 'Has two already' } as const;
 const statusText = (p: SiegePlayer) => ({ picking: 'Choosing', alive: 'In', downed: 'Down!', ghost: p.inArena ? 'Knocked out' : 'Ghost', prep: p.victoryAt >= 0 ? 'Boss slain!' : 'Ready', arena: 'Fighting' })[p.status];
@@ -153,8 +159,8 @@ export function SiegeHud({ getState, localId, contestants }: MinigameSceneProps<
     <div className="siege-top" aria-live="off">
       <div className="siege-clock" aria-label={arena ? `Arena ${clock(s.arenaT)}` : `${clock(s.runT)} of ${clock(s.config.durationMs)}`}><strong data-testid="siege-clock">{arena ? clock(s.arenaT) : clock(Math.min(s.runT, s.config.durationMs))}</strong><small>{next}</small></div>
       <div className="siege-bars">
-        <div className="siege-bar siege-bar--hp" aria-label={`Health ${Math.ceil(viewed.hp)} of ${viewed.stat.maxHp}`}><i style={{ width: `${(100 * viewed.hp) / viewed.stat.maxHp}%` }} /><span>{Math.ceil(viewed.hp)} / {viewed.stat.maxHp}</span></div>
-        <div className="siege-bar siege-bar--xp" aria-label={`Level ${viewed.level}`}><i style={{ width: `${(100 * viewed.xp) / viewed.xpNext}%` }} /><span data-testid="siege-level">Lv {viewed.level}</span></div>
+        <div className="siege-bar siege-bar--hp" aria-label={`Health ${Math.ceil(viewed.hp)} of ${viewed.stat.maxHp}`}><i style={fill(viewed.hp, viewed.stat.maxHp)} /><span>{Math.ceil(viewed.hp)} / {viewed.stat.maxHp}</span></div>
+        <div className="siege-bar siege-bar--xp" aria-label={`Level ${viewed.level}`}><i style={fill(viewed.xp, viewed.xpNext)} /><span data-testid="siege-level">Lv {viewed.level}</span></div>
       </div>
       <div className="siege-score"><strong>{viewed.points}</strong><small>pts · {arena ? `${viewed.arenaKOs} arena KOs` : `${viewed.kills} KOs`}</small></div>
     </div>
@@ -173,14 +179,14 @@ export function SiegeHud({ getState, localId, contestants }: MinigameSceneProps<
             <i style={{ background: p.cls ? CLASS_COLOUR[p.cls] : '#A8998A' }} />
             <span className="siege-name">{names(p.id)}</span>
             <span className="siege-row-meta">{statusText(p)} · Lv {p.level}{p.incoming.length && !arena ? ' · elite incoming!' : ''}</span>
-            {p.status === 'arena' && <span className="siege-row-hp"><b style={{ width: `${(100 * p.hp) / p.stat.maxHp}%` }} /></span>}
+            {p.status === 'arena' && <span className="siege-row-hp"><b style={fill(p.hp, p.stat.maxHp)} /></span>}
           </button>
         </li>;
       })}
     </ol>
 
-    {boss && <div className="siege-boss" data-testid="siege-boss"><strong>{BIGS.baron.name}</strong><div className="siege-bar siege-bar--boss"><i style={{ width: `${(100 * boss.hp) / boss.maxHp}%` }} /></div></div>}
-    {ally && <div className="siege-boss siege-boss--ally" data-testid="siege-ally"><strong>Your {BIGS.baron.name.replace(/^The /, '')}</strong><div className="siege-bar siege-bar--boss"><i style={{ width: `${(100 * ally.hp) / ally.maxHp}%` }} /></div></div>}
+    {boss && <div className="siege-boss" data-testid="siege-boss"><strong>{BIGS.baron.name}</strong><div className="siege-bar siege-bar--boss"><i style={fill(boss.hp, boss.maxHp)} /></div></div>}
+    {ally && <div className="siege-boss siege-boss--ally" data-testid="siege-ally"><strong>Your {BIGS.baron.name.replace(/^The /, '')}</strong><div className="siege-bar siege-bar--boss"><i style={fill(ally.hp, ally.maxHp)} /></div></div>}
     {incoming && <div className="siege-alert" role="status" data-testid="siege-incoming"><strong>Elite incoming from {names(incoming.from)}!</strong><span>Arrives in {Math.max(0, Math.ceil((incoming.at - s.runT) / 1000))} s</span></div>}
 
     {/* The prep window: after the boss (three chests) or at 5:00. */}

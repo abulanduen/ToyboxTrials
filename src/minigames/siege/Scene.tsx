@@ -73,6 +73,12 @@ const SHADOW = fade(0.28, PALETTE.ink);
 const TELEGRAPH = fade(0.42, FX.telegraph);
 const GHOST_MATERIAL = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.42, depthWrite: false, toneMapped: false });
 const HURT_MATERIAL = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, emissive: HURT_TINT, emissiveIntensity: 0.7 });
+/**
+ * The same look as TOY_MATERIAL, for the single (non-instanced) toys: the hero, elites, rivals. One
+ * material shared by instanced and plain meshes makes three.js rebuild its program-cache key (a long
+ * string) every time the draw order switches between them, several times a frame.
+ */
+const SOLO_MATERIAL = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0.05 });
 const BAR_BACK = new THREE.MeshBasicMaterial({ color: PALETTE.ink, toneMapped: false });
 const BAR_FILL = new THREE.MeshBasicMaterial({ color: PALETTE.coral, toneMapped: false });
 const BAR_GEOMETRY = new THREE.BoxGeometry(1, 0.22, 0.22);
@@ -103,11 +109,11 @@ class SiegeView {
   private readonly chests: THREE.InstancedMesh;
   private readonly chips: THREE.InstancedMesh;
   private readonly stars: THREE.InstancedMesh;
-  private readonly hero = new THREE.Mesh(undefined, TOY_MATERIAL);
+  private readonly hero = new THREE.Mesh(undefined, SOLO_MATERIAL);
   private readonly heroShadow = new THREE.Mesh(DISC_GEOMETRY, SHADOW);
   private readonly heroRing = new THREE.Mesh(RING_GEOMETRY, fade(0.7, PALETTE.honey));
   private readonly pickupRing = new THREE.Mesh(RING_GEOMETRY, fade(0.16, PALETTE.cream));
-  private readonly bigs: { mesh: THREE.Mesh; back: THREE.Mesh; fill: THREE.Mesh; line: THREE.Mesh; shadow: THREE.Mesh }[] = [];
+  private readonly bigs: { mesh: THREE.Mesh; back: THREE.Mesh; fill: THREE.Mesh; line: THREE.Mesh; shadow: THREE.Mesh; parts: THREE.Mesh[] }[] = [];
   private readonly ghosts: THREE.Mesh[] = [];
   /** Arena: the other toys still fighting, each with a class-coloured ring and a health bar. */
   private readonly rivals: { mesh: THREE.Mesh; ring: THREE.Mesh; shadow: THREE.Mesh; back: THREE.Mesh; fill: THREE.Mesh }[] = [];
@@ -125,6 +131,7 @@ class SiegeView {
   /** The arena is on screen (the Scene swaps the quilt for the ring). */
   arena = false;
   private kills = 0;
+  private readonly counts = [0, 0, 0, 0];
 
   constructor(caps: { mobs: number; projs: number; shots: number; gems: number; blasts: number; chests: number; bigs: number }, private readonly low: boolean) {
     mobGeometry ??= MOB_PARTS.map((parts) => bakeParts(parts));
@@ -154,13 +161,15 @@ class SiegeView {
     this.pickupRing.position.y = 0.08;
     for (const m of [this.hero, this.heroShadow, this.heroRing, this.pickupRing]) { m.raycast = () => {}; this.group.add(m); }
     for (let i = 0; i < caps.bigs; i++) {
-      const slot = { mesh: new THREE.Mesh(undefined, TOY_MATERIAL), back: new THREE.Mesh(BAR_GEOMETRY, BAR_BACK), fill: new THREE.Mesh(BAR_GEOMETRY, BAR_FILL), line: new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-H).translate(0, 0, 0.5), TELEGRAPH), shadow: new THREE.Mesh(DISC_GEOMETRY, SHADOW) };
-      for (const m of Object.values(slot)) { m.visible = false; m.raycast = () => {}; this.group.add(m); }
-      this.bigs.push(slot);
+      const mesh = new THREE.Mesh(undefined, SOLO_MATERIAL), back = new THREE.Mesh(BAR_GEOMETRY, BAR_BACK), fill = new THREE.Mesh(BAR_GEOMETRY, BAR_FILL);
+      const line = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-H).translate(0, 0, 0.5), TELEGRAPH), shadow = new THREE.Mesh(DISC_GEOMETRY, SHADOW);
+      const parts = [mesh, back, fill, line, shadow];
+      for (const m of parts) { m.visible = false; m.raycast = () => {}; this.group.add(m); }
+      this.bigs.push({ mesh, back, fill, line, shadow, parts });
     }
     for (let i = 0; i < 8; i++) { const g = new THREE.Mesh(undefined, GHOST_MATERIAL); g.visible = false; g.raycast = () => {}; this.group.add(g); this.ghosts.push(g); }
     for (let i = 0; i < 8; i++) {
-      const r = { mesh: new THREE.Mesh(undefined, TOY_MATERIAL), ring: new THREE.Mesh(RING_GEOMETRY, fade(0.7, PALETTE.honey)), shadow: new THREE.Mesh(DISC_GEOMETRY, SHADOW), back: new THREE.Mesh(BAR_GEOMETRY, BAR_BACK), fill: new THREE.Mesh(BAR_GEOMETRY, BAR_FILL) };
+      const r = { mesh: new THREE.Mesh(undefined, SOLO_MATERIAL), ring: new THREE.Mesh(RING_GEOMETRY, fade(0.7, PALETTE.honey)), shadow: new THREE.Mesh(DISC_GEOMETRY, SHADOW), back: new THREE.Mesh(BAR_GEOMETRY, BAR_BACK), fill: new THREE.Mesh(BAR_GEOMETRY, BAR_FILL) };
       for (const m of Object.values(r)) { m.visible = false; m.raycast = () => {}; this.group.add(m); }
       this.rivals.push(r);
     }
@@ -199,9 +208,14 @@ class SiegeView {
     mesh.setMatrixAt(i, this.obj.matrix);
     if (colour) mesh.setColorAt(i, colour);
   }
+  /** Show the first `n` instances and upload only those (not the whole pool sized to the gameplay cap). */
   private finish(mesh: THREE.InstancedMesh, n: number) {
     mesh.count = n; mesh.visible = n > 0;
-    if (n) { mesh.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true; }
+    if (!n) return;
+    const m = mesh.instanceMatrix;
+    m.clearUpdateRanges(); m.addUpdateRange(0, n * 16); m.needsUpdate = true;
+    const c = mesh.instanceColor;
+    if (c) { c.clearUpdateRanges(); c.addUpdateRange(0, n * 3); c.needsUpdate = true; }
   }
 
   frame(s: SiegeState | null, localId: string, dt: number) {
@@ -231,7 +245,7 @@ class SiegeView {
       this.hero.rotation.set(fallen ? -H * 0.9 : 0, Math.atan2(viewed.fx, viewed.fz), moving ? Math.sin(sec * 11) * 0.08 : 0);
       // A toy out of the run lies where it fell on its own board (its ghost hovers above); in the arena it is gone.
       this.hero.visible = !blink && !(inArena && viewed.status === 'ghost');
-      this.hero.material = inArena && bt - viewed.hurtAt < 110 && Math.floor(bt / 70) % 2 === 0 ? HURT_MATERIAL : TOY_MATERIAL;
+      this.hero.material = inArena && bt - viewed.hurtAt < 110 && Math.floor(bt / 70) % 2 === 0 ? HURT_MATERIAL : SOLO_MATERIAL;
     }
     this.bar(this.heroBack, this.heroFill, viewed.x, viewed.z, Math.max(0, viewed.hp / viewed.stat.maxHp), inArena && viewed.status === 'arena');
     this.heroShadow.position.set(viewed.x, 0.09, viewed.z);
@@ -242,7 +256,7 @@ class SiegeView {
     this.pickupRing.position.set(viewed.x, 0.08, viewed.z); this.pickupRing.scale.setScalar(viewed.stat.pickup);
 
     // ---------------- the swarm
-    const counts = [0, 0, 0, 0];
+    const counts = this.counts; counts.fill(0);
     for (let i = 0; i < b.mobs.length; i++) {
       const m = b.mobs[i];
       const before = this.prevSerial[i];
@@ -257,30 +271,31 @@ class SiegeView {
       obj.scale.setScalar(1);
       this.put(mesh, n, bt - m.hurt < 110 ? tint(HURT_TINT) : WHITE);
     }
-    this.mobs.forEach((mesh, k) => this.finish(mesh, counts[k]));
+    for (let k = 0; k < this.mobs.length; k++) this.finish(this.mobs[k], counts[k]);
 
     // ---------------- elites and the boss
-    b.bigs.forEach((g, i) => {
-      const slot = this.bigs[i];
-      if (!slot) return;
+    for (let i = 0; i < b.bigs.length; i++) {
+      const g = b.bigs[i], slot = this.bigs[i];
+      if (!slot) continue;
       const was = this.prevBig[i];
       if (was && (!g.on || g.serial !== was)) { this.burst(this.prevBigX[i], 2, this.prevBigZ[i], this.low ? 8 : 18, PALETTE.honey, 1, 14, 0.5); this.sounds.push('kill'); }
       this.prevBig[i] = g.on ? g.serial : 0;
-      for (const m of Object.values(slot)) m.visible = g.on;
+      for (let k = 0; k < slot.parts.length; k++) slot.parts[k].visible = g.on;
       const ring = this.allyRings[i];
       if (ring) ring.visible = g.on && inArena;
-      if (!g.on) return;
+      if (!g.on) continue;
       this.prevBigX[i] = g.x; this.prevBigZ[i] = g.z;
       const look = BIG_MODEL[g.type], d = BIGS[g.type];
       slot.mesh.geometry = toyGeometry(look.kind);
-      slot.mesh.material = bt - g.hurt < 110 && Math.floor(bt / 70) % 2 === 0 ? HURT_MATERIAL : TOY_MATERIAL; // flicker, so a big toy under fire still reads
+      slot.mesh.material = bt - g.hurt < 110 && Math.floor(bt / 70) % 2 === 0 ? HURT_MATERIAL : SOLO_MATERIAL; // flicker, so a big toy under fire still reads
       const shake = g.mode === 1 ? Math.sin(bt / 25) * 0.15 : 0;
       slot.mesh.position.set(g.x + shake, g.mode === 2 ? 0.4 : Math.abs(Math.sin(sec * 4)) * 0.2, g.z);
       slot.mesh.rotation.set(0, g.mode ? Math.atan2(g.aimX, g.aimZ) : Math.atan2(viewed.x - g.x, viewed.z - g.z), 0);
       const scale = look.scale * (inArena ? FINALE.ally.scale : 1);
       slot.mesh.scale.setScalar(scale);
       if (ring && inArena) {
-        const owner = s.players.find((q) => q.id === g.from);
+        let owner: SiegePlayer | undefined;
+        for (let j = 0; j < s.players.length; j++) if (s.players[j].id === g.from) owner = s.players[j];
         (ring.material as THREE.MeshBasicMaterial).color.set(owner?.cls ? CLASS_COLOUR[owner.cls] : PALETTE.honey);
         ring.position.set(g.x, 0.11, g.z); ring.scale.setScalar(g.r * 1.25);
       }
@@ -294,11 +309,12 @@ class SiegeView {
         const length = inArena ? (FINALE.ally.dashSpeed * FINALE.ally.dashMs) / 1000 + g.r : (d.dashSpeed * d.dashMs) / 1000 + g.r;
         slot.line.position.set(g.x, 0.12, g.z); slot.line.rotation.set(0, Math.atan2(g.aimX, g.aimZ), 0); slot.line.scale.set(g.r * 2, 1, length);
       }
-    });
+    }
 
     // ---------------- gems, biscuits, chests
     let ng = 0, ns = 0;
-    for (const g of b.gems) {
+    for (let i = 0; i < b.gems.length; i++) {
+      const g = b.gems[i];
       if (!g.on) continue;
       if (g.kind === 1) { if (ns < 24) { obj.position.set(g.x, 0.1, g.z); obj.rotation.set(0, sec, 0); obj.scale.setScalar(1); this.put(this.snacks, ns++, WHITE); } continue; }
       obj.position.set(g.x, 0.6 + Math.sin(sec * 3 + g.x) * 0.15, g.z); obj.rotation.set(0, sec * 2 + g.z, 0);
@@ -307,7 +323,7 @@ class SiegeView {
     }
     this.finish(this.gems, ng); this.finish(this.snacks, ns);
     let nc = 0;
-    for (const c of b.chests) { if (!c.on) continue; obj.position.set(c.x, Math.abs(Math.sin(sec * 3)) * 0.3, c.z); obj.rotation.set(0, sec * 0.8, 0); obj.scale.setScalar(1.15); this.put(this.chests, nc++, WHITE); }
+    for (let i = 0; i < b.chests.length; i++) { const c = b.chests[i]; if (!c.on) continue; obj.position.set(c.x, Math.abs(Math.sin(sec * 3)) * 0.3, c.z); obj.rotation.set(0, sec * 0.8, 0); obj.scale.setScalar(1.15); this.put(this.chests, nc++, WHITE); }
     this.finish(this.chests, nc);
 
     // ---------------- projectiles
@@ -320,7 +336,7 @@ class SiegeView {
       if (q.kind === 0) { obj.scale.setScalar(0.75); this.put(this.corks, nk++, tint(WEAPON_COLOUR.popgun)); }
       else { obj.rotation.set(0, Math.atan2(q.vx, q.vz), Math.sin(sec * 8) * 0.3); obj.scale.setScalar(1.3); this.put(this.planes, np++, tint(WEAPON_COLOUR.planes)); }
     }
-    for (const sh of b.shots) { if (!sh.on) continue; obj.position.set(sh.x, 1.2, sh.z); obj.rotation.set(0, 0, 0); obj.scale.setScalar(sh.r * 1.6); this.put(this.shots, nb++, tint(SHOT_COLOUR)); }
+    for (let i = 0; i < b.shots.length; i++) { const sh = b.shots[i]; if (!sh.on) continue; obj.position.set(sh.x, 1.2, sh.z); obj.rotation.set(0, 0, 0); obj.scale.setScalar(sh.r * 1.6); this.put(this.shots, nb++, tint(SHOT_COLOUR)); }
     for (const q of s.players) {
       if (inArena ? q.status !== 'arena' : q !== viewed || q.status !== 'alive') continue;
       for (const w of q.weapons) {
@@ -333,8 +349,9 @@ class SiegeView {
 
     // ---------------- area hits
     let nr = 0, na = 0, nd = 0, nm = 0;
-    b.blasts.forEach((k, i) => {
-      if (!k.on) { this.prevBlast[i] = 0; return; }
+    for (let i = 0; i < b.blasts.length; i++) {
+      const k = b.blasts[i];
+      if (!k.on) { this.prevBlast[i] = 0; continue; }
       const fresh = this.prevBlast[i] === 0;
       if (fresh) this.sounds.push(k.kind === 0 ? 'sweep' : k.kind === 1 ? 'chime' : k.kind === 2 ? 'marble' : 'revive');
       const landed = k.done && this.prevBlast[i] < 2;
@@ -343,19 +360,19 @@ class SiegeView {
       if (k.kind === 0) { // bayonet sweep
         if (k.arc >= 360) { obj.position.set(k.x, 0.35, k.z); obj.rotation.set(0, 0, 0); obj.scale.setScalar(k.r * (0.6 + 0.4 * easeOut(t))); this.put(this.rings, nr++, tint(FX.sweep)); }
         else { obj.position.set(k.x, 0.35, k.z); obj.rotation.set(0, k.ang + (t - 0.5) * 0.5, 0); obj.scale.setScalar(k.r * (0.7 + 0.3 * easeOut(t))); this.put(this.arcs, na++, tint(FX.sweep)); }
-        return;
+        continue;
       }
       if (!k.done) { // fuse / falling marble: a target ring, and the marble itself
         obj.position.set(k.x, 0.12, k.z); obj.rotation.set(0, 0, 0); obj.scale.setScalar(k.r * 0.9); this.put(this.rings, nr++, tint(k.kind === 2 ? FX.marble : FX.chime));
         if (k.kind === 2) { const f = 1 - k.age / k.delay; obj.position.set(k.x, 0.8 + 14 * f * f, k.z); obj.scale.setScalar(1.3); this.put(this.marbles, nm++, tint(FX.marble)); }
-        return;
+        continue;
       }
       if (landed && !this.low) this.burst(k.x, 0.6, k.z, k.kind === 3 ? 10 : 4, k.kind === 1 ? FX.chimeCore : k.kind === 3 ? FX.revive : FX.marble, k.kind === 1 || k.kind === 3 ? 1 : 0, 8, 0.3);
       const u = (k.age - k.delay) / Math.max(1, k.life - k.delay);
       obj.position.set(k.x, 0.14, k.z); obj.rotation.set(0, 0, 0); obj.scale.setScalar(k.r * (0.35 + 0.65 * easeOut(Math.min(1, u))));
       this.put(this.discs, nd++, tint(k.kind === 1 ? FX.chime : k.kind === 3 ? FX.revive : FX.marble));
       this.put(this.rings, nr++, tint(k.kind === 1 ? FX.chimeCore : FX.revive));
-    });
+    }
     this.finish(this.rings, nr); this.finish(this.arcs, na); this.finish(this.discs, nd); this.finish(this.marbles, nm);
 
     // ---------------- ghosts watching this board (you can see the other ghosts)
@@ -378,7 +395,7 @@ class SiegeView {
       const moving = Math.hypot(q.ax, q.ay) > 0.1;
       r.mesh.visible = r.ring.visible = r.shadow.visible = true;
       r.mesh.geometry = geometryFor(q.cls);
-      r.mesh.material = bt - q.hurtAt < 110 && Math.floor(bt / 70) % 2 === 0 ? HURT_MATERIAL : TOY_MATERIAL;
+      r.mesh.material = bt - q.hurtAt < 110 && Math.floor(bt / 70) % 2 === 0 ? HURT_MATERIAL : SOLO_MATERIAL;
       r.mesh.position.set(q.x, moving ? Math.abs(Math.sin(sec * 11 + ri)) * 0.25 : 0, q.z);
       r.mesh.rotation.set(0, Math.atan2(q.fx, q.fz), moving ? Math.sin(sec * 11 + ri) * 0.08 : 0);
       (r.ring.material as THREE.MeshBasicMaterial).color.set(CLASS_COLOUR[q.cls]);
@@ -391,7 +408,8 @@ class SiegeView {
     // ---------------- particles (simulation-time when paused? they settle in real time; cosmetic only)
     let nchip = 0, nstar = 0;
     const step = Math.min(dt, 0.1);
-    for (const p of this.particles) {
+    for (let i = 0; i < this.particles.length; i++) {
+      const p = this.particles[i];
       if (!p.on) continue;
       p.age += step;
       if (p.age >= p.life) { p.on = false; continue; }
@@ -478,7 +496,17 @@ const PLAY: Record<SiegeCue, () => void> = {
 
 export function SiegeScene({ getState, localId }: MinigameSceneProps<SiegeState>) {
   const low = useGame((s) => s.quality === 'low');
-  const { camera } = useThree();
+  const { camera, gl } = useThree();
+  // Nothing in a Siege match casts a moving shadow (toys, mobs and effects use blob shadows; the room and
+  // the play mats are still), so the sun's shadow map is drawn when the set changes, not every frame:
+  // on Balanced and High that is a whole depth pass of the room (about 50 draw calls into a 2048- or
+  // 4096-texel map) saved per frame. Restored when the trial's scene unmounts.
+  const shadowRefresh = useRef(3);
+  useEffect(() => {
+    const map = gl.shadowMap, before = map.autoUpdate;
+    map.autoUpdate = false; map.needsUpdate = true;
+    return () => { map.autoUpdate = before; map.needsUpdate = true; };
+  }, [gl]);
   const view = useMemo(() => {
     const c = getState()?.config;
     // Sized for the busier of a board and the arena (twice the projectile pools, one summoned boss per toy).
@@ -502,11 +530,15 @@ export function SiegeScene({ getState, localId }: MinigameSceneProps<SiegeState>
     } });
   }, [getState, localId]);
   const quiltRef = useRef<THREE.Group>(null), ringRef = useRef<THREE.Group>(null);
+  const shownArena = useRef<boolean | null>(null);
   useFrame((_, dt) => {
     const s = getState();
     view.frame(s, localId, dt);
     if (quiltRef.current) quiltRef.current.visible = !view.arena;
     if (ringRef.current) ringRef.current.visible = view.arena;
+    // Redraw the shadow map for the first few frames (the set mounts with this scene) and when the set swaps.
+    if (shownArena.current !== view.arena) { shownArena.current = view.arena; shadowRefresh.current = Math.max(shadowRefresh.current, 2); }
+    if (shadowRefresh.current > 0) { shadowRefresh.current--; gl.shadowMap.needsUpdate = true; }
     if (s && !useMatch.getState().paused) for (const cue of view.sounds) if (limiter.allow(cue, s.t)) PLAY[cue]();
     const persp = camera as THREE.PerspectiveCamera;
     // About 50 cm across in landscape and 20 cm across (40 cm tall) in portrait, centred on the toy,

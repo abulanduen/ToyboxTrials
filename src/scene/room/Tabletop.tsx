@@ -80,7 +80,9 @@ function TableBody({ tb, top, edge, pedestal }: { tb: Tb; top: THREE.Material; e
           {/* three drawers on the side facing the room, each with a knob */}
           {[0, 1, 2].map((i) => (
             <group key={i} position={[0, ph / 2 - 4 - (i + 0.5) * ((ph - 8) / 3), (d - 4) / 2]}>
-              <mesh position={[0, 0, 0.6]} material={top}>
+              {/* receiveShadow like the table top it shares a material with: a material drawn by meshes that
+                  differ in receiveShadow makes three.js rebuild its program-cache key at every switch, each frame */}
+              <mesh position={[0, 0, 0.6]} material={top} receiveShadow>
                 <boxGeometry args={[pedestal.w - 3, (ph - 8) / 3 - 1.6, 1.2]} />
               </mesh>
               <mesh position={[0, 0, 1.9]} material={pedestal.knob}>
