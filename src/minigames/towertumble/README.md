@@ -373,7 +373,7 @@ Re-measured 20 November 2026 with the player rail, status badges and the damage 
 
 | Layout | Draw calls | Triangles | Geometries | Meshes in scene | Live effect particles |
 |---|---|---|---|---|---|
-| Desktop 1280×800 | 69 | 33,288 | 160 | 186 | 60 |
+| Desktop 1280×800 | 71 | 35,380 | 156 | 186 | 54 |
 | Phone portrait 390×844 | 70 | 31,482 | 148 | 186 | 60 |
 | Phone landscape 844×390 | 76 | 34,644 | 159 | 186 | 60 |
 
