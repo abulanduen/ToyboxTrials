@@ -3,7 +3,10 @@
  * The online server runs the same code as the authority, so these also pin down online behaviour.
  */
 import { describe, expect, it } from 'vitest';
-import { isWalkable } from '../../src/game/hubBounds';
+import { GATES_WALK, isWalkable } from '../../src/game/hubBounds';
+import { overlaps, type Collider } from '../../src/game/collision';
+import { INTERACTABLES } from '../../src/game/interactables';
+import { GATES, GATE_ROAD, GATE_STAND, gateLocal, hubColliders } from '../../src/scene/layout';
 import { BALL, BRIDGE_DECK, HOOP, MARBLE, NET, NETS, PITCH_CENTRE, rollFloorAt } from '../../src/game/hubPlay';
 import {
   BALL_IDLE_RESET,
@@ -38,6 +41,56 @@ function kickFrom(s: HubPlayState, x: number, z: number, dx: number, dz: number,
   const b = body('p1', x - (dx / l) * 2.2, z - (dz / l) * 2.2, Math.atan2(dx, dz));
   return kickMarble(s, b, dx, dz, p, 0, ev);
 }
+
+describe('where the hub play objects stand', () => {
+  const all = hubColliders();
+  const mine = (c: Collider) => c.id?.startsWith('hp-');
+  const others = all.filter((c) => !mine(c) && c.top > 0.6);
+  const hits = (x: number, z: number, r: number, list = others) => list.filter((c) => overlaps(c, x, z, r)).map((c) => c.id);
+
+  it('the nets and the hoop are in the layout, on the trials table, clear of every gate, arch, tree and prop', () => {
+    const hp = all.filter(mine);
+    expect(hp.length).toBe(11); // 2 × (2 posts + 2 sides + back) + the hoop's pole
+    for (const c of hp) {
+      expect(isWalkable(c.x, c.z, 0, [GATES_WALK]), c.id).toBe(true);
+      const r = c.kind === 'circle' ? c.r : Math.hypot(c.hx, c.hz);
+      // a toy can walk all the way round each piece: 2 cm clear of anything else solid
+      expect(hits(c.x, c.z, r + 2), c.id).toEqual([]);
+    }
+    // a gate's stand spot and the way through its arch are not touched (hub-layout.test.ts checks the roads)
+    for (const g of GATES) for (const lz of [GATE_ROAD, GATE_STAND, 0]) {
+      const p = gateLocal(g, 0, lz);
+      expect(hp.filter((c) => overlaps(c, p.x, p.z, 1.5)).map((c) => c.id), g.id).toEqual([]);
+    }
+  });
+
+  it("each net's mouth faces the pitch with nothing in front of it, and the end arch stands behind it across the road", () => {
+    for (const n of NETS) {
+      for (let d = 0.5; d <= 14; d += 0.5)
+        for (const dz of [-NET.width / 2, 0, NET.width / 2]) expect(hits(n.mouthX + n.dir * d, n.z + dz, MARBLE.r), `${n.id} ${d} ${dz}`).toEqual([]);
+      const arch = GATES.find((g) => g.game === (n.id === 'w' ? 'inferno-escape' : 'spellbox-showdown'))!;
+      expect(arch.z).toBe(n.z);
+      expect((arch.x - n.backX) * n.dir).toBeLessThan(-5); // behind the net, beyond the loop road
+    }
+    // the centre spot, the ball's spot and the space under the rim are clear
+    expect(hits(PITCH_CENTRE.x, PITCH_CENTRE.z, MARBLE.r + 1)).toEqual([]);
+    expect(hits(BALL.spot.x, BALL.spot.z, BALL.r + 2, all.filter((c) => c.top > 0.6))).toEqual([]);
+    expect(hits(HOOP.rim.x, HOOP.rim.z, HOOP.rim.r + 1, all.filter((c) => c.top > 0.6 && c.id !== 'hp-hoop-pole'))).toEqual([]);
+    // a free shot: nothing taller than the rim's height between the ball's spot and the rim
+    for (let k = 0; k <= 1; k += 0.05) {
+      const x = BALL.spot.x + (HOOP.rim.x - BALL.spot.x) * k;
+      const z = BALL.spot.z + (HOOP.rim.z - BALL.spot.z) * k;
+      expect(all.filter((c) => c.id !== 'hp-hoop-pole' && c.top > 3 && overlaps(c, x, z, 1)).map((c) => c.id)).toEqual([]);
+    }
+  });
+
+  it('the marble is the Push secret it always was, now a Kick, and the ball has its prompts', () => {
+    const marble = INTERACTABLES.find((i) => i.id === 'marble')!;
+    expect([marble.x, marble.z, marble.verb, marble.secret]).toEqual([MARBLE.home.x, MARBLE.home.z, 'Kick', true]);
+    expect(INTERACTABLES.find((i) => i.id === 'ball')).toMatchObject({ verb: 'Pick up', label: 'the basketball' });
+    expect(INTERACTABLES.find((i) => i.id === 'ball-throw')).toMatchObject({ verb: 'Hold to throw' });
+  });
+});
 
 describe('the shared marble', () => {
   it('starts where the secret always was, rolls about a third of a metre from a full kick and stops', () => {
