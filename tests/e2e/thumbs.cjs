@@ -27,7 +27,7 @@ const MOMENT = {
   'jack-in-the-box': 7000,
   'odd-page-out': 6000,
   'toy-tower-tumble': 26000,
-  // Staged (STAGE below): the class pick, then the swarm with every elite and the boss at 4:05.
+  // Staged (STAGE below): the class pick, then the swarm with every elite and the boss at 4:01.
   'toybox-siege': 0,
 };
 
@@ -45,18 +45,20 @@ const STAGE = {
       for (const p of s.players) p.invuln = 1e12;
       const me = s.players.find((p) => p.id === 'you');
       me.xpNext = 1e9;
-      me.weapons = [['popgun', 5, true], ['chime', 5], ['yoyo', 4], ['marbles', 4]].map(([id, level, evolved = false]) => ({ id, level, evolved, cd: 100, aux: 0 }));
+      me.weapons = [['popgun', 4], ['chime', 3], ['yoyo', 3], ['marbles', 3]].map(([id, level, evolved = false]) => ({ id, level, evolved, cd: 100, aux: 0 }));
       me.passives = [{ id: 'gears', level: 3 }, { id: 'magnifier', level: 3 }, { id: 'crayon', level: 2 }];
-      s.runT = 228000;
+      s.runT = 233000;
     });
     await page.evaluate(() => window.__toybox.match.timeScale(3));
-    await page.waitForFunction(() => { const s = window.__toybox.match.state(); return s.runT >= 245000; }, null, { polling: 100 });
+    await page.waitForFunction(() => { const s = window.__toybox.match.state(); return s.runT >= 240400 && s.players.find((p) => p.id === 'you').board.bigs.some((g) => g.on && g.type === 'baron'); }, null, { polling: 100 });
+    await page.evaluate(() => window.__toybox.match.timeScale(1));
     await page.evaluate(() => {
       const s = window.__toybox.match.state(), me = s.players.find((p) => p.id === 'you');
-      const at = [[8, -6], [-9, -5], [6, 7], [-7, 6]];
-      me.board.bigs.filter((g) => g.on).forEach((g, i) => { g.x = me.x + at[i % 4][0]; g.z = me.z + at[i % 4][1]; g.mode = 0; });
+      // The Baron and the elites close around the toy, in frame, and not yet worn down.
+      const spots = { baron: [7, -4], bear: [-8, -3], drummer: [-5, 6], rhino: [8, 6] };
+      for (const g of me.board.bigs) if (g.on) { const [x, z] = spots[g.type]; g.x = me.x + x; g.z = me.z + z; g.mode = 0; g.dashT = 1e9; g.hp = g.maxHp; }
     });
-    await page.waitForFunction(() => window.__toybox.match.state().runT >= 246500, null, { polling: 100 });
+    await page.waitForFunction(() => window.__toybox.match.state().runT >= 241100, null, { polling: 100 });
   },
 };
 
