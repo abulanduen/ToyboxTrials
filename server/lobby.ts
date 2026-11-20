@@ -185,6 +185,8 @@ export class LobbyBoard {
         const l = this.byPlayer.get(p.id);
         const m = l?.members.find((x) => x.id === p.id);
         if (!l || !m) return [this.err(p.id, 'not_in_lobby')];
+        // Pressed in a phase the match has already left: stale, so it can't skip the next card.
+        if (msg.phase && l.flow?.phase !== msg.phase) return [];
         m.ready = msg.ready;
         return this.broadcastState(l, now);
       }

@@ -1,6 +1,6 @@
 /**
- * The facts about each trial that the online game server needs: category, field size, tournament
- * eligibility and the formats a trial may appear in. Pure data (no React, no lazy imports), so the
+ * The facts about each trial that the online game server needs: category, group (party or
+ * strategy), field size, tournament eligibility and the formats a trial may appear in. Pure data (no React, no lazy imports), so the
  * server can import it; the client's registry.ts holds the full catalogue, and
  * tests/unit/lobby-match.test.ts checks the two agree.
  *
@@ -9,11 +9,13 @@
  */
 import type { MinigameId } from './ids';
 import type { TournamentFormat } from './tournament';
-import type { MinigameCategory } from './types';
+import type { MinigameCategory, TrialGroup } from './types';
 
 export interface GameFacts {
   id: MinigameId;
   category: MinigameCategory;
+  /** Mirrors the registry's `group` (absent = party): strategy trials are tournament finales only. */
+  group?: TrialGroup;
   players: { min: number; max: number };
   /** Typical round length in seconds [min, max]. */
   durationSec: [number, number];
@@ -41,6 +43,9 @@ const f = (id: MinigameId, category: MinigameCategory, min: number, durationSec:
   ...(heldInputs ? { heldInputs } : {}),
 });
 
+/** The strategy trials' eligibility: tournaments, but only the longer formats (as their finale). */
+const FINALE: GameFacts['eligibility'] = { tournament: true, formats: ['normal', 'treasure'] };
+
 export const GAME_FACTS: Partial<Record<MinigameId, GameFacts>> = {
   'copycat-conductor': f('copycat-conductor', 'memory', 1, [60, 180]),
   'inferno-escape': f('inferno-escape', 'survival', 2, [60, 120], undefined, true),
@@ -50,14 +55,13 @@ export const GAME_FACTS: Partial<Record<MinigameId, GameFacts>> = {
   'blink-duel': f('blink-duel', 'pvp', 2, [45, 120]),
   'wind-up-dash': f('wind-up-dash', 'racing', 2, [20, 75]),
   'music-box-rhythm': f('music-box-rhythm', 'rhythm', 1, [60, 80]),
-  // Owner decision (19 Nov 2026): the full 5–10 minute game, but only in the longer formats.
-  'toy-squad': f('toy-squad', 'strategy', 1, [300, 630], { tournament: true, formats: ['normal', 'treasure'] }),
+  // Owner decisions (19 and 20 Nov 2026): the strategy trials only close Normal and Treasure tournaments.
+  'toy-squad': { ...f('toy-squad', 'strategy', 1, [300, 630], FINALE), group: 'strategy' },
   'spellbox-showdown': { ...f('spellbox-showdown', 'pvp', 2, [90, 180]), skipStartCountdown: true },
   'jack-in-the-box': f('jack-in-the-box', 'knowledge', 2, [60, 240]),
   'odd-page-out': f('odd-page-out', 'observation', 1, [60, 145]),
-  'toy-tower-tumble': f('toy-tower-tumble', 'strategy', 1, [300, 600], { tournament: false }),
-  // A five-minute run: casual and practice only for now (registry decision, see siege/README.md).
-  'toybox-siege': { ...f('toybox-siege', 'survival', 1, [300, 390], { tournament: false }), skipStartCountdown: true },
+  'toy-tower-tumble': { ...f('toy-tower-tumble', 'strategy', 1, [300, 600], FINALE), group: 'strategy' },
+  'toybox-siege': { ...f('toybox-siege', 'survival', 1, [300, 390], FINALE), group: 'strategy', skipStartCountdown: true },
 };
 
 /** Every trial the online server can run. */

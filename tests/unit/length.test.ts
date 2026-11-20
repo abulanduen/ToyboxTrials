@@ -1,6 +1,6 @@
 /** Trial length classes and labels (src/minigames/length.ts), derived from `durationSec`. */
 import { describe, expect, it } from 'vitest';
-import { byLength, durationChip, durationLabel, lengthClassOf } from '../../src/minigames/length';
+import { GROUP_ORDER, byLength, durationChip, durationLabel, groupDurationLabel, inGroup, lengthClassOf } from '../../src/minigames/length';
 import { MINIGAMES } from '../../src/minigames/registry';
 
 const d = (lo: number, hi: number) => ({ durationSec: [lo, hi] as [number, number] });
@@ -40,5 +40,17 @@ describe('length classes', () => {
     const long = MINIGAMES.filter((g) => lengthClassOf(g) === 'long').map((g) => g.id);
     expect(long).toEqual(['toy-squad', 'toy-tower-tumble', 'toybox-siege']);
     expect(sorted).toEqual([...MINIGAMES.filter((g) => lengthClassOf(g) !== 'long').map((g) => g.id), ...long]);
+  });
+});
+
+describe('trial groups for the pickers', () => {
+  it('splits the catalogue into party and strategy sections, each game in exactly one', () => {
+    const sections = GROUP_ORDER.map((g) => inGroup(MINIGAMES, g).map((x) => x.id));
+    expect(sections.flat().sort()).toEqual(MINIGAMES.map((g) => g.id).sort());
+    expect(sections[1].sort()).toEqual(['toy-squad', 'toy-tower-tumble', 'toybox-siege']);
+  });
+  it('labels a section with the span of its lengths', () => {
+    expect(groupDurationLabel([d(20, 75), d(60, 240)])).toBe('about 1–4 min each');
+    expect(groupDurationLabel([])).toBe('');
   });
 });

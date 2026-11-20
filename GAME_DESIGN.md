@@ -18,7 +18,7 @@ Conductor implementation. Amendment A1 records the earlier Base44 decision, not 
 
 **Implemented in this branch:** explorable 3D hub, menu, Workshop, local persistence, Copycat
 Conductor, Jack-in-the-Box, Inferno Escape, Midnight Hunger, Toy Squad, Blink Duel and Spellbox Showdown, with local
-practice/bots. Local unranked Blitz/Normal/Treasure tournaments include all except Toy Squad.
+practice/bots. Local unranked Blitz/Normal/Treasure tournaments: see **Tournament selection** below.
 **Not implemented here:** the other four games (Claude's separate work), online
 multiplayer, matchmaking, ranked ratings or online leaderboards.
 Registry eligibility flags describe intended use, not available online/ranked modes.
@@ -96,6 +96,18 @@ Treasure rank.
 9. Show tournament results after the final minigame.
 10. Give rewards. In ranked play, update that format's rating.
 11. Return to the lobby.
+
+**Tournament selection** (owner decision, 20 Nov 2026; implemented for local and online tournaments)
+- Trials come in two groups, set on each registry entry (`group`, absent = party): **party games**
+  (the quick trials) and **strategy games** (Toy Squad, Toybox Siege, Toy Tower Tumble: long and much
+  more complex). The group never comes from a game's duration.
+- **Blitz** (3): party games only.
+- **Normal** (5) and **Treasure** (8): party games for every round but the last, then exactly one
+  strategy game, chosen from the seed, as the **finale**. Strategy games never appear earlier.
+- The same `selectTournament` (`src/minigames/tournament.ts`) runs locally and on the online server.
+- Every trial opens on an intro card with its quick **How to play** steps (pictures and captions),
+  in practice, local tournaments and online lobbies alike; the player's "Game tutorials" setting
+  decides whether the steps open by themselves (the card always offers "How to play").
 
 **Randomisation**
 - Pick from tournament-eligible games, with no repeats within a tournament while enough distinct games exist.

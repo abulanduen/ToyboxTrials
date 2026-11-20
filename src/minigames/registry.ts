@@ -251,14 +251,21 @@ export const MINIGAMES: MinigameDefinition[] = [
     tagline: 'A pocket-sized auto-battler.',
     description: 'Ten rounds of toy auto-battles. Buy from a level-weighted shop, merge matching copies up to three stars, deploy your squad, and choose passives on rounds 3, 6 and 9.',
     category: 'strategy',
+    group: 'strategy',
     accent: PALETTE.sage,
     players: { min: 1, max: 8 },
     durationSec: [300, 630],
-    // Owner decision (19 Nov 2026): the full 5–10 minute game, in the longer formats only (never Blitz).
+    // Owner decisions (19 and 20 Nov 2026): the full 5–10 minute game, in the longer formats only
+    // (never Blitz), and as a strategy trial only ever their finale.
     eligibility: { tournament: true, ranked: false, casual: true, formats: ['normal', 'treasure'] },
     scoring: 'score',
     tieBreak: 'Remaining unit health',
-    controls: [{ keys: 'Drag / Click / Tab + Enter', action: 'Buy or reroll; drag matching equal-star toys together to merge. Formation drawer manages reserves and keyboard placement.' }],
+    // One chip per way of playing, so no chip is long enough to break across lines on the intro card.
+    controls: [
+      { keys: 'Click', action: 'Buy or reroll' },
+      { keys: 'Drag', action: 'Drag matching equal-star toys together to merge' },
+      { keys: 'Tab + Enter', action: 'Keyboard play: the Formation drawer manages reserves and placement' },
+    ],
     inputs: ['keyboard', 'mouse', 'touch'], bots: 'available', recordUnit: 'points',
     touch: { movement: 'none', look: 'none', orientation: 'any',
       buttons: [{ id: 'buy', label: 'Shop offer' }, { id: 'reroll', label: 'Reroll' }, { id: 'place', label: 'Formation square' }, { id: 'merge', label: 'Merge pair' }, { id: 'bench', label: 'Reserve slot' }, { id: 'passive', label: 'Passive choice' }, { id: 'sell', label: 'Sell' }, { id: 'ready', label: 'Ready' }],
@@ -352,12 +359,14 @@ export const MINIGAMES: MinigameDefinition[] = [
     description:
       'Every player defends their own 8×8 board. Build pays for a random tower, and any two towers of the same tier merge into a random tower one tier up, all the way to tier 7. Level your builder for better odds, finish quick quests for gold, and beat the bosses on waves 5, 10, 15 and 20 for free towers. Leaks cost lives; knocked-out players watch the other boards. Survive the most waves to win.',
     category: 'strategy',
+    group: 'strategy',
     accent: PALETTE.honey,
     players: { min: 1, max: 8 },
     durationSec: [300, 600],
     inputs: ['keyboard', 'mouse', 'touch'],
     bots: 'available',
-    eligibility: { tournament: false, ranked: false, casual: true },
+    // Owner decision (20 Nov 2026): a strategy finale for Normal and Treasure tournaments only.
+    eligibility: { tournament: true, ranked: false, casual: true, formats: ['normal', 'treasure'] },
     scoring: 'progress',
     tieBreak: 'Waves survived, then lives left, then damage score',
     recordUnit: 'waves',
@@ -392,6 +401,7 @@ export const MINIGAMES: MinigameDefinition[] = [
     description:
       'Pick a Tin Soldier, a Pop-Gun Ranger or a Clockwork Wizard and hold out on your own patch of the table. Your weapons fire on their own: you only move. Swarms of dust bunnies, wind-up mice, marbles and paper planes close in, an elite arrives every minute and the Boiler Baron at 4:00. Level up, max a weapon, crack a chest to evolve it, or skip one to send an elite to a rival. Beat the boss for three chests; at 5:00 every toy still standing is pulled into one arena to fight with its build. Last toy standing wins.',
     category: 'survival',
+    group: 'strategy',
     accent: PALETTE.honey,
     players: { min: 1, max: 8 },
     // The run is 5:00, then up to 15 s of upgrades and an arena of about 15–45 s with bots (90 s at most), plus the untimed class pick.
@@ -400,8 +410,9 @@ export const MINIGAMES: MinigameDefinition[] = [
     bots: 'available',
     // The class pick is the game's own untimed opening card: no 3-2-1 before it.
     skipStartCountdown: true,
-    // Provisional: a five-minute run is long for a tournament round (like Toy Squad), so practice only for now.
-    eligibility: { tournament: false, ranked: false, casual: true },
+    // Owner decision (20 Nov 2026): a five-minute run is long for a tournament round, so like Toy
+    // Squad it is a strategy trial: only ever the finale of a Normal or Treasure tournament.
+    eligibility: { tournament: true, ranked: false, casual: true, formats: ['normal', 'treasure'] },
     scoring: 'time',
     tieBreak: 'Arena survival (last toy standing first), then boss slain (earlier is better), then survival time, then knockouts, then points',
     recordUnit: 'points',
@@ -435,3 +446,4 @@ export const tournamentPool = (format?: TournamentFormat) =>
   format ? poolForFormat(format, MINIGAMES) : MINIGAMES.filter((g) => g.status === 'playable' && g.eligibility.tournament);
 
 export { lengthClassOf, durationLabel, durationChip } from './length';
+export { groupOf, isStrategy } from './tournament';

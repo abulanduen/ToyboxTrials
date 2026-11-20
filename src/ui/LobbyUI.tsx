@@ -28,16 +28,16 @@ import { fetchLeaderboard, useLeaderboard } from '../net/leaderboard';
 import { DEFAULT_LOBBY_SETTINGS, LOBBY_MAX_CAP, LOBBY_MIN_CAP, type LobbyFormat, type LobbySettings, type LobbyState, type LobbySummary } from '../net/protocol';
 import { MINIGAMES, gameById } from '../minigames/registry';
 import { isOnlineGame } from '../minigames/facts';
-import { FORMATS } from '../minigames/tournament';
-import { LENGTH_LABEL, byLength, durationChip, durationLabel, lengthClassOf } from '../minigames/length';
+import { FORMATS, groupOf, isStrategy } from '../minigames/tournament';
+import { GROUP_INFO, GROUP_ORDER, LENGTH_LABEL, byLength, durationChip, durationLabel, groupDurationLabel, inGroup, lengthClassOf } from '../minigames/length';
 import { getMatchState, pauseMatch, useMatch } from '../minigames/session';
 import { pointsForPlace, rankStandings } from '../minigames/scoring';
-import type { BotDifficulty, MinigameDefinition, MinigameId } from '../minigames/types';
+import type { BotDifficulty, MinigameDefinition, MinigameId, TrialGroup } from '../minigames/types';
 import { CardboardSheet, ToyButton } from './common';
 import { GearIcon } from './icons';
 import { PAINT_JOBS } from '../game/palette';
 import { netLink } from '../net/link';
-import { Countdown, Medal, Who, unit } from './MatchOverlay';
+import { Countdown, IntroGuide, Medal, Who, unit } from './MatchOverlay';
 
 const ordinal = (n: number) => `${n}${n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd' : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th'}`;
 
@@ -80,8 +80,10 @@ function Thumb({ def }: { def: MinigameDefinition }) {
 
 /**
  * Trials as picture cards: thumbnail (or the trial's accent colour), title, length chip, players.
- * Ordered short to long by default; the player can re-sort by name or type. Two columns in
- * portrait, more in landscape, no sideways scrolling.
+ * In two collapsible sections, party games and strategy games (each game's `group`), closed at
+ * first so a long list never fills the sheet; a picked trial shows compactly above them. Ordered
+ * short to long by default; the player can re-sort by name or type. Two columns in portrait, more
+ * in landscape, no sideways scrolling.
  */
 export function GameCardGrid({
   selected,
@@ -101,51 +103,113 @@ export function GameCardGrid({
   readOnly?: boolean;
 }) {
   const [sort, setSort] = useState<CardSort>('length');
+  const [open, setOpen] = useState<Record<TrialGroup, boolean>>({ party: false, strategy: false });
   const games = useMemo(() => sortGames(MINIGAMES.filter((g) => g.status === 'playable'), sort), [sort]);
+  const picked = selected ? games.find((g) => g.id === selected) : undefined;
+  const anyOpen = GROUP_ORDER.some((k) => open[k]);
+  const card = (g: MinigameDefinition) => {
+    const reason = disabledReason?.(g) ?? null;
+    const on = selected === g.id;
+    const extra = sub?.(g);
+    return (
+      <button
+        key={g.id}
+        role="radio"
+        aria-checked={on}
+        className={`game-card${on ? ' on' : ''}${reason ? ' game-card--off' : ''}`}
+        style={{ ['--accent' as string]: g.accent }}
+        disabled={!!reason || readOnly}
+        data-testid={`${testPrefix}-${g.id}`}
+        onClick={() => {
+          sfx.click();
+          onPick(g.id);
+          // Picked: fold the list away again so the choice shows compactly.
+          if (selected !== undefined) setOpen({ party: false, strategy: false });
+        }}
+      >
+        <Thumb def={g} />
+        <strong className="game-card__title">{g.title}</strong>
+        <span className="game-card__meta">
+          <LengthChip def={g} />
+          <span className="game-card__players">
+            {g.players.min === g.players.max ? g.players.min : `${g.players.min}–${g.players.max}`} toys
+          </span>
+        </span>
+        {(reason || extra) && <span className="game-card__sub">{reason ?? extra}</span>}
+      </button>
+    );
+  };
   return (
     <div className="game-grid-wrap">
-      <div className="game-grid__sort" role="radiogroup" aria-label="Sort trials">
-        <span>Sort</span>
-        {(Object.keys(SORT_LABEL) as CardSort[]).map((k) => (
-          <button key={k} role="radio" aria-checked={sort === k} className={sort === k ? 'on' : ''} onClick={() => (sfx.click(), setSort(k))} data-testid={`${testPrefix}-sort-${k}`}>
-            {SORT_LABEL[k]}
-          </button>
-        ))}
-      </div>
-      <div className="game-grid" role="radiogroup" aria-label="Trials">
-        {games.map((g) => {
-          const reason = disabledReason?.(g) ?? null;
-          const on = selected === g.id;
-          const extra = sub?.(g);
-          return (
+      {picked && (
+        <div className="game-picked" style={{ ['--accent' as string]: picked.accent }} data-testid={`${testPrefix}-selected`} data-game={picked.id}>
+          <Thumb def={picked} />
+          <span className="game-picked__words">
+            <strong>{picked.title}</strong>
+            <span className="game-card__meta">
+              <LengthChip def={picked} />
+              <span>{GROUP_INFO[groupOf(picked)].label.replace(/s$/, '')}</span>
+            </span>
+          </span>
+        </div>
+      )}
+      {anyOpen && (
+        <div className="game-grid__sort" role="radiogroup" aria-label="Sort trials">
+          <span>Sort</span>
+          {(Object.keys(SORT_LABEL) as CardSort[]).map((k) => (
+            <button key={k} role="radio" aria-checked={sort === k} className={sort === k ? 'on' : ''} onClick={() => (sfx.click(), setSort(k))} data-testid={`${testPrefix}-sort-${k}`}>
+              {SORT_LABEL[k]}
+            </button>
+          ))}
+        </div>
+      )}
+      {GROUP_ORDER.map((group) => {
+        const list = inGroup(games, group);
+        if (!list.length) return null;
+        const isOpen = open[group];
+        const bodyId = `${testPrefix}-group-${group}-cards`;
+        const hasPick = !!picked && groupOf(picked) === group;
+        return (
+          <section key={group} className={`game-group game-group--${group}${isOpen ? ' open' : ''}`} aria-label={GROUP_INFO[group].label}>
             <button
-              key={g.id}
-              role="radio"
-              aria-checked={on}
-              className={`game-card${on ? ' on' : ''}${reason ? ' game-card--off' : ''}`}
-              style={{ ['--accent' as string]: g.accent }}
-              disabled={!!reason || readOnly}
-              data-testid={`${testPrefix}-${g.id}`}
-              onClick={() => {
-                sfx.click();
-                onPick(g.id);
-              }}
+              className="game-group__head"
+              aria-expanded={isOpen}
+              aria-controls={bodyId}
+              data-testid={`${testPrefix}-group-${group}`}
+              onClick={() => (sfx.click(), setOpen((o) => ({ ...o, [group]: !o[group] })))}
             >
-              <Thumb def={g} />
-              <strong className="game-card__title">{g.title}</strong>
-              <span className="game-card__meta">
-                <LengthChip def={g} />
-                <span className="game-card__players">
-                  {g.players.min === g.players.max ? g.players.min : `${g.players.min}–${g.players.max}`} toys
+              <span className="game-group__chev" aria-hidden />
+              <span className="game-group__words">
+                <strong>
+                  {GROUP_INFO[group].label} <span className="game-group__count">· {list.length}</span>
+                </strong>
+                <span className="game-group__blurb">
+                  {GROUP_INFO[group].blurb} · {groupDurationLabel(list)}
                 </span>
               </span>
-              {(reason || extra) && <span className="game-card__sub">{reason ?? extra}</span>}
+              {hasPick && !isOpen && <span className="game-group__tag">Picked</span>}
             </button>
-          );
-        })}
-      </div>
+            {isOpen && (
+              <div className="game-grid" id={bodyId} role="radiogroup" aria-label={GROUP_INFO[group].label}>
+                {list.map(card)}
+              </div>
+            )}
+          </section>
+        );
+      })}
     </div>
   );
+}
+
+/** What a tournament format deals, from the formats table and each game's group. */
+export function formatRule(format: LobbyFormat): string {
+  const finales = MINIGAMES.filter((g) => g.status === 'playable' && g.eligibility.tournament && isStrategy(g)).map((g) => g.title);
+  const f = FORMATS[format];
+  const words = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'];
+  const parties = f.finale ? f.games - 1 : f.games;
+  return f.finale && finales.length
+    ? `${f.name}: ${words[parties] ?? parties} party trials, then a strategy finale (${new Intl.ListFormat('en', { style: 'long', type: 'disjunction' }).format(finales)}).`
+    : `${f.name}: ${words[parties] ?? parties} quick party trials.`;
 }
 
 // ---------------------------------------------------------------- Hub: alert, Lobbies button, sheet
@@ -358,7 +422,11 @@ function LobbyCard({ lobby, you }: { lobby: LobbyState; you: string }) {
           <GameCardGrid selected={s.game} onPick={(id) => set({ game: id })} readOnly={!host} testPrefix="pick" disabledReason={(g) => (isOnlineGame(g.id) ? null : 'Not online yet')} />
         </>
       )}
-      {s.mode === 'tournament' && <p className="panel__note">The server picks the trials from the {FORMATS[s.format].name} rotation{s.format === 'blitz' ? ' (short trials only; Toy Squad is for Normal and Treasure)' : ''}.</p>}
+      {s.mode === 'tournament' && (
+        <p className="panel__note" data-testid="lobby-format-rule">
+          The server deals the trials. {formatRule(s.format)}
+        </p>
+      )}
       <div className="pause__actions">
         {host ? (
           <ToyButton onClick={startLobby} testId="lobby-start" autoFocus>
@@ -390,21 +458,64 @@ function useSecondsLeft(endsAt: number | null) {
   return Math.max(0, Math.ceil((endsAt - now) / 1000));
 }
 
-function OnlineReveal({ lobby }: { lobby: LobbyState }) {
+/**
+ * The server's `reveal` phase: the trial's intro card, as in practice and local tournaments (the
+ * same How to play steps, following the player's tutorial setting), with Ready. The server starts
+ * the countdown once every seated player is ready, or when its time limit runs out.
+ */
+function OnlineIntro({ lobby, you }: { lobby: LobbyState; you: string }) {
   const match = lobby.match!;
   const def = gameById(match.game);
   const t = match.tournament;
+  const touch = useGame((s) => s.touchUI);
+  const left = useSecondsLeft(match.endsAt);
+  const Extras = useMatch((s) => (s.gameId === match.game ? s.module?.IntroExtras : undefined));
   useEffect(() => sfx.windUp(8), [match.seq]);
+  const me = lobby.members.find((x) => x.id === you);
+  const seated = !!me && !me.spectating && match.seats.some((s) => s.id === you);
+  const humans = lobby.members.filter((x) => !x.spectating && match.seats.some((s) => s.id === x.id));
+  const readyCount = humans.filter((x) => x.ready).length;
   return (
-    <div className="modal-layer">
-      <div className="reveal-ticket" style={{ ['--accent' as string]: def.accent }} data-testid="online-reveal">
-        <span className="reveal-ticket__round">{t ? `${FORMATS[t.format].name} · Trial ${t.round + 1} of ${t.games.length}` : 'Online lobby'}</span>
-        <span className="reveal-ticket__next">Next up</span>
-        <strong className="reveal-ticket__title">{def.title}</strong>
-        <span className="reveal-ticket__tag">{def.tagline}</span>
-        <span className="reveal-ticket__tag">{useGame.getState().touchUI ? def.touch.notes : def.controls.map((c) => `${c.keys}: ${c.action}`).join(' · ')}</span>
+    <CardboardSheet title={def.title} className="match-intro online-intro">
+      <div className="info-panel__sub" style={{ background: def.accent }} data-testid="online-reveal">
+        {t ? `${FORMATS[t.format].name} · Trial ${t.round + 1} of ${t.games.length}${t.round + 1 === t.games.length && isStrategy(def) ? ' · the finale' : ''}` : 'Online lobby'}
       </div>
-    </div>
+      <div className="intro-length">
+        <LengthChip def={def} /> <span>{durationLabel(def)}</span>
+      </div>
+      <IntroGuide key={match.seq} def={def} touch={touch} />
+      {/* Game options that are the player's own (Music Box Rhythm's timing offset), as in local tournaments. */}
+      {Extras && <Extras practice={false} />}
+      <div className="intro-field">
+        {match.seats.map((s) => {
+          const m = lobby.members.find((x) => x.id === s.id);
+          return (
+            <span key={s.id} className="who" data-testid={`intro-seat-${s.name}`}>
+              <span className="who__dot" style={{ background: (PAINT_JOBS[s.look.paint] ?? PAINT_JOBS[0]).body, borderColor: (PAINT_JOBS[s.look.paint] ?? PAINT_JOBS[0]).trim }} />
+              {s.id === you ? <strong>{s.name} (you)</strong> : s.name}
+              {!s.bot && m?.ready && <span className="lobby-tag lobby-tag--ready">Ready</span>}
+            </span>
+          );
+        })}
+      </div>
+      <div className="pause__actions">
+        {seated ? (
+          <ToyButton armDelay={700} onClick={() => setLobbyReady(true, 'reveal')} disabled={me?.ready} autoFocus testId="online-intro-ready">
+            {me?.ready ? `Waiting for the others… ${readyCount}/${humans.length}` : 'Ready!'}
+          </ToyButton>
+        ) : (
+          <p className="panel__note">You are watching this trial; you join at the next one.</p>
+        )}
+        <ToyButton armDelay={700} tone="ink" onClick={leaveLobby} testId="online-intro-leave">
+          Leave lobby
+        </ToyButton>
+      </div>
+      {left !== null && (
+        <p className="panel__note" data-testid="online-intro-left">
+          Starts when everyone is ready, or in {left} s
+        </p>
+      )}
+    </CardboardSheet>
   );
 }
 
@@ -438,7 +549,7 @@ function OnlineResults({ lobby, you }: { lobby: LobbyState; you: string }) {
         })}
       </ol>
       <div className="pause__actions">
-        <ToyButton armDelay={700} onClick={() => setLobbyReady(true)} disabled={me?.ready} testId="online-continue">
+        <ToyButton armDelay={700} onClick={() => setLobbyReady(true, 'results')} disabled={me?.ready} testId="online-continue">
           {me?.ready ? 'Waiting for the others…' : t && t.round + 1 < t.games.length ? 'Standings' : t ? 'Final standings' : 'Back to the lobby'}
         </ToyButton>
         <ToyButton armDelay={700} tone="ink" onClick={leaveLobby} testId="online-leave">
@@ -499,7 +610,7 @@ function OnlineStandings({ lobby, you, final }: { lobby: LobbyState; you: string
       </div>
       <OnlineStandingsTable lobby={lobby} you={you} />
       <div className="pause__actions">
-        <ToyButton armDelay={700} onClick={() => setLobbyReady(true)} disabled={me?.ready} testId={final ? 'online-final-continue' : 'online-standings-next'}>
+        <ToyButton armDelay={700} onClick={() => setLobbyReady(true, final ? 'final' : 'standings')} disabled={me?.ready} testId={final ? 'online-final-continue' : 'online-standings-next'}>
           {me?.ready ? 'Waiting for the others…' : final ? 'Back to the lobby' : 'Next trial'}
         </ToyButton>
         <ToyButton armDelay={700} tone="ink" onClick={leaveLobby}>
@@ -578,7 +689,7 @@ export function OnlineMatchOverlay() {
       {inPlay && !seated && match && <SpectatorBar lobby={lobby} />}
       {m.phase === 'countdown' && <Countdown />}
       {m.phase === 'lobby' && <LobbyCard lobby={lobby} you={you} />}
-      {m.phase === 'reveal' && match && <OnlineReveal lobby={lobby} />}
+      {m.phase === 'reveal' && match && <OnlineIntro lobby={lobby} you={you} />}
       {inPlay && !m.module && (
         <div className="loading match-loading">
           <span>Setting the stage…</span>

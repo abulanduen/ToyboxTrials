@@ -100,6 +100,7 @@ async function run(name) {
     if (v.touch) await page.locator('.prompt').tap(); else await page.keyboard.press('KeyE');
     // Menu cards are static, so these use Playwright's normal (scroll, wait-until-stable) clicks.
     const ui = (locator) => (v.touch ? locator.tap() : locator.click());
+    await ui(page.getByTestId('practice-group-strategy')); // the practice list opens by section
     await ui(page.getByTestId('practice-toybox-siege'));
     await page.getByTestId('match-start').waitFor({ state: 'visible' });
     await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after they appear

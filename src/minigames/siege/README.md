@@ -282,7 +282,7 @@ The scene holds 137 meshes in total, whatever the entity count.
 ## Online (server entry)
 
 `server/games.ts` runs the same rules core and bots on the authoritative server, and
-`src/minigames/facts.ts` lists it (casual only, no tournaments). The server entry:
+`src/minigames/facts.ts` lists it (a strategy trial: tournament finales only). The server entry:
 
 - validates every input shape;
 - hides the seed and the match-wide random counter;
@@ -301,8 +301,9 @@ wire size needs measuring.
 
 ## Decisions and open questions (provisional)
 
-- **Tournaments:** off for now (`eligibility.tournament: false`), like Toy Squad. A five-minute
-  run is long for a tournament round. Flip it once the formats account for game length.
+- **Tournaments:** a strategy trial (`group: 'strategy'`, owner decision 20 Nov 2026), like Toy
+  Squad and Toy Tower Tumble: never in Blitz, and in Normal and Treasure only ever the finale
+  (`selectTournament` in `src/minigames/tournament.ts`).
 - **Clocks:** the board freezes during cards and while downed, but the run clock does not. This is
   fair locally. On a server, `choiceTimeoutMs` and `pickTimeoutMs` (both 0, meaning untimed, by
   default) can force a choice.
