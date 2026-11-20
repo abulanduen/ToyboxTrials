@@ -4331,7 +4331,7 @@ textarea,
   }
 }
 /* Short landscape phones: just the heading. */
-@media (max-height: 500px) {
+@media (max-height: 500px) and (pointer: coarse) {
   .hub-lobbies__list,
   .hub-lobbies__none {
     display: none;
