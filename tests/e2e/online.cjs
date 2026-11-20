@@ -681,11 +681,18 @@ async function phoneMic(P, w, h, label, file) {
       const bId = await net(B.page, 'selfId');
       await A.page.waitForFunction((id) => window.__toybox.hubplay.state().newest?.h === id, bId, { timeout: 60000, polling: 100 }).catch(() => null);
       await travel(B, A, [[50, -120]], Math.PI / 2);
-      await travel(A, B, [[57, -118]], -Math.PI / 2);
+      await travel(A, B, [[52, -118]], -Math.PI / 2);
       await sleep(1700); // past the 1.5 s after the ball changed hands
-      const stoleP = A.page.waitForFunction(() => window.__toybox.hubplay.stealable() && window.__toybox.hubplay.grab(), null, { timeout: 20000, polling: 30 }).then(() => true).catch(() => false);
+      // W walks the way B's camera faces: see which way B goes, then A steps into its path, 2 cm to the side
+      const seeB = () => A.page.evaluate(() => { const r = window.__toybox.net.remotes().find((q) => q.name === 'Bravo'); return [r.x, r.z]; });
+      const b0 = await seeB();
       await B.page.keyboard.down('KeyW');
-      const stole = await stoleP;
+      await A.page.waitForFunction(([x, z]) => { const r = window.__toybox.net.remotes().find((q) => q.name === 'Bravo'); return Math.hypot(r.x - x, r.z - z) > 2; }, b0, { timeout: 20000, polling: 50 }).catch(() => null);
+      const b1 = await seeB();
+      const dl = Math.hypot(b1[0] - b0[0], b1[1] - b0[1]) || 1;
+      const [dx, dz] = [(b1[0] - b0[0]) / dl, (b1[1] - b0[1]) / dl];
+      await A.page.evaluate(([x, z, y]) => window.__toybox.teleport(x, z, y), [b1[0] + dx * 4 - dz * 2, b1[1] + dz * 4 + dx * 2, Math.atan2(-dx, -dz)]);
+      const stole = await A.page.waitForFunction(() => window.__toybox.hubplay.stealable() && window.__toybox.hubplay.grab(), null, { timeout: 20000, polling: 30 }).then(() => true).catch(() => false);
       await B.page.keyboard.up('KeyW');
       await B.page.waitForFunction((id) => window.__toybox.hubplay.state().newest?.h === id, aId, { timeout: 30000, polling: 100 }).catch(() => null);
       const stolenNote = await B.page.waitForFunction(() => [...document.querySelectorAll('.ticket')].some((t) => t.textContent.includes('Stolen!')), null, { timeout: 15000 }).then(() => true).catch(() => false);
