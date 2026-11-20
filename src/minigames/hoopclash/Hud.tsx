@@ -92,7 +92,8 @@ export function HoopHud({ getState: rawState, localId, contestants }: MinigameSc
   useEffect(
     () =>
       matchBus.on('event', (e) => {
-        const now = performance.now();
+        // Timed on the match clock, so a paused or frozen game keeps its announcement up.
+        const now = getState()?.t ?? 0;
         const show = (big: string, small?: string, team?: number) => setBanner({ big, small, team, at: now });
         switch (e.type) {
           case 'jumpball':
@@ -141,7 +142,7 @@ export function HoopHud({ getState: rawState, localId, contestants }: MinigameSc
   const live = !paused && hostPhase === 'playing';
   const iHold = !!me && holder === me;
   const inbounding = s.phase === 'inbound' && s.inbound?.by === localId;
-  const showBanner = banner && performance.now() - banner.at < 2000 ? banner : null;
+  const showBanner = banner && s.t - banner.at > -500 && s.t - banner.at < 2200 ? banner : null;
 
   let ballLine: { text: string; team?: number };
   if (s.phase === 'jump') ballLine = { text: 'Jump ball' };
@@ -183,7 +184,7 @@ export function HoopHud({ getState: rawState, localId, contestants }: MinigameSc
           <strong data-testid="hc-clock">{clockText(s.clock)}</strong>
           <span>{periodText(s.period)}</span>
           <em className={s.shotClock <= 5000 && s.poss !== null && s.phase === 'live' ? 'is-low' : ''} data-testid="hc-shotclock" title="Shot clock">
-            {s.poss === null ? '–' : Math.ceil(s.shotClock / 1000)}
+            {s.poss === null || s.phase === 'half' || s.phase === 'final' || s.phase === 'over' || s.phase === 'jump' ? '–' : Math.ceil(s.shotClock / 1000)}
           </em>
         </div>
         <div className="hc-team hc-team--blue" style={{ background: TEAM_COLOURS[1] }}>

@@ -781,6 +781,21 @@
       "license": "Original work of this project (captured from the game itself; no third-party content)."
     },
     {
+      "id": "thumb-hoop-clash",
+      "file": "thumbs/hoop-clash.webp",
+      "status": "original-capture",
+      "type": "ui-thumbnail",
+      "subject": "hoop-clash: gameplay thumbnail for the trial card grid",
+      "width": 480,
+      "height": 270,
+      "aspect": "16:9",
+      "bytes": 6872,
+      "transparency": false,
+      "intendedUse": "Game cards in the Pavilion practice grid and the online lobby trial picker (src/ui/LobbyUI.tsx)",
+      "source": "Screenshot of this game running in the browser (practice with bots, software rendering, DOM overlay hidden; a shot under the east hoop staged with the ?debug hooks), tests/e2e/thumbs.cjs, 2026-11-20",
+      "license": "Original work of this project (captured from the game itself; no third-party content)."
+    },
+    {
       "id": "thumb-wind-up-dash",
       "file": "thumbs/wind-up-dash.webp",
       "status": "original-capture",
