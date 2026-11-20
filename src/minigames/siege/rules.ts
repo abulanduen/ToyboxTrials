@@ -298,7 +298,14 @@ function spawnPoint(s: SiegeState, p: SiegePlayer, out: { x: number; z: number }
 const spot = { x: 0, z: 0 };
 
 function freeMob(b: Board): Mob | null {
-  for (const m of b.mobs) if (!m.on) return m;
+  const list = b.mobs;
+  for (let i = 0; i < list.length; i++) if (!list[i].on) return list[i];
+  return null;
+}
+/** A free enemy bullet, or null (indexed loop: hot paths avoid iterators and closures). */
+function freeShot(b: Board): Shot | null {
+  const list = b.shots;
+  for (let i = 0; i < list.length; i++) if (!list[i].on) return list[i];
   return null;
 }
 export function spawnMob(s: SiegeState, p: SiegePlayer, kind: number, x: number, z: number): Mob | null {
@@ -340,7 +347,8 @@ export function spawnBig(s: SiegeState, p: SiegePlayer, type: BigId, sent: boole
 // ---------------------------------------------------------------- damage
 
 function dropGem(b: Board, cap: number, kind: number, x: number, z: number, v: number) {
-  for (const g of b.gems) if (!g.on) { g.on = true; g.kind = kind; g.x = x; g.z = z; g.v = v; g.pull = false; return; }
+  const gems = b.gems;
+  for (let i = 0; i < gems.length; i++) { const g = gems[i]; if (!g.on) { g.on = true; g.kind = kind; g.x = x; g.z = z; g.v = v; g.pull = false; return; } }
   // Full: fold the value into an existing gem (round robin), so experience is never lost.
   b.gemCursor = (b.gemCursor + 1) % cap;
   const g = b.gems[b.gemCursor];
@@ -533,14 +541,20 @@ function gainXp(s: SiegeState, p: SiegePlayer, v: number) {
 // ---------------------------------------------------------------- weapons
 
 function addBlast(b: Board, kind: number, x: number, z: number, r: number, ang: number, arc: number, delay: number, life: number, dmg: number, knock: number, own = -1) {
-  for (const k of b.blasts) if (!k.on) {
+  const list = b.blasts;
+  for (let i = 0; i < list.length; i++) {
+    const k = list[i];
+    if (k.on) continue;
     k.on = true; k.kind = kind; k.x = x; k.z = z; k.r = r; k.ang = ang; k.arc = arc; k.delay = delay; k.age = 0; k.life = life; k.dmg = dmg; k.knock = knock; k.done = false; k.own = own;
     return k;
   }
   return null;
 }
 function addProj(b: Board, kind: number, x: number, z: number, vx: number, vz: number, r: number, dmg: number, pierce: number, life: number, range: number, own = -1) {
-  for (const q of b.projs) if (!q.on) {
+  const list = b.projs;
+  for (let i = 0; i < list.length; i++) {
+    const q = list[i];
+    if (q.on) continue;
     q.on = true; q.kind = kind; q.x = x; q.z = z; q.vx = vx; q.vz = vz; q.r = r; q.dmg = dmg; q.pierce = pierce; q.life = life; q.ox = x; q.oz = z; q.range = range; q.back = false; q.nh = 0; q.own = own;
     return q;
   }
@@ -552,7 +566,7 @@ const aim = { x: 0, z: 0, d: 0 };
 function nearestEnemy(p: SiegePlayer, range: number): boolean {
   const b = p.board;
   let best = range * range, found = false;
-  for (const g of b.bigs) if (g.on) { const d = (g.x - p.x) ** 2 + (g.z - p.z) ** 2; if (d < best) { best = d; aim.x = g.x; aim.z = g.z; found = true; } }
+  for (let i = 0; i < b.bigs.length; i++) { const g = b.bigs[i]; if (g.on) { const d = (g.x - p.x) ** 2 + (g.z - p.z) ** 2; if (d < best) { best = d; aim.x = g.x; aim.z = g.z; found = true; } } }
   const n = query(b.mobs, p.x, p.z, range);
   for (let k = 0; k < n; k++) { const m = b.mobs[near[k]]; const d = (m.x - p.x) ** 2 + (m.z - p.z) ** 2; if (d < best) { best = d; aim.x = m.x; aim.z = m.z; found = true; } }
   aim.d = Math.sqrt(best);
@@ -562,7 +576,7 @@ function nearestEnemy(p: SiegePlayer, range: number): boolean {
 function randomEnemy(s: SiegeState, p: SiegePlayer, range: number): boolean {
   const b = p.board, n = query(b.mobs, p.x, p.z, range);
   let live = 0;
-  for (const g of b.bigs) if (g.on && len(g.x - p.x, g.z - p.z) <= range) live++;
+  for (let i = 0; i < b.bigs.length; i++) { const g = b.bigs[i]; if (g.on && len(g.x - p.x, g.z - p.z) <= range) live++; }
   let inRange = 0;
   for (let k = 0; k < n; k++) { const m = b.mobs[near[k]]; if ((m.x - p.x) ** 2 + (m.z - p.z) ** 2 <= range * range) near[inRange++] = near[k]; }
   const total = inRange + live;
@@ -570,7 +584,7 @@ function randomEnemy(s: SiegeState, p: SiegePlayer, range: number): boolean {
   let pick = Math.floor(rand(s) * total);
   if (pick < inRange) { const m = b.mobs[near[pick]]; aim.x = m.x; aim.z = m.z; return true; }
   pick -= inRange;
-  for (const g of b.bigs) if (g.on && len(g.x - p.x, g.z - p.z) <= range) { if (pick-- === 0) { aim.x = g.x; aim.z = g.z; return true; } }
+  for (let i = 0; i < b.bigs.length; i++) { const g = b.bigs[i]; if (g.on && len(g.x - p.x, g.z - p.z) <= range) { if (pick-- === 0) { aim.x = g.x; aim.z = g.z; return true; } } }
   return false;
 }
 
@@ -635,7 +649,8 @@ const yo = { x: 0, z: 0 };
 
 function weapons(s: SiegeState, p: SiegePlayer, dt: number) {
   const b = p.board;
-  for (const w of p.weapons) {
+  for (let wi = 0; wi < p.weapons.length; wi++) {
+    const w = p.weapons[wi];
     const st = weaponStats(w);
     if (w.id === 'yoyo') {
       w.aux = (w.aux + st.speed * (dt / 1000)) % (Math.PI * 2);
@@ -652,7 +667,7 @@ function weapons(s: SiegeState, p: SiegePlayer, dt: number) {
           const d = len(m.x - p.x, m.z - p.z) || 1;
           hitMob(s, p, m, dmg, (m.x - p.x) / d, (m.z - p.z) / d, 4);
         }
-        for (const g of b.bigs) if (g.on && b.bt - g.yo >= gap && len(g.x - yo.x, g.z - yo.z) < g.r + 0.9) { g.yo = b.bt; hitBig(s, p, g, dmg); }
+        for (let gi = 0; gi < b.bigs.length; gi++) { const g = b.bigs[gi]; if (g.on && b.bt - g.yo >= gap && len(g.x - yo.x, g.z - yo.z) < g.r + 0.9) { g.yo = b.bt; hitBig(s, p, g, dmg); } }
       }
       continue;
     }
@@ -676,12 +691,34 @@ function movePlayer(p: SiegePlayer, sec: number, half: number) {
   p.fx = nx; p.fz = nz;
 }
 
+/**
+ * One board's step. Split into a function per entity kind: each is a small, hot loop that the JIT
+ * optimises (and inlines its helpers into) on its own, and every loop is indexed (no iterators,
+ * closures or boxed numbers per entity). Each stage returns false once the toy is no longer alive
+ * (downed, or the boss fell), which ends the board's step there.
+ */
 function stepBoard(s: SiegeState, p: SiegePlayer, dt: number) {
-  const b = p.board, c = s.config, sec = dt / 1000;
+  const b = p.board, sec = dt / 1000;
   b.bt += dt;
   movePlayer(p, sec, ARENA_HALF);
+  stepSchedule(s, p);
+  stepSpawns(s, p, dt);
+  if (!stepMobs(s, p, dt)) return;
+  if (!stepBigs(s, p, dt)) return;
+  if (!stepShots(s, p, dt)) return;
+  // The hash again: positions changed above.
+  buildHash(b.mobs);
+  weapons(s, p, dt);
+  stepProjs(s, p, dt);
+  stepBlasts(s, p, dt);
+  if (p.status !== 'alive') return; // the boss fell: the run is won
+  stepPickups(s, p, dt);
+  openChoice(s, p);
+}
 
-  // The run's schedule: one elite a minute, the boss at 4:00, and elites sent by rivals.
+/** The run's schedule: one elite a minute, the boss at 4:00, and elites sent by rivals. */
+function stepSchedule(s: SiegeState, p: SiegePlayer) {
+  const b = p.board;
   if (b.nextElite < ELITE_SCHEDULE.length && s.runT >= ELITE_SCHEDULE[b.nextElite].at) { if (spawnBig(s, p, ELITE_SCHEDULE[b.nextElite].elite, false, null)) b.nextElite++; }
   if (!b.bossUp && s.runT >= BOSS_AT) { if (spawnBig(s, p, 'baron', false, null)) b.bossUp = true; }
   for (let i = p.incoming.length - 1; i >= 0; i--) {
@@ -689,11 +726,14 @@ function stepBoard(s: SiegeState, p: SiegePlayer, dt: number) {
     if (s.runT < inc.at) continue;
     if (spawnBig(s, p, sentEliteFor(s.runT), true, inc.from)) p.incoming.splice(i, 1); // full board: it waits
   }
+}
 
-  // The swarm grows.
+/** The swarm grows: a steady trickle, and a ring of enemies every WAVE_MS. */
+function stepSpawns(s: SiegeState, p: SiegePlayer, dt: number) {
+  const b = p.board, c = s.config, mobs = b.mobs;
   let alive = 0;
-  for (const m of b.mobs) if (m.on) alive++;
-  b.spawnAcc += spawnRate(s.runT) * sec * (b.bossUp && !b.bossDown ? 0.5 : 1);
+  for (let i = 0; i < mobs.length; i++) if (mobs[i].on) alive++;
+  b.spawnAcc += spawnRate(s.runT) * (dt / 1000) * (b.bossUp && !b.bossDown ? 0.5 : 1);
   while (b.spawnAcc >= 1) {
     b.spawnAcc -= 1;
     if (alive >= c.mobCap) continue;
@@ -709,15 +749,18 @@ function stepBoard(s: SiegeState, p: SiegePlayer, dt: number) {
       if (spawnMob(s, p, kind, clamp(p.x + Math.cos(a) * r, -ARENA_HALF + 1, ARENA_HALF - 1), clamp(p.z + Math.sin(a) * r, -ARENA_HALF + 1, ARENA_HALF - 1))) alive++;
     }
   }
+}
 
-  // Mobs: steer, separate (own hash cell only, a few neighbours), shove off the player, bite.
-  buildHash(b.mobs);
-  const reach = PLAYER_RADIUS;
-  for (let i = 0; i < b.mobs.length; i++) {
-    const m = b.mobs[i];
+/** Mobs: steer, separate (own hash cell only, a few neighbours), shove off the player, bite. False once the toy is down. */
+function stepMobs(s: SiegeState, p: SiegePlayer, dt: number): boolean {
+  const b = p.board, sec = dt / 1000, mobs = b.mobs;
+  buildHash(mobs);
+  const reach = PLAYER_RADIUS, decay = Math.max(0, 1 - 6 * sec);
+  for (let i = 0; i < mobs.length; i++) {
+    const m = mobs[i];
     if (!m.on) continue;
     let dx = p.x - m.x, dz = p.z - m.z;
-    const d = len(dx, dz) || 1;
+    const d = Math.sqrt(dx * dx + dz * dz) || 1;
     dx /= d; dz /= d;
     m.timer -= dt;
     let sp = m.speed;
@@ -734,19 +777,19 @@ function stepBoard(s: SiegeState, p: SiegePlayer, dt: number) {
       case 3: { // paper plane: swoops side to side on the way in
         const wob = Math.sin(b.bt / 300 + m.serial) * 0.8;
         m.vx = dx - dz * wob; m.vz = dz + dx * wob;
-        const l = len(m.vx, m.vz) || 1; m.vx /= l; m.vz /= l;
+        const l = Math.sqrt(m.vx * m.vx + m.vz * m.vz) || 1; m.vx /= l; m.vz /= l;
         break;
       }
       default: m.vx = dx; m.vz = dz;
     }
     m.x += (m.vx * sp + m.kx) * sec; m.z += (m.vz * sp + m.kz) * sec;
-    const decay = Math.max(0, 1 - 6 * sec); m.kx *= decay; m.kz *= decay;
+    m.kx *= decay; m.kz *= decay;
     // separation: a few neighbours in the same cell
     const cellIdx = cellOf(m.z) * GRID + cellOf(m.x);
     let seen = 0;
     for (let j = head[cellIdx]; j >= 0 && seen < 6; j = next[j]) {
       if (j === i) continue;
-      const o = b.mobs[j];
+      const o = mobs[j];
       if (!o.on) continue;
       seen++;
       const ox = m.x - o.x, oz = m.z - o.z, rr = m.r + o.r, dd = ox * ox + oz * oz;
@@ -755,20 +798,25 @@ function stepBoard(s: SiegeState, p: SiegePlayer, dt: number) {
       m.x += (ox / dl) * push; m.z += (oz / dl) * push;
     }
     m.x = clamp(m.x, -ARENA_HALF, ARENA_HALF); m.z = clamp(m.z, -ARENA_HALF, ARENA_HALF);
-    const px = m.x - p.x, pz = m.z - p.z, pd = len(px, pz), touch = m.r + reach;
+    const px = m.x - p.x, pz = m.z - p.z, pd = Math.sqrt(px * px + pz * pz), touch = m.r + reach;
     if (pd < touch) {
       if (pd > 1e-6) { m.x = p.x + (px / pd) * touch; m.z = p.z + (pz / pd) * touch; }
       hurtPlayer(s, p, m.dmg);
-      if (p.status !== 'alive') return;
+      if (p.status !== 'alive') return false;
     }
   }
+  return true;
+}
 
-  // Elites and the boss: chase, telegraph and charge, fire rings of bullets, summon.
-  for (const g of b.bigs) {
+/** Elites and the boss: chase, telegraph and charge, fire rings of bullets, summon. False once the toy is down. */
+function stepBigs(s: SiegeState, p: SiegePlayer, dt: number): boolean {
+  const b = p.board, sec = dt / 1000, reach = PLAYER_RADIUS;
+  for (let gi = 0; gi < b.bigs.length; gi++) {
+    const g = b.bigs[gi];
     if (!g.on) continue;
     const d = BIGS[g.type];
     let dx = p.x - g.x, dz = p.z - g.z;
-    const dist = len(dx, dz) || 1;
+    const dist = Math.sqrt(dx * dx + dz * dz) || 1;
     dx /= dist; dz /= dist;
     if (g.mode === 0) {
       g.x += dx * g.speed * sec; g.z += dz * g.speed * sec;
@@ -789,7 +837,7 @@ function stepBoard(s: SiegeState, p: SiegePlayer, dt: number) {
         const off = rand(s) * Math.PI;
         for (let k = 0; k < d.ringCount; k++) {
           const a = off + (k / d.ringCount) * Math.PI * 2;
-          const shot = b.shots.find((x) => !x.on);
+          const shot = freeShot(b);
           if (!shot) break;
           shot.on = true; shot.x = g.x; shot.z = g.z; shot.vx = Math.cos(a) * d.ringSpeed; shot.vz = Math.sin(a) * d.ringSpeed; shot.r = 0.7; shot.dmg = d.ringDmg; shot.life = 4000; shot.own = -1;
         }
@@ -804,94 +852,111 @@ function stepBoard(s: SiegeState, p: SiegePlayer, dt: number) {
     }
     if (len(p.x - g.x, p.z - g.z) < g.r + reach) {
       hurtPlayer(s, p, g.dmg);
-      if (p.status !== 'alive') return;
+      if (p.status !== 'alive') return false;
     }
   }
+  return true;
+}
 
-  // Enemy bullets.
-  for (const sh of b.shots) {
+/** Enemy bullets. False once the toy is down. */
+function stepShots(s: SiegeState, p: SiegePlayer, dt: number): boolean {
+  const shots = p.board.shots, sec = dt / 1000, reach = PLAYER_RADIUS;
+  for (let i = 0; i < shots.length; i++) {
+    const sh = shots[i];
     if (!sh.on) continue;
     sh.x += sh.vx * sec; sh.z += sh.vz * sec; sh.life -= dt;
     if (sh.life <= 0 || Math.abs(sh.x) > ARENA_HALF + 2 || Math.abs(sh.z) > ARENA_HALF + 2) { sh.on = false; continue; }
     if ((sh.x - p.x) ** 2 + (sh.z - p.z) ** 2 < (sh.r + reach) ** 2) {
       sh.on = false; hurtPlayer(s, p, sh.dmg);
-      if (p.status !== 'alive') return;
+      if (p.status !== 'alive') return false;
     }
   }
+  return true;
+}
 
-  // The hash again: positions changed above.
-  buildHash(b.mobs);
-  weapons(s, p, dt);
+/** Has projectile `q` already hit the entity with this serial? */
+function projSeen(q: Proj, serial: number): boolean {
+  for (let h = 0; h < q.nh; h++) if (q.hits[h] === serial) return true;
+  return false;
+}
 
-  // Projectiles.
-  for (const q of b.projs) {
+/** Player projectiles: corks and paper planes. */
+function stepProjs(s: SiegeState, p: SiegePlayer, dt: number) {
+  const b = p.board, sec = dt / 1000, projs = b.projs, mobs = b.mobs;
+  for (let qi = 0; qi < projs.length; qi++) {
+    const q = projs[qi];
     if (!q.on) continue;
     q.life -= dt;
     if (q.kind === 1) { // paper plane: out to its range, then home back to the toy
       if (!q.back && (q.x - q.ox) ** 2 + (q.z - q.oz) ** 2 >= q.range * q.range) { q.back = true; q.nh = 0; }
       if (q.back) {
-        const dx = p.x - q.x, dz = p.z - q.z, dl = len(dx, dz) || 1, sp = len(q.vx, q.vz);
+        const dx = p.x - q.x, dz = p.z - q.z, dl = Math.sqrt(dx * dx + dz * dz) || 1, sp = Math.sqrt(q.vx * q.vx + q.vz * q.vz);
         q.vx = (dx / dl) * sp; q.vz = (dz / dl) * sp;
         if (dl < 1.5) { q.on = false; continue; }
       }
     }
     q.x += q.vx * sec; q.z += q.vz * sec;
     if (q.life <= 0 || Math.abs(q.x) > ARENA_HALF + 4 || Math.abs(q.z) > ARENA_HALF + 4) { q.on = false; continue; }
-    const n = query(b.mobs, q.x, q.z, q.r + 1.2);
+    const n = query(mobs, q.x, q.z, q.r + 1.2);
     for (let k = 0; k < n && q.on; k++) {
-      const m = b.mobs[near[k]];
+      const m = mobs[near[k]];
       if (!m.on || (m.x - q.x) ** 2 + (m.z - q.z) ** 2 > (m.r + q.r) ** 2) continue;
-      let seen = false;
-      for (let h = 0; h < q.nh; h++) if (q.hits[h] === m.serial) { seen = true; break; }
-      if (seen) continue;
+      if (projSeen(q, m.serial)) continue;
       if (q.nh < q.hits.length) q.hits[q.nh++] = m.serial;
       else { q.hits[0] = m.serial; } // planes pierce forever: keep the newest hits only
-      const sp = len(q.vx, q.vz) || 1;
+      const sp = Math.sqrt(q.vx * q.vx + q.vz * q.vz) || 1;
       hitMob(s, p, m, q.dmg, q.vx / sp, q.vz / sp, q.kind === 0 ? 3 : 1.5);
       if (q.pierce >= 0) { if (q.pierce === 0) q.on = false; else q.pierce--; }
     }
-    for (const g of b.bigs) {
+    for (let gi = 0; gi < b.bigs.length; gi++) {
+      const g = b.bigs[gi];
       if (!q.on || !g.on || (g.x - q.x) ** 2 + (g.z - q.z) ** 2 > (g.r + q.r) ** 2) continue;
-      let seen = false;
-      for (let h = 0; h < q.nh; h++) if (q.hits[h] === g.serial) { seen = true; break; }
-      if (seen) continue;
+      if (projSeen(q, g.serial)) continue;
       if (q.nh < q.hits.length) q.hits[q.nh++] = g.serial;
       hitBig(s, p, g, q.dmg);
       if (q.pierce >= 0) { if (q.pierce === 0) q.on = false; else q.pierce--; }
     }
   }
+}
 
-  // Area hits (sweeps, chimes, marbles, the revive shockwave).
-  for (const k of b.blasts) {
+/** Area hits (sweeps, chimes, marbles, the revive shockwave). */
+function stepBlasts(s: SiegeState, p: SiegePlayer, dt: number) {
+  const b = p.board, blasts = b.blasts, mobs = b.mobs;
+  for (let bi = 0; bi < blasts.length; bi++) {
+    const k = blasts[bi];
     if (!k.on) continue;
     k.age += dt;
     if (!k.done && k.age >= k.delay) {
       k.done = true;
-      const n = query(b.mobs, k.x, k.z, k.r + 1.2), half = (k.arc / 2) * (Math.PI / 180);
+      const n = query(mobs, k.x, k.z, k.r + 1.2), half = (k.arc / 2) * (Math.PI / 180);
       for (let i = 0; i < n; i++) {
-        const m = b.mobs[near[i]];
-        const dx = m.x - k.x, dz = m.z - k.z, dd = len(dx, dz);
+        const m = mobs[near[i]];
+        const dx = m.x - k.x, dz = m.z - k.z, dd = Math.sqrt(dx * dx + dz * dz);
         if (dd > k.r + m.r) continue;
         if (k.arc < 360 && dd > 0.5) { let da = Math.atan2(dx, dz) - k.ang; da = Math.atan2(Math.sin(da), Math.cos(da)); if (Math.abs(da) > half) continue; }
         hitMob(s, p, m, k.dmg, dd ? dx / dd : 0, dd ? dz / dd : 0, k.knock);
       }
-      for (const g of b.bigs) {
+      for (let gi = 0; gi < b.bigs.length; gi++) {
+        const g = b.bigs[gi];
         if (!g.on) continue;
-        const dx = g.x - k.x, dz = g.z - k.z, dd = len(dx, dz);
+        const dx = g.x - k.x, dz = g.z - k.z, dd = Math.sqrt(dx * dx + dz * dz);
         if (dd > k.r + g.r) continue;
         if (k.arc < 360 && dd > 0.5) { let da = Math.atan2(dx, dz) - k.ang; da = Math.atan2(Math.sin(da), Math.cos(da)); if (Math.abs(da) > half + 0.3) continue; }
         hitBig(s, p, g, k.dmg);
         if (p.status !== 'alive') break;
       }
-      if (k.kind === 3) for (const sh of b.shots) if (sh.on && len(sh.x - k.x, sh.z - k.z) < k.r) sh.on = false;
+      if (k.kind === 3) for (let i = 0; i < b.shots.length; i++) { const sh = b.shots[i]; if (sh.on && len(sh.x - k.x, sh.z - k.z) < k.r) sh.on = false; }
     }
     if (k.age >= k.life) k.on = false;
   }
-  if (p.status !== 'alive') return; // the boss fell: the run is won
+}
 
-  // Gems, biscuits and chests.
+/** Gems, biscuits and chests. */
+function stepPickups(s: SiegeState, p: SiegePlayer, dt: number) {
+  const b = p.board, sec = dt / 1000, gems = b.gems;
   const pick2 = p.stat.pickup * p.stat.pickup;
-  for (const g of b.gems) {
+  for (let i = 0; i < gems.length; i++) {
+    const g = gems[i];
     if (!g.on) continue;
     const dx = p.x - g.x, dz = p.z - g.z, dd = dx * dx + dz * dz;
     if (!g.pull && dd < pick2) g.pull = true;
@@ -906,8 +971,7 @@ function stepBoard(s: SiegeState, p: SiegePlayer, dt: number) {
     const step = Math.min(dl, 34 * sec);
     g.x += (dx / dl) * step; g.z += (dz / dl) * step;
   }
-  for (const ch of b.chests) if (ch.on && len(ch.x - p.x, ch.z - p.z) < 2.6) { ch.on = false; p.pendingChests++; emit(s, { type: 'siege-chest-pick', id: p.id }); }
-  openChoice(s, p);
+  for (let i = 0; i < b.chests.length; i++) { const ch = b.chests[i]; if (ch.on && len(ch.x - p.x, ch.z - p.z) < 2.6) { ch.on = false; p.pendingChests++; emit(s, { type: 'siege-chest-pick', id: p.id }); } }
 }
 
 // ---------------------------------------------------------------- prep: after the boss, or at 5:00
@@ -953,7 +1017,8 @@ function stepPrep(s: SiegeState, p: SiegePlayer, dt: number) {
   b.bt += dt;
   if (!p.choice) movePlayer(p, sec, ARENA_HALF);
   const step = FINALE.vacuumSpeed * sec;
-  for (const g of b.gems) {
+  for (let i = 0; i < b.gems.length; i++) {
+    const g = b.gems[i];
     if (!g.on) continue;
     const dx = p.x - g.x, dz = p.z - g.z, dl = len(dx, dz);
     if (dl < 1.3 + step) { g.on = false; if (g.kind === 1) p.hp = Math.min(p.stat.maxHp, p.hp + p.stat.maxHp * SNACK_HEAL); else gainXp(s, p, g.v); continue; }
@@ -1113,7 +1178,7 @@ function stepAllies(s: SiegeState, dt: number) {
       g.ringT += A.ringEvery;
       const off = rand(s) * Math.PI;
       for (let k = 0; k < A.ringCount; k++) {
-        const shot = a.shots.find((x) => !x.on);
+        const shot = freeShot(a);
         if (!shot) break;
         const ang = off + (k / A.ringCount) * Math.PI * 2;
         shot.on = true; shot.x = g.x; shot.z = g.z; shot.vx = Math.cos(ang) * A.ringSpeed; shot.vz = Math.sin(ang) * A.ringSpeed; shot.r = 0.7; shot.dmg = A.ringDmg; shot.life = 3000; shot.own = own;
@@ -1138,7 +1203,8 @@ function stepArena(s: SiegeState, dt: number) {
   stepAllies(s, dt);
 
   // Projectiles: corks and planes hit rival toys and their summoned bosses.
-  for (const q of a.projs) {
+  for (let qi = 0; qi < a.projs.length; qi++) {
+    const q = a.projs[qi];
     if (!q.on) continue;
     const owner = s.players[q.own];
     if (!owner || owner.status !== 'arena') { q.on = false; continue; }
@@ -1169,7 +1235,8 @@ function stepArena(s: SiegeState, dt: number) {
   }
 
   // Area hits (sweeps, chimes, marbles).
-  for (const k of a.blasts) {
+  for (let bi = 0; bi < a.blasts.length; bi++) {
+    const k = a.blasts[bi];
     if (!k.on) continue;
     k.age += dt;
     if (!k.done && k.age >= k.delay) {
@@ -1191,7 +1258,8 @@ function stepArena(s: SiegeState, dt: number) {
   }
 
   // A summoned boss's bullets.
-  for (const sh of a.shots) {
+  for (let si = 0; si < a.shots.length; si++) {
+    const sh = a.shots[si];
     if (!sh.on) continue;
     sh.x += sh.vx * sec; sh.z += sh.vz * sec; sh.life -= dt;
     if (sh.life <= 0 || Math.abs(sh.x) > half + 2 || Math.abs(sh.z) > half + 2) { sh.on = false; continue; }
