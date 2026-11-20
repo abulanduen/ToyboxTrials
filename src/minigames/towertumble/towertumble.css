@@ -129,7 +129,7 @@
   .td-hud .td-side--quests:not(.is-open) .td-quests-open { display:block; position:absolute; inset:0; width:100%; height:100%; min-height:0; border:0; background:transparent; border-radius:10px; }
   .td-side--quests.is-open { z-index:3; }
   .td-side--quests.is-open .td-quests li { grid-template-columns:40px minmax(0,1fr) 38px; }
-  .td-hud .td-toasts { left:var(--l); right:calc(var(--r) + var(--right) + 6px); }
+  .td-hud .td-toasts { left:calc(var(--l) + var(--left) + 6px); right:calc(var(--r) + var(--right) + 6px); }
 }
 
 /* Phone portrait: bar on top, quests left, rail right, the board centred between them, the dock at the bottom. */
