@@ -4452,12 +4452,34 @@ textarea,
 }
 @media (max-width: 700px), (max-height: 500px) {
   .hubplay-score {
-    top: calc(118px + env(safe-area-inset-top));
     font-size: 0.8rem;
     padding: 4px 10px;
     gap: 6px;
   }
   .hubplay-meter__bar {
     width: 120px;
+  }
+}
+/* phones in landscape: the top centre is free (the HUD sign is top left, the gear top right) */
+@media (max-height: 500px) {
+  .hubplay-score {
+    top: calc(12px + env(safe-area-inset-top));
+  }
+}
+/* phones in portrait: a compact two-line chip under the gear, clear of the left-hand HUD */
+@media (max-width: 700px) and (min-height: 501px) {
+  .hubplay-score {
+    top: calc(84px + env(safe-area-inset-top));
+    left: auto;
+    right: calc(12px + env(safe-area-inset-right));
+    transform: none;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 170px;
+    border-radius: 14px;
+    row-gap: 2px;
+  }
+  .hubplay-score__sep {
+    display: none;
   }
 }
