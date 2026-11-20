@@ -157,12 +157,15 @@ const shot = (page, name) => page.screenshot({ path: path.join(OUT, name), timeo
     check('online intro: a server time limit long enough to read (≥ 20 s at full speed)', /in \d+ s/.test(left) && Number(left.match(/in (\d+) s/)[1]) >= 20, left);
     await shot(B, 'lobby-04a-online-intro-tutorial.png');
     // Ready from both: the server starts the countdown at once instead of waiting out the card.
+    // The test server holds the match when play begins, so two slow pages both see it start.
+    await A.evaluate(() => window.__toybox.lobby.timeScale(0.5, 'playing'));
     await A.waitForTimeout(800); // match buttons ignore taps for 0.7 s after appearing
     await A.click('[data-testid=online-intro-ready]');
     await B.waitForFunction(() => document.querySelector('[data-testid=intro-seat-Ticker] .lobby-tag--ready'), null, { timeout: T, polling: 250 });
     check('B sees A marked ready on the intro card', true);
     await B.click('[data-testid=online-intro-ready]');
     await Promise.all([waitPhase(A, 'playing'), waitPhase(B, 'playing')]);
+    await A.evaluate(() => window.__toybox.lobby.timeScale(0.5));
     check('both clients enter the server-run match', true);
     // A plays a note once the server opens the input phase: the press must reach the server.
     await A.waitForFunction(() => window.__toybox.match.state()?.phase === 'input', null, { timeout: T, polling: 100 });
