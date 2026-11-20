@@ -33,6 +33,7 @@ import { netLink } from './link';
 import { onLobbies, onLobbyAlert, onLobbyErr, onLobbyState, onMatchState, resetLobbies } from './lobby';
 import { accountToken } from './account';
 import { onHubPlayEvents, onHubPlaySnap, setHubPlayOnline } from '../hubplay/runtime';
+import { installVoice, onVoiceMic, onVoiceMics, onVoiceSignal } from './voiceChat';
 
 /** Give up on a room that hasn't welcomed us by then. */
 const WELCOME_TIMEOUT_MS = 12_000;
@@ -325,6 +326,10 @@ const handlers: { [K in ServerMsg['t']]: (m: Extract<ServerMsg, { t: K }>) => vo
   lobbyErr: onLobbyErr,
   ms: onMatchState,
   play: (m) => onHubPlayEvents(m.e),
+  // proximity voice chat (v5)
+  mic: onVoiceMic,
+  mics: onVoiceMics,
+  sig: onVoiceSignal,
 };
 
 // ---------------------------------------------------------------- outgoing intent
@@ -382,6 +387,7 @@ let installed = false;
 export function installNet() {
   if (installed) return;
   installed = true;
+  installVoice();
   netLink.send = (msg) => {
     if (useNet.getState().status === 'online') send(msg);
   };

@@ -14,6 +14,7 @@ import { GestureGlyph } from './itemIcons';
 import { EMOTE_ACTIONS, tapVirtual } from '../game/input';
 import { unlockAudio } from '../game/audio';
 import { CardboardSheet, ToyButton } from './common';
+import { VoiceTagMark } from './VoiceUI';
 
 const cleanName = (v: string) => v.replace(/[^\p{L}\p{N} '\-]/gu, '').slice(0, 16);
 const cleanCode = (v: string) => v.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, ROOM_CODE_LENGTH);
@@ -192,6 +193,7 @@ export function NameTags() {
             }}
           >
             <span className="name-tag__name">{p.name}</span>
+            <VoiceTagMark id={p.id} />
             <span className="name-tag__sub" style={{ display: 'none' }} />
           </div>
         ))}

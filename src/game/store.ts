@@ -8,6 +8,7 @@ import { STORE_VERSION, buyItem, dateKey, equipItem, migratePersisted, rewardSec
 import type { MinigameId } from '../minigames/types';
 import type { TournamentFormat } from '../minigames/tournament';
 import { tourFlag } from './tourFlag';
+import { VOICE_SETTING_DEFAULTS, cleanVoiceSettings, type VoiceSettings } from './voiceSettings';
 
 export type Quality = 'low' | 'balanced' | 'high';
 /** Top-level screens. `menu` = live 3D diorama main menu; `workshop` = customisation. */
@@ -38,7 +39,7 @@ export interface Panel {
 }
 
 /** Persisted player-facing settings. Kept separate from session state so they can sync later. */
-interface SettingsSlice {
+interface SettingsSlice extends VoiceSettings {
   masterVolume: number; // 0..1
   sfxVolume: number; // 0..1
   quality: Quality;
@@ -153,6 +154,8 @@ export const useGame = create<GameState>()(
       voiceVolume: 0.9,
       hubTrack: 'windowsill-waltz',
       tourSeen: false,
+      // voice chat (src/game/voiceSettings.ts): hearing on, mic in push-to-talk, never on by default
+      ...VOICE_SETTING_DEFAULTS,
 
       // session
       screen: 'menu',
@@ -222,7 +225,7 @@ export const useGame = create<GameState>()(
       // Whatever is stored, the profile that comes out is valid (unknown items dropped, nothing negative).
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<GameState>;
-        return { ...current, ...p, profile: normalizeProfile(p.profile) };
+        return { ...current, ...p, ...cleanVoiceSettings(p), profile: normalizeProfile(p.profile) };
       },
       partialize: (s) => ({
         masterVolume: s.masterVolume,
@@ -245,6 +248,9 @@ export const useGame = create<GameState>()(
         voiceVolume: s.voiceVolume,
         hubTrack: s.hubTrack,
         tourSeen: s.tourSeen,
+        voiceHear: s.voiceHear,
+        voiceChatVolume: s.voiceChatVolume,
+        micMode: s.micMode,
       }),
     },
   ),

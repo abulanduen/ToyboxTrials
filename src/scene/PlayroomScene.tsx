@@ -13,6 +13,7 @@ import { PALETTE } from '../game/palette';
 import { player } from '../game/player';
 import { PlayerController } from '../character/PlayerController';
 import { RemotePlayers } from '../character/RemotePlayers';
+import { VoiceProximity } from '../character/VoiceProximity';
 import { Room, LAMP_HEAD, LAMP_AIM } from './Room';
 import { sunRig } from './room/bake';
 import { exposeDebug } from '../game/debug';
@@ -140,6 +141,7 @@ function SceneContents() {
           <Village />
           <PlayerController />
           <RemotePlayers />
+          <VoiceProximity />
         </>
       )}
       <Effects quality={quality} sharp={inMatch} />

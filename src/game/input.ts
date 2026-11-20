@@ -25,9 +25,17 @@ export const EMOTE_KEYS: Record<EmoteAction, string[]> = {
   emote3: ['Digit3', 'Numpad3'],
   emote4: ['Digit4', 'Numpad4'],
 };
+/**
+ * Hub voice chat: push-to-talk (hold V, or hold the mic button on touch; src/net/voiceChat.ts).
+ * Like the emotes it is not an `Action`, so it never reaches a minigame's bindings or press log.
+ * V is free in the Hub (movement is WASD/arrows, E interact, H the controls card).
+ */
+export type VoiceAction = 'talk';
+export const VOICE_KEYS: Record<VoiceAction, string[]> = { talk: ['KeyV'] };
 /** Any action a device can trigger. */
-export type InputAction = Action | EmoteAction;
+export type InputAction = Action | EmoteAction | VoiceAction;
 const isEmoteAction = (a: InputAction): a is EmoteAction => a in EMOTE_KEYS;
+const isVoiceAction = (a: InputAction): a is VoiceAction => a in VOICE_KEYS;
 
 export const HUB_BINDINGS: Record<Action, string[]> = {
   forward: ['KeyW', 'ArrowUp'],
@@ -142,7 +150,7 @@ export function setBindings(b: Record<Action, string[]>) {
   bindings = b;
 }
 
-const keysFor = (a: InputAction): readonly string[] => (isEmoteAction(a) ? EMOTE_KEYS[a] : bindings[a]);
+const keysFor = (a: InputAction): readonly string[] => (isEmoteAction(a) ? EMOTE_KEYS[a] : isVoiceAction(a) ? VOICE_KEYS[a] : bindings[a]);
 
 export function isDown(a: InputAction): boolean {
   return virtualDown.has(a) || keysFor(a).some((c) => down.has(c));
@@ -196,7 +204,12 @@ export function releaseVirtual(a: Action) {
 /** One-shot tap (press + release on the next frame). Emote taps never enter the press log. */
 export function tapVirtual(a: InputAction, eventTime?: number) {
   virtualPressed.add(a);
-  if (!isEmoteAction(a)) logPress(a, eventTime);
+  if (!isEmoteAction(a) && !isVoiceAction(a)) logPress(a, eventTime);
+}
+/** Hold or let go of a Hub-only action from a touch button (the mic button's push-to-talk). Never logged as a press. */
+export function holdVirtual(a: VoiceAction, held: boolean) {
+  if (held) virtualDown.add(a);
+  else virtualDown.delete(a);
 }
 
 /** Ordered presses since the last frame (for minigames where order matters, e.g. Copycat). */
