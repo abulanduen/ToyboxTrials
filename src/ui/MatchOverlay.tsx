@@ -2,7 +2,7 @@
  * DOM side of the minigame host: loading, tournament reveal, intro card, countdown, in-game HUD
  * slot + pause, results, standings, final podium. Shared by every minigame.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useGame } from '../game/store';
 import { sfx } from '../game/audio';
 import { MINIGAMES, gameById } from '../minigames/registry';
@@ -24,7 +24,7 @@ import {
 import { FORMATS, poolForFormat, type TournamentFormat } from '../minigames/tournament';
 import { pointsForPlace, rankStandings } from '../minigames/scoring';
 import type { BotDifficulty, Contestant } from '../minigames/types';
-import { tutorialFor, type TutorialStep } from '../minigames/tutorials';
+import { tutorialFor, tutorialText, type TutorialStep } from '../minigames/tutorials';
 import { CardboardSheet, KeyCap, ToyButton } from './common';
 import { TutorialPicture, preloadTutorialArt } from './TutorialPicture';
 import { GearIcon, StarSticker, WindKeyIcon } from './icons';
@@ -256,10 +256,15 @@ function Intro({ touch }: { touch: boolean }) {
 /** Quick paged "how to play" for one minigame, shown inside the intro card. Start stays available. */
 function Tutorial({ steps, touch, accent, onClose, onNever }: { steps: TutorialStep[]; touch: boolean; accent: string; onClose: () => void; onNever: () => void }) {
   const [i, setI] = useState(0);
+  const root = useRef<HTMLElement>(null);
+  const go = (next: number) => {
+    sfx.click(); setI(next);
+    root.current?.scrollIntoView({ block: 'start' });
+  };
   const step = steps[i];
   const last = i === steps.length - 1;
   return (
-    <section className="tutorial" aria-label="How to play" data-testid="tutorial" style={{ ['--accent' as string]: accent }}>
+    <section ref={root} className="tutorial" aria-label="How to play" data-testid="tutorial" style={{ ['--accent' as string]: accent }}>
       <div className="tutorial__head">
         <span>How to play</span>
         <span aria-live="polite" data-testid="tutorial-step">
@@ -267,10 +272,17 @@ function Tutorial({ steps, touch, accent, onClose, onNever }: { steps: TutorialS
         </span>
       </div>
       <div className="tutorial__body">
-        <TutorialPicture key={i} id={(touch && step.touchArt) || step.art} className="tutorial__art" />
+        {step.image ? (
+          <figure className="tutorial__visual">
+            <img key={step.image} src={step.image} alt={step.caption ?? step.title} width={960} height={540} decoding="async" data-testid="tutorial-photo" />
+            <figcaption>{step.caption}</figcaption>
+          </figure>
+        ) : <TutorialPicture key={i} id={(touch && step.touchArt) || step.art} className="tutorial__art" />}
         <div className="tutorial__words">
           <h3 className="tutorial__title">{step.title}</h3>
-          <p className="tutorial__text">{(touch && step.touch) || step.text}</p>
+          <p className="tutorial__text">{tutorialText((touch && step.touch) || step.text, step.emphasis).map((part, n) =>
+            part.strong ? <strong key={n}>{part.text}</strong> : part.text,
+          )}</p>
         </div>
       </div>
       <div className="tutorial__dots" aria-hidden>
@@ -279,10 +291,10 @@ function Tutorial({ steps, touch, accent, onClose, onNever }: { steps: TutorialS
         ))}
       </div>
       <div className="tutorial__nav">
-        <button onClick={() => (sfx.click(), setI(i - 1))} disabled={i === 0} data-testid="tutorial-back">
+        <button onClick={() => go(i - 1)} disabled={i === 0} data-testid="tutorial-back">
           Back
         </button>
-        <button className="tutorial__next" onClick={() => (sfx.click(), last ? onClose() : setI(i + 1))} data-testid="tutorial-next">
+        <button className="tutorial__next" onClick={() => { if (last) { sfx.click(); onClose(); } else go(i + 1); }} data-testid="tutorial-next">
           {last ? 'Got it' : 'Next'}
         </button>
       </div>

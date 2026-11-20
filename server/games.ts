@@ -236,6 +236,9 @@ const GAMES: ServerGame[] = [
       switch (i.type) {
         case 'build':
           return i.cell === undefined ? { type: 'build' } : cell(i.cell) ? { type: 'build', cell: i.cell } : null;
+        case 'auto-merge':
+          return i.preferredCell === undefined ? { type: 'auto-merge' }
+            : cell(i.preferredCell) ? { type: 'auto-merge', preferredCell: i.preferredCell } : null;
         case 'merge':
         case 'move':
           return cell(i.from) && cell(i.to) ? { type: i.type, from: i.from, to: i.to } : null;

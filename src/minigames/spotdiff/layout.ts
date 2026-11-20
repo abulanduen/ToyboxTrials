@@ -52,7 +52,7 @@ export function bookLayout(w: number, h: number, inset: Insets = { top: 0, right
   const gutter = portrait ? 8 : short ? 10 : 16;
   let pw: number;
   if (portrait) pw = Math.min(availW - 2 * pad - 2 * cover, (availH - gutter - 4 * pad - 2 * cover) / (2 * ASPECT));
-  else pw = Math.min((availW - gutter - 4 * pad - 2 * cover) / 2, (availH - 2 * pad - 2 * cover) / ASPECT, 640);
+  else pw = Math.min((availW - gutter - 4 * pad - 2 * cover) / 2, (availH - 2 * pad - 2 * cover) / ASPECT, short ? 640 : 820);
   pw = Math.max(80, Math.floor(pw));
   const ph = Math.round(pw * ASPECT);
   const pageW = pw + 2 * pad;

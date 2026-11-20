@@ -19,13 +19,13 @@ const reach = new Map<number, number>(BUILDABLE.map((c) => [c, coverage(c, 2.4)]
 
 /** Merge pairs, lowest tier first; the result lands on the better-placed of the two. */
 function mergePair(s: TdState, p: TdPlayer, skill: BotDifficulty): TdInput | null {
-  const groups = new Map<string, Tower[]>();
-  for (const t of p.towers) if (TOWERS[t.def].tier < MAX_TIER) groups.set(t.def, [...(groups.get(t.def) ?? []), t]);
+  const groups = new Map<number, Tower[]>();
+  for (const t of p.towers) { const tier = TOWERS[t.def].tier; if (tier < MAX_TIER) groups.set(tier, [...(groups.get(tier) ?? []), t]); }
   const pairs = [...groups.values()].filter((g) => g.length >= 2).sort((a, b) => TOWERS[a[0].def].tier - TOWERS[b[0].def].tier);
   for (const g of pairs) {
-    const def = g[0].def, tier = TOWERS[def].tier;
+    const tier = TOWERS[g[0].def].tier;
     // Quest-minded bots hold a pair while collecting three of an ordered tower (if there is room to wait).
-    const ordered = (def === s.orders.t1 && !p.quests.order1) || (def === s.orders.t2 && !p.quests.order2) || (def === s.orders.t3 && !p.quests.order3)
+    const ordered = g.some(t => (t.def === s.orders.t1 && !p.quests.order1) || (t.def === s.orders.t2 && !p.quests.order2) || (t.def === s.orders.t3 && !p.quests.order3))
       || (tier === 2 && !p.quests.triple2 && skill === 'hard');
     if (ordered && g.length === 2 && skill !== 'easy' && p.towers.length < 30) continue;
     const [a, b] = g.slice().sort((x, y) => (reach.get(y.cell) ?? 0) - (reach.get(x.cell) ?? 0));

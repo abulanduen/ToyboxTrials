@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { GameRun, applyForfeits, STEP_MS } from '../../server/matchRunner';
 import { MatchFlow, PHASE_MS, startProblem, type FlowMember } from '../../server/lobbyMatch';
 import { HIDDEN_FUSE_MS, SERVER_GAMES } from '../../server/games';
+import type { TdState } from '../../src/minigames/towertumble/rules';
 import { makeBots } from '../../src/minigames/bots';
 import { MINIGAME_IDS, type MinigameId } from '../../src/minigames/ids';
 import { GAME_FACTS, onlineGames } from '../../src/minigames/facts';
@@ -63,6 +64,22 @@ describe('server match runner: every trial runs headless with bots', () => {
     expect(run.input('nobody', [{ slot: 1 }])).toBe(0);
     runToEnd(run);
     expect(run.result().placements.find((p) => p.contestantId === 'p1')).toBeDefined();
+  });
+
+  it.each([undefined, 17])('Tower quick merge crosses server validation (preferred cell %s)', (preferredCell) => {
+    const run = new GameRun('toy-tower-tumble', field(0, ['p1']), 1978);
+    const s = run.state as unknown as TdState;
+    expect(run.input('p1', [{ type: 'build', cell: 17 }, { type: 'build', cell: 20 }])).toBe(2);
+    run.advance(STEP_MS);
+    const me = s.players[0];
+    expect(me.towers).toHaveLength(2);
+    me.towers[0].def = 'tin-sentry'; me.towers[1].def = 'spark-bot';
+    expect(run.input('p1', [-1, 1.5, '17', NaN, Infinity].map(preferredCell => ({ type: 'auto-merge', preferredCell })))).toBe(0);
+    expect(run.input('p1', [{ type: 'auto-merge', preferredCell }])).toBe(1);
+    run.advance(STEP_MS);
+    expect(me.merges).toBe(1);
+    expect(me.towers).toHaveLength(1);
+    expect(me.towers[0].cell).toBe(17);
   });
 
   it('a forfeit puts the player last, below everyone who finished', () => {

@@ -72,6 +72,7 @@ export interface TdPlayer {
 export type TdInput =
   | { type: 'build'; cell?: number }
   | { type: 'merge'; from: number; to: number }
+  | { type: 'auto-merge'; preferredCell?: number }
   | { type: 'move'; from: number; to: number }
   | { type: 'sell'; cell: number }
   | { type: 'builder' }
@@ -124,8 +125,21 @@ export const humansIn = (s: TdState) => s.players.filter((p) => p.human && !p.ou
 export const allHumansOut = (s: TdState) => s.players.some((p) => p.human) && humansIn(s) === 0;
 /** The next builder level's price, or null at the top level. */
 export const builderCost = (p: TdPlayer) => (p.builder < MAX_BUILDER ? BUILDER[p.builder].cost : null);
-/** Towers on this board with the same id as `t` (its merge partners). */
-export const twinsOf = (p: TdPlayer, t: Tower) => p.towers.filter((o) => o !== t && o.def === t.def && TOWERS[t.def].tier < MAX_TIER);
+/** Any two towers of the same tier can merge, except at the tier-7 cap. */
+export const canMergeTowers = (a: Tower | undefined, b: Tower | undefined) =>
+  !!a && !!b && a !== b && TOWERS[a.def].tier === TOWERS[b.def].tier && TOWERS[a.def].tier < MAX_TIER;
+/** Same-tier merge partners on this board (the existing name is retained for callers). */
+export const twinsOf = (p: TdPlayer, t: Tower) => p.towers.filter((o) => canMergeTowers(t, o));
+
+/** Prefer the selected tower; otherwise merge the lowest-tier pair on the lowest cell. */
+function automaticMerge(p: TdPlayer, preferredCell?: number): { from: number; to: number } | undefined {
+  const sorted = p.towers.slice().sort((a, b) => TOWERS[a.def].tier - TOWERS[b.def].tier || a.cell - b.cell);
+  const selected = preferredCell === undefined ? undefined : towerAt(p, preferredCell);
+  for (const target of selected ? [selected, ...sorted] : sorted) {
+    const partner = sorted.find(other => canMergeTowers(target, other));
+    if (partner) return { from: partner.cell, to: target.cell };
+  }
+}
 export const freeCell = (p: TdPlayer) => BUILD_ORDER.find((c) => !p.towers.some((t) => t.cell === c));
 export const canBuild = (s: TdState, p: TdPlayer) => s.phase !== 'over' && !p.out && p.gold >= BUILD_COST && freeCell(p) !== undefined;
 
@@ -226,9 +240,12 @@ function apply(s: TdState, p: TdPlayer, input: TdInput) {
       place(s, p, def, cell, 'build');
       s.events.push({ type: 'td-build', id: p.id, def, cell }); return;
     }
+    case 'auto-merge':
     case 'merge': {
-      const a = towerAt(p, input.from), b = towerAt(p, input.to);
-      if (!a || !b || a === b || a.def !== b.def || TOWERS[a.def].tier >= MAX_TIER) return;
+      const pair = input.type === 'merge' ? input : automaticMerge(p, input.preferredCell);
+      if (!pair) return;
+      const a = towerAt(p, pair.from), b = towerAt(p, pair.to);
+      if (!a || !b || !canMergeTowers(a, b)) return;
       const { def, lucky } = rollMerge(p, TOWERS[a.def].tier);
       p.towers = p.towers.filter((t) => t !== a);
       b.def = def; b.cd = 0; b.shots = 0; b.bornAt = s.t; b.how = lucky ? 'lucky' : 'merge';

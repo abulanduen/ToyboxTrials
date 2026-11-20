@@ -64,6 +64,8 @@ bots almost never clear a page, hard bots clear most.
   page edges, a page curl in each outer corner (inside the paper margin, never over a picture) and a page-turn
   animation. Landscape: side by side. Portrait: stacked (`layout.ts`). The pictures are inline **SVG**, so they are
   sharp at any device pixel ratio. They are memoised per round; the HUD itself updates at 12 Hz.
+  Desktop pictures can now grow to 820 px wide each (formerly 640), within the available window.
+  Short landscape phones retain their previous cap; portrait sizing is unchanged.
 - `Scene.tsx` puts a 3D hardback under the DOM book (the camera looks straight down and is fitted every frame to
   the same layout), with pencils, crayons, an eraser, a magnifying glass and a toy block round it.
 - Keyboard: arrows hop a ring between the scene's 60 things (all of them, so it gives nothing away), Enter or Space

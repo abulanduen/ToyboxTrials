@@ -1,8 +1,8 @@
 /* Toy Tower Tumble, desktop + phone portrait + phone landscape (real touch events on phones).
  *
  * Enter from the Tournament Pavilion's practice list, build (on a chosen square and automatically),
- * merge two identical towers (desktop: mouse drag onto the twin; portrait: tap, then tap the
- * glowing twin; landscape: touch drag, then the sheet's Merge button), level the builder and open the
+ * merge different towers of the same tier (mouse drag, tap, touch drag and the sheet button),
+ * press M without a selection to auto-merge, level the builder and open the
  * odds, complete a quest, fast-forward waves, beat the wave-5 boss for its free tier-4 tower, get
  * knocked out, spectate another board (and fast-forward it), reach the results and return to the hub.
  * Test hooks (`?debug`) set up boards and time; they are never gameplay.
@@ -101,9 +101,9 @@ async function frames(page, n) {
       // A fresh build selects its tower; start the merge from no selection.
       if (await page.getByTestId('td-sheet-close').count()) { await click('td-sheet-close'); await page.getByTestId('td-sheet').waitFor({ state: 'detached' }); }
 
-      // ── merge two identical towers (forced identical with the debug hook) ──
+      // ── merge different tower types of the same tier ──
       const [a, b] = await me('p.towers.slice(0, 2).map(t => t.cell)');
-      await state(() => { const p = window.__toybox.match.state().players[0]; p.towers[0].def = 'tin-sentry'; p.towers[1].def = 'tin-sentry'; });
+      await state(() => { const p = window.__toybox.match.state().players[0]; p.towers[0].def = 'tin-sentry'; p.towers[1].def = 'spark-bot'; });
       if (layout === 'desktop') {
         const from = await square(a, 1.4), to = await square(b, 0.3);
         await page.mouse.move(from.x, from.y); await page.mouse.down();
@@ -128,7 +128,7 @@ async function frames(page, n) {
       await shot('merge');
       // Landscape also merges with the sheet's button.
       if (layout === 'landscape') {
-        await state(() => { const p = window.__toybox.match.state().players[0]; p.towers.forEach(t => { t.def = 'felt-cub'; }); });
+        await state(() => { const p = window.__toybox.match.state().players[0]; p.towers.forEach((t,i) => { t.def = i ? 'felt-cub' : 'tin-sentry'; }); });
         const cells = await me('p.towers.map(t => t.cell)');
         // The merged tower is still selected; clear it so the tap selects rather than toggles.
         if (await page.getByTestId('td-sheet-close').count()) { await click('td-sheet-close'); await page.getByTestId('td-sheet').waitFor({ state: 'detached' }); }
@@ -139,7 +139,15 @@ async function frames(page, n) {
         await until('p.merges === 2 && p.towers.length === 1');
         await click('td-sheet-close');
       }
-      log('merged');
+      if (layout === 'desktop') {
+        await state(() => { const p = window.__toybox.match.state().players[0]; p.towers.forEach((t,i) => { t.def = i ? 'spark-bot' : 'tin-sentry'; }); });
+        if (await page.getByTestId('td-sheet-close').count()) { await click('td-sheet-close'); await page.getByTestId('td-sheet').waitFor({state:'detached'}); }
+        await page.keyboard.press('KeyM');
+        await until('p.merges === 2 && p.towers.length === 1');
+        await shot('keyboard-merge');
+        if (await page.getByTestId('td-sheet-close').count()) await click('td-sheet-close');
+      }
+      log(layout === 'desktop' ? 'merged same-tier towers; M works without selection' : 'merged same-tier towers with touch');
 
       // ── level the builder and read the odds ──
       await state(() => { window.__toybox.match.state().players[0].gold = 300; });

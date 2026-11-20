@@ -5,8 +5,7 @@
  */
 import { create } from 'zustand';
 import { isBuildable } from './board';
-import { MAX_TIER, TOWERS } from './catalogue';
-import { towerAt, type TdInput, type TdPlayer } from './rules';
+import { canMergeTowers, towerAt, type TdInput, type TdPlayer } from './rules';
 
 export type TdPanel = 'quests' | 'odds' | 'players' | null;
 export interface TumbleUI {
@@ -29,14 +28,14 @@ export function submitTumbleInput(input: TdInput) { if (queue.length < 64) queue
 export function clearTumbleInput() { queue = []; }
 export function drainTumbleInput() { const inputs = queue; queue = []; return inputs; }
 
-/** Identical towers can merge (tier 7 is the top). */
+/** Same-tier towers can merge (tier 7 is the top). */
 export const canMergeCells = (p: TdPlayer, from: number, to: number) => {
   const a = towerAt(p, from), b = towerAt(p, to);
-  return !!a && !!b && a !== b && a.def === b.def && TOWERS[a.def].tier < MAX_TIER;
+  return canMergeTowers(a, b);
 };
 
 /**
- * A tap (or Enter) on a square of your own board. With a tower selected, tapping one of its twins
+ * A tap (or Enter) on a square of your own board. With a tower selected, tapping a same-tier partner
  * merges them (the new tower lands on the twin you tapped). Otherwise it selects the square, and
  * tapping the selected square again clears the selection. Path squares clear it too.
  */

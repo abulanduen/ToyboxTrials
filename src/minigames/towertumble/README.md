@@ -1,7 +1,7 @@
 # Toy Tower Tumble
 
 A 5–10 minute random-merge tower defence for 1–8 players. Every player defends an 8×8 board
-against 20 shared waves of wind-up toys. **Build** pays for a *random* tower; **two identical towers
+against 20 shared waves of wind-up toys. **Build** pays for a *random* tower; **any two same-tier towers
 merge into a random tower one tier up**, all the way to tier 7. Level your **builder** for better
 odds, finish **quick quests** for gold, beat the **bosses** on waves 5, 10, 15 and 20 for free
 towers, and hold out longer than everyone else. Knocked-out players watch the other boards.
@@ -22,6 +22,9 @@ landing and Blink Duel: the mirror of Odd Page Out's spot west of the landing) �
   towers merging into a random higher tier, builder levels that improve the odds, quick quests, boss
   rewards, a tier-7 cap) and filled the gaps with the design below. Names, models and text are
   original to Toybox Trials.
+
+Owner revision, 20 November 2026: matching is now by **tier**, not tower identity. **M** merges
+one available pair without a selection; clicking/dragging and bots use the same eligibility.
 
 ## The board
 
@@ -121,10 +124,13 @@ non-boss under 15% health). Targeting: the enemy furthest along its route, withi
 - **Build: 20 gold** for one random tower, on the selected empty square (or, with nothing selected,
   on the free square that reaches the most path). The tier comes from the builder odds; the tower is
   uniform within that tier.
-- **Merge:** two towers with the same name (so the same tier) → one random tower of the next tier,
+- **Merge:** any two towers of the same tier, regardless of name or family → one random tower of the next tier,
   on the square of the tower you merged *into*. The other square empties. Tier 7 never merges.
+- **M quick merge:** no selection required. It keeps the result on the selected tower if that
+  tower has a partner; otherwise it picks the lowest-tier pair, keeping the lowest-cell position.
+  Each press merges one pair; invalid/capped selections fall back to another available pair.
 - **Lucky merge:** with the builder's lucky chance a merge jumps two tiers instead of one, but never
-  past tier 5. Tiers 6 and 7 only ever come from two identical towers.
+  past tier 5. Tiers 6 and 7 require two same-tier towers from the preceding tier.
 - **Move:** drag a tower onto an empty square (free); onto a different tower to swap.
 - **Sell:** 10 gold per tier (10, 20 … 70).
 
@@ -254,14 +260,15 @@ hard bots move their strongest tower to the best empty square.
 On a 390 px portrait screen the 8×8 board is about 44 px a square: below the 56 px rule. So squares
 **only select** (a wrong tap just selects another square, and is undone by Close), and every action
 that changes the board is a **≥ 56 px button** in the sheet that opens for the selected square:
-*Build here*, *Merge with twin B3* (one button per twin, up to three), *Sell* and *Close*. The
-selected square has a white ring and its twins glow gold, so tapping a glowing twin (or dragging
+*Build here*, *Merge tier N at B3* (up to three partner choices), *Sell* and *Close*. The
+selected square has a white ring and its same-tier partners glow gold, so tapping a glowing partner (or dragging
 onto it) also merges; those are shortcuts, never the only way. Portrait puts the board in a square
 under the top bar, the sheet below it (never covering it) and the dock at the bottom; landscape
 puts quests left, the dock right and the sheet over the quests while a square is selected. The 3D
 camera fits the board into the HUD's `.td-board-slot` with `setViewOffset`, so the board is always
 framed in the free space whatever the layout. Keyboard: arrows move a cursor, Enter selects or
-merges, B builds, U levels the builder, M merges with a twin, Q sells, N or Space starts the wave.
+merges, B builds, U levels the builder, M automatically merges a same-tier pair without selection,
+Q sells, N or Space starts the wave. Same-tier partner highlights also apply to different tower kinds.
 
 ## Rendering and performance
 
@@ -282,7 +289,10 @@ the tower sheet, the attack looks (`EFFECT_SPECS`), status colours and effect sh
 now exported: the only change to Toy Squad, additive). Host: `session.ts` lifecycle, bots, results,
 records; `audio.ts` cues (`sfx`, `playToyCue`) for every sound; `palette.ts` for colours.
 
-## Balance (headless bot lobbies, provisional)
+## Historical balance (before the same-tier merge revision)
+
+The figures below used the former identical-tower requirement. The owner's same-tier revision
+makes merging easier; these figures are not validation of the revised balance.
 
 Twelve simulated 8-bot lobbies (2 easy, 4 normal, 2 hard per lobby), 1/60 s steps:
 
