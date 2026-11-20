@@ -57,8 +57,11 @@ export interface ServerGame {
   validate(input: Obj): unknown | null;
   /** Remove hidden information from a fresh wire copy of the state (mutating it is fine). */
   publicView?(view: Obj): void;
-  /** What `viewer` may see, from the public view (return a shallow copy; never mutate `view`). */
-  viewFor?(view: Obj, viewer: string | null): Obj;
+  /**
+   * What `viewer` may see, from the public view (return a shallow copy; never mutate `view`).
+   * `watching` is another seat whose board the viewer is looking at (a game's player rail), if any.
+   */
+  viewFor?(view: Obj, viewer: string | null, watching?: string | null): Obj;
   config?: Obj;
   repeatInputs?: boolean;
   /** Send a snapshot every N server ticks (default 1). */
@@ -183,10 +186,12 @@ const GAMES: ServerGame[] = [
     publicView(v) {
       v.seed = 1;
     },
-    // Your own shop, passive offers and battle; nobody else's.
-    viewFor(v, viewer) {
+    // Your own shop and passive offers; nobody else's. Squads (units, passives, points, last
+    // result) are public, so the player rail can show anyone's board; battles are sent only for
+    // you and the board you are viewing (they are large, not secret).
+    viewFor(v, viewer, watching) {
       const players = (v.players as Obj[]).map((p) => (p.id === viewer ? p : { ...p, shop: [], passiveOffers: [] }));
-      const battles = (v.battles as Obj[]).filter((b) => b.owner === viewer);
+      const battles = (v.battles as Obj[]).filter((b) => b.owner === viewer || (!!watching && b.owner === watching));
       return { ...v, players, battles };
     },
     snapshotEvery: 2,

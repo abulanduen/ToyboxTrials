@@ -1,9 +1,10 @@
 # Toy Squad
 
-Local casual auto-battler, 1–8 contenders with solo clockwork squads or bot fill. Entry: Tournament
-Pavilion → **Or practise one trial → Strategy games → Toy Squad**. Ten rounds; not ranked. A
-strategy trial (owner decisions 19 and 20 Nov 2026): never in Blitz, and only ever the finale of a
-Normal or Treasure tournament. Full unit/passive designs: [CATALOGUE.md](CATALOGUE.md).
+Casual auto-battler, 1–8 contenders with solo clockwork squads or bot fill. Entry: Tournament
+Pavilion → **Or practise one trial → Strategy games → Toy Squad**, or an online lobby (the server
+runs the rules and hides each player's shop and passive offers; see `server/games.ts`). Ten rounds;
+not ranked. A strategy trial (owner decisions 19 and 20 Nov 2026): never in Blitz, and only ever the
+finale of a Normal or Treasure tournament. Full unit/passive designs: [CATALOGUE.md](CATALOGUE.md).
 
 ## Owner-defined progression
 
@@ -154,8 +155,25 @@ holds them with stun. These are strategic options, not established optimal build
 - **Toy Handbook:** the Toys button (top left) lists all 62 toys with picture, rarity, cost, trait
   symbols, stats, passive and spell, filterable by rarity and trait. Each has a star toggle;
   favourites are saved in the shared settings (`squadFavourites`) and marked on shop cards.
-- **Damage overview:** during the battle and the recap, a panel at the right edge (opposite the
-  traits) lists your toys with picture and name, damage dealt high to low with a bar each (the blue
+- **Player rail** (`shared/PlayerRail.tsx`, shared with Toy Tower Tumble): every player in a column
+  at the right edge (a 64 px chip column on phones), in standings order (points, then surviving
+  health: the placement order), with points and wins. A rosette, an even sign or a cross marks how
+  each player's last match went (a public `last` field the rules set at the recap); during the
+  build, players still building glow. Tap or click a row (or Tab and Enter) to view that player's
+  board, read-only: their deployed toys and reserves while building, their battle, damage numbers,
+  effects and damage overview while fighting. "Watching X · Back to my board" (or Escape) returns.
+  Your shop, Reroll and Ready keep working while you look; dragging and F/arrow placement only
+  work on your own board. It replaces the old standings box, which covered the board on phones.
+  On phones the camera frames the board in the space left of the rail. Online, the server is told
+  whose board you are viewing (the lobby `watch` message, for a seated player) and adds that
+  board's battle to your snapshots; shops and passive offers stay private.
+- **Debuff badges:** the shared code-drawn status badges (`shared/statusIcons.ts`, the same as Tower
+  Tumble's) float over fighters that are poisoned, stunned, marked, silenced, or have a net
+  negative haste (slowed), armour (armour broken) or damage, spell power or range (weakened)
+  buff, read by `fighterStatus` in `info.ts` exactly as the next battle tick reads them. One
+  instanced quad mesh per status kind; the key is in the battle's "Spells, mana & badges" tab.
+- **Damage overview:** during the battle and the recap, a panel at the right (beside the player
+  rail, opposite the traits) lists the viewed squad's toys with picture and name, damage dealt high to low with a bar each (the blue
   part is spells and passives), and a Taken toggle for health lost. A row flashes when that toy
   lands or takes a hit (a static outline with reduced motion). It starts folded into a Damage tab on
   phones and can be folded anywhere. The numbers are a read-only `stats` tally on each fighter that
@@ -187,6 +205,12 @@ button, drag-to-sell, keyboard placement, Q/R/E shortcuts and physical reserve d
 It checks the damage overview in battle, then plays all ten rounds, where the passive modal must
 block Q/R/E until a choice is made. Real-device performance, audio quality and strategic balance
 still need human playtesting.
+
+Verification, 20 November 2026 (player rail, debuff badges, board viewing): 920 unit tests (whole
+suite), the production build and the server build pass; `tests/e2e/toysquad.cjs` passes on desktop,
+portrait-touch and landscape-touch, now with three bot squads, the rail (standings order, compact on
+phones, keyboard and touch switching, the viewed battle in the damage overview, last-match marks) and
+the badges.
 
 Verification, 18 November 2026 (HUD update): 284 unit tests and the production build pass. The
 desktop, portrait-touch and landscape-touch ten-round checks above pass without console/page errors.

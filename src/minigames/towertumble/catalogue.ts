@@ -190,8 +190,17 @@ export const BOSSES: Record<number, BossDef> = {
   5: { name: 'Rumble Ram', model: 'ratchet-rhino', hp: 14, flying: false, reward: 'A free random tier-4 tower' },
   10: { name: 'Tin Juggernaut', model: 'brass-behemoth', hp: 18, flying: false, reward: 'A free random tier-5 tower' },
   15: { name: 'Kite Dragon', model: 'glass-griffin', hp: 16, flying: true, reward: 'A free random tier-5 tower and a free builder level' },
-  20: { name: 'The Grand Wind-Up', model: 'grandfather-gear', hp: 30, flying: false, reward: 'Victory, and a 500-point bounty' },
+  20: { name: 'The Grand Wind-Up', model: 'grandfather-gear', hp: 30, flying: false, reward: 'A free random tier-6 tower and a 500-point bounty' },
 };
+/** Free random tower tier for toppling each wave's boss (0: none). */
+export const BOSS_GIFT_TIER: Record<number, number> = { 5: 4, 10: 5, 15: 5, 20: 6 };
+
+/**
+ * The damage check after the final wave: just for fun. It cannot be toppled, has no health bar
+ * and costs no lives when it walks off the board; each board's towers simply see how much damage
+ * they can pour into one target while it crosses. It never changes placements.
+ */
+export const DAMAGE_CHECK = { name: 'The Tally Bear', model: 'clockwork-bear', blurb: 'A huge wind-up practice bear: no health bar, costs no lives. How hard can your board hit it?', speed: 0.75, prepMs: 15000, capMs: 60000 } as const;
 export const isBossWave = (wave: number) => wave in BOSSES;
 
 /** Base health of one walker on wave `w` (1–20). */
@@ -232,17 +241,19 @@ export const WAVE_COUNT = WAVES.length;
 // ─────────────────────────────────────────────── quests ───────────────────────────────────────────────
 
 export type QuestId = 'collect5' | 'triple2' | 'order1' | 'order2' | 'order3' | 'first6' | 'clean5' | 'album';
-export interface QuestDef { title: string; gold: number; lives?: number; builder?: number }
+export interface QuestDef { title: string; gold: number; lives?: number; builder?: number;
+  /** A free random tower of this tier, placed like a boss gift. */
+  tower?: number }
 /** Quick quests, always on show. Each pays once. `order1–3` targets are picked per match from the seed. */
 export const QUESTS: Record<QuestId, QuestDef> = {
   collect5: { title: 'Own all 5 different tier-1 towers at once', gold: 40 },
-  triple2: { title: 'Own 3 of the same tier-2 tower', gold: 60 },
+  triple2: { title: 'Own 3 of the same tier-2 tower', gold: 30, tower: 2 },
   order1: { title: 'Own 3 of the ordered tier-1 tower', gold: 25 },
-  order2: { title: 'Own 3 of the ordered tier-2 tower', gold: 50 },
+  order2: { title: 'Own 3 of the ordered tier-2 tower', gold: 30, tower: 3 },
   order3: { title: 'Own 3 of the ordered tier-3 tower', gold: 80, builder: 1 },
   first6: { title: 'Be the first in the lobby to own a tier-6 tower', gold: 150, lives: 5 },
   clean5: { title: 'Clear 5 waves in a row without a leak', gold: 50 },
-  album: { title: 'Own a tier-3+ tower of every family at once', gold: 100 },
+  album: { title: 'Own a tier-3+ tower of every family at once', gold: 50, tower: 4 },
 };
 export const QUEST_ORDER: readonly QuestId[] = ['collect5', 'order1', 'triple2', 'order2', 'order3', 'clean5', 'album', 'first6'];
-export const questReward = (q: QuestDef) => [`${q.gold} gold`, q.lives ? `${q.lives} lives` : '', q.builder ? 'a free builder level' : ''].filter(Boolean).join(' + ');
+export const questReward = (q: QuestDef) => [`${q.gold} gold`, q.tower ? `a free tier-${q.tower} tower` : '', q.lives ? `${q.lives} lives` : '', q.builder ? 'a free builder level' : ''].filter(Boolean).join(' + ');

@@ -18,7 +18,7 @@ import { rankByKey } from '../scoring';
 import type { MatchEvent, RulesCore } from '../types';
 import { BUILD_ORDER, GLIDE, WALK, dist2, isBuildable, pointAt, type Polyline } from './board';
 import {
-  BOSSES, BUILD_COST, BUILDER, ENEMIES, FAMILIES, LUCKY_CAP, MAX_BUILDER, MAX_TIER, QUESTS, START_GOLD, START_LIVES, TIER_POOLS, TOWERS, WAVES,
+  BOSSES, BOSS_GIFT_TIER, BUILD_COST, BUILDER, DAMAGE_CHECK, ENEMIES, FAMILIES, LUCKY_CAP, MAX_BUILDER, MAX_TIER, QUESTS, START_GOLD, START_LIVES, TIER_POOLS, TOWERS, WAVES,
   bossBounty, sellValue, waveBonus, waveBounty, waveHp, type EnemyKind, type QuestId, type TowerDef,
 } from './catalogue';
 
@@ -40,6 +40,8 @@ export interface Enemy {
   dist: number; x: number; z: number; speed: number;
   slow: number; slowUntil: number; stunUntil: number; burn: number; burnUntil: number; markUntil: number;
   bounty: number; leak: number;
+  /** The damage-check target after the final wave: never loses health, costs no lives. */
+  check: boolean;
 }
 /** One tower shot, for the effects layer. `hops` holds chain jumps as x,z pairs. */
 export interface Shot { serial: number; t: number; tower: number; def: string; x: number; z: number; tx: number; tz: number; splash: number; hops: number[]; hopCount: number; effects: number }
@@ -64,6 +66,13 @@ export interface TdPlayer {
   /** Waves in a row without a leak, and whether this wave has leaked yet. */
   streak: number; leakedThisWave: boolean;
   ready: boolean; spawnIdx: number;
+  /**
+   * This board has dealt with every enemy of the current wave (killed or leaked) and has been paid
+   * its round rewards at once, while other boards may still be fighting.
+   */
+  waveDone: boolean;
+  /** Damage poured into the damage-check target (just for fun: never part of the score). */
+  checkDamage: number;
   /** Free towers waiting for an empty square (boss rewards on a full board). */
   gifts: string[];
   shots: Shot[]; shotSerial: number; pops: Pop[]; popSerial: number;
@@ -87,14 +96,19 @@ export interface TdConfig {
   /** A wave that has not been cleared this long after it started ends anyway: what is left leaks. */
   waveCapMs: number;
   waves: number;
+  /** After the final wave: a short build phase, then the damage-check target crosses every board still in. */
+  damageCheck: boolean; checkPrepMs: number; checkCapMs: number;
 }
-export const DEFAULT_CONFIG: TdConfig = { firstBuildMs: 20000, buildMs: 8000, botBuildMs: 3000, waveCapMs: 90000, waves: WAVES.length };
+export const DEFAULT_CONFIG: TdConfig = {
+  firstBuildMs: 20000, buildMs: 8000, botBuildMs: 3000, waveCapMs: 90000, waves: WAVES.length,
+  damageCheck: true, checkPrepMs: DAMAGE_CHECK.prepMs, checkCapMs: DAMAGE_CHECK.capMs,
+};
 export const SPEEDS = [1, 2, 4] as const;
 
 export interface TdState {
   kind: 'tower-tumble'; seed: number; config: TdConfig;
   t: number; phase: 'build' | 'wave' | 'over'; phaseEnds: number;
-  /** Current (or next, during a build phase) wave, 1-based. */
+  /** Current (or next, during a build phase) wave, 1-based. `config.waves + 1` is the damage check. */
   wave: number; waveT: number;
   spawns: { at: number; kind: EnemyKind }[];
   players: TdPlayer[]; nextId: number; events: MatchEvent[];
@@ -121,6 +135,8 @@ function rand(p: TdPlayer): number {
 const pick = <T>(p: TdPlayer, items: readonly T[]) => items[Math.floor(rand(p) * items.length)];
 export const towerAt = (p: TdPlayer, cell: number) => p.towers.find((t) => t.cell === cell);
 export const defOf = (t: Tower): TowerDef => TOWERS[t.def];
+/** The damage check (its build phase or its run) is on. */
+export const inCheck = (s: TdState) => s.wave > s.config.waves;
 export const humansIn = (s: TdState) => s.players.filter((p) => p.human && !p.out).length;
 export const allHumansOut = (s: TdState) => s.players.some((p) => p.human) && humansIn(s) === 0;
 /** The next builder level's price, or null at the top level. */
@@ -176,6 +192,7 @@ function grantQuest(s: TdState, p: TdPlayer, q: QuestId) {
   p.quests[q] = true; p.gold += def.gold; p.lives += def.lives ?? 0;
   if (def.builder && p.builder < MAX_BUILDER) p.builder++;
   s.events.push({ type: 'td-quest', id: p.id, quest: q });
+  if (def.tower) { p.gifts.push(pick(p, TIER_POOLS[def.tower - 1])); placeGifts(s, p); }
 }
 /** Progress towards every quest, as [have, need]. Pure: the HUD uses it too. */
 export function questProgress(s: TdState, p: TdPlayer): Record<QuestId, [number, number]> {
@@ -276,6 +293,7 @@ function apply(s: TdState, p: TdPlayer, input: TdInput) {
 
 function scheduleWave(s: TdState) {
   const spawns: TdState['spawns'] = [];
+  if (inCheck(s)) { s.spawns = [{ at: 0, kind: 'boss' }]; return; }
   for (const g of WAVES[s.wave - 1]) for (let i = 0; i < g.count; i++) spawns.push({ at: (g.delayMs ?? 0) + i * g.gapMs, kind: g.kind });
   spawns.sort((a, b) => a.at - b.at);
   s.spawns = spawns;
@@ -283,21 +301,29 @@ function scheduleWave(s: TdState) {
 function startWave(s: TdState) {
   scheduleWave(s);
   s.phase = 'wave'; s.waveT = 0;
-  for (const p of s.players) { p.spawnIdx = 0; p.ready = false; p.leakedThisWave = false; }
-  s.events.push({ type: 'td-wave', wave: s.wave, boss: s.wave in BOSSES });
+  for (const p of s.players) { p.spawnIdx = 0; p.ready = false; p.leakedThisWave = false; p.waveDone = false; }
+  s.events.push({ type: 'td-wave', wave: s.wave, boss: !inCheck(s) && s.wave in BOSSES, ...(inCheck(s) ? { check: true } : {}) });
 }
 function startBuild(s: TdState, first = false) {
   s.phase = 'build';
-  s.phaseEnds = s.t + (humansIn(s) ? (first ? s.config.firstBuildMs : s.config.buildMs) : s.config.botBuildMs);
+  s.phaseEnds = s.t + (humansIn(s) ? (first ? s.config.firstBuildMs : inCheck(s) ? s.config.checkPrepMs : s.config.buildMs) : s.config.botBuildMs);
   for (const p of s.players) p.ready = false;
 }
 function spawn(s: TdState, p: TdPlayer, kind: EnemyKind) {
+  if (inCheck(s)) {
+    // The damage check: its health never changes (there is no bar), it pays nothing and costs nothing.
+    const e: Enemy = {
+      id: s.nextId++, kind: 'boss', boss: true, flying: false, hp: 1, maxHp: 1, armour: 0, dist: 0, x: 0, z: 0, speed: DAMAGE_CHECK.speed,
+      slow: 0, slowUntil: 0, stunUntil: 0, burn: 0, burnUntil: 0, markUntil: 0, bounty: 0, leak: 0, check: true,
+    };
+    pointAt(WALK, 0, e); p.enemies.push(e); return;
+  }
   const def = ENEMIES[kind], w = s.wave, boss = kind === 'boss', b = BOSSES[w];
   const hp = Math.round(waveHp(w) * (boss ? b?.hp ?? 20 : def.hp));
   const e: Enemy = {
     id: s.nextId++, kind, boss, flying: boss ? !!b?.flying : def.flying, hp, maxHp: hp, armour: Math.round(def.armour * w * 10) / 10,
     dist: 0, x: 0, z: 0, speed: def.speed, slow: 0, slowUntil: 0, stunUntil: 0, burn: 0, burnUntil: 0, markUntil: 0,
-    bounty: boss ? bossBounty(w) : Math.max(1, Math.round(def.bounty * waveBounty(w))), leak: def.leak,
+    bounty: boss ? bossBounty(w) : Math.max(1, Math.round(def.bounty * waveBounty(w))), leak: def.leak, check: false,
   };
   pointAt(e.flying ? GLIDE : WALK, 0, e);
   p.enemies.push(e);
@@ -312,20 +338,35 @@ function pop(s: TdState, p: TdPlayer, e: Enemy, leaked: boolean) {
   slot.serial = p.popSerial; slot.t = s.t; slot.x = e.x; slot.z = e.z; slot.kind = e.kind; slot.boss = e.boss; slot.leaked = leaked;
 }
 function leak(s: TdState, p: TdPlayer, e: Enemy) {
+  if (e.check) {
+    e.hp = 0;
+    s.events.push({ type: 'td-check-done', id: p.id, damage: Math.round(p.checkDamage) });
+    return;
+  }
   e.hp = 0; p.lives -= e.leak; p.leaks++; p.leakedThisWave = true; p.lastLeakAt = s.t;
   pop(s, p, e, true);
   s.events.push({ type: 'td-leak', id: p.id, lives: Math.max(0, p.lives), boss: e.boss });
   if (p.lives <= 0) knockOut(s, p);
 }
+/** A board has dealt with its whole wave: pay its round rewards now, whoever else is still fighting. */
+function clearBoard(s: TdState, p: TdPlayer) {
+  if (p.waveDone || p.out) return;
+  p.waveDone = true;
+  if (inCheck(s)) return;
+  const gold = waveBonus(s.wave);
+  p.cleared = s.wave; p.gold += gold;
+  p.streak = p.leakedThisWave ? 0 : p.streak + 1;
+  s.events.push({ type: 'td-board-clear', id: p.id, wave: s.wave, gold });
+  if (p.streak >= 5) grantQuest(s, p, 'clean5');
+}
 function endWave(s: TdState) {
-  for (const p of s.players) {
-    if (p.out) continue;
-    p.cleared = s.wave; p.gold += waveBonus(s.wave);
-    p.streak = p.leakedThisWave ? 0 : p.streak + 1;
-    if (p.streak >= 5) grantQuest(s, p, 'clean5');
-  }
+  for (const p of s.players) clearBoard(s, p);
+  if (inCheck(s)) { finish(s); return; }
   s.events.push({ type: 'td-cleared', wave: s.wave });
-  if (s.wave >= s.config.waves) { s.victory = true; finish(s); return; }
+  if (s.wave >= s.config.waves) {
+    s.victory = true;
+    if (!s.config.damageCheck) { finish(s); return; }
+  }
   s.wave++;
   startBuild(s);
 }
@@ -353,7 +394,8 @@ function hit(s: TdState, p: TdPlayer, tower: Tower, d: TowerDef, e: Enemy, damag
   let fx = 0;
   let dmg = d.abilities.includes('pierce') ? damage : Math.max(1, damage - e.armour);
   if (e.markUntil > s.t) dmg *= 1.25;
-  e.hp -= dmg; p.damage += dmg; tower.dealt += dmg;
+  if (e.check) p.checkDamage += dmg;
+  else { e.hp -= dmg; p.damage += dmg; tower.dealt += dmg; }
   if (d.slow) {
     const slow = Math.min(0.6, e.boss ? d.slow / 2 : d.slow);
     if (e.slowUntil <= s.t || slow >= e.slow) { e.slow = slow; e.slowUntil = s.t + d.slowMs; }
@@ -374,7 +416,7 @@ function kill(s: TdState, p: TdPlayer, e: Enemy) {
   pop(s, p, e, false);
   if (e.boss) {
     s.events.push({ type: 'td-boss-down', id: p.id, wave: s.wave });
-    const tier = s.wave === 5 ? 4 : s.wave === 10 || s.wave === 15 ? 5 : 0;
+    const tier = BOSS_GIFT_TIER[s.wave] ?? 0;
     if (tier) p.gifts.push(pick(p, TIER_POOLS[tier - 1]));
     if (s.wave === 15 && p.builder < MAX_BUILDER) p.builder++;
     if (s.wave === 20) p.bonus += 500;
@@ -435,7 +477,10 @@ function advanceBoard(s: TdState, p: TdPlayer, dt: number) {
   const sec = dt / 1000;
   for (const e of p.enemies) {
     if (e.hp <= 0) continue;
-    if (e.burnUntil > s.t) { const b = Math.min(e.hp, e.burn * sec); e.hp -= b; p.damage += b; if (e.hp <= 0.0001) { kill(s, p, e); continue; } }
+    if (e.burnUntil > s.t) {
+      if (e.check) p.checkDamage += e.burn * sec;
+      else { const b = Math.min(e.hp, e.burn * sec); e.hp -= b; p.damage += b; if (e.hp <= 0.0001) { kill(s, p, e); continue; } }
+    }
     if (e.stunUntil <= s.t) {
       e.dist += e.speed * (1 - (e.slowUntil > s.t ? e.slow : 0)) * sec;
       const route = routeOf(e);
@@ -455,6 +500,7 @@ function advanceBoard(s: TdState, p: TdPlayer, dt: number) {
   let n = 0;
   for (const e of p.enemies) if (e.hp > 0) p.enemies[n++] = e;
   p.enemies.length = n;
+  if (!p.waveDone && p.spawnIdx >= s.spawns.length && n === 0) clearBoard(s, p);
 }
 
 function advance(s: TdState, dt: number) {
@@ -469,14 +515,14 @@ function advance(s: TdState, dt: number) {
   for (const p of s.players) if (!p.out) advanceBoard(s, p, dt);
   if (s.players.every((p) => p.out)) { finish(s); return; }
   const live = s.players.filter((p) => !p.out);
-  const spawned = live.every((p) => p.spawnIdx >= s.spawns.length);
-  if (spawned && live.every((p) => p.enemies.length === 0)) { endWave(s); return; }
-  if (s.waveT >= s.config.waveCapMs) {
+  if (live.every((p) => p.waveDone)) { endWave(s); return; }
+  if (s.waveT >= (inCheck(s) ? s.config.checkCapMs : s.config.waveCapMs)) {
     // Too long: whatever is left gets through.
     for (const p of live) {
       while (p.spawnIdx < s.spawns.length) spawn(s, p, s.spawns[p.spawnIdx++].kind);
       for (const e of p.enemies) if (!p.out && e.hp > 0) leak(s, p, e);
       p.enemies.length = 0;
+      clearBoard(s, p);
     }
     if (s.players.every((p) => p.out)) finish(s); else endWave(s);
   }
@@ -493,7 +539,7 @@ export const tumbleRules: RulesCore<TdState, TdInput, TdConfig> = {
   init(contestants, seed, config) {
     const cfg = { ...DEFAULT_CONFIG, ...config };
     if (!contestants.length || contestants.length > 8) throw new Error('Toy Tower Tumble needs 1–8 players.');
-    if (!Number.isInteger(cfg.waves) || cfg.waves < 1 || cfg.waves > WAVES.length) throw new Error('Invalid Toy Tower Tumble configuration.');
+    if (!Number.isInteger(cfg.waves) || cfg.waves < 1 || cfg.waves > WAVES.length || typeof cfg.damageCheck !== 'boolean') throw new Error('Invalid Toy Tower Tumble configuration.');
     const orderRng = seededRng(subSeed(seed, 'orders'));
     const s: TdState = {
       kind: 'tower-tumble', seed, config: cfg, t: 0, phase: 'build', phaseEnds: 0, wave: 1, waveT: 0, spawns: [], nextId: 1, events: [],
@@ -502,7 +548,7 @@ export const tumbleRules: RulesCore<TdState, TdInput, TdConfig> = {
       players: contestants.map((c) => ({
         id: c.id, human: !c.bot, rng: subSeed(seed, `board:${c.id}`), gold: START_GOLD, lives: START_LIVES, builder: 1, towers: [], enemies: [],
         out: false, outWave: 0, cleared: 0, damage: 0, kills: 0, leaks: 0, bonus: 0, builds: 0, merges: 0, luckyMerges: 0, maxTier: 0,
-        quests: blankQuests(), streak: 0, leakedThisWave: false, ready: false, spawnIdx: 0, gifts: [],
+        quests: blankQuests(), streak: 0, leakedThisWave: false, ready: false, spawnIdx: 0, waveDone: false, checkDamage: 0, gifts: [],
         shots: Array.from({ length: SHOT_RING }, blankShot), shotSerial: 0, pops: Array.from({ length: POP_RING }, blankPop), popSerial: 0,
         lastLeakAt: -1e9, auraDirty: false, boardDirty: false,
       })),
@@ -530,7 +576,7 @@ export const tumbleRules: RulesCore<TdState, TdInput, TdConfig> = {
     return {
       durationMs: s.t,
       placements: rankByKey(ordered.map((p) => ({ contestantId: p.id, score: p.cleared, key: `${p.cleared}:${Math.max(0, p.lives)}:${score(p)}`, eliminated: p.out }))),
-      stats: { wave: Math.min(s.wave, s.config.waves), victory: s.victory ? 1 : 0 },
+      stats: { wave: Math.min(s.wave, s.config.waves), victory: s.victory ? 1 : 0, damageCheck: Math.round(Math.max(0, ...s.players.map((p) => p.checkDamage))) },
     };
   },
   drainEvents(s) { const events = s.events; s.events = []; return events; },
@@ -540,6 +586,9 @@ export const tumbleRules: RulesCore<TdState, TdInput, TdConfig> = {
 export const boardScore = (p: TdPlayer) => Math.round(p.damage / 10) + p.bonus;
 
 // ─────────────────────────────────────────────── spectating ───────────────────────────────────────────────
+
+/** Boards still fighting the current wave (not out, not yet cleared it): the rail highlights them. */
+export const stillGoing = (s: TdState, p: TdPlayer) => s.phase === 'wave' && !p.out && !p.waveDone;
 
 /** Boards worth watching, in seat order: everyone still in, then (if nobody is) every board. */
 export function watchable(s: TdState): string[] {
@@ -553,11 +602,12 @@ export function cycleWatch(s: TdState, current: string, dir: 1 | -1): string {
   if (i < 0) return list[dir > 0 ? 0 : list.length - 1];
   return list[(i + dir + list.length) % list.length];
 }
-/** Which board a viewer should see: their own while they are in, otherwise the requested one if still watchable. */
+/**
+ * Which board a viewer sees: the one they asked for (any board, read-only), otherwise their own.
+ * Nobody is moved off their own board automatically, not even when knocked out.
+ */
 export function viewedBoard(s: TdState, viewer: string, requested: string | null): string {
-  const me = s.players.find((p) => p.id === viewer);
-  if (me && !me.out) return viewer;
-  const list = watchable(s);
-  if (requested && list.includes(requested)) return requested;
-  return list[0] ?? viewer;
+  if (requested && s.players.some((p) => p.id === requested)) return requested;
+  if (s.players.some((p) => p.id === viewer)) return viewer;
+  return watchable(s)[0] ?? viewer;
 }

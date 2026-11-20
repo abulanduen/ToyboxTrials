@@ -17,11 +17,11 @@ const game: MinigameModule<SquadState, SquadInput> = {
     // A pending passive choice comes first: nothing else is accepted until it is made.
     if (me?.passiveOffers.length) return inputs.filter(i => i.type === 'passive');
     for (const action of presses) {
-      const ui = useSquadUI.getState(), unit = ui.hovered ?? ui.selected, step = STEPS[action];
+      const ui = useSquadUI.getState(), unit = ui.hovered ?? ui.selected, step = ui.watching ? undefined : STEPS[action];
       if (action === 'slot1' && unit !== null) inputs.push({ type: 'sell', unit });
       if (action === 'slot2') inputs.push({ type: 'reroll' });
       if (action === 'slot3') inputs.push({ type: 'ready' });
-      if (action === 'interact' && me?.units.length) {
+      if (action === 'interact' && !ui.watching && me?.units.length) {
         // Board first (front row to back), then reserves, so F walks the squad in reading order.
         const order = me.units.slice().sort((a, b) => (a.cell < 0 ? 100 - a.cell : a.cell) - (b.cell < 0 ? 100 - b.cell : b.cell));
         const next = order[(order.findIndex(u => u.id === ui.selected) + 1) % order.length];

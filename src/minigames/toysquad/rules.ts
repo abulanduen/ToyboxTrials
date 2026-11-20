@@ -14,6 +14,8 @@ export interface SquadUnit { id: number; kind: UnitKind; tier: number; cell: num
 export interface SquadPlayer {
   id: string; level: number; coins: number; units: SquadUnit[]; ready: boolean; points: number; health: number; wins: number;
   shop: (UnitKind | null)[]; roll: number; passives: PassiveId[]; passiveOffers: PassiveId[];
+  /** How this player's battle went last round (public: the player rail marks the winners), or null before the first. */
+  last: 'win' | 'loss' | 'draw' | null;
 }
 export type SquadInput = { type: 'buy'; slot: number } | { type: 'move'; unit: number; cell: number }
   | { type: 'merge'; unit: number; other: number } | { type: 'sell' | 'bench'; unit: number }
@@ -144,15 +146,18 @@ function recap(s: SquadState) {
     const p = s.players.find(p => p.id === b.owner)!;
     p.points += b.outcome === 'win' ? 3 : b.outcome === 'draw' ? 1 : 0; p.health += b.health;
     if (b.outcome === 'win') p.wins++;
+    p.last = b.outcome;
   }
   s.phase = 'recap'; s.phaseEnds = s.t + s.config.recapMs; s.events.push({ type: 'squad-recap', round: s.round });
 }
+/** Standings order (the same as the final placements): points, then surviving health. */
+export const standings = (s: SquadState) => [...s.players].sort((a, b) => b.points - a.points || b.health - a.health);
 export const squadRules: RulesCore<SquadState, SquadInput, SquadConfig> = {
   init(contestants, seed, config) {
     const cfg = { ...DEFAULT_CONFIG, ...config };
     if (!contestants.length || contestants.length > 8 || Object.values(cfg).some(v => !Number.isFinite(v) || v <= 0) || !Number.isInteger(cfg.rounds) || !Number.isInteger(cfg.income)) throw new Error('Invalid Toy Squad configuration.');
     const s: SquadState = { kind: 'toy-squad', seed, config: cfg, t: 0, phase: 'build', phaseEnds: cfg.buildMs, nextTick: 0, round: 1, nextId: 1, battles: [], events: [],
-      players: contestants.map(c => ({ id: c.id, level: 1, coins: cfg.income, units: [], ready: false, points: 0, health: 0, wins: 0, shop: [], roll: 0, passives: [], passiveOffers: [] })) };
+      players: contestants.map(c => ({ id: c.id, level: 1, coins: cfg.income, units: [], ready: false, points: 0, health: 0, wins: 0, shop: [], roll: 0, passives: [], passiveOffers: [], last: null })) };
     for (const p of s.players) refresh(s, p); return s;
   },
   step(s, inputs, dtMs) {
@@ -187,7 +192,7 @@ export const squadRules: RulesCore<SquadState, SquadInput, SquadConfig> = {
   },
   isOver: s => s.phase === 'over',
   result(s) {
-    const ordered = [...s.players].sort((a, b) => b.points - a.points || b.health - a.health);
+    const ordered = standings(s);
     return { durationMs: s.t, placements: rankByKey(ordered.map(p => ({ contestantId: p.id, score: p.points, key: `${p.points}:${p.health}` }))), stats: { rounds: s.round } };
   },
   drainEvents(s) { const events = s.events; s.events = []; return events; },

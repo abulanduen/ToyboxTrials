@@ -1,13 +1,18 @@
 /**
- * Toy Tower Tumble on the tabletop: the watched board (your own, or another player's once you are
- * knocked out), its towers, the enemies on the path and the effects. Everything per-frame reads the
- * live rules state and plain objects; React only renders the fixed set of meshes once.
+ * Toy Tower Tumble on the tabletop: the viewed board (your own, or anyone's picked from the player
+ * rail, read-only), its towers, the enemies on the path and the effects. Everything per-frame reads
+ * the live rules state and plain objects; React only renders the fixed set of meshes once.
  *
  * Draw-call budget: board tiles, stands, pips, auras, hp bars and each enemy kind are instanced;
- * a tower is one mesh (its Toy Squad toy, one baked geometry); effects are pooled (Fx.tsx).
+ * a tower is one mesh (its Toy Squad toy, one baked geometry); effects are pooled (Fx.tsx); status
+ * badges are one instanced quad per status kind on screen (shared/statusIcons.ts).
+ *
+ * Input is plain DOM pointer events on the canvas: a press on one of your towers can drag it (move,
+ * swap, merge); any other press pans the camera once it moves; a press that barely moves is a tap
+ * (select); two fingers pinch-zoom and the wheel zooms, toward the fingers or the cursor.
  */
 import { useEffect, useMemo, useRef, type RefObject } from 'react';
-import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { PALETTE } from '../../game/palette';
 import { playToyCue, sfx, unlockAudio } from '../../game/audio';
@@ -18,9 +23,13 @@ import { drawQueuedPortrait } from '../toysquad/portraits';
 import { TOY_COLOURS } from '../toysquad/models';
 import { TOY_GLOW_MATERIAL, TOY_MATERIAL, UNLIT_VERTEX_MATERIAL, bakeParts, toyGeometry } from '../toysquad/toys';
 import { BUILDABLE, GLIDE, PATH_CELLS, WALK, isBuildable, pointAt } from './board';
-import { BOSSES, MAX_TIER, TIER_COLOURS, TOWERS, type EnemyKind } from './catalogue';
+import { BOSSES, DAMAGE_CHECK, MAX_TIER, TIER_COLOURS, TOWERS, type EnemyKind } from './catalogue';
 import { ENEMY_PARTS, ENEMY_SCALE, FLY_HEIGHT } from './models';
-import { canMergeTowers, towerAt, viewedBoard, type TdPlayer, type TdState } from './rules';
+import { canMergeTowers, inCheck, towerAt, viewedBoard, type TdPlayer, type TdState } from './rules';
+import { enemyStatus } from './status';
+import { tumbleView } from './camera';
+import { StatusIconBatch } from '../shared/statusIcons';
+import { TAP_SLOP, type Ground } from '../shared/panZoom';
 import { canMergeCells, submitTumbleInput, tapCell, useTumbleUI } from './local';
 import { BRIDGE, CELL, bw, groundY, worldCell } from './space';
 import { TumbleFxLayer, tumbleFxRef } from './Fx';
@@ -39,7 +48,6 @@ const TILE = new THREE.BoxGeometry(CELL - 0.16, 0.24, CELL - 0.16);
 const PATH_TILE = new THREE.BoxGeometry(CELL + 0.02, 0.14, CELL + 0.02);
 const RING = new THREE.RingGeometry(0.86, 1, 40).rotateX(-H);
 const BAR = new THREE.BoxGeometry(1, 0.16, 0.22);
-const PICK_MATERIAL = new THREE.MeshBasicMaterial({ visible: false });
 const tileMat = new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.95 });
 const standMat = new THREE.MeshStandardMaterial({ color: '#FFFFFF', roughness: 0.6 });
 const barMat = new THREE.MeshBasicMaterial({ color: '#FFFFFF', toneMapped: false });
@@ -201,10 +209,15 @@ function Enemies() {
   const counts = useMemo(() => new Array<number>(ENEMY_KINDS.length).fill(0), []);
   const shownBoss = useRef('');
   const reduced = useRef(reducedMotion());
-  useEffect(() => () => { meshes.forEach((m) => m.dispose()); bars.dispose(); }, [meshes, bars]);
+  const badges = useMemo(() => new StatusIconBatch(96, 1.7), []);
+  const sign = useMemo(() => new CheckSign(), []);
+  const { camera } = useThree();
+  useEffect(() => () => { meshes.forEach((m) => m.dispose()); bars.dispose(); badges.dispose(); sign.dispose(); }, [meshes, bars, badges, sign]);
+  useEffect(() => { exposeDebug({ tumbleStatus: { shown: () => badges.shown, byKind: () => badges.shownByKind() }, tumbleCheck: { shown: () => sign.sprite.visible, text: () => sign.text } }); }, [badges, sign]);
   useFrame(() => {
-    const b = view.board, now = view.now, sNow = view.s?.t ?? 0;
+    const b = view.board, now = view.now, sNow = view.s?.t ?? 0, wave = view.s?.wave ?? 1, check = !!view.s && inCheck(view.s);
     counts.fill(0);
+    badges.begin();
     let barN = 0, bossShown = false;
     if (b) for (const e of b.enemies) {
       if (e.hp <= 0) continue;
@@ -215,19 +228,22 @@ function Enemies() {
       const y = 0.3 + groundY(e.x, e.z) + (e.flying ? FLY_HEIGHT + (reduced.current ? 0 : Math.sin(now * 3 + e.id) * 0.2) : reduced.current ? 0 : Math.abs(Math.sin(now * 9 + e.id)) * 0.08);
       // Slowed enemies tint blue, burning ones orange, marked ones coral.
       c.set(e.burnUntil > sNow ? TOY_COLOURS.orange : e.slowUntil > sNow ? TOY_COLOURS.glass : e.markUntil > sNow ? TOY_COLOURS.pink : '#FFFFFF');
+      badges.add(enemyStatus(e, sNow, wave), x, y + (e.boss ? (e.check ? 11 : 8.6) : 3.1), z);
       if (e.boss) {
-        const model = BOSSES[view.s?.wave ?? 5]?.model ?? 'ratchet-rhino';
+        const model = e.check ? DAMAGE_CHECK.model : BOSSES[wave]?.model ?? 'ratchet-rhino';
         if (shownBoss.current !== model) { shownBoss.current = model; boss.geometry = toyGeometry(model); }
         boss.visible = bossShown = true;
-        boss.position.set(x, y, z); boss.rotation.set(0, yaw, wobble * 0.5); boss.scale.setScalar(ENEMY_SCALE.boss);
+        boss.position.set(x, y, z); boss.rotation.set(0, yaw, wobble * 0.5); boss.scale.setScalar(ENEMY_SCALE.boss * (e.check ? 1.15 : 1));
         bossRing.visible = true; bossRing.position.set(x, 0.3, z); bossRing.scale.setScalar(2.2);
+        // The damage check has no health bar: a sign above it counts the damage it has taken.
+        if (e.check) sign.show(b.checkDamage, x, y + 8.6, z);
       } else {
         const k = ENEMY_KINDS.indexOf(e.kind as Exclude<EnemyKind, 'boss'>), mesh = meshes[k];
         if (counts[k] >= ENEMY_CAP) continue;
         o.position.set(x, y, z); o.rotation.set(0, yaw, wobble); o.scale.setScalar(ENEMY_SCALE[e.kind]); o.updateMatrix();
         mesh.setMatrixAt(counts[k], o.matrix); mesh.setColorAt(counts[k], c); counts[k]++;
       }
-      if (e.hp < e.maxHp && barN + 2 <= BAR_CAP) {
+      if (!e.check && e.hp < e.maxHp && barN + 2 <= BAR_CAP) {
         const w = e.boss ? 4 : 1.5, top = y + (e.boss ? 7.2 : 1.8), f = Math.max(0.02, e.hp / e.maxHp);
         o.rotation.set(0, 0, 0);
         o.position.set(x, top, z); o.scale.set(w + 0.12, e.boss ? 1.6 : 1, 1.3); o.updateMatrix(); bars.setMatrixAt(barN, o.matrix); bars.setColorAt(barN++, c.set(PALETTE.ink));
@@ -237,9 +253,44 @@ function Enemies() {
     }
     for (let k = 0; k < meshes.length; k++) { const m = meshes[k]; m.count = counts[k]; m.visible = counts[k] > 0; if (counts[k]) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; } }
     if (!bossShown) { boss.visible = false; bossRing.visible = false; }
+    if (!bossShown || !check) sign.hide();
     bars.count = barN; bars.visible = barN > 0; if (barN) { bars.instanceMatrix.needsUpdate = true; if (bars.instanceColor) bars.instanceColor.needsUpdate = true; }
+    badges.end(camera);
   });
-  return <group>{meshes.map((m, i) => <primitive key={i} object={m} />)}<primitive object={boss} /><primitive object={bossRing} /><primitive object={bars} /></group>;
+  return <group>{meshes.map((m, i) => <primitive key={i} object={m} />)}<primitive object={boss} /><primitive object={bossRing} /><primitive object={bars} />
+    <primitive object={badges.group} /><primitive object={sign.sprite} /></group>;
+}
+
+/** The damage check's sign: the damage taken so far, redrawn at most ten times a second. */
+class CheckSign {
+  readonly canvas = document.createElement('canvas');
+  readonly texture: THREE.CanvasTexture;
+  readonly sprite: THREE.Sprite;
+  text = '';
+  private drawnAt = -1;
+  constructor() {
+    this.canvas.width = 512; this.canvas.height = 160;
+    this.texture = new THREE.CanvasTexture(this.canvas); this.texture.colorSpace = THREE.SRGBColorSpace;
+    this.sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.texture, depthTest: false, depthWrite: false, toneMapped: false }));
+    this.sprite.renderOrder = 22; this.sprite.visible = false; this.sprite.raycast = () => {};
+    this.sprite.scale.set(8, 2.5, 1);
+  }
+  show(damage: number, x: number, y: number, z: number) {
+    this.sprite.visible = true; this.sprite.position.set(x, y, z);
+    const now = performance.now(), text = Math.round(damage).toLocaleString('en-GB');
+    if (text === this.text || now - this.drawnAt < 100) return;
+    this.text = text; this.drawnAt = now;
+    const g = this.canvas.getContext('2d')!, w = this.canvas.width, h = this.canvas.height;
+    g.clearRect(0, 0, w, h);
+    g.beginPath(); g.roundRect(8, 8, w - 16, h - 16, 40);
+    g.fillStyle = PALETTE.cream; g.fill(); g.lineWidth = 10; g.strokeStyle = PALETTE.ink; g.stroke();
+    g.fillStyle = PALETTE.inkPurple; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = `700 34px Nunito, sans-serif`; g.fillText('DAMAGE', w / 2, 44);
+    g.fillStyle = PALETTE.ink; g.font = `600 70px Fredoka, sans-serif`; g.fillText(text, w / 2, 104);
+    this.texture.needsUpdate = true;
+  }
+  hide() { this.sprite.visible = false; }
+  dispose() { this.texture.dispose(); this.sprite.material.dispose(); }
 }
 
 // ───────────── selection, cursor, twins, drag target ─────────────
@@ -282,17 +333,27 @@ function Markers({ drag }: { drag: RefObject<Drag | null> }) {
 }
 
 // ───────────── camera: fit the board into the HUD's board slot ─────────────
-const CORNERS = [[-1.7, -0.75], [7.75, -0.75], [-1.7, 8.85], [7.75, 8.85]].flatMap(([x, z]) => [[bw(x), 0, bw(z)], [bw(x), 2.4, bw(z)]]) as [number, number, number][];
+const corners = (left: number) => [[left, -0.75], [7.75, -0.75], [left, 8.85], [7.75, 8.85]].flatMap(([x, z]) => [[bw(x), 0, bw(z)], [bw(x), 2.4, bw(z)]]) as [number, number, number][];
+/** The whole tray with the toy box; on a tall, narrow slot (phone portrait) just the tray, so the squares get every pixel of width (the toy box may tuck under the quest strip). */
+const CORNERS = corners(-1.7), TIGHT_CORNERS = corners(-0.75);
 const TARGET = new THREE.Vector3(bw(2.9), 0, bw(4.0));
 const ELEVATION = 1.12; // radians above the table
-function fitCamera(camera: THREE.PerspectiveCamera, slot: DOMRect, canvas: DOMRect) {
+/** Place the camera for the current pan and zoom (`fitD` is the fitted distance at zoom 1). */
+function placeCamera(camera: THREE.PerspectiveCamera, fitD: number) {
+  const d = fitD / tumbleView.zoom, tx = TARGET.x + tumbleView.panX, tz = TARGET.z + tumbleView.panZ;
+  camera.position.set(tx, TARGET.y + Math.sin(ELEVATION) * d, tz + Math.cos(ELEVATION) * d);
+  camera.lookAt(tx, TARGET.y, tz);
+  camera.updateMatrixWorld();
+}
+/** Fit the board into the slot (zoom 1, no pan) and return the fitted distance; the view offset centres it in the slot. */
+function fitCamera(camera: THREE.PerspectiveCamera, slot: DOMRect, canvas: DOMRect): number {
   const p = new THREE.Vector3();
   camera.clearViewOffset();
   const place = (d: number) => {
     camera.position.set(TARGET.x, TARGET.y + Math.sin(ELEVATION) * d, TARGET.z + Math.cos(ELEVATION) * d); camera.lookAt(TARGET);
     camera.updateMatrixWorld(); camera.updateProjectionMatrix();
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    for (const c of CORNERS) { p.set(c[0], c[1], c[2]).project(camera); minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y); }
+    for (const c of slot.height > slot.width * 1.3 ? TIGHT_CORNERS : CORNERS) { p.set(c[0], c[1], c[2]).project(camera); minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y); }
     return { w: ((maxX - minX) / 2) * canvas.width, h: ((maxY - minY) / 2) * canvas.height, cx: ((minX + maxX) / 2 + 1) / 2 * canvas.width, cy: (1 - (minY + maxY) / 2) / 2 * canvas.height };
   };
   let d = 60;
@@ -300,11 +361,16 @@ function fitCamera(camera: THREE.PerspectiveCamera, slot: DOMRect, canvas: DOMRe
   const r = place(d);
   const sx = slot.left - canvas.left + slot.width / 2, sy = slot.top - canvas.top + slot.height / 2;
   camera.setViewOffset(canvas.width, canvas.height, r.cx - sx, r.cy - sy, canvas.width, canvas.height);
+  return d;
 }
 
-// ───────────── input: tap to select, drag onto a twin to merge ─────────────
-interface Drag { pointer: number; from: number; sx: number; sy: number; moved: boolean; x: number; z: number; over: number | null; release: () => void }
+// ───────────── input: tap to select, drag a tower onto a twin to merge, drag elsewhere to pan ─────────────
+interface Drag { pointer: number; from: number; sx: number; sy: number; moved: boolean; x: number; z: number; over: number | null }
+/** A press that is not on one of your towers: a tap if it barely moves, otherwise a pan. */
+interface Press { pointer: number; sx: number; sy: number; cell: number | null; panned: boolean }
 const floor = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.3);
+const table = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+const raycaster = new THREE.Raycaster(), ndc = new THREE.Vector2(), groundHit = new THREE.Vector3();
 const box = new THREE.Box3(), hitPoint = new THREE.Vector3();
 /** The square under a pointer ray: a tower's body first (tall toys overlap the square behind), else the felt. */
 function pickCell(ray: THREE.Ray, b: TdPlayer | undefined): number | null {
@@ -321,53 +387,95 @@ function pickCell(ray: THREE.Ray, b: TdPlayer | undefined): number | null {
 export function TumbleScene({ getState, localId }: MinigameSceneProps<TdState>) {
   const { camera, gl, size } = useThree();
   const drag = useRef<Drag | null>(null);
-  const fit = useRef({ key: '', frame: 0 });
+  const press = useRef<Press | null>(null);
+  const fit = useRef({ key: '', frame: 0, d: 0, version: -1 });
   const heard = useRef({ board: '', serial: 0, tick: -1, voices: 0 });
-  const cancel = () => { const d = drag.current; drag.current = null; d?.release(); if (useTumbleUI.getState().dragging !== null) useTumbleUI.setState({ dragging: null, dragOver: null }); gl.domElement.style.cursor = ''; };
-
-  const down = (e: ThreeEvent<PointerEvent>) => {
-    const v = readView(getState, localId);
-    if (!editable(v) || drag.current) return;
-    e.stopPropagation(); unlockAudio();
-    const cell = pickCell(e.ray, v.me);
-    if (cell === null) { useTumbleUI.setState({ selected: null }); return; }
-    const target = e.target as unknown as { setPointerCapture(id: number): void; releasePointerCapture(id: number): void };
-    try { target.setPointerCapture(e.pointerId); } catch { /* not capturable */ }
-    drag.current = { pointer: e.pointerId, from: cell, sx: e.nativeEvent.clientX, sy: e.nativeEvent.clientY, moved: false, x: 0, z: 0, over: cell,
-      release: () => { try { target.releasePointerCapture(e.pointerId); } catch { /* already released */ } } };
-  };
-  const move = (e: ThreeEvent<PointerEvent>) => {
-    const d = drag.current; if (!d || e.pointerId !== d.pointer) return;
-    const v = readView(getState, localId);
-    if (!editable(v)) { cancel(); return; }
-    if (!d.moved && Math.hypot(e.nativeEvent.clientX - d.sx, e.nativeEvent.clientY - d.sy) > 10 && v.me && towerAt(v.me, d.from)) {
-      d.moved = true; useTumbleUI.setState({ dragging: d.from, selected: d.from }); gl.domElement.style.cursor = 'grabbing';
-    }
-    if (d.moved && e.ray.intersectPlane(floor, hitPoint)) { d.x = hitPoint.x; d.z = hitPoint.z; d.over = worldCell(d.x, d.z); if (useTumbleUI.getState().dragOver !== d.over) useTumbleUI.setState({ dragOver: d.over }); }
-  };
-  const up = (e: ThreeEvent<PointerEvent>) => {
-    const d = drag.current; if (!d || e.pointerId !== d.pointer) return;
-    move(e);
-    const v = readView(getState, localId);
-    if (editable(v) && v.me) {
-      if (!d.moved) tapCell(v.me, d.from);
-      else if (d.over !== null && d.over !== d.from) {
-        if (canMergeCells(v.me, d.from, d.over)) { submitTumbleInput({ type: 'merge', from: d.from, to: d.over }); useTumbleUI.setState({ selected: d.over, cursor: d.over }); }
-        else if (isBuildable(d.over)) { submitTumbleInput({ type: 'move', from: d.from, to: d.over }); useTumbleUI.setState({ selected: d.over, cursor: d.over }); }
-      }
-    }
-    cancel();
-  };
+  const cancel = () => { drag.current = null; if (useTumbleUI.getState().dragging !== null) useTumbleUI.setState({ dragging: null, dragOver: null }); gl.domElement.style.cursor = ''; };
 
   useEffect(() => {
-    const previousTouch = gl.domElement.style.touchAction; gl.domElement.style.touchAction = 'none';
-    const off = useMatch.subscribe((s) => { if (s.paused || s.phase !== 'playing') cancel(); });
-    const blur = () => cancel(); window.addEventListener('blur', blur);
-    return () => {
-      off(); window.removeEventListener('blur', blur); cancel(); gl.domElement.style.touchAction = previousTouch;
-      (camera as THREE.PerspectiveCamera).clearViewOffset();
+    const el = gl.domElement, cam = camera as THREE.PerspectiveCamera;
+    const rayAt = (x: number, y: number) => {
+      const r = el.getBoundingClientRect();
+      ndc.set(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1);
+      raycaster.setFromCamera(ndc, cam); return raycaster.ray;
     };
-  }, [gl, camera]);
+    const ground = (x: number, y: number): Ground | null => (rayAt(x, y).intersectPlane(table, groundHit) ? { x: groundHit.x, z: groundHit.z } : null);
+    const apply = () => { if (fit.current.d) { placeCamera(cam, fit.current.d); fit.current.version = tumbleView.version; } };
+    const dragMove = (d: Drag, x: number, y: number) => {
+      const v = readView(getState, localId);
+      if (!editable(v)) { cancel(); return; }
+      if (!d.moved && Math.hypot(x - d.sx, y - d.sy) > TAP_SLOP && v.me && towerAt(v.me, d.from)) {
+        d.moved = true; useTumbleUI.setState({ dragging: d.from, selected: d.from }); el.style.cursor = 'grabbing';
+      }
+      if (d.moved && rayAt(x, y).intersectPlane(floor, hitPoint)) { d.x = hitPoint.x; d.z = hitPoint.z; d.over = worldCell(d.x, d.z); if (useTumbleUI.getState().dragOver !== d.over) useTumbleUI.setState({ dragOver: d.over }); }
+    };
+    const onDown = (e: PointerEvent) => {
+      if (e.button > 0) return;
+      unlockAudio();
+      try { el.setPointerCapture(e.pointerId); } catch { /* not capturable */ }
+      if (tumbleView.down(e.pointerId, e.clientX, e.clientY)) { cancel(); press.current = null; return; } // a second finger: pinch
+      if (tumbleView.pointerCount > 1) return;
+      const v = readView(getState, localId);
+      const cell = pickCell(rayAt(e.clientX, e.clientY), v.board);
+      if (editable(v) && cell !== null && v.me && towerAt(v.me, cell)) {
+        drag.current = { pointer: e.pointerId, from: cell, sx: e.clientX, sy: e.clientY, moved: false, x: 0, z: 0, over: cell };
+        press.current = null;
+      } else press.current = { pointer: e.pointerId, sx: e.clientX, sy: e.clientY, cell, panned: false };
+    };
+    const onMove = (e: PointerEvent) => {
+      if (tumbleView.pinching) { tumbleView.move(e.pointerId, e.clientX, e.clientY, ground, apply); return; }
+      const d = drag.current;
+      if (d && e.pointerId === d.pointer) { dragMove(d, e.clientX, e.clientY); return; }
+      const p = press.current;
+      if (!p || e.pointerId !== p.pointer) return;
+      if (!p.panned && Math.hypot(e.clientX - p.sx, e.clientY - p.sy) > TAP_SLOP) { p.panned = true; tumbleView.startPan(p.sx, p.sy, ground); el.style.cursor = 'grabbing'; }
+      if (p.panned) tumbleView.move(e.pointerId, e.clientX, e.clientY, ground, apply);
+    };
+    const onUp = (e: PointerEvent) => {
+      const wasPinch = tumbleView.pinching || tumbleView.pointerCount > 1;
+      tumbleView.up(e.pointerId);
+      try { el.releasePointerCapture(e.pointerId); } catch { /* already released */ }
+      const d = drag.current, p = press.current;
+      if (d && e.pointerId === d.pointer) {
+        dragMove(d, e.clientX, e.clientY);
+        const v = readView(getState, localId);
+        if (editable(v) && v.me) {
+          if (!d.moved) tapCell(v.me, d.from);
+          else if (d.over !== null && d.over !== d.from) {
+            if (canMergeCells(v.me, d.from, d.over)) { submitTumbleInput({ type: 'merge', from: d.from, to: d.over }); useTumbleUI.setState({ selected: d.over, cursor: d.over }); }
+            else if (isBuildable(d.over)) { submitTumbleInput({ type: 'move', from: d.from, to: d.over }); useTumbleUI.setState({ selected: d.over, cursor: d.over }); }
+          }
+        }
+        cancel();
+      } else if (p && e.pointerId === p.pointer) {
+        press.current = null; el.style.cursor = '';
+        // A tap (not a pan, not the end of a pinch) selects on your own board.
+        const v = readView(getState, localId);
+        if (!p.panned && !wasPinch && editable(v) && v.me) { if (p.cell === null) useTumbleUI.setState({ selected: null }); else tapCell(v.me, p.cell); }
+      }
+    };
+    const onCancel = (e: PointerEvent) => { tumbleView.up(e.pointerId); if (drag.current?.pointer === e.pointerId) cancel(); if (press.current?.pointer === e.pointerId) { press.current = null; el.style.cursor = ''; } };
+    const onWheel = (e: WheelEvent) => { e.preventDefault(); tumbleView.wheel(e.deltaY, e.deltaMode, e.clientX, e.clientY, ground, apply); };
+    const previousTouch = el.style.touchAction; el.style.touchAction = 'none';
+    el.addEventListener('pointerdown', onDown); el.addEventListener('pointermove', onMove); el.addEventListener('pointerup', onUp);
+    el.addEventListener('pointercancel', onCancel); el.addEventListener('lostpointercapture', onCancel); el.addEventListener('wheel', onWheel, { passive: false });
+    const off = useMatch.subscribe((s) => { if (s.paused || s.phase !== 'playing') { cancel(); press.current = null; tumbleView.cancelAll(); } });
+    const blur = () => { cancel(); press.current = null; tumbleView.cancelAll(); }; window.addEventListener('blur', blur);
+    tumbleView.reset(); tumbleView.cancelAll();
+    exposeDebug({ tumbleView: {
+      get: () => ({ zoom: tumbleView.zoom, panX: tumbleView.panX, panZ: tumbleView.panZ, pointers: tumbleView.pointerCount, pinching: tumbleView.pinching }),
+      reset: () => tumbleView.reset(),
+      /** Zoom by `k` about a screen point (what the wheel and pinch do). */
+      zoomAt: (k: number, x: number, y: number) => tumbleView.zoomAt(k, x, y, ground, apply),
+    } });
+    return () => {
+      off(); window.removeEventListener('blur', blur); cancel(); press.current = null; tumbleView.cancelAll();
+      el.removeEventListener('pointerdown', onDown); el.removeEventListener('pointermove', onMove); el.removeEventListener('pointerup', onUp);
+      el.removeEventListener('pointercancel', onCancel); el.removeEventListener('lostpointercapture', onCancel); el.removeEventListener('wheel', onWheel);
+      el.style.touchAction = previousTouch; el.style.cursor = '';
+      cam.clearViewOffset();
+    };
+  }, [gl, camera, getState, localId]);
 
   // Sounds and flourishes for rules events: your own actions, the watched board's leaks and bosses.
   useEffect(() => matchBus.on('event', (e) => {
@@ -401,6 +509,14 @@ export function TumbleScene({ getState, localId }: MinigameSceneProps<TdState>) 
         return { x: r.left + ((p.x + 1) / 2) * r.width, y: r.top + ((1 - p.y) / 2) * r.height };
       },
       watching: () => { const s = getState(); return s ? viewedBoard(s, localId, useTumbleUI.getState().watching) : null; },
+      /** What a press at a screen point would pick on the viewed board: a square, and whether it is one of the towers. */
+      pick: (x: number, y: number) => {
+        const r = gl.domElement.getBoundingClientRect(), v = readView(getState, localId);
+        ndc.set(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1);
+        raycaster.setFromCamera(ndc, camera);
+        const cell = pickCell(raycaster.ray, v.board);
+        return { cell, tower: cell !== null && !!v.board && !!towerAt(v.board, cell) };
+      },
       /** True once the camera has been fitted to the HUD's board slot. */
       fitted: () => fit.current.key !== '',
     } });
@@ -415,9 +531,11 @@ export function TumbleScene({ getState, localId }: MinigameSceneProps<TdState>) 
       const slotEl = document.querySelector('.td-board-slot'), canvas = gl.domElement.getBoundingClientRect();
       if (slotEl) {
         const slot = slotEl.getBoundingClientRect(), key = `${slot.left},${slot.top},${slot.width},${slot.height}|${canvas.width},${canvas.height}|${size.width},${size.height}`;
-        if (key !== fit.current.key) { fit.current.key = key; fitCamera(camera as THREE.PerspectiveCamera, slot, canvas); }
+        if (key !== fit.current.key) { fit.current.key = key; fit.current.d = fitCamera(camera as THREE.PerspectiveCamera, slot, canvas); fit.current.version = -1; }
       }
     }
+    // Pan and zoom (gestures, or Reset view from the HUD).
+    if (fit.current.d && fit.current.version !== tumbleView.version) { placeCamera(camera as THREE.PerspectiveCamera, fit.current.d); fit.current.version = tumbleView.version; }
     // Shot sounds for the watched board: a couple of voices per 100 ms at most.
     const b = v.board;
     if (b && !useMatch.getState().paused) {
@@ -436,10 +554,6 @@ export function TumbleScene({ getState, localId }: MinigameSceneProps<TdState>) 
     {/* First child: its frame callback runs before the others', so they all read this frame's view. */}
     <ViewSync getState={getState} localId={localId} />
     <BoardBase />
-    {/* One pick surface for the whole board; towers are hit-tested against their bodies in pickCell. */}
-    <mesh position={[0, 0.3, 0]} rotation={[-H, 0, 0]} material={PICK_MATERIAL} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={cancel} onLostPointerCapture={cancel}>
-      <planeGeometry args={[90, 90]} />
-    </mesh>
     <Towers drag={drag} />
     <Enemies />
     <Markers drag={drag} />

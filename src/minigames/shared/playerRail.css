@@ -1,0 +1,59 @@
+/* Shared player rail, watch banner and knocked-out popup (Toy Tower Tumble, Toy Squad).
+   Colours are palette.ts values: cream F4E8CE, honey EFAE45, coral E76B62, toy blue 6BA7C8, sage 89B78A, ink purple 574D69, ink 2B2433, white FFF9EE.
+   The game places the rail (position, width); this file styles its rows. Phones get 56 px chips. */
+.player-rail { pointer-events:auto; box-sizing:border-box; display:flex; flex-direction:column; gap:4px; background:#FFF9EE; border:3px solid #C9A57A; border-radius:12px; padding:6px; box-shadow:0 3px 0 #574D69; overflow:auto; overscroll-behavior:contain; color:#2B2433; font:13px Nunito,sans-serif; }
+.player-rail__title { font:600 15px Fredoka,sans-serif; padding:0 2px; }
+.player-rail ol { list-style:none; margin:0; padding:0; display:grid; gap:4px; }
+.player-rail .rail-row button { position:relative; display:grid; grid-template-columns:auto minmax(0,1fr) auto; grid-template-rows:auto auto; column-gap:6px; align-items:center; width:100%; min-height:56px; box-sizing:border-box;
+  text-align:left; padding:5px 8px 5px 10px; border:2px solid transparent; border-left:6px solid var(--rail-accent,#A9A6AE); border-radius:9px; background:#F4E8CE; color:#2B2433; cursor:pointer; touch-action:manipulation; font:inherit; line-height:1.15; }
+.player-rail .rail-row button:hover { border-color:#C9A57A; }
+.player-rail .rail-row button:focus-visible { outline:3px solid #6BA7C8; outline-offset:2px; }
+.player-rail .rail-row__rank { grid-row:1 / span 2; display:grid; place-items:center; width:22px; height:22px; border-radius:50%; background:#FFF9EE; border:2px solid #574D69; font:600 12px Fredoka,sans-serif; }
+.player-rail .rail-row__name { grid-column:2; font:600 14px Fredoka,sans-serif; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.player-rail .rail-row__you { font:700 11px Nunito,sans-serif; }
+.player-rail .rail-row__stat { grid-column:3; grid-row:1; text-align:right; white-space:nowrap; }
+.player-rail .rail-row__stat b { font:600 17px Fredoka,sans-serif; }
+.player-rail .rail-row__stat small { font:700 11px Nunito,sans-serif; }
+.player-rail .rail-row__detail { grid-column:2 / span 2; font:600 11px Nunito,sans-serif; opacity:.85; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.player-rail .rail-row .rail-mark { position:absolute; right:-5px; top:-6px; }
+.player-rail .rail-row.is-you button { background:#FFF9EE; border-color:#574D69; }
+.player-rail .rail-row.is-shown button,.player-rail .rail-row button[aria-pressed=true] { background:#FFF9EE; border-color:#6BA7C8; box-shadow:inset 0 0 0 2px #6BA7C8; }
+.player-rail .rail-row.is-out button { opacity:.55; }
+/* Still going this round: a honey glow and a pulsing dot. */
+.player-rail .rail-row.is-busy button { background:color-mix(in srgb,#EFAE45 55%,#F4E8CE); border-color:#EFAE45; }
+.player-rail .rail-row__busy { position:absolute; left:-5px; top:-5px; width:12px; height:12px; border-radius:50%; background:#EFAE45; border:2px solid #574D69; animation:rail-pulse 1.1s ease-in-out infinite; }
+@keyframes rail-pulse { 50% { transform:scale(1.35); } }
+@media(prefers-reduced-motion:reduce) { .player-rail .rail-row__busy { animation:none; } }
+
+/* Phones: a column of 56 px chips (rank, short name, the figure). */
+@media(max-width:600px),(max-height:500px) {
+  .player-rail { padding:4px; gap:3px; border-width:2px; }
+  .player-rail__title { font-size:11px; text-align:center; padding:0; }
+  .player-rail ol { gap:3px; }
+  .player-rail .rail-row button { display:flex; flex-direction:column; justify-content:flex-end; align-items:center; gap:0; min-width:56px; min-height:60px; padding:14px 2px 3px; border-left-width:2px; border-top:5px solid var(--rail-accent,#A9A6AE); text-align:center; }
+  .player-rail .rail-row__rank { position:absolute; left:2px; top:1px; width:14px; height:14px; font-size:9px; border-width:1px; }
+  .player-rail .rail-row__name { width:100%; font-size:11px; padding:0 1px; box-sizing:border-box; text-align:center; }
+  .player-rail .rail-row__you { display:none; }
+  .player-rail .rail-row__stat b { font-size:15px; }
+  .player-rail .rail-row__stat small { display:block; font-size:9px; margin-top:-2px; }
+  .player-rail .rail-row__detail { display:none; }
+  .player-rail .rail-row .rail-mark { right:-4px; top:-5px; width:16px; height:16px; }
+}
+
+/* Watching someone else's board */
+.watch-banner { pointer-events:auto; display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:6px 10px; box-sizing:border-box; padding:5px 6px 5px 12px; background:#6BA7C8; color:#FFF9EE; border:3px solid #574D69; border-radius:12px; box-shadow:0 3px 0 #574D69; font:600 15px Fredoka,sans-serif; }
+.watch-banner b { font-weight:600; }
+.watch-banner small { font:700 11px Nunito,sans-serif; }
+div.watch-banner button { min-height:56px; min-width:56px; padding:4px 12px; border:2px solid #574D69; border-radius:9px; background:#FFF9EE; color:#2B2433; font:600 14px Fredoka,sans-serif; cursor:pointer; touch-action:manipulation; line-height:1.1; }
+div.watch-banner button small { display:block; opacity:.7; }
+div.watch-banner button:focus-visible { outline:3px solid #EFAE45; outline-offset:2px; }
+@media(max-width:600px),(max-height:500px) { .watch-banner { font-size:13px; padding:3px 4px 3px 8px; gap:4px 6px; } div.watch-banner button small { display:none; } .watch-banner small { display:none; } }
+
+/* Knocked out: the offer to watch */
+.spectate-offer { position:absolute; z-index:4; left:50%; top:50%; transform:translate(-50%,-50%); width:min(360px,calc(100% - 24px)); box-sizing:border-box; pointer-events:auto; text-align:center; background:#FFF9EE; color:#2B2433; border:3px solid #E76B62; border-radius:14px; padding:14px; box-shadow:0 5px 0 #574D69; font:14px Nunito,sans-serif; }
+.spectate-offer strong { display:block; font:600 19px Fredoka,sans-serif; }
+.spectate-offer p { margin:6px 0 10px; font-weight:600; }
+.spectate-offer__row { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
+div.spectate-offer button { flex:1 1 120px; min-height:56px; min-width:56px; border:2px solid #574D69; border-radius:10px; background:#F4E8CE; color:#2B2433; font:600 15px Fredoka,sans-serif; cursor:pointer; touch-action:manipulation; }
+div.spectate-offer button.is-primary { background:#89B78A; }
+div.spectate-offer button:focus-visible { outline:3px solid #6BA7C8; outline-offset:2px; }

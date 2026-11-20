@@ -1,11 +1,11 @@
 /* Toy Tower Tumble HUD. Colours are palette.ts values (cream F4E8CE, honey EFAE45, coral E76B62, toy blue 6BA7C8, sage 89B78A, ink purple 574D69, ink 2B2433, white FFF9EE).
-   Layout regions: bar (top), quests (left), players + tower sheet (right), dock (bottom). The 3D camera fits the board into .td-board-slot. */
+   Layout regions on every screen: bar (top), quests (left), the player rail (right), dock (bottom; phone landscape: right).
+   The 3D camera fits the board into .td-board-slot, so the board is centred in whatever space is left. */
 .td-hud { position:absolute; inset:0; pointer-events:none; color:#2B2433; font:13px Nunito,sans-serif;
   --top:max(10px,env(safe-area-inset-top)); --bottom:max(10px,env(safe-area-inset-bottom)); --l:max(10px,env(safe-area-inset-left)); --r:max(10px,env(safe-area-inset-right));
-  --bar:60px; --dock:78px; --left:262px; --right:276px; }
+  --bar:60px; --dock:78px; --left:262px; --right:276px; --rail-w:var(--right); --gap:8px; }
 .td-icon { display:inline-block; vertical-align:middle; flex:none; }
 .td-sr { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
-.td-only-phone { display:none !important; }
 .td-hud button { min-width:56px; min-height:56px; color:#2B2433; border:2px solid #574D69; border-radius:9px; background:#FFF9EE; padding:5px 8px; font:600 14px Fredoka,sans-serif; cursor:pointer; touch-action:manipulation; pointer-events:auto; line-height:1.1; }
 .td-hud button small { display:block; font:600 11px Nunito,sans-serif; opacity:.85; margin-top:2px; }
 .td-hud button:disabled { opacity:.5; cursor:default; }
@@ -14,9 +14,14 @@
 .td-hud .td-primary:not(:disabled) { background:#EFAE45; }
 .td-hud .td-next:not(:disabled) { background:#89B78A; }
 .td-hud .td-sell { background:#F4E8CE; }
+.td-hud kbd { font:700 10px Nunito,sans-serif; border:1px solid #574D69; border-radius:4px; padding:0 3px; background:#FFF9EE; vertical-align:2px; }
+/* Prices: the same Fredoka 17 px figure and coin as the top bar's gold and lives. */
+.td-cost { display:inline-flex; align-items:center; justify-content:center; gap:4px; white-space:nowrap; }
+.td-cost b { font:600 17px Fredoka,sans-serif; }
+.td-cost .td-icon { width:17px; height:17px; }
 
-/* Where the camera puts the board (no visuals). */
-.td-board-slot { position:absolute; top:calc(var(--top) + var(--bar) + 8px); bottom:calc(var(--bottom) + var(--dock) + 8px); left:calc(var(--l) + var(--left) + 8px); right:calc(var(--r) + var(--right) + 8px); }
+/* Where the camera puts the board (no visuals): between the quests, the rail, the bar and the dock. */
+.td-board-slot { position:absolute; top:calc(var(--top) + var(--bar) + var(--gap)); bottom:calc(var(--bottom) + var(--dock) + var(--gap)); left:calc(var(--l) + var(--left) + var(--gap)); right:calc(var(--r) + var(--right) + var(--gap)); }
 
 /* Top bar */
 .td-bar { position:absolute; top:var(--top); left:calc(var(--l) + var(--left) + 8px); right:calc(var(--r) + var(--right) + 8px); min-height:var(--bar); box-sizing:border-box; display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:4px 14px; padding:6px 12px; background:#F4E8CE; border:3px solid #89B78A; border-radius:12px; box-shadow:0 3px 0 #574D69; }
@@ -28,33 +33,44 @@
 .td-bar__stat { display:inline-flex; align-items:center; gap:4px; }
 .td-bar__score { font-size:12px; }
 .td-bar__score b { font-size:14px; }
-.td-bar__watch { font-weight:800; background:#6BA7C8; color:#FFF9EE; border-radius:6px; padding:2px 8px; }
+.td-bar.is-check { border-color:#EFAE45; }
+.td-bar__check { flex-wrap:wrap; justify-content:center; font-weight:800; }
+.td-bar__check b { font-size:21px; }
+.td-bar__check small { flex-basis:100%; text-align:center; font-weight:700; font-size:11px; }
 .td-bar.is-hit { animation:td-hit .7s ease-out; }
 @keyframes td-hit { 0% { background:#E76B62; } 100% { background:#F4E8CE; } }
 
-/* Side panels: quests (left) and players (right) */
+/* Quests (left) */
 .td-side { position:absolute; pointer-events:auto; background:#FFF9EE; border:3px solid #C9A57A; border-radius:12px; padding:8px; box-shadow:0 3px 0 #574D69; overflow:auto; overscroll-behavior:contain; box-sizing:border-box; }
 .td-side--quests { top:var(--top); left:var(--l); width:var(--left); max-height:calc(100% - var(--top) - var(--bottom)); }
-.td-side--players { top:calc(var(--top) + 64px); right:var(--r); width:var(--right); max-height:calc(38% - 64px); }
 .td-panel__head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:4px; }
 .td-panel__head strong { font:600 16px Fredoka,sans-serif; }
-.td-quests,.td-players { list-style:none; margin:0; padding:0; display:grid; gap:4px; }
-.td-quests li { display:grid; grid-template-columns:38px minmax(0,1fr); gap:6px; align-items:center; background:#F4E8CE; border-radius:8px; padding:4px 6px; font-weight:700; font-size:12px; line-height:1.2; }
+.td-quests { list-style:none; margin:0; padding:0; display:grid; gap:4px; }
+.td-quests li { display:grid; grid-template-columns:40px minmax(0,1fr) 38px; gap:6px; align-items:center; background:#F4E8CE; border-radius:8px; padding:4px 6px; font-weight:700; font-size:12px; line-height:1.2; }
 .td-quests li small { display:block; font-weight:600; font-size:11px; opacity:.8; }
 .td-quests__mark { display:grid; place-items:center; width:38px; height:30px; border-radius:6px; background:#FFF9EE; border:2px solid #C9A57A; font:600 13px Fredoka,sans-serif; }
 .td-quests li.is-done { background:#89B78A; }
 .td-quests li.is-done .td-quests__mark { background:#EFAE45; border-color:#574D69; }
 .td-quests li.is-taken { opacity:.55; }
-.td-players li { border-left:6px solid var(--tier,#A9A6AE); border-radius:8px; background:#F4E8CE; }
-.td-players li > div,.td-hud .td-players li > button { display:block; width:100%; text-align:left; padding:5px 8px; border:0; background:transparent; border-radius:8px; min-height:44px; }
-.td-hud .td-players li > button { min-height:56px; }
-.td-players strong { display:block; font:600 13px Fredoka,sans-serif; }
-.td-players small { display:block; font:600 11px Nunito,sans-serif; }
-.td-players li.is-out { opacity:.55; }
-.td-players li.is-watched { outline:3px solid #6BA7C8; }
+/* The quest's picture: the ordered tower, or a tier tile. */
+.td-quest-art { display:block; width:40px; height:40px; }
+.td-quest-art .td-portrait { width:40px; height:40px; border:2px solid #574D69; box-sizing:border-box; }
+.td-tier-tile { display:block; }
+.td-hud .td-quests-open { display:none; }
+.td-quests-key { margin-top:8px; padding-top:6px; border-top:2px dashed #C9A57A; }
+.td-quests-key::before { content:'Badges over enemies'; display:block; font:600 12px Fredoka,sans-serif; margin-bottom:3px; }
+
+/* The player rail (right): the shared rail, placed here. */
+.td-rail { position:absolute; top:calc(var(--top) + 64px); right:var(--r); width:var(--rail-w); max-height:calc(100% - var(--top) - var(--bottom) - var(--dock) - 74px); }
+.td-hud.has-sheet .td-rail { max-height:calc(42% - 64px); }
+
+/* Watching another board; reset view */
+.td-watch { position:absolute; z-index:2; bottom:calc(var(--bottom) + var(--dock) + 10px); left:calc(var(--l) + var(--left) + 8px); right:calc(var(--r) + var(--right) + 8px); margin:0 auto; width:fit-content; max-width:calc(100% - var(--l) - var(--r) - var(--left) - var(--right) - 16px); }
+.td-hud .td-watch button { min-width:56px; }
+.td-hud .td-view-reset { position:absolute; top:calc(var(--top) + var(--bar) + 8px); right:calc(var(--r) + var(--right) + 8px); background:#FFF9EE; font-size:13px; padding:4px 10px; opacity:.92; }
 
 /* The selected square's sheet: right column on desktop */
-.td-sheet { position:absolute; pointer-events:auto; right:var(--r); bottom:calc(var(--bottom) + var(--dock) + 10px); width:var(--right); box-sizing:border-box; max-height:calc(62% - var(--dock)); overflow:auto; background:#FFF9EE; border:3px solid var(--tier,#574D69); border-radius:12px; padding:8px; box-shadow:0 3px 0 #574D69; }
+.td-sheet { position:absolute; pointer-events:auto; right:var(--r); bottom:calc(var(--bottom) + var(--dock) + 10px); width:var(--right); box-sizing:border-box; max-height:calc(58% - var(--dock)); overflow:auto; background:#FFF9EE; border:3px solid var(--tier,#574D69); border-radius:12px; padding:8px; box-shadow:0 3px 0 #574D69; }
 .td-sheet__head { display:flex; gap:8px; align-items:center; }
 .td-sheet__head > strong { font:600 16px Fredoka,sans-serif; }
 .td-sheet__title strong { display:block; font:600 16px Fredoka,sans-serif; }
@@ -66,13 +82,14 @@
 .td-abilities { margin:0 0 4px; padding-left:16px; font-size:12px; }
 .td-sheet__dealt { display:block; font-size:11px; opacity:.8; }
 .td-sheet__actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
-.td-sheet__actions button { flex:1 1 auto; }
+.td-sheet__actions button { flex:1 1 auto; display:inline-flex; flex-direction:column; align-items:center; justify-content:center; }
+.td-sheet__actions .td-sell { flex-direction:row; gap:2px; }
 .td-note { flex:1 1 100%; font-size:12px; font-weight:700; }
 
 /* Dock: Build, Builder, Odds, Next wave */
 .td-dock { position:absolute; pointer-events:auto; bottom:var(--bottom); left:calc(var(--l) + var(--left) + 8px); right:calc(var(--r) + var(--right) + 8px); box-sizing:border-box; background:#F4E8CE; border:3px solid #C9A57A; border-radius:12px; padding:6px; box-shadow:0 3px 0 #574D69; }
 .td-dock__row { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
-.td-dock__level { align-self:center; text-align:center; font:600 13px Fredoka,sans-serif; }
+.td-dock__row button { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; }
 
 /* Odds table */
 .td-odds { position:absolute; z-index:3; pointer-events:auto; left:50%; top:50%; transform:translate(-50%,-50%); width:min(440px,calc(100% - 24px)); max-height:calc(100% - 24px); overflow:auto; box-sizing:border-box; background:#FFF9EE; border:3px solid #EFAE45; border-radius:12px; padding:10px; box-shadow:0 5px 0 #574D69; }
@@ -80,15 +97,16 @@
 .td-odds table { width:100%; border-collapse:collapse; font:600 13px Fredoka,sans-serif; text-align:center; }
 .td-odds th,.td-odds td { padding:5px 3px; border-bottom:1px solid #C9A57A; }
 .td-odds tr.is-current td { background:#EFAE45; }
+.td-odds .td-odds__key { margin:10px 0 4px; }
 
-/* Spectating */
-.td-spectate { position:absolute; pointer-events:auto; bottom:var(--bottom); left:50%; transform:translateX(-50%); width:min(560px,calc(100% - 24px)); box-sizing:border-box; background:#F4E8CE; border:3px solid #6BA7C8; border-radius:12px; padding:8px; box-shadow:0 3px 0 #574D69; text-align:center; }
+/* Knocked out */
+.td-spectate { position:absolute; pointer-events:auto; bottom:var(--bottom); left:calc(var(--l) + var(--left) + 8px); right:calc(var(--r) + var(--right) + 8px); margin:0 auto; max-width:560px; box-sizing:border-box; background:#F4E8CE; border:3px solid #6BA7C8; border-radius:12px; padding:8px; box-shadow:0 3px 0 #574D69; text-align:center; }
 .td-spectate strong { display:block; font:600 14px Fredoka,sans-serif; margin-bottom:6px; }
 .td-spectate__row { display:flex; flex-wrap:wrap; gap:6px; justify-content:center; }
 .td-hud.is-out { --dock:84px; --left:0px; }
 
 /* Notices */
-.td-toasts { position:absolute; top:calc(var(--top) + var(--bar) + 12px); left:50%; transform:translateX(-50%); width:min(420px,calc(100% - 24px)); margin:0; padding:0; list-style:none; display:grid; gap:4px; }
+.td-toasts { position:absolute; top:calc(var(--top) + var(--bar) + 12px); left:calc(var(--l) + var(--left) + 8px); right:calc(var(--r) + var(--right) + 8px); margin:0 auto; max-width:420px; padding:0; list-style:none; display:grid; gap:4px; }
 .td-toast { background:#FFF9EE; border:2px solid #574D69; border-radius:9px; padding:6px 10px; font-weight:800; font-size:13px; text-align:center; box-shadow:0 2px 0 #574D69; animation:td-in .25s ease-out; }
 .td-toast--good { background:#89B78A; }
 .td-toast--bad { background:#E76B62; color:#FFF9EE; }
@@ -99,59 +117,74 @@
 /* Mid-size screens: narrower side columns. */
 @media(max-width:1100px) and (min-width:601px) { .td-hud { --left:220px; --right:236px; } .td-dock__row button { font-size:13px; } }
 
-/* Phone portrait: bar on top, the board under it, the sheet under the board, the dock at the bottom. Quests and players open as overlays. */
+/* ───── Phones: quests on the left and the rail on the right as slim columns, the board centred between them. ───── */
+@media(max-width:600px),(max-height:500px) {
+  /* The quest column becomes a strip of quest pictures with progress; tapping it opens the full list. */
+  .td-side--quests:not(.is-open) { padding:3px; border-width:2px; overflow:hidden; }
+  .td-side--quests:not(.is-open) .td-panel__head strong { font-size:11px; display:block; text-align:center; width:100%; }
+  .td-side--quests:not(.is-open) .td-quests li { grid-template-columns:1fr; justify-items:center; gap:0; padding:2px; }
+  .td-side--quests:not(.is-open) .td-quests__text,.td-side--quests:not(.is-open) .td-quests-key { display:none; }
+  .td-side--quests:not(.is-open) .td-quests__mark { width:auto; height:auto; border:0; background:transparent; font-size:12px; }
+  .td-side--quests:not(.is-open) .td-quest-art,.td-side--quests:not(.is-open) .td-quest-art .td-portrait,.td-side--quests:not(.is-open) .td-tier-tile { width:34px; height:34px; }
+  .td-hud .td-side--quests:not(.is-open) .td-quests-open { display:block; position:absolute; inset:0; width:100%; height:100%; min-height:0; border:0; background:transparent; border-radius:10px; }
+  .td-side--quests.is-open { z-index:3; }
+  .td-side--quests.is-open .td-quests li { grid-template-columns:40px minmax(0,1fr) 38px; }
+  .td-hud .td-toasts { left:calc(var(--l) + var(--left) + 6px); right:calc(var(--r) + var(--right) + 6px); }
+}
+
+/* Phone portrait: bar on top, quests left, rail right, the board centred between them, the dock at the bottom. */
 @media(max-width:600px) {
-  .td-hud { --left:0px; --right:0px; --bar:62px; --dock:136px; font-size:12px; }
-  .td-only-phone { display:revert !important; }
-  .td-dock__row.td-only-phone { display:grid !important; grid-template-columns:repeat(3,minmax(0,1fr)); margin-top:6px; }
-  /* The board takes a square under the bar, so the sheet below never covers it. */
-  .td-board-slot { bottom:auto; height:min(calc(100vw - 8px), calc(100% - var(--top) - var(--bar) - var(--dock) - var(--bottom) - 200px)); left:var(--l); right:var(--r); }
+  .td-hud { --left:58px; --right:64px; --bar:60px; --dock:78px; --gap:3px; font-size:12px; }
   .td-bar { left:var(--l); right:calc(var(--r) + 66px); gap:2px 10px; padding:4px 8px; }
   .td-bar b { font-size:15px; }
   .td-bar__score { display:none; }
-  .td-side { display:none; }
-  .td-side.is-open { display:block; z-index:2; top:calc(var(--top) + var(--bar) + 6px); left:var(--l); right:var(--r); width:auto; max-height:calc(100% - var(--top) - var(--bar) - var(--dock) - var(--bottom) - 20px); }
+  .td-side--quests { top:calc(var(--top) + var(--bar) + 6px); width:var(--left); max-height:calc(100% - var(--top) - var(--bar) - var(--dock) - var(--bottom) - 18px); }
+  .td-side--quests.is-open { right:var(--r); width:auto; }
+  .td-rail { top:calc(var(--top) + var(--bar) + 6px); width:var(--right); max-height:calc(100% - var(--top) - var(--bar) - var(--dock) - var(--bottom) - 18px); }
   .td-dock { left:var(--l); right:var(--r); padding:5px; }
   .td-dock__row { gap:4px; }
-  .td-hud .td-dock button { font-size:13px; padding:4px; }
+  .td-hud .td-dock button { font-size:13px; padding:3px; }
   .td-hud .td-dock button small { font-size:10px; }
-  .td-sheet { left:var(--l); right:var(--r); width:auto; bottom:calc(var(--bottom) + var(--dock) + 8px); max-height:calc(100% - var(--top) - var(--bar) - var(--dock) - var(--bottom) - 100vw); min-height:0; padding:6px 8px; }
+  .td-dock .td-cost b { font-size:16px; }
+  .td-hud .td-dock kbd { display:none; }
+  /* A selected square's sheet sits above the dock, full width; the board moves up into the space above it. */
+  .td-sheet { z-index:2; left:var(--l); right:var(--r); width:auto; bottom:calc(var(--bottom) + var(--dock) + 8px); max-height:236px; padding:6px 8px; }
+  .td-hud.has-sheet .td-board-slot { bottom:calc(var(--bottom) + var(--dock) + 250px); }
+  .td-hud.has-sheet .td-rail,.td-hud.has-sheet .td-side--quests:not(.is-open) { max-height:calc(100% - var(--top) - var(--bar) - var(--dock) - var(--bottom) - 260px); }
   .td-sheet__stats { font-size:11px; margin:3px 0; }
   .td-abilities { font-size:11px; }
   .td-portrait { width:44px; height:44px; }
-  .td-hud.is-out { --dock:120px; }
-  .td-hud.is-out .td-side--players { display:none; }
+  .td-watch,.td-spectate { left:var(--l); right:var(--r); }
+  .td-hud.is-out { --left:0px; --dock:120px; }
+  .td-hud .td-view-reset { top:calc(var(--top) + var(--bar) + 6px); }
 }
 
-/* Phone landscape: quests left (compact), dock + sheet right, board in the middle. */
+/* Phone landscape: quests left, board in the middle, then the rail and the dock on the right. */
 @media(max-height:500px) {
-  .td-hud { --bar:44px; --left:200px; --right:236px; --dock:0px; font-size:12px; }
-  .td-bar { padding:3px 8px; gap:2px 10px; }
+  .td-hud { --bar:44px; --left:58px; --dockw:228px; --rail-w:64px; --right:calc(var(--dockw) + var(--rail-w) + 6px); --dock:0px; --gap:6px; font-size:12px; }
+  .td-bar { padding:3px 8px; gap:2px 10px; right:calc(var(--r) + var(--right) + 8px); }
   .td-bar b { font-size:14px; }
   .td-bar__phase small,.td-bar__score { display:none; }
-  .td-side--quests { width:var(--left); padding:5px; }
-  .td-quests li { grid-template-columns:32px minmax(0,1fr); padding:3px 4px; font-size:11px; }
-  .td-quests li small { display:none; }
-  .td-quests__mark { width:32px; height:24px; font-size:12px; }
-  .td-side--players { display:none; }
-  .td-side--players.is-open { display:block; z-index:2; top:calc(var(--top) + 250px); left:auto; right:var(--r); width:var(--right); max-height:calc(100% - var(--top) - var(--bottom) - 250px); }
-  /* The dock sits under the host's pause button; the sheet covers the quest column while a square is selected. */
-  .td-dock { top:calc(var(--top) + 62px); bottom:auto; left:auto; right:var(--r); width:var(--right); padding:4px; }
+  .td-bar__check b { font-size:16px; }
+  .td-side--quests { top:var(--top); width:var(--left); }
+  .td-side--quests.is-open { width:min(340px,calc(100% - var(--l) - var(--r) - var(--right) - 12px)); max-height:calc(100% - var(--top) - var(--bottom)); }
+  .td-rail { top:var(--top); right:calc(var(--r) + var(--dockw) + 6px); width:var(--rail-w); max-height:calc(100% - var(--top) - var(--bottom)); }
+  /* The dock sits under the host's pause button. */
+  .td-dock { top:calc(var(--top) + 62px); bottom:auto; left:auto; right:var(--r); width:var(--dockw); padding:4px; }
   .td-dock__row { grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px; }
-  .td-dock__row.td-only-phone { display:grid !important; grid-template-columns:repeat(2,minmax(0,1fr)); margin-top:4px; }
-  .td-dock__row.td-only-phone [data-testid=td-quests-open],.td-dock__level { display:none !important; }
-  .td-only-phone { display:revert !important; }
-  .td-side--quests .td-only-phone { display:none !important; }
   .td-hud .td-dock button { font-size:12px; padding:3px; }
   .td-hud .td-dock button small { font-size:10px; }
-  .td-sheet { z-index:2; top:var(--top); bottom:var(--bottom); left:var(--l); right:auto; width:calc(var(--left) + 30px); max-height:none; padding:5px 6px; }
+  .td-hud .td-dock kbd { display:none; }
+  /* A selected square's sheet covers the quest column and the left of the board. */
+  .td-sheet { z-index:3; top:var(--top); bottom:var(--bottom); left:var(--l); right:auto; width:260px; max-height:none; padding:5px 6px; }
   .td-sheet__stats,.td-abilities { font-size:10.5px; margin:2px 0; }
   .td-sheet__dealt { display:none; }
   .td-portrait { width:40px; height:40px; }
-  .td-toasts { top:calc(var(--top) + var(--bar) + 6px); width:min(340px,calc(100% - 24px)); }
+  .td-toasts { top:calc(var(--top) + var(--bar) + 6px); }
   .td-toast { font-size:11px; padding:3px 8px; }
   .td-toast:nth-last-child(n+3) { display:none; }
-  .td-spectate { width:min(420px,calc(100% - 24px)); padding:4px; }
-  .td-hud.is-out { --left:0px; --right:0px; --dock:70px; }
-  .td-hud.is-out .td-board-slot { bottom:calc(var(--bottom) + 76px); }
+  .td-watch { bottom:var(--bottom); }
+  .td-spectate { top:calc(var(--top) + 62px); bottom:auto; left:auto; right:var(--r); width:var(--dockw); padding:4px; margin:0; }
+  .td-hud.is-out { --left:0px; }
+  .td-hud .td-view-reset { top:calc(var(--top) + var(--bar) + 6px); }
 }

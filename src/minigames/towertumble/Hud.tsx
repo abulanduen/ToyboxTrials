@@ -1,27 +1,38 @@
 /**
  * Toy Tower Tumble HUD (DOM). Re-renders ten times a second from the live rules state, never per
- * frame. Every committing action is a ≥ 56 px button: the board squares (about 44 px on a 390 px
- * phone) only select, and the sheet that opens for the selected square carries Build, Merge, Sell
- * and Close. Dragging a tower onto its twin on the board merges too.
+ * frame. Every committing action is a ≥ 56 px button: the board squares (small on a phone) only
+ * select, and the sheet that opens for the selected square carries Build, Merge, Sell and Close.
+ * Dragging a tower onto a same-tier partner on the board merges too.
+ *
+ * Layout on every screen: quests on the left, the shared player rail on the right (tap a player to
+ * view their board, read-only), the board centred between them (drag to look around, pinch or
+ * wheel to zoom), the bar on top and the build dock at the bottom (phone landscape: right).
  */
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
 import { matchBus, pauseMatch, useMatch } from '../session';
 import { unlockAudio } from '../../game/audio';
+import { PALETTE } from '../../game/palette';
 import type { MinigameSceneProps } from '../types';
 import { subscribePortraits, toyPortrait, portraitCount } from '../toysquad/portraits';
+import { PlayerRail, SpectateOffer, WatchBanner, type RailEntry } from '../shared/PlayerRail';
+import { StatusLegend } from '../shared/StatusIcon';
 import { cellName, isBuildable, isPath } from './board';
 import {
-  ABILITY_NAME, ABILITY_TEXT, BOSSES, BUILD_COST, BUILDER, ENEMIES, FAMILY, MAX_BUILDER, MAX_TIER, QUESTS, QUEST_ORDER, TIER_COLOURS, TOWERS, WAVES,
+  ABILITY_NAME, ABILITY_TEXT, BOSSES, BUILD_COST, BUILDER, DAMAGE_CHECK, ENEMIES, FAMILY, FAMILIES, MAX_BUILDER, MAX_TIER, QUESTS, QUEST_ORDER, TIER_COLOURS, TOWERS, WAVES,
   isBossWave, questReward, sellValue, type QuestId,
 } from './catalogue';
 import {
-  SPEEDS, allHumansOut, boardScore, builderCost, canBuild, cycleWatch, questProgress, towerAt, twinsOf, viewedBoard, type TdPlayer, type TdState,
+  SPEEDS, allHumansOut, boardScore, builderCost, canBuild, cycleWatch, inCheck, questProgress, stillGoing, towerAt, twinsOf, viewedBoard, watchable,
+  type TdPlayer, type TdState,
 } from './rules';
 import { buildHere, clearTumbleInput, resetTumbleUI, submitTumbleInput, useTumbleUI, type TdPanel } from './local';
+import { tumbleView } from './camera';
+import { TUMBLE_STATUSES } from './status';
 import './towertumble.css';
 
 const tierStyle = (tier: number) => ({ '--tier': TIER_COLOURS[tier - 1] }) as CSSProperties;
 interface Toast { key: number; text: string; tone: 'good' | 'bad' | 'boss' | 'info'; until: number }
+const fmt = (n: number) => Math.round(n).toLocaleString('en-GB');
 
 function Portrait({ model }: { model: string }) {
   useSyncExternalStore(subscribePortraits, portraitCount);
@@ -31,6 +42,10 @@ function Portrait({ model }: { model: string }) {
 function Coin() { return <svg className="td-icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden><circle cx="8" cy="8" r="7" fill="#EFAE45" stroke="#574D69" strokeWidth="1.5" /><circle cx="8" cy="8" r="3.5" fill="none" stroke="#574D69" strokeWidth="1.2" /></svg>; }
 function Heart() { return <svg className="td-icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden><path d="M8 14 2 8.3A3.4 3.4 0 0 1 8 4a3.4 3.4 0 0 1 6 4.3Z" fill="#E76B62" stroke="#574D69" strokeWidth="1.3" /></svg>; }
 function Tick() { return <svg className="td-icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden><path d="m3 8.5 3.2 3L13 4.5" fill="none" stroke="#2B2433" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></svg>; }
+/** A gold price in the top bar's coin style (same font and size as the bar's gold and lives). */
+function Cost({ gold, testId }: { gold: number; testId?: string }) {
+  return <span className="td-cost" data-testid={testId}><Coin /><b>{gold}</b><span className="td-sr"> gold</span></span>;
+}
 
 /** Quest titles with this match's ordered towers filled in. */
 function questTitle(s: TdState, q: QuestId) {
@@ -38,6 +53,23 @@ function questTitle(s: TdState, q: QuestId) {
   if (q === 'order2') return `Own 3 × ${TOWERS[s.orders.t2].name} (tier 2)`;
   if (q === 'order3') return `Own 3 × ${TOWERS[s.orders.t3].name} (tier 3)`;
   return QUESTS[q].title;
+}
+/** A tier tile: "T2" on the tier's colour, with dots for "one of each family" quests. */
+function TierTile({ tier, label, dots }: { tier: number; label?: string; dots?: boolean }) {
+  return <svg className="td-tier-tile" width="40" height="40" viewBox="0 0 40 40" aria-hidden>
+    <rect x="2" y="2" width="36" height="36" rx="8" fill={TIER_COLOURS[tier - 1]} stroke={PALETTE.inkPurple} strokeWidth="2.5" />
+    <text x="20" y={dots ? 21 : 26} textAnchor="middle" fontFamily="Fredoka, sans-serif" fontWeight="600" fontSize="15" fill={PALETTE.ink}>{label ?? `T${tier}`}</text>
+    {dots && FAMILIES.map((f, i) => <circle key={f} cx={9 + i * 5.5} cy="31" r="2.3" fill={PALETTE.white} stroke={PALETTE.ink} strokeWidth="1" />)}
+  </svg>;
+}
+/** The quest's picture: the ordered tower itself, or a tier tile for "any tower of tier N" quests. */
+function QuestArt({ s, q }: { s: TdState; q: QuestId }) {
+  const order = q === 'order1' ? s.orders.t1 : q === 'order2' ? s.orders.t2 : q === 'order3' ? s.orders.t3 : null;
+  if (order) { const d = TOWERS[order]; return <span className="td-quest-art" style={tierStyle(d.tier)} data-testid={`td-quest-art-${q}`} data-model={d.model}><Portrait model={d.model} /></span>; }
+  return <span className="td-quest-art" data-testid={`td-quest-art-${q}`}>{
+    q === 'collect5' ? <TierTile tier={1} label="T1" dots /> : q === 'triple2' ? <TierTile tier={2} label="3×T2" /> : q === 'album' ? <TierTile tier={3} label="T3+" dots />
+      : q === 'first6' ? <TierTile tier={6} label="1st" /> : <svg className="td-tier-tile" width="40" height="40" viewBox="0 0 40 40" aria-hidden><rect x="2" y="2" width="36" height="36" rx="8" fill={PALETTE.sage} stroke={PALETTE.inkPurple} strokeWidth="2.5" /><path d="M20 31 9.5 21a6 6 0 0 1 10.5-7.2A6 6 0 0 1 30.5 21Z" fill={PALETTE.coral} stroke={PALETTE.ink} strokeWidth="1.8" /></svg>
+  }</span>;
 }
 
 function TowerSheet({ me, cell, send }: { me: TdPlayer; cell: number; send: (i: Parameters<typeof submitTumbleInput>[0]) => void }) {
@@ -47,7 +79,7 @@ function TowerSheet({ me, cell, send }: { me: TdPlayer; cell: number; send: (i: 
       <header className="td-sheet__head"><strong>Empty square {cellName(cell)}</strong></header>
       <p className="td-sheet__lead">Build places a random tower here (usually tier 1: see the builder odds).</p>
       <div className="td-sheet__actions">
-        <button className="td-primary" data-testid="td-build-here" disabled={me.gold < BUILD_COST} onClick={() => send({ type: 'build', cell })}>Build here · {BUILD_COST}<span className="td-sr"> gold</span><Coin /></button>
+        <button className="td-primary" data-testid="td-build-here" disabled={me.gold < BUILD_COST} onClick={() => send({ type: 'build', cell })}>Build here <Cost gold={BUILD_COST} /></button>
         <button data-testid="td-sheet-close" onClick={close}>Close</button>
       </div>
     </section>;
@@ -64,13 +96,13 @@ function TowerSheet({ me, cell, send }: { me: TdPlayer; cell: number; send: (i: 
       {d.splash ? ` · splash ${d.splash}` : ''}{d.chain ? ` · jumps to ${d.chain} more` : ''}{d.slow ? ` · slows ${Math.round(d.slow * 100)}%` : ''}
       {d.aura ? ` · aura: towers within ${d.aura} squares hit ${Math.round(d.auraDamage * 100)}% harder and ${Math.round(d.auraSpeed * 100)}% faster` : ''}</p>
     {d.abilities.length > 0 && <ul className="td-abilities">{d.abilities.map((a) => <li key={a}><b>{ABILITY_NAME[a]}:</b> {ABILITY_TEXT[a]}</li>)}</ul>}
-    <small className="td-sheet__dealt">Dealt {Math.round(t.dealt)} damage · square {cellName(cell)}</small>
+    <small className="td-sheet__dealt">Dealt {fmt(t.dealt)} damage · square {cellName(cell)}</small>
     <div className="td-sheet__actions">
       {d.tier >= MAX_TIER ? <span className="td-note">Tier 7: the top.</span>
         : twins.length === 0 ? <span className="td-note">No partner yet: any other tier {d.tier} tower can merge.</span>
           : twins.slice(0, 3).map((o) => <button key={o.id} className="td-primary" data-testid={`td-merge-${o.cell}`} onClick={() => send({ type: 'merge', from: o.cell, to: cell })}>
             Merge tier {d.tier} at {cellName(o.cell)}<small>→ random tier {d.tier + 1} · shortcut M</small></button>)}
-      <button className="td-sell" data-testid="td-sell" onClick={() => { send({ type: 'sell', cell }); close(); }}>Sell +{sellValue(d.tier)}<span className="td-sr"> gold</span><Coin /></button>
+      <button className="td-sell" data-testid="td-sell" onClick={() => { send({ type: 'sell', cell }); close(); }}>Sell +<Cost gold={sellValue(d.tier)} /></button>
       <button data-testid="td-sheet-close" onClick={close}>Close</button>
     </div>
   </section>;
@@ -83,6 +115,8 @@ function OddsPanel({ me, onClose }: { me: TdPlayer; onClose: () => void }) {
     <table><thead><tr><th>Level</th><th>Cost</th><th>Tier 1</th><th>Tier 2</th><th>Tier 3</th><th>Lucky</th></tr></thead>
       <tbody>{BUILDER.map((l) => <tr key={l.level} className={l.level === me.builder ? 'is-current' : undefined} data-testid={`td-odds-${l.level}`}>
         <td>{l.level}</td><td>{l.cost || '–'}</td><td>{l.build[0]}%</td><td>{l.build[1]}%</td><td>{l.build[2]}%</td><td>{l.lucky}%</td></tr>)}</tbody></table>
+    <p className="td-odds__key"><b>Badges over enemies:</b></p>
+    <StatusLegend kinds={TUMBLE_STATUSES} />
   </aside>;
 }
 
@@ -91,21 +125,25 @@ function QuestList({ s, me }: { s: TdState; me: TdPlayer }) {
   return <ol className="td-quests" data-testid="td-quests">{QUEST_ORDER.map((q) => {
     const [have, need] = progress[q], done = me.quests[q], taken = q === 'first6' && !done && s.firstSix.length > 0;
     return <li key={q} data-testid={`td-quest-${q}`} data-done={done || undefined} className={done ? 'is-done' : taken ? 'is-taken' : undefined}>
-      <span className="td-quests__mark">{done ? <Tick /> : <b>{Math.min(have, need)}/{need}</b>}</span>
+      <QuestArt s={s} q={q} />
       <span className="td-quests__text">{questTitle(s, q)}<small>{taken ? 'Already claimed this match' : questReward(QUESTS[q])}</small></span>
+      <span className="td-quests__mark">{done ? <Tick /> : <b>{Math.min(have, need)}/{need}</b>}</span>
     </li>; })}</ol>;
 }
 
-function PlayerList({ s, localId, watching, name, canWatch }: { s: TdState; localId: string; watching: string; name: (id: string) => string; canWatch: boolean }) {
-  const rows = s.players.slice().sort((a, b) => Number(a.out) - Number(b.out) || b.cleared - a.cleared || b.lives - a.lives);
-  return <ol className="td-players" data-testid="td-players">{rows.map((p) => {
-    const body = <>
-      <strong>{name(p.id)}{p.id === localId ? ' (you)' : ''}</strong>
-      <small>{p.out ? `Out on wave ${p.outWave}` : `${p.lives} lives`} · best tier {p.maxTier || '–'} · {boardScore(p)} pts{s.firstSix.includes(p.id) ? ' · first tier 6' : ''}</small>
-    </>;
-    return <li key={p.id} className={`${p.out ? 'is-out' : ''}${p.id === watching ? ' is-watched' : ''}`} style={tierStyle(Math.max(1, p.maxTier))}>
-      {canWatch && !p.out ? <button data-testid={`td-watch-${p.id}`} onClick={() => useTumbleUI.setState({ watching: p.id })}>{body}</button> : <div>{body}</div>}
-    </li>; })}</ol>;
+/** The rail's rows: standings normally; during the damage check, a damage leaderboard. */
+function railEntries(s: TdState, name: (id: string) => string): RailEntry[] {
+  const check = inCheck(s);
+  const rows = s.players.slice().sort(check
+    ? (a, b) => Number(a.out) - Number(b.out) || b.checkDamage - a.checkDamage
+    : (a, b) => Number(a.out) - Number(b.out) || b.cleared - a.cleared || b.lives - a.lives || boardScore(b) - boardScore(a));
+  return rows.map((p) => ({
+    id: p.id, name: name(p.id), out: p.out, accent: TIER_COLOURS[Math.max(1, p.maxTier) - 1],
+    stat: check && !p.out ? fmt(p.checkDamage) : p.out ? '–' : String(Math.max(0, p.lives)),
+    statLabel: check && !p.out ? 'damage' : p.out ? 'out' : 'lives',
+    detail: p.out ? `Out on wave ${p.outWave}` : `Best tier ${p.maxTier || '–'} · ${boardScore(p)} pts${s.firstSix.includes(p.id) ? ' · first tier 6' : ''}`,
+    busy: stillGoing(s, p), busyLabel: check ? 'damage check still crossing' : `still fighting wave ${s.wave}`,
+  }));
 }
 
 export function TumbleHud({ getState, localId, contestants }: MinigameSceneProps<TdState>) {
@@ -114,6 +152,8 @@ export function TumbleHud({ getState, localId, contestants }: MinigameSceneProps
   const paused = useMatch((m) => m.paused), hostPhase = useMatch((m) => m.phase);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const toastKey = useRef(0);
+  // Damage per second on the damage check, from the viewed board's total (sampled by the HUD timer).
+  const rate = useRef<{ board: string; samples: [number, number][] }>({ board: '', samples: [] });
   const name = (id: string) => contestants.find((c) => c.id === id)?.name || 'Player';
   useEffect(() => {
     resetTumbleUI();
@@ -121,7 +161,7 @@ export function TumbleHud({ getState, localId, contestants }: MinigameSceneProps
     return () => { window.clearInterval(timer); clearTumbleInput(); resetTumbleUI(); };
   }, []);
   useEffect(() => { if (paused) clearTumbleInput(); }, [paused]);
-  // Notices from the rules: your quests, merges and boss rewards, boss waves, the lobby's first tier 6.
+  // Notices from the rules: your quests, merges and free towers, round rewards, boss waves, the lobby's first tier 6.
   useEffect(() => matchBus.on('event', (e) => {
     const s = getState(); if (s?.kind !== 'tower-tumble') return;
     const id = (e as { id?: string }).id, mine = id === localId, def = TOWERS[(e as { def?: string }).def ?? ''];
@@ -135,14 +175,18 @@ export function TumbleHud({ getState, localId, contestants }: MinigameSceneProps
       const cell = e.cell as number;
       useTumbleUI.setState({ selected: cell, cursor: cell });
     }
-    else if (e.type === 'td-gift' && mine && def) push(`Boss reward: ${def.name} · tier ${def.tier}`, 'good', 4200);
+    else if (e.type === 'td-gift' && mine && def) push(`Free tower: ${def.name} · tier ${def.tier}`, 'good', 4200);
     else if (e.type === 'td-build' && mine && def) {
       push(`Built: ${def.name} · tier ${def.tier}`, def.tier > 1 ? 'good' : 'info', 2200);
       const cell = e.cell as number, sel = useTumbleUI.getState().selected;
       if (sel === null || sel === cell) useTumbleUI.setState({ selected: cell, cursor: cell });
-    } else if (e.type === 'td-wave' && (e as { boss?: boolean }).boss) push(`Boss wave! ${BOSSES[e.wave as number]?.name ?? 'Boss'} is coming`, 'boss', 3600);
+    } else if (e.type === 'td-board-clear' && mine) push(`Wave ${e.wave as number} cleared: +${e.gold as number} gold`, 'good', 2600);
+    else if (e.type === 'td-wave' && (e as { check?: boolean }).check) push(`Damage check! ${DAMAGE_CHECK.name} costs no lives: hit it as hard as you can`, 'boss', 4200);
+    else if (e.type === 'td-wave' && (e as { boss?: boolean }).boss) push(`Boss wave! ${BOSSES[e.wave as number]?.name ?? 'Boss'} is coming`, 'boss', 3600);
+    else if (e.type === 'td-cleared' && (e.wave as number) === s.config.waves && s.config.damageCheck) push(`All ${s.config.waves} waves done! ${Math.round(s.config.checkPrepMs / 1000)} s to get ready for the damage check`, 'good', 5000);
+    else if (e.type === 'td-check-done' && mine) push(`Damage check: ${fmt(e.damage as number)} damage`, 'good', 5000);
     else if (e.type === 'td-boss-down' && mine) push('Boss toppled!', 'good');
-    else if (e.type === 'td-out' && mine) { push(`Knocked out on wave ${e.wave as number}. Watch the other boards.`, 'bad', 5000); useTumbleUI.setState({ selected: null, panel: null }); }
+    else if (e.type === 'td-out' && mine) { push(`Knocked out on wave ${e.wave as number}`, 'bad', 4000); useTumbleUI.setState({ selected: null, panel: null, offer: 'open' }); }
     else if (e.type === 'td-builder' && mine) push(`Builder level ${e.level as number}: better odds`, 'good');
   }), [getState, localId]);
 
@@ -161,63 +205,82 @@ export function TumbleHud({ getState, localId, contestants }: MinigameSceneProps
   if (s?.kind !== 'tower-tumble' || !me) return null;
 
   const watchingId = viewedBoard(s, localId, ui.watching), board = s.players.find((p) => p.id === watchingId) ?? me;
+  const viewing = board !== me;
   const canAct = !me.out && s.phase !== 'over' && !paused && hostPhase === 'playing';
   const send = (input: Parameters<typeof submitTumbleInput>[0]) => { if (canAct || input.type === 'speed') { unlockAudio(); submitTumbleInput(input); } };
   const setPanel = (panel: TdPanel) => useTumbleUI.setState({ panel: ui.panel === panel ? null : panel });
+  const view = (id: string) => useTumbleUI.setState({ watching: id === localId ? null : id, selected: id === localId ? ui.selected : null });
   const seconds = Math.max(0, Math.ceil((s.phaseEnds - s.t) / 1000));
+  const check = inCheck(s);
   const left = s.phase === 'wave' ? board.enemies.length + Math.max(0, s.spawns.length - board.spawnIdx) : 0;
-  const cost = builderCost(me), boss = isBossWave(s.wave) ? BOSSES[s.wave] : null;
-  const waveKinds = [...new Set(WAVES[Math.min(s.wave, WAVES.length) - 1].map((g) => (g.kind === 'boss' ? boss?.name ?? 'Boss' : ENEMIES[g.kind].name)))].join(', ');
+  const cost = builderCost(me), boss = !check && isBossWave(s.wave) ? BOSSES[s.wave] : null;
+  const waveKinds = check ? DAMAGE_CHECK.name : [...new Set(WAVES[Math.min(s.wave, WAVES.length) - 1].map((g) => (g.kind === 'boss' ? boss?.name ?? 'Boss' : ENEMIES[g.kind].name)))].join(', ');
   const questsDone = QUEST_ORDER.filter((q) => me.quests[q]).length;
   const flash = s.t - board.lastLeakAt < 700;
-  const selected = ui.selected !== null && !me.out && (towerAt(me, ui.selected) || (isBuildable(ui.selected) && !isPath(ui.selected))) ? ui.selected : null;
+  const selected = !viewing && ui.selected !== null && !me.out && (towerAt(me, ui.selected) || (isBuildable(ui.selected) && !isPath(ui.selected))) ? ui.selected : null;
+  // Damage per second on the viewed board over the last second or so.
+  const r = rate.current;
+  if (r.board !== board.id) { r.board = board.id; r.samples = []; }
+  if (check && s.phase === 'wave') { if (!r.samples.length || s.t > r.samples[r.samples.length - 1][0]) r.samples.push([s.t, board.checkDamage]); while (r.samples.length > 2 && s.t - r.samples[0][0] > 1500) r.samples.shift(); }
+  const dps = r.samples.length > 1 ? (r.samples[r.samples.length - 1][1] - r.samples[0][1]) / Math.max(0.1, (r.samples[r.samples.length - 1][0] - r.samples[0][0]) / 1000) : 0;
+  const phaseText = s.phase === 'over' ? 'Finished'
+    : check ? (s.phase === 'build' ? `Damage check in ${seconds} s` : board.waveDone ? 'Damage check done' : 'Damage check')
+      : s.phase === 'build' ? `Next wave in ${seconds} s` : board.waveDone ? 'Cleared! Waiting for the others' : `${left} left`;
+  const offer = me.out && ui.offer !== 'closed' && s.phase !== 'over';
+  const others = watchable(s).filter((id) => id !== localId);
 
-  return <div className={`td-hud${me.out ? ' is-out' : ''}`} data-testid="td-hud">
+  return <div className={`td-hud${me.out ? ' is-out' : ''}${selected !== null ? ' has-sheet' : ''}${viewing ? ' is-viewing' : ''}`} data-testid="td-hud">
     <div className="td-board-slot" aria-hidden />
-    <header className={`td-bar${flash ? ' is-hit' : ''}`} data-testid="td-bar">
-      <span className="td-bar__wave" data-testid="td-wave"><b>Wave {Math.min(s.wave, s.config.waves)}/{s.config.waves}</b>{boss && <i className="td-boss-tag">Boss</i>}</span>
-      <span className="td-bar__phase" data-testid="td-phase">{s.phase === 'build' ? `Next wave in ${seconds} s` : s.phase === 'wave' ? `${left} left` : 'Finished'}<small>{s.phase === 'build' ? waveKinds : ''}</small></span>
-      <span className="td-bar__stat" data-testid="td-gold" title="Gold"><Coin /><b>{board.gold}</b><span className="td-sr"> gold</span></span>
-      <span className="td-bar__stat" data-testid="td-lives" title="Lives"><Heart /><b>{Math.max(0, board.lives)}</b><span className="td-sr"> lives</span></span>
-      <span className="td-bar__stat td-bar__score" title="Score"><b>{boardScore(board)}</b> pts</span>
-      {board !== me && <span className="td-bar__watch" data-testid="td-watching">Watching {name(board.id)}</span>}
+    <header className={`td-bar${flash ? ' is-hit' : ''}${check ? ' is-check' : ''}`} data-testid="td-bar">
+      <span className="td-bar__wave" data-testid="td-wave"><b>{check ? 'Bonus' : `Wave ${Math.min(s.wave, s.config.waves)}/${s.config.waves}`}</b>{boss && <i className="td-boss-tag">Boss</i>}</span>
+      <span className="td-bar__phase" data-testid="td-phase">{phaseText}<small>{s.phase === 'build' ? waveKinds : ''}</small></span>
+      {check && s.phase !== 'build' ? <span className="td-bar__stat td-bar__check" data-testid="td-check-damage" title="Damage dealt to the damage check">
+        <b>{fmt(board.checkDamage)}</b> damage<small>{board.waveDone ? 'final' : `${fmt(dps)}/s`}</small></span> : <>
+        <span className="td-bar__stat" data-testid="td-gold" title="Gold"><Coin /><b>{board.gold}</b><span className="td-sr"> gold</span></span>
+        <span className="td-bar__stat" data-testid="td-lives" title="Lives"><Heart /><b>{Math.max(0, board.lives)}</b><span className="td-sr"> lives</span></span>
+        <span className="td-bar__stat td-bar__score" title="Score"><b>{boardScore(board)}</b> pts</span></>}
     </header>
 
     {!me.out && <aside className={`td-side td-side--quests${ui.panel === 'quests' ? ' is-open' : ''}`} aria-label="Quests">
-      <header className="td-panel__head"><strong>Quests {questsDone}/{QUEST_ORDER.length}</strong>{ui.panel === 'quests' && <button className="td-only-phone" data-testid="td-quests-close" onClick={() => setPanel(null)}>Close</button>}</header>
+      <header className="td-panel__head"><strong>Quests {questsDone}/{QUEST_ORDER.length}</strong>
+        {ui.panel === 'quests' && <button className="td-quests-close" data-testid="td-quests-close" onClick={() => setPanel(null)}>Close</button>}</header>
       <QuestList s={s} me={me} />
+      {/* Phones: the column is a strip of quest pictures; tapping it opens the full list. */}
+      <button className="td-quests-open" data-testid="td-quests-open" aria-label={`Quests ${questsDone} of ${QUEST_ORDER.length} done. Show the list`} aria-pressed={ui.panel === 'quests'} onClick={() => setPanel('quests')} />
+      <div className="td-quests-key"><StatusLegend kinds={TUMBLE_STATUSES} /></div>
     </aside>}
-    <aside className={`td-side td-side--players${ui.panel === 'players' || me.out ? ' is-open' : ''}`} aria-label="Players">
-      <header className="td-panel__head"><strong>Players</strong>{ui.panel === 'players' && <button className="td-only-phone" data-testid="td-players-close" onClick={() => setPanel(null)}>Close</button>}</header>
-      <PlayerList s={s} localId={localId} watching={board.id} name={name} canWatch={me.out} />
-    </aside>
+    <PlayerRail className="td-rail" title={check ? 'Damage' : 'Players'} label={check ? 'Damage check leaderboard' : 'Players: view a board'}
+      entries={railEntries(s, name)} localId={localId} viewing={board.id} onView={view} ranked={check} />
 
-    {me.out ? <section className="td-spectate" data-testid="td-spectate" aria-label="Spectating">
-      <strong>Knocked out on wave {me.outWave}. Watching {name(board.id)}{board.out ? ' (out)' : ` · wave ${s.wave} · ${board.lives} lives`}</strong>
+    {viewing && <WatchBanner className="td-watch" name={name(board.id)} onBack={() => view(localId)}>
+      {me.out && others.length > 1 && <>
+        <button data-testid="td-watch-prev" aria-label="Previous board" onClick={() => view(cycleWatch(s, board.id, -1))}>‹</button>
+        <button data-testid="td-watch-next" aria-label="Next board" onClick={() => view(cycleWatch(s, board.id, 1))}>›</button></>}
+    </WatchBanner>}
+    {tumbleView.changed && <button className="td-view-reset" data-testid="td-view-reset" onClick={() => tumbleView.reset()}>Reset view</button>}
+
+    {me.out ? <section className="td-spectate" data-testid="td-spectate" aria-label="Knocked out">
+      <strong>Knocked out on wave {me.outWave}{viewing ? '' : '. Tap a player to watch their board.'}</strong>
       <div className="td-spectate__row">
-        <button data-testid="td-watch-prev" aria-label="Previous board" onClick={() => useTumbleUI.setState({ watching: cycleWatch(s, board.id, -1) })}>‹ Prev</button>
-        <button data-testid="td-watch-next" aria-label="Next board" onClick={() => useTumbleUI.setState({ watching: cycleWatch(s, board.id, 1) })}>Next ›</button>
+        {!viewing && others.length > 0 && <button data-testid="td-watch-others" onClick={() => view(others[0])}>Watch other players</button>}
         {allHumansOut(s) && SPEEDS.map((k) => <button key={k} data-testid={`td-speed-${k}`} aria-pressed={s.speed === k} onClick={() => send({ type: 'speed', speed: k })}>×{k}</button>)}
       </div>
     </section> : <section className="td-dock" data-testid="td-dock" aria-label="Build controls">
       <div className="td-dock__row">
         <button className="td-primary td-build" data-testid="td-build" disabled={!canAct || !canBuild(s, me)} onClick={() => buildHere(me)}>
-          Build [B]<small>{BUILD_COST} gold · random tower</small></button>
+          <span>Build <kbd>B</kbd></span><Cost gold={BUILD_COST} testId="td-build-cost" /></button>
         <button data-testid="td-builder" disabled={!canAct || cost === null || me.gold < cost} onClick={() => send({ type: 'builder' })}>
-          Builder Lv {me.builder}{cost !== null ? ' ↑' : ''} [U]<small>{cost !== null ? `Lv ${me.builder + 1}: ${cost} gold` : 'Top level'}</small></button>
-        <button data-testid="td-odds-open" aria-pressed={ui.panel === 'odds'} onClick={() => setPanel('odds')}>Odds<small>Lv {me.builder}: {BUILDER[me.builder - 1].build.filter(Boolean).map((n, i) => `T${i + 1} ${n}%`).join(' ')}</small></button>
+          <span>Builder {me.builder}{cost !== null ? `→${me.builder + 1}` : "/6"} <kbd>U</kbd></span>{cost !== null ? <Cost gold={cost} testId="td-builder-cost" /> : <small>Top level</small>}</button>
+        <button data-testid="td-odds-open" aria-pressed={ui.panel === 'odds'} onClick={() => setPanel('odds')}>Odds<small>Lv {me.builder}/{MAX_BUILDER}: {BUILDER[me.builder - 1].build.filter(Boolean).map((n, i) => `T${i + 1} ${n}%`).join(' ')}</small></button>
         <button className="td-next" data-testid="td-next" disabled={!canAct || s.phase !== 'build' || me.ready} onClick={() => send({ type: 'ready' })}>
-          {me.ready ? 'Waiting…' : 'Next wave [N]'}<small>{s.phase === 'build' ? `or in ${seconds} s` : 'Wave running'}</small></button>
-      </div>
-      <div className="td-dock__row td-only-phone">
-        <button data-testid="td-quests-open" aria-pressed={ui.panel === 'quests'} onClick={() => setPanel('quests')}>Quests {questsDone}/{QUEST_ORDER.length}</button>
-        <button data-testid="td-players-open" aria-pressed={ui.panel === 'players'} onClick={() => setPanel('players')}>Players</button>
-        <span className="td-dock__level">Builder Lv {me.builder}/{MAX_BUILDER}</span>
+          {me.ready ? 'Waiting…' : <span>Next wave <kbd>N</kbd></span>}<small>{s.phase === 'build' ? `or in ${seconds} s` : me.waveDone ? 'Others still going' : 'Wave running'}</small></button>
       </div>
     </section>}
 
-    {!me.out && selected !== null && <TowerSheet me={me} cell={selected} send={send} />}
+    {selected !== null && <TowerSheet me={me} cell={selected} send={send} />}
     {ui.panel === 'odds' && <OddsPanel me={me} onClose={() => setPanel(null)} />}
+    {offer && <SpectateOffer title={`Knocked out on wave ${me.outWave}`} body={others.length ? 'Your towers stay on your board. Watch the others play on, or stay here.' : 'Nobody else is still in.'}
+      onWatch={() => { useTumbleUI.setState({ offer: 'closed' }); if (others.length) view(others[0]); }} onDismiss={() => useTumbleUI.setState({ offer: 'closed' })} />}
     <ol className="td-toasts" aria-live="polite">{toasts.map((t) => <li key={t.key} className={`td-toast td-toast--${t.tone}`}>{t.text}</li>)}</ol>
   </div>;
 }
