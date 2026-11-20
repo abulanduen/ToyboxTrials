@@ -62,15 +62,22 @@
 
 /* The player rail (right): the shared rail, placed here. */
 .td-rail { position:absolute; top:calc(var(--top) + 64px); right:var(--r); width:var(--rail-w); max-height:calc(100% - var(--top) - var(--bottom) - var(--dock) - 74px); }
-.td-hud.has-sheet .td-rail { max-height:calc(42% - 64px); }
 
 /* Watching another board; reset view */
-.td-watch { position:absolute; z-index:2; bottom:calc(var(--bottom) + var(--dock) + 10px); left:calc(var(--l) + var(--left) + 8px); right:calc(var(--r) + var(--right) + 8px); margin:0 auto; width:fit-content; max-width:calc(100% - var(--l) - var(--r) - var(--left) - var(--right) - 16px); }
+.td-watch { position:absolute; z-index:3; bottom:calc(var(--bottom) + var(--dock) + 10px); left:calc(var(--l) + var(--left) + 8px); right:calc(var(--r) + var(--right) + 8px); margin:0 auto; width:fit-content; max-width:calc(100% - var(--l) - var(--r) - var(--left) - var(--right) - 16px); }
 .td-hud .td-watch button { min-width:56px; }
 .td-hud .td-view-reset { position:absolute; top:calc(var(--top) + var(--bar) + 8px); right:calc(var(--r) + var(--right) + 8px); background:#FFF9EE; font-size:13px; padding:4px 10px; opacity:.92; }
 
-/* The selected square's sheet: right column on desktop */
-.td-sheet { position:absolute; pointer-events:auto; right:var(--r); bottom:calc(var(--bottom) + var(--dock) + 10px); width:var(--right); box-sizing:border-box; max-height:calc(58% - var(--dock)); overflow:auto; background:#FFF9EE; border:3px solid var(--tier,#574D69); border-radius:12px; padding:8px; box-shadow:0 3px 0 #574D69; }
+/* The selected square's sheet and the mouse's hover tip: popovers floating beside their square. The HUD sets left/top
+   (and the size limits) so they stay inside .td-pop-bounds (the board slot; on a phone in landscape, widened over the quest
+   strip, the only way a sheet fits beside its square there): they never cover the bar, the rail or the dock, and never take
+   space from anything. The Odds, Board and Quests panels open above them. */
+.td-pop-bounds { position:absolute; top:calc(var(--top) + var(--bar) + var(--gap)); bottom:calc(var(--bottom) + var(--dock) + var(--gap)); left:calc(var(--l) + var(--left) + var(--gap)); right:calc(var(--r) + var(--right) + var(--gap)); pointer-events:none; visibility:hidden; }
+@media(max-height:500px) { .td-pop-bounds { left:var(--l); } }
+.td-sheet { position:absolute; z-index:2; pointer-events:auto; left:calc(var(--l) + var(--left) + 8px); top:calc(var(--top) + var(--bar) + 8px); width:min(276px,calc(100% - var(--l) - var(--r))); box-sizing:border-box; max-height:calc(100% - var(--top) - var(--bar) - 4px - var(--bottom)); overflow:auto; overscroll-behavior:contain; background:#FFF9EE; border:3px solid var(--tier,#574D69); border-radius:12px; padding:8px; box-shadow:0 4px 0 #574D69,0 6px 18px rgba(43,36,51,.28); }
+.td-tip { pointer-events:none; width:min(250px,calc(100% - var(--l) - var(--r))); padding:6px 8px; }
+.td-sheet__owner { display:block; font:700 11px Nunito,sans-serif; color:#574D69; margin:-2px 0 4px; }
+.td-sheet .is-pair { outline:3px solid #6BA7C8; outline-offset:1px; }
 .td-sheet__head { display:flex; gap:8px; align-items:center; }
 .td-sheet__head > strong { font:600 16px Fredoka,sans-serif; }
 .td-sheet__title strong { display:block; font:600 16px Fredoka,sans-serif; }
@@ -90,6 +97,32 @@
 .td-dock { position:absolute; pointer-events:auto; bottom:var(--bottom); left:calc(var(--l) + var(--left) + 8px); right:calc(var(--r) + var(--right) + 8px); box-sizing:border-box; background:#F4E8CE; border:3px solid #C9A57A; border-radius:12px; padding:6px; box-shadow:0 3px 0 #574D69; }
 .td-dock__row { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
 .td-dock__row button { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; }
+/* Read-only dock (looking at someone else's board): figures in the buttons' place. */
+.td-dock__info { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:56px; box-sizing:border-box; border:2px dashed #C9A57A; border-radius:9px; font:600 14px Fredoka,sans-serif; text-align:center; line-height:1.1; }
+.td-dock__info small { display:block; font:600 11px Nunito,sans-serif; opacity:.85; margin-top:2px; }
+.td-side__owner { font:700 11px Nunito,sans-serif; }
+
+/* One board in full (any board, read-only): stats, builder, families, towers by tier, quests. */
+.td-odds.td-board-panel { width:min(460px,calc(100% - 24px)); z-index:5; }
+.td-board-panel h3 { font:600 14px Fredoka,sans-serif; margin:8px 0 4px; }
+.td-board-panel h3 small { font:600 11px Nunito,sans-serif; opacity:.8; }
+.td-board-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:4px; margin:4px 0; }
+.td-board-stats div { background:#F4E8CE; border-radius:8px; padding:3px 6px; }
+.td-board-stats dt { font:700 10px Nunito,sans-serif; opacity:.8; }
+.td-board-stats dd { margin:0; font:600 15px Fredoka,sans-serif; display:flex; align-items:center; gap:3px; }
+.td-board-builder { margin:4px 0; font-size:12px; }
+.td-board-families { list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:4px; }
+.td-board-families li { display:flex; flex-direction:column; align-items:center; text-align:center; padding:4px 2px; border-radius:8px; background:var(--tier,#F4E8CE); border:2px solid #574D69; font-size:11px; line-height:1.15; }
+.td-board-families li.is-none { background:#F4E8CE; border-style:dashed; border-color:#C9A57A; opacity:.75; }
+.td-board-families b { font:600 12px Fredoka,sans-serif; }
+.td-board-families small { font-size:10px; }
+.td-board-families span { font:600 13px Fredoka,sans-serif; }
+.td-board-towers { list-style:none; margin:0; padding:0; display:grid; gap:4px; }
+.td-board-towers li { display:grid; grid-template-columns:34px minmax(0,1fr); align-items:start; gap:6px; }
+.td-board-towers li > .td-tier { text-align:center; font:600 13px Fredoka,sans-serif; padding:2px 0; }
+.td-board-towers li > span { display:flex; flex-wrap:wrap; gap:3px 8px; }
+.td-board-tower { display:inline-flex; align-items:center; gap:4px; font-weight:700; font-size:12px; }
+.td-board-tower .td-portrait { width:28px; height:28px; border:1.5px solid #574D69; box-sizing:border-box; }
 
 /* Odds table */
 .td-odds { position:absolute; z-index:3; pointer-events:auto; left:50%; top:50%; transform:translate(-50%,-50%); width:min(440px,calc(100% - 24px)); max-height:calc(100% - 24px); overflow:auto; box-sizing:border-box; background:#FFF9EE; border:3px solid #EFAE45; border-radius:12px; padding:10px; box-shadow:0 5px 0 #574D69; }
@@ -103,7 +136,8 @@
 .td-spectate { position:absolute; pointer-events:auto; bottom:var(--bottom); left:calc(var(--l) + var(--left) + 8px); right:calc(var(--r) + var(--right) + 8px); margin:0 auto; max-width:560px; box-sizing:border-box; background:#F4E8CE; border:3px solid #6BA7C8; border-radius:12px; padding:8px; box-shadow:0 3px 0 #574D69; text-align:center; }
 .td-spectate strong { display:block; font:600 14px Fredoka,sans-serif; margin-bottom:6px; }
 .td-spectate__row { display:flex; flex-wrap:wrap; gap:6px; justify-content:center; }
-.td-hud.is-out { --dock:84px; --left:0px; }
+.td-hud.is-out { --dock:84px; }
+.td-hud.no-quests { --left:0px; }
 
 /* Notices */
 .td-toasts { position:absolute; top:calc(var(--top) + var(--bar) + 12px); left:calc(var(--l) + var(--left) + 8px); right:calc(var(--r) + var(--right) + 8px); margin:0 auto; max-width:420px; padding:0; list-style:none; display:grid; gap:4px; }
@@ -147,15 +181,20 @@
   .td-hud .td-dock button small { font-size:10px; }
   .td-dock .td-cost b { font-size:16px; }
   .td-hud .td-dock kbd { display:none; }
-  /* A selected square's sheet sits above the dock, full width; the board moves up into the space above it. */
-  .td-sheet { z-index:2; left:var(--l); right:var(--r); width:auto; bottom:calc(var(--bottom) + var(--dock) + 8px); max-height:236px; padding:6px 8px; }
-  .td-hud.has-sheet .td-board-slot { bottom:calc(var(--bottom) + var(--dock) + 250px); }
-  .td-hud.has-sheet .td-rail,.td-hud.has-sheet .td-side--quests:not(.is-open) { max-height:calc(100% - var(--top) - var(--bar) - var(--dock) - var(--bottom) - 260px); }
+  /* The sheet floats beside its square (above or below it); the board and the columns stay where they are. */
+  .td-sheet { width:min(300px,calc(100% - var(--l) - var(--r))); padding:6px 8px; }
   .td-sheet__stats { font-size:11px; margin:3px 0; }
   .td-abilities { font-size:11px; }
   .td-portrait { width:44px; height:44px; }
   .td-watch,.td-spectate { left:var(--l); right:var(--r); }
-  .td-hud.is-out { --left:0px; --dock:120px; }
+  .td-hud.is-out { --dock:120px; }
+  .td-hud.no-quests { --left:0px; }
+  .td-side--quests:not(.is-open) .td-side__owner { display:none; }
+  .td-hud .td-dock__info { font-size:13px; }
+  .td-hud .td-dock__info small { font-size:10px; }
+  .td-board-families { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  /* Under the host's pause button, so its Close stays reachable. */
+  .td-odds.td-board-panel { top:calc(var(--top) + 64px); transform:translateX(-50%); max-height:calc(100% - var(--top) - 64px - var(--bottom)); }
   .td-hud .td-view-reset { top:calc(var(--top) + var(--bar) + 6px); }
 }
 
@@ -175,8 +214,11 @@
   .td-hud .td-dock button { font-size:12px; padding:3px; }
   .td-hud .td-dock button small { font-size:10px; }
   .td-hud .td-dock kbd { display:none; }
-  /* A selected square's sheet covers the quest column and the left of the board. */
-  .td-sheet { z-index:3; top:var(--top); bottom:var(--bottom); left:var(--l); right:auto; width:260px; max-height:none; padding:5px 6px; }
+  /* The sheet floats beside its square (left or right of it), up to the full height of the screen. */
+  .td-sheet { width:260px; padding:5px 6px; }
+  .td-tip { width:230px; }
+  .td-hud .td-dock__info { font-size:12px; min-height:52px; }
+  .td-hud .td-dock__info small { font-size:10px; }
   .td-sheet__stats,.td-abilities { font-size:10.5px; margin:2px 0; }
   .td-sheet__dealt { display:none; }
   .td-portrait { width:40px; height:40px; }
@@ -185,6 +227,7 @@
   .td-toast:nth-last-child(n+3) { display:none; }
   .td-watch { bottom:var(--bottom); }
   .td-spectate { top:calc(var(--top) + 62px); bottom:auto; left:auto; right:var(--r); width:var(--dockw); padding:4px; margin:0; }
-  .td-hud.is-out { --left:0px; }
+  .td-hud.no-quests { --left:0px; }
+  .td-side--quests:not(.is-open) .td-side__owner { display:none; }
   .td-hud .td-view-reset { top:calc(var(--top) + var(--bar) + 6px); }
 }

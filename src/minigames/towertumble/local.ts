@@ -7,10 +7,20 @@ import { create } from 'zustand';
 import { isBuildable } from './board';
 import { canMergeTowers, towerAt, type TdInput, type TdPlayer } from './rules';
 
-export type TdPanel = 'quests' | 'odds' | null;
+export type TdPanel = 'quests' | 'odds' | 'board' | null;
 export interface TumbleUI {
-  /** Selected square (a tower or an empty buildable square), or null. */
+  /**
+   * Selected square (a tower or an empty buildable square), or null. On a board you are only
+   * looking at (someone else's from the player rail, or yours once out) it is a tower being inspected.
+   */
   selected: number | null;
+  /**
+   * Touch: the tower that was selected before a same-tier tower was tapped (or dragged onto). Its
+   * Merge button comes first in the sheet: on touch a tap never merges, only that button does.
+   */
+  pair: number | null;
+  /** Mouse: the tower under the pointer on the viewed board (a floating tip), or null. */
+  hover: number | null;
   /** Keyboard cursor square. */
   cursor: number;
   /** Square of the tower being dragged, and the square under the pointer. */
@@ -21,7 +31,7 @@ export interface TumbleUI {
   /** The knocked-out popup: 'open' after you are knocked out, until you watch or dismiss it. */
   offer: 'none' | 'open' | 'closed';
 }
-const blank: TumbleUI = { selected: null, cursor: 27, dragging: null, dragOver: null, watching: null, panel: null, offer: 'none' };
+const blank: TumbleUI = { selected: null, pair: null, hover: null, cursor: 27, dragging: null, dragOver: null, watching: null, panel: null, offer: 'none' };
 export const useTumbleUI = create<TumbleUI>(() => ({ ...blank }));
 export const resetTumbleUI = () => useTumbleUI.setState({ ...blank });
 
@@ -38,19 +48,28 @@ export const canMergeCells = (p: TdPlayer, from: number, to: number) => {
 
 /**
  * A tap (or Enter) on a square of your own board. With a tower selected, tapping a same-tier partner
- * merges them (the new tower lands on the twin you tapped). Otherwise it selects the square, and
- * tapping the selected square again clears the selection. Path squares clear it too.
+ * merges them with a mouse or keyboard (the new tower lands on the twin you tapped). On touch
+ * (`touch`, from the shared touch setting) a tap never merges: it selects the tapped tower and keeps
+ * the previous one as its `pair`, whose Merge button the sheet shows first. Otherwise it selects the
+ * square, and tapping the selected square again clears the selection. Path squares clear it too.
  */
-export function tapCell(p: TdPlayer | undefined, cell: number) {
+export function tapCell(p: TdPlayer | undefined, cell: number, touch = false) {
   if (!p || p.out) return;
   const { selected } = useTumbleUI.getState();
   if (selected !== null && selected !== cell && canMergeCells(p, selected, cell)) {
+    if (touch) { useTumbleUI.setState({ selected: cell, cursor: cell, pair: selected }); return; }
     submitTumbleInput({ type: 'merge', from: selected, to: cell });
-    useTumbleUI.setState({ selected: cell, cursor: cell });
+    useTumbleUI.setState({ selected: cell, cursor: cell, pair: null });
     return;
   }
-  if (selected === cell || !isBuildable(cell)) { useTumbleUI.setState({ selected: null, cursor: isBuildable(cell) ? cell : useTumbleUI.getState().cursor }); return; }
-  useTumbleUI.setState({ selected: cell, cursor: cell });
+  if (selected === cell || !isBuildable(cell)) { useTumbleUI.setState({ selected: null, pair: null, cursor: isBuildable(cell) ? cell : useTumbleUI.getState().cursor }); return; }
+  useTumbleUI.setState({ selected: cell, cursor: cell, pair: null });
+}
+
+/** A tap on a board you are only looking at: inspect a tower there (read-only), or clear. */
+export function inspectCell(p: TdPlayer | undefined, cell: number | null) {
+  const { selected } = useTumbleUI.getState();
+  useTumbleUI.setState({ selected: p && cell !== null && cell !== selected && towerAt(p, cell) ? cell : null, pair: null });
 }
 
 /** Build: on the selected empty square if there is one, otherwise on the best free square. */

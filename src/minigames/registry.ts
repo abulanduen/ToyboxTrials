@@ -300,7 +300,7 @@ export const MINIGAMES: MinigameDefinition[] = [
     inputs: ['keyboard', 'mouse', 'touch'], bots: 'available', recordUnit: 'points',
     touch: { movement: 'none', look: 'none', orientation: 'any',
       buttons: [{ id: 'buy', label: 'Shop offer' }, { id: 'reroll', label: 'Reroll' }, { id: 'place', label: 'Formation square' }, { id: 'merge', label: 'Merge pair' }, { id: 'bench', label: 'Reserve slot' }, { id: 'passive', label: 'Passive choice' }, { id: 'sell', label: 'Sell' }, { id: 'ready', label: 'Ready' }],
-      notes: 'Tap an offer to buy; reroll costs coins. Drag equal-star matching toys together to merge (maximum 3 stars); nonmatching toys swap. Formation drawer manages your reserves. Choose a passive on rounds 3, 6 and 9 before Ready.' },
+      notes: 'Tap an offer to buy; reroll costs coins (your coins show beside Reroll). Matching toys merge automatically (maximum 3 stars); a tap only selects a toy, and dragging onto a nonmatching toy swaps. Reserves sit below the board. Choose a passive on rounds 3, 6 and 9 before Ready. Tap a player on the rail to view their squad read-only.' },
     status: 'playable', load: () => import('./toysquad').then(m => m.default),
   },
   {
@@ -420,7 +420,7 @@ export const MINIGAMES: MinigameDefinition[] = [
         { id: 'close', label: 'Close' },
       ],
       orientation: 'any',
-      notes: 'Tap a square to select it; a sheet opens with Build here, Merge same tier, Sell and Close (all large buttons). Same-tier partners glow gold: tap one, or drag a tower onto it, to merge. Quests and Players open from the dock.',
+      notes: 'Tap a square to select it; a sheet floats beside it with Build here, Merge same tier, Sell and Close (all large buttons). Same-tier partners glow gold. On touch, tapping (or dragging onto) another tower only selects it and pairs it with the last one: only the Merge button merges. Tap a player on the rail to view their board read-only (quests, towers, builder, Board details).',
     },
     status: 'playable',
     load: () => import('./towertumble').then((m) => m.default),

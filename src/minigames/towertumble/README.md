@@ -34,6 +34,12 @@ their tower; prices use the top bar's coin style; anyone's board can be viewed f
 out players stay on their board and are offered (not forced) to watch; status badges over enemies;
 on phones the quests sit left and the rail right, with drag-to-pan and pinch/wheel zoom.
 
+Owner revision, 20 November 2026 (board views): viewing another board, or spectating, shows that
+player's whole picture (their quests, towers, builder level and odds, gold and lives, and a Board panel
+with towers by tier and by family) read-only; the tower sheet and hover tip float beside their square
+instead of pushing the layout; on touch, a tap (or drop) on another tower never merges: only the
+sheet's Merge button does.
+
 ## The board
 
 ```
@@ -137,6 +143,10 @@ non-boss under 15% health). Targeting: the enemy furthest along its route, withi
   uniform within that tier.
 - **Merge:** any two towers of the same tier, regardless of name or family → one random tower of the next tier,
   on the square of the tower you merged *into*. The other square empties. Tier 7 never merges.
+  With a mouse, select a tower and click (or drag it onto) a glowing partner. **On touch a tap never
+  merges** (owner request: stray taps merged towers): tapping or dropping onto a same-tier tower selects
+  it and pairs it with the previous one, and its sheet's first button, *Merge tier N with B3*, merges.
+  Touch is the shared `touchUI` setting (coarse pointer), not the user agent.
 - **M quick merge:** no selection required. It keeps the result on the selected tower if that
   tower has a partner; otherwise it picks the lowest-tier pair, keeping the lowest-cell position.
   Each press merges one pair; invalid/capped selections fall back to another available pair.
@@ -265,11 +275,19 @@ the finale of a Normal or Treasure tournament.
 The shared **player rail** (`shared/PlayerRail.tsx`) lists every player at the side of the screen:
 lives, best tier and score (during the damage check: damage, highest first). Click or tap a row
 (or Tab to it and press Enter) to view that board, read-only: a "Watching X · Back to my board"
-banner appears (Escape also goes back), squares only select on your own board, and your dock still
-builds on yours. Rows of boards still fighting the current wave glow.
+banner appears (Escape also goes back). The HUD is the same one, showing **their** board: the bar
+has their gold and lives, the quest column their quests and progress, and the dock turns read-only
+(Board details, their builder level, their Odds, whether they are building, ready or fighting). The
+**Board** panel lists everything on that board: gold, lives, score, waves, best tier, merges, the
+builder level and odds, the five tower families with how many towers and the best tier of each (the
+game's equivalent of traits), every tower grouped by tier, free towers waiting, and the quests. Tap
+one of their towers for its sheet (read-only: no Merge or Sell). Nothing acts while you look (no
+buttons, no shortcuts) until you go back to your own board. An online spectator following a seat sees
+the same read-only HUD. Rows of boards still fighting the current wave glow.
 
 At 0 lives a board is out: its enemies vanish, its towers stay. You are **not** moved anywhere: a
-popup offers **Watch other players** or **Dismiss**. Watching puts **‹ ›** in the banner to cycle
+popup offers **Watch other players** or **Dismiss**. The knocked-out bar keeps a **Board** button
+for the board on show. Watching puts **‹ ›** in the banner to cycle
 through the boards still in; the rail works too. Once **every** human is out, the knocked-out bar
 also offers **×1 / ×2 / ×4**: the rules themselves run 1, 2 or 4 sub-steps per step (a `speed`
 input, accepted only from a human and only then), so it stays deterministic and works the same on
@@ -312,10 +330,15 @@ On a phone a square is small (about 28 px in portrait at the fitted zoom): below
 squares **only select** (a wrong tap just selects another square, and is undone by Close), and every
 action that changes the board is a **≥ 56 px button** in the sheet that opens for the selected
 square: *Build here*, *Merge tier N at B3* (up to three partner choices), *Sell* and *Close*. The
-selected square has a white ring and its same-tier partners glow gold, so tapping a glowing partner
-(or dragging onto it) also merges; those are shortcuts, never the only way. Portrait puts the sheet
-above the dock at full width and the board moves up into the space above it; landscape puts the
-sheet over the quest strip. The dock (Build, Builder, Odds, Next wave) is at the bottom in portrait,
+selected square has a white ring and its same-tier partners glow gold. With a mouse, clicking a
+glowing partner (or dragging onto it) also merges; on touch it only selects the pair (see Merge).
+The sheet is a **floating popover** (`shared/popover.ts`, pure and unit-tested): it sits beside its
+square (above or below it in portrait, left or right in landscape and on desktop), clamped inside
+the board's space (in phone landscape also over the quest strip; never over the bar, the player rail or the dock,
+which stay reachable; panels such as Odds open above it), and follows the square when the board is
+panned. Nothing else moves: the board, the
+columns and the dock keep their places (the browser test compares their boxes). With a mouse,
+resting on a tower shows the same facts as a floating tip. The dock (Build, Builder, Odds, Next wave) is at the bottom in portrait,
 in thumb reach, and at the right in landscape. Prices on the dock and in the sheet use the top
 bar's coin and Fredoka 17 px figure. Keyboard: arrows move a cursor, Enter selects or merges, B
 builds, U levels the builder, M automatically merges a same-tier pair without selection, Q sells,

@@ -136,6 +136,10 @@ holds them with stun. These are strategic options, not established optimal build
 
 ## HUD (presentation only)
 
+- **Coins:** shown with the game's coin mark (the brass cog of the Hub's wallet and shop prices,
+  `CogIcon`): a large purse counter at the top of the shop's actions (beside them on phones), on
+  every shop price, on Reroll and Sell, on the drop-to-sell target, in the banner, and in the
+  read-only view of another squad.
 - **Shop dock:** the five offers always fit side by side with no sideways scrolling (upright cards
   on phone portrait, compact rows in landscape). A card shows a small picture of the toy, name,
   cost, rarity colour, both trait symbols, a star if the toy is a handbook favourite, and the
@@ -162,8 +166,14 @@ holds them with stun. These are strategic options, not established optimal build
   build, players still building glow. Tap or click a row (or Tab and Enter) to view that player's
   board, read-only: their deployed toys and reserves while building, their battle, damage numbers,
   effects and damage overview while fighting. "Watching X · Back to my board" (or Escape) returns.
-  Your shop, Reroll and Ready keep working while you look; dragging and F/arrow placement only
-  work on your own board. It replaces the old standings box, which covered the board on phones.
+  The HUD shows **their** picture (owner request, 20 Nov 2026): the trait column is their traits
+  (tap one: their progress), the banner their level, points, coins and passives, and in the shop
+  dock's place a read-only panel with their level, coins, board count, ready state, the three
+  run-wide passives they chose (their build) and every toy on their board and reserves with stars
+  (tap one, here or on the board, for its kit). Their shop stays private. **Nothing acts while you
+  look**: no shop, Reroll, Sell, Ready, drags or shortcuts until you go back to your own board (a
+  passive choice brings you back on its own). An online spectator following a seat sees the same
+  read-only HUD. Toy Squad has no quests. It replaces the old standings box, which covered the board on phones.
   On phones the camera frames the board in the space left of the rail. Online, the server is told
   whose board you are viewing (the lobby `watch` message, for a seated player) and adds that
   board's battle to your snapshots; shops and passive offers stay private.

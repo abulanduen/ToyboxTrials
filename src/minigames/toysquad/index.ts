@@ -2,7 +2,8 @@ import { HUB_BINDINGS, type Action } from '../../game/input';
 import type { MinigameModule } from '../types';
 import { squadRules, type SquadInput, type SquadState } from './rules';
 import { createSquadBot } from './bot';
-import { drainSquadInput, getLocalPlayer, useSquadUI } from './local';
+import { drainSquadInput, getLocalPlayer, useSquadUI, viewedSquad } from './local';
+import { getMatchState } from '../session';
 import { stepCell } from './board';
 import { SquadScene } from './Scene';
 import { SquadHud } from './Hud';
@@ -16,6 +17,9 @@ const game: MinigameModule<SquadState, SquadInput> = {
     const inputs = drainSquadInput(), me = getLocalPlayer();
     // A pending passive choice comes first: nothing else is accepted until it is made.
     if (me?.passiveOffers.length) return inputs.filter(i => i.type === 'passive');
+    // Looking at someone else's board is read-only: no shortcut acts until you are back on yours.
+    const s = getMatchState() as SquadState | null, watched = useSquadUI.getState().watching;
+    if (watched && me && s?.kind === 'toy-squad' && viewedSquad(s.players, me.id, watched) !== me.id) return [];
     for (const action of presses) {
       const ui = useSquadUI.getState(), unit = ui.hovered ?? ui.selected, step = ui.watching ? undefined : STEPS[action];
       if (action === 'slot1' && unit !== null) inputs.push({ type: 'sell', unit });

@@ -412,7 +412,13 @@ online"). The other choice in both places is the existing **practice with bots**
 - **Blink Duel, Spellbox, Hoop Hustle:** other players' queued inputs (`pending`) are not sent.
 - **Hoop Hustle:** the seed (it deals every toy's next spot) is not sent.
 - **Toy Squad:** you get your own shop, passive offers and battle; other players' shops and
-  offers are blanked and their battles are not sent.
+  offers are blanked and their battles are not sent (except the one board you are viewing, whose
+  battle is added).
+- **Public on purpose** (what a player has on their board, so the player rail can show anyone's
+  whole picture): Toy Squad squads (units on the board and reserves, hence traits), chosen
+  passives, level, coins, points, wins and last result; Toy Tower Tumble boards (towers, gold,
+  lives, builder level, quests and progress, gifts waiting, score). Unit tests:
+  `tests/unit/board-views.test.ts`.
 - Inferno Escape, Wind-Up Dash and Music Box Rhythm have nothing hidden (the course and chart are
   what everyone plays). Find the Original's real Baldwyn is not a stored secret: it is whichever
   toy matches the card everyone sees. Likewise Odd Page Out's differences are drawn on the two

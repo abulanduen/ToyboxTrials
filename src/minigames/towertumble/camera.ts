@@ -8,3 +8,9 @@ import { PanZoom } from '../shared/panZoom';
 import { CELL } from './space';
 
 export const tumbleView = new PanZoom({ minZoom: 1, maxZoom: 3.2, panX: CELL * 4, panZ: CELL * 4 });
+
+/**
+ * Screen box (client pixels) of a board square and the tower standing on it, for the HUD's floating
+ * popovers. Set by the Scene while it is mounted (it owns the camera); null otherwise.
+ */
+export const tumbleScreen: { cellRect: ((cell: number) => { left: number; top: number; right: number; bottom: number } | null) | null } = { cellRect: null };
