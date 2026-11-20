@@ -44,6 +44,8 @@ you until you're back ("in the Workshop" and "at the Odds & Ends shop" work the 
 | `src/character/RemotePlayers.tsx` | Remote toys: `WindupBot` with each player's paint, hat, key and accessories, DOM name tags. |
 | `src/game/cosmetics.ts`, `src/game/emotes.ts` | The shared cosmetics catalogue and gesture list. The server validates looks and emotes against them (docs/ECONOMY.md). |
 | `src/ui/OnlineUI.tsx` | Play online sheet, HUD chip, touch Emote menu. |
+| `server/voiceRelay.ts`, `src/net/voicePlan.ts`, `src/net/voiceConfig.ts` | Voice chat, the pure parts: mic states and the handshake relay's checks (server), who links to whom and the distance/stereo shaping (client), ICE servers. |
+| `src/net/voiceChat.ts`, `src/character/VoiceProximity.tsx`, `src/ui/VoiceUI.tsx` | Voice chat in the browser: microphone, WebRTC links, Web Audio playback; the frame loop that feeds it positions; the mic button, name-tag marks and the pause menu's Voice chat section. |
 | `src/game/hubPlay.ts`, `src/game/hubPlaySim.ts`, `src/game/hubSolids.ts` | Hub play (the shared marble, football nets, basketball hoop): where things are, the **pure physics** both sides run, and the hub's solid props as data (generated from the layout). |
 | `src/hubplay/runtime.ts`, `src/scene/HubPlay.tsx`, `src/ui/HubPlayHud.tsx` | Hub play in the browser: offline physics or the server's state (interpolated), controls, sounds, celebrations; the 3D objects; the score chip and throw meter. |
 | `server/hubChat.ts` | **Pure** per-room text chat and Who Am I? cards: cleaning, rate limits, the word filter, dealing, guessing, per-recipient messages (owned by `hubRoom.ts`). |
@@ -198,13 +200,84 @@ Who Am I? needs other players.
   wearing one says so.
 - **Privacy:** the holder's own word is never in any message sent to them while the card is on
   (unit test `tests/unit/hub-chat.test.ts`, and the browser test checks every message A received).
+### Proximity voice chat (optional)
+
+Players can talk to the toys near them in any Hub room (public or private). It is optional and
+Hub-only, and the microphone is never asked for until the player presses the mic button or V.
+
+- **Controls.** The mic button sits at the top right of the Hub HUD while online (desktop: in the
+  corner, with a small V key cap in push-to-talk mode; touch: left of the gear button). Settings:
+  **Hear voice chat** (on by default), **Voice chat volume** (separate from "Voice volume", which is
+  Pipwick's lines; both are multiplied by the master volume) and **Mic mode**:
+  - *Push to talk (V)*, the default: hold V (desktop) or hold the mic button (touch, or a mouse)
+    to talk. A tap with no hold sends a fraction of a second at most and toggles nothing.
+  - *Always on*: the mic button (or V) switches the mic on and off.
+
+  The first press in either mode only asks for the microphone; in push to talk the next hold
+  talks. A refused permission shows a ticket explaining how to allow it, and the button stays
+  usable to try again. In push to talk the microphone stays open (the browser shows its recording
+  indicator) but sends silence until you hold the key; **Turn my mic off** in the pause menu closes it.
+  The mic closes by itself on entering a trial, the Workshop or the shop, on the main menu, and
+  when the connection drops; it is never on at the start of a session. V goes through the shared
+  input layer (`talk`, a Hub-only action like the emotes, so it never reaches a minigame), and is
+  ignored while typing in a text box.
+- **Who hears whom.** Listening is on by default: anyone whose mic is on can be heard by players
+  near them unless those players mute them or switch hearing off. A listener links to a speaker who
+  comes within **45 cm** and lets go beyond **60 cm** (hysteresis), keeping the nearest **6**
+  speakers; a speaker sends to its nearest **8** listeners (within 60 cm plus 15 cm of slack, since
+  the two see each other ~100 ms apart). Up to two new links start every 300 ms; a link that hasn't
+  connected in 15 s is given up and retried after 10 s; a speaker who is full answers `bye` and is
+  asked again after 6 s. The rules are the pure `src/net/voicePlan.ts` (unit-tested).
+- **Links.** Each link is one-way WebRTC audio (Opus where the browser lets us choose), speaker →
+  listener, and the listener starts it with a receive-only transceiver, so **hearing needs no
+  microphone and no permission**. The speaker answers by putting its one microphone track on the
+  link (echo cancellation, noise suppression and auto gain requested). Audio goes directly between
+  the two browsers; the server only relays the handshake.
+- **Playback.** Each voice goes through Web Audio: an analyser (the speaking ring on that player's
+  name tag), a gain that is full up to 12 cm and eases to silence at 60 cm, a stereo pan from the
+  direction relative to the camera, then the voice chat bus (master × Voice chat volume, 0 with
+  hearing off) into the shared output stage of `src/game/audio.ts`. It respects the audio unlock:
+  until the first tap or click there is no sound. These are updated every frame from plain objects,
+  never React state. (Chrome only feeds a remote WebRTC stream into Web Audio while a media element
+  plays it, so each voice also has a muted `<audio>` element.)
+- **Mute.** The pause menu's **Voice chat** section lists the players whose mic is on (nearest first)
+  with Mute / Unmute; muting closes that player's link and doesn't ask for it again. Mutes last for
+  the session (player ids are per room). Name tags show a mic mark while that player's mic is on,
+  a ring that grows with their voice level (measured on your side) and a slash when you muted them.
+  Your own level shows on the mic button.
+- **Server checks** (`server/voiceRelay.ts`, called by `hubRoom.ts`): a `sig` is relayed only
+  between two players **of the same room** (ids are per room, so it can't cross rooms), never to
+  yourself, only when both are connected and walking the Hub (not in a trial, the Workshop or the
+  shop; a `bye` always passes), an offer only to a player whose mic is on and an answer only from
+  one. Each player gets a signalling budget of 80 messages in a burst, refilled at 25 a second;
+  mic changes 6 in a burst, 1 a second (a refused change is answered with the real state). Shapes
+  and sizes are checked by the protocol: SDP at most 6000 characters and starting `v=0`, at most 8
+  candidates per message of at most 512 characters, link ids positive integers. A `sig` frame may
+  be up to **8 KB**; every other message keeps the 2 KB limit. The server turns a player's mic off
+  when they disconnect or start an activity, and tells the room.
+- **ICE servers.** `VITE_ICE_SERVERS` (JSON, the `RTCIceServer` shape, baked in at build time)
+  configures STUN/TURN, e.g. `[{"urls":"stun:stun.example.org:3478"},{"urls":"turns:turn.example.org:5349","username":"u","credential":"p"}]`;
+  `[]` means none (same network only). The default is one public STUN server
+  (`stun:stun.l.google.com:19302`) and **no TURN**. Some networks (strict NATs, many company and
+  school networks, some mobile carriers) block direct connections: players there need a TURN relay,
+  which has to be run or rented and configured here. TURN credentials in a static build are visible
+  to anyone who opens it, so use short-lived or restricted credentials.
+
+**Voice chat privacy and safety.**
+- STUN shares each player's public IP address with the STUN provider, and a peer-to-peer link shows
+  each player's IP address (public, and on the same network local) to the players they talk to.
+  The pause menu says so. A TURN relay would hide it from peers but not from the relay.
+- The server never receives audio and logs nothing about voice. Nothing is recorded anywhere.
+- No moderation beyond per-player mute and switching hearing off: no reporting, no blocking across
+  sessions, no age gate. Anyone in a public Hub can talk to players standing near them.
 
 ### Reconnects and limits
 
 - The welcome message carries a secret resume token. If a connection drops, the player's slot is
   held for 30 s, and others see "reconnecting…". The client retries with backoff and gets the
   same room, slot and player id back. The client also treats 6 s without any message as a drop.
-- Messages over 2 KB close the socket. Each connection may send 45 messages a second, in bursts of
+- Messages over 2 KB are refused (`bad_request`), except voice handshakes (`sig`, up to 8 KB);
+  frames over 8 KB close the socket. Each connection may send 45 messages a second, in bursts of
   60 (match inputs go out about 30 times a second); persistent flooding closes it. The server pings every 10 s and drops sockets that miss
   three pings in a row (about 30 s; a busy phone can stop reading its socket for a few seconds). A socket that hasn't joined a room within 10 s is closed. The server turns players away
   above 1000 connected (`server_full`).
@@ -334,8 +407,9 @@ online"). The other choice in both places is the existing **practice with bots**
 - **In the game:** the Hub Scoreboard panel shows the top ten per format above your local records
   (which stay on this device), and the TV beside it has a "Leaderboard" channel (Blitz).
 
-## Protocol (version 5)
+## Protocol (version 6)
 
+Version 6 (voice chat): adds `mic`, `mics` and `sig`, and allows `sig` frames up to 8 KB.
 Version 5 (chat and Who Am I?): adds `chat` (both ways), `chatNote`, `card` (both ways) and `cards`.
 Version 4 (hub play): adds `kick`, `ball` and the test-only `hpdebug`, the snapshot's `hp` and the
 `play` events. Version 3 (lobbies): adds the lobby, match and account-link messages below. Version 2 (the shop)
@@ -364,6 +438,8 @@ Client → server:
 | `hpdebug` | `x, z` | Test servers only (`MATCH_DEBUG=1`): put the marble at (x, z). |
 | `chat` | `text` (at most 300 characters as sent) | Say something in the room (v5). Cleaned to at most 120 characters, filtered, rate-limited (3, then 1 per 1.5 s). |
 | `card` | `a`: `deal` or `peel` | Who Am I? at the suspicious box (v5): ask for a card, or give up on yours. |
+| `mic` | `on` (boolean) | Voice chat (v6): my mic is on (willing to send) or off. Refused outside the Hub; 6 in a burst, 1 a second. |
+| `sig` | `to` (player id), `c` (link id, positive integer chosen by the listener), `s` (1 = sent by the link's speaker side, 0 = listener side), `k`: `offer` (s 0, `d` SDP) / `answer` (s 1, `d` SDP) / `ice` (`d`: 1–8 `{c, m, i}` candidates) / `bye` | WebRTC handshake for one voice link (v6). Relayed only to a connected player in the same room, both in the Hub; offers only to a player whose mic is on, answers only from one. SDP ≤ 6000 characters; up to 8 KB per frame. |
 
 Server → client: `welcome` (your id, resume token, room, roster, spawn point, server time),
 `joined`, `left`, `room` (host changed), `snap` (`now`, players: `id x y z r s g e es a off`, and
@@ -387,6 +463,10 @@ started hosting), `lobby` (your lobby: members, settings, and the running match'
 tournament table and result; `null` with a reason when you left, were kicked or it closed),
 `lobbyErr` (a refused action, with player-facing text), and `ms` (match state: `m` sequence, `k`
 1 = keyframe / 0 = patch, `d` data, `e` events, `n` server time).
+
+Voice chat (v6): `mic` (`id`, `on`: a player's mic changed; sent to the others, and to the player
+only when the server overrode them), `mics` (`on`: the ids whose mic is on, sent right after
+`welcome` when there are any), and `sig` (`from`, set by the server, plus `c`, `s`, `k`, `d` as sent).
 
 ## Optional accounts
 
@@ -516,6 +596,8 @@ BASE_URL=http://localhost:4190/ node tests/e2e/online.cjs   # starts the server 
 # (SKIP_HUBPLAY=1 skips the long marble/basketball part; chat and Who Am I? always run)
 # the phone chat sheet and Who Am I? chip: a plain build for BASE_URL plus this online build
 BASE_URL=http://localhost:4173/ CHAT_BASE_URL=http://localhost:4190/ CHAT_SERVER_PORT=2567 node tests/e2e/mobile.cjs
+ONLY=voice BASE_URL=http://localhost:4190/ node tests/e2e/online.cjs   # just the raw-socket and voice chat checks (fake microphone, two pages)
+BASE_URL=http://localhost:4190/ node tests/e2e/mobile.cjs   # with this online build it also checks the phone mic button (starts the server)
 # accounts: the client build must point at port 2570
 VITE_SERVER_URL=ws://localhost:2570 npx vite build --outDir /tmp/acct-dist
 npx vite preview --outDir /tmp/acct-dist --port 4198 --strictPort &
@@ -613,6 +695,16 @@ Railway pushes a new server on every commit to the branch it watches. The client
   readers, and how readable the card is on real phone screens. The anti-spoiler mask catches the
   answer, its aliases, plurals and spelled-out letters, not paraphrases or other languages. The
   cog reward is client-side like all rewards, so a modified client could award itself.
+- No text chat, moderation, reporting or blocking. Nickname filtering is a short word list.
+- **Voice chat was tested in this container only**: unit tests, and headless Chromium pages on one
+  machine with Chromium's fake microphone (a beeping tone) against the built server on localhost,
+  where every link connects over local host candidates. **Not verified:** real devices (iOS Safari
+  and Android Chrome in particular, including Web Audio playback of WebRTC streams and the
+  permission prompts), real networks across NATs (how often STUN alone is enough, and when a TURN
+  relay is needed), echo cancellation quality with speakers rather than headphones (whether the
+  browser's echo canceller removes voices played through Web Audio varies by platform), audio
+  quality and latency, CPU and battery cost on phones with several links, and Firefox or Safari at
+  all. No TURN server is configured.
 - Unlock state and the cog wallet are client-side, so a modified client could wear a cosmetic or
   play a gesture it hasn't bought. Only catalogue ids are accepted. Accounts save the profile but
   don't make it trustworthy: the wallet has only a soft cap (docs/ECONOMY.md).

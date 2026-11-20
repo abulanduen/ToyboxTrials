@@ -35,6 +35,7 @@ import { accountToken } from './account';
 import { onHubPlayEvents, onHubPlaySnap, setHubPlayOnline } from '../hubplay/runtime';
 import { onCard, onCards, onChat, onChatNote, resetChat, useChat } from './chat';
 import { DEBUG } from '../game/debug';
+import { installVoice, onVoiceMic, onVoiceMics, onVoiceSignal } from './voiceChat';
 
 /** Give up on a room that hasn't welcomed us by then. */
 const WELCOME_TIMEOUT_MS = 12_000;
@@ -341,6 +342,10 @@ const handlers: { [K in ServerMsg['t']]: (m: Extract<ServerMsg, { t: K }>) => vo
   chatNote: onChatNote,
   card: onCard,
   cards: onCards,
+  // proximity voice chat (v6)
+  mic: onVoiceMic,
+  mics: onVoiceMics,
+  sig: onVoiceSignal,
 };
 
 // ---------------------------------------------------------------- outgoing intent
@@ -398,6 +403,7 @@ let installed = false;
 export function installNet() {
   if (installed) return;
   installed = true;
+  installVoice();
   netLink.send = (msg) => {
     if (useNet.getState().status === 'online') send(msg);
   };

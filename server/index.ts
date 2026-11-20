@@ -23,7 +23,7 @@
 import { createServer } from 'node:http';
 import { randomInt } from 'node:crypto';
 import { WebSocketServer, type WebSocket } from 'ws';
-import { MATCH_TICK_HZ, MAX_MESSAGE_BYTES, PROTOCOL_VERSION, SNAPSHOT_HZ, parseClientMessage } from '../src/net/protocol';
+import { MATCH_TICK_HZ, MAX_SIGNAL_BYTES, PROTOCOL_VERSION, SNAPSHOT_HZ, parseClientMessage } from '../src/net/protocol';
 import type { LeaderboardResult } from '../src/net/leaderboardProtocol';
 import { CLOSE, type Outgoing } from './hubRoom';
 import { HubDirectory } from './hubDirectory';
@@ -155,7 +155,8 @@ const http = createServer((req, res) => {
 });
 
 // ---------------------------------------------------------------- WebSocket upgrade
-const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_MESSAGE_BYTES, perMessageDeflate: false });
+// Frames up to MAX_SIGNAL_BYTES (voice handshakes carry SDP); the parser holds every other message to MAX_MESSAGE_BYTES.
+const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_SIGNAL_BYTES, perMessageDeflate: false });
 
 http.on('upgrade', (req, socket, head) => {
   const refuse = (status: string) => {

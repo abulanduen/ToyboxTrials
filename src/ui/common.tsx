@@ -132,10 +132,37 @@ export function SettingsForm() {
         </label>
       )}
       {onlineAvailable() && (
-        <label className="setting setting--check">
-          <input type="checkbox" checked={s.textChat} onChange={(e) => s.set({ textChat: e.target.checked })} data-testid="setting-text-chat" />
-          <span>Text chat (online Hub)</span>
-        </label>
+        <>
+          <label className="setting setting--check">
+            <input type="checkbox" checked={s.textChat} onChange={(e) => s.set({ textChat: e.target.checked })} data-testid="setting-text-chat" />
+            <span>Text chat (online Hub)</span>
+          </label>
+          {/* Proximity voice chat (src/net/voiceChat.ts): hearing on by default, the mic only on request. */}
+          <label className="setting setting--check">
+            <input type="checkbox" checked={s.voiceHear} onChange={(e) => s.set({ voiceHear: e.target.checked })} data-testid="setting-voice-hear" />
+            <span>Hear voice chat</span>
+          </label>
+          <Slider label="Voice chat volume" value={s.voiceChatVolume} onChange={(v) => s.set({ voiceChatVolume: v })} testId="setting-voice-chat" />
+          <div className="setting">
+            <span>Mic mode</span>
+            <div className="segmented" data-testid="setting-mic-mode">
+              {(['ptt', 'open'] as const).map((m) => (
+                <button
+                  key={m}
+                  className={s.micMode === m ? 'on' : ''}
+                  data-mode={m}
+                  aria-pressed={s.micMode === m}
+                  onClick={() => {
+                    sfx.click();
+                    s.set({ micMode: m });
+                  }}
+                >
+                  {m === 'ptt' ? (s.touchUI ? 'Push to talk' : 'Push to talk (V)') : 'Always on'}
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

@@ -47,10 +47,12 @@ import {
   type PlayerState,
   type RoomInfo,
   type ServerMsg,
+  type SignalMsg,
 } from '../src/net/protocol';
 import { sanitizeLook, sanitizeNickname, uniqueName, type CleanLook } from './sanitize';
 import { LobbyBoard, type LobbyOut, type LobbyPlayer } from './lobby';
 import { HubChat, type ChatPlayer } from './hubChat';
+import { VoiceRelay, type VoicePeerView } from './voiceRelay';
 import type { LeaderboardResult } from '../src/net/leaderboardProtocol';
 
 /**
@@ -172,6 +174,8 @@ export class HubRoom {
   private readonly matchDebug: boolean;
   /** Text chat and Who Am I? cards (hubChat.ts). */
   private readonly chat: HubChat;
+  /** Proximity voice chat: mic states and the WebRTC handshake relay (voiceRelay.ts). */
+  private readonly voice = new VoiceRelay();
 
   /** Throws for an id that is neither `public-<n>` nor a valid room code. */
   constructor(opts: RoomOptions) {
@@ -233,6 +237,10 @@ export class HubRoom {
   get hubPlay(): Readonly<HubPlayState> {
     return this.play;
   }
+  /** Voice chat state (tests). */
+  get voiceRelay(): VoiceRelay {
+    return this.voice;
+  }
   /** Is this resume token one of this room's players? */
   hasToken(token: string) {
     return this.byToken.has(token);
@@ -258,7 +266,7 @@ export class HubRoom {
     p.emote = null;
     this.letGoOfBall(p, now);
     this.updateEmpty(now);
-    return [...this.fromLobby(this.lobbies.playerDropped(p.id, now)), ...this.fromLobby(this.chat.drop(this.chatPlayer(p)))];
+    return [...this.micForcedOff(p), ...this.fromLobby(this.lobbies.playerDropped(p.id, now)), ...this.fromLobby(this.chat.drop(this.chatPlayer(p)))];
   }
 
   /** Link a signed-in account (the socket layer has checked the token). */
@@ -289,13 +297,18 @@ export class HubRoom {
         if (msg.a) {
           p.speed = 0;
           this.letGoOfBall(p, now);
-          return this.fromLobby(this.chat.drop(this.chatPlayer(p)));
+          // voice is Hub-only; a Who Am I? card falls off too
+          return [...this.micForcedOff(p), ...this.fromLobby(this.chat.drop(this.chatPlayer(p)))];
         }
         return [];
       case 'chat':
         return this.fromLobby(this.chat.say(this.chatPlayer(p), msg.text, now));
       case 'card':
         return this.fromLobby(msg.a === 'deal' ? this.chat.deal(this.chatPlayer(p), now) : this.chat.peel(this.chatPlayer(p)));
+      case 'mic':
+        return this.setMic(p, msg.on, now);
+      case 'sig':
+        return this.relaySignal(p, msg, now);
       case 'kick':
         return this.kick(p, msg, now);
       case 'ball':
@@ -425,7 +438,7 @@ export class HubRoom {
     if (this.kind === 'private' && !this.host) this.host = p.id;
     this.emptySince = null;
 
-    const out: Outgoing[] = [this.welcome(p, false, now), ...this.cardsFor(p)];
+    const out: Outgoing[] = [this.welcome(p, false, now), ...this.cardsFor(p), ...this.micList(p)];
     if (others.length) out.push({ kind: 'send', to: others, msg: { t: 'joined', player: this.playerInfo(p) } });
     out.push(...this.fromLobby(this.lobbies.playerArrived(this.lobbyPlayer(p), now)));
     return out;
@@ -438,7 +451,7 @@ export class HubRoom {
     p.budgetAt = now;
     this.byConn.set(conn, p);
     this.emptySince = null;
-    return [this.welcome(p, true, now), ...this.cardsFor(p), ...this.fromLobby(this.lobbies.playerArrived(this.lobbyPlayer(p), now))];
+    return [this.welcome(p, true, now), ...this.cardsFor(p), ...this.micList(p), ...this.fromLobby(this.lobbies.playerArrived(this.lobbyPlayer(p), now))];
   }
 
   private refuse(conn: string, code: ErrorCode): Outgoing[] {
@@ -519,6 +532,7 @@ export class HubRoom {
   private removePlayer(p: Player, now: number): Outgoing[] {
     if (!this.players.has(p.id)) return [];
     this.letGoOfBall(p, now);
+    this.voice.remove(p.id); // the others drop their links on `left`
     this.players.delete(p.id);
     if (p.conn) this.byConn.delete(p.conn);
     p.conn = null;
@@ -539,6 +553,7 @@ export class HubRoom {
   private closeRoom() {
     this.lobbies.clear();
     this.chat.clear();
+    this.voice.clear();
     this.players.clear();
     this.byConn.clear();
     this.byToken.clear();
@@ -624,6 +639,41 @@ export class HubRoom {
       s: [this.play.score[0], this.play.score[1]],
       k: this.play.hoops,
     };
+  }
+
+  // ------------------------------------------------------------ proximity voice chat (voiceRelay.ts)
+  private voicePeer(p: Player): VoicePeerView {
+    return { id: p.id, connected: p.conn !== null, inHub: p.activity === null };
+  }
+
+  /** Mic on/off: the others hear of a change; a refused one tells the sender how things stand. */
+  private setMic(p: Player, on: boolean, now: number): Outgoing[] {
+    const v = this.voice.setMic(this.voicePeer(p), on, now);
+    if (!v.ok) return [{ kind: 'send', to: [p.conn!], msg: { t: 'mic', id: p.id, on: v.on } }];
+    const others = this.conns(p);
+    return v.changed && others.length ? [{ kind: 'send', to: others, msg: { t: 'mic', id: p.id, on } }] : [];
+  }
+
+  /** The room turns a mic off (disconnect, a trial, the Workshop): everyone is told, the player too. */
+  private micForcedOff(p: Player): Outgoing[] {
+    if (!this.voice.forceOff(p.id)) return [];
+    const to = this.conns();
+    return to.length ? [{ kind: 'send', to, msg: { t: 'mic', id: p.id, on: false } }] : [];
+  }
+
+  /** Who has their mic on, for a player who has just (re)joined (nothing when nobody has). */
+  private micList(p: Player): Outgoing[] {
+    const on = this.voice.list();
+    return on.length && p.conn ? [{ kind: 'send', to: [p.conn], msg: { t: 'mics', on } }] : [];
+  }
+
+  /** Relay a WebRTC handshake message to another player of this room, if allowed (see voiceRelay.ts). */
+  private relaySignal(p: Player, m: SignalMsg, now: number): Outgoing[] {
+    const target = this.players.get(m.to);
+    const v = this.voice.checkSignal(this.voicePeer(p), target ? this.voicePeer(target) : null, m, now);
+    if (!v.ok || !target?.conn) return [];
+    const msg: ServerMsg = { t: 'sig', from: p.id, c: m.c, s: m.s, k: m.k, ...(m.d !== undefined ? { d: m.d } : {}) };
+    return [{ kind: 'send', to: [target.conn], msg }];
   }
 
   // ------------------------------------------------------------ message builders

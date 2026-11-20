@@ -2,8 +2,15 @@
    Run: BASE_URL=http://localhost:4173/ node tests/e2e/mobile.cjs
    The online Hub chat sheet (portrait and landscape) also runs when CHAT_BASE_URL points at a
    preview of a build made with VITE_SERVER_URL=ws://localhost:<CHAT_SERVER_PORT> (default 2567);
-   it starts server-dist/index.cjs itself (npm run server:build first). */
+   it starts server-dist/index.cjs itself (npm run server:build first).
+
+   Voice chat's mic button: absent offline (always checked). With a build that has a server
+   (VITE_SERVER_URL=ws://localhost:<port>) and `npm run server:build` done, the suite also starts that
+   server, joins the public Hub on a phone and checks the mic button in portrait and landscape
+   (≥ 56 px, top right, clear of the other HUD controls), and that it asks for the microphone only
+   when pressed. Offline builds skip that part (and say so). ONLY=voice runs just that part. */
 const { chromium, devices } = require('playwright');
+const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const OUT = process.env.OUT_DIR || path.join(__dirname, 'output');
@@ -13,8 +20,16 @@ const res = [];
 const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? '  — ' + d : ''}`);
 
 (async () => {
-  const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+  // fake microphone, granted without a prompt (only the online voice part uses it)
+  const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] });
   const phone = devices['Pixel 7'];
+  if (process.env.ONLY === 'voice') {
+    // just the voice chat part (see the header)
+    await voiceMicOnline(browser, phone);
+    console.log(res.join('\n'));
+    await browser.close();
+    return;
+  }
   const ctx = await browser.newContext({ ...phone, viewport: { width: 915, height: 412 }, screen: { width: 915, height: 412 } });
   const page = await ctx.newPage();
   page.setDefaultTimeout(+process.env.E2E_TIMEOUT || 120000);
@@ -26,7 +41,7 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
   const st = () => page.evaluate(() => window.__toybox.state());
 
   // Pipwick's first-visit Hub tour has its own suite (welcome.cjs); this one starts as a returning player.
-  await page.addInitScript(() => { if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { tourSeen: true }, version: 2 })); } });
+  await page.addInitScript(() => { if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { tourSeen: true, autoOnline: false }, version: 2 })); } });
   await page.goto(BASE + '?debug');
   await page.waitForTimeout(4000);
   check('main menu shows on touch device', await page.isVisible('[data-testid=menu-play]'));
@@ -35,6 +50,7 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
   await page.waitForTimeout(2500);
   check('touch controls visible in hub', await page.isVisible('.touch-stick-zone'));
   check('keyboard controls card hidden on touch', !(await page.isVisible('.controls')));
+  check('voice chat: no mic button while offline', (await page.$('[data-testid=voice-mic]')) === null);
   await page.screenshot({ path: `${OUT}/mobile-01-hub-landscape.png` });
 
   // Joystick: thumb down in the left zone, push up (forward), hold.
@@ -305,6 +321,8 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
   check('menu → Workshop works (portrait)', await page.isVisible('.workshop-panel'));
   await page.screenshot({ path: `${OUT}/mobile-08-workshop-portrait.png` });
 
+  await voiceMicOnline(browser, phone);
+
   check('no console/page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
 
   // ---------------------------------------------------------------- online Hub chat sheet (phone)
@@ -392,3 +410,70 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
   console.log(res.join('\n'));
   await browser.close();
 })().catch(e => { console.log(res.join('\n')); console.error(e); process.exitCode = 1; });
+
+/** Voice chat's mic button on a phone in the online Hub (needs an online build and server-dist; see the header). */
+async function voiceMicOnline(browser, phone) {
+  const probe = await browser.newPage();
+  await probe.goto(BASE + '?debug');
+  const url = await probe.waitForFunction(() => window.__toybox?.net?.serverUrl !== undefined, null, { timeout: 120000 }).then(() => probe.evaluate(() => window.__toybox.net.serverUrl())).catch(() => null);
+  await probe.close();
+  const m = /^ws:\/\/localhost:(\d+)$/.exec(url || '');
+  const dist = path.join(__dirname, '../../server-dist/index.cjs');
+  if (!m || !fs.existsSync(dist)) {
+    console.log(`(voice chat online layout skipped: ${m ? 'no server-dist (npm run server:build)' : 'this build has no local VITE_SERVER_URL'})`);
+    return;
+  }
+  const port = m[1];
+  const up = () => fetch(`http://localhost:${port}/health`).then((r) => r.ok).catch(() => false);
+  let server = null;
+  if (!(await up())) {
+    server = spawn(process.execPath, [dist], { env: { ...process.env, PORT: port }, stdio: 'ignore' });
+    for (let i = 0; i < 100 && !(await up()); i++) await new Promise((r) => setTimeout(r, 100));
+  }
+  const errs = [];
+  const ctx = await browser.newContext({ ...phone, viewport: { width: 412, height: 915 }, screen: { width: 412, height: 915 } });
+  await ctx.addInitScript(() => {
+    window.__gum = 0;
+    const md = navigator.mediaDevices;
+    if (md && md.getUserMedia) {
+      const real = md.getUserMedia.bind(md);
+      md.getUserMedia = (c) => { window.__gum++; return real(c); };
+    }
+    try {
+      if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { tourSeen: true, contenderName: 'Phone' }, version: 2 })); }
+    } catch { /* about:blank has no storage */ }
+  });
+  const p = await ctx.newPage();
+  p.setDefaultTimeout(+process.env.E2E_TIMEOUT || 120000);
+  p.on('pageerror', (e) => errs.push(e.message));
+  p.on('console', (c) => { if (c.type() === 'error') errs.push(c.text()); });
+  try {
+    await p.goto(BASE + '?debug');
+    await p.waitForSelector('.loading', { state: 'detached', timeout: 600000 });
+    await p.tap('[data-testid=menu-play]');
+    await p.waitForFunction(() => window.__toybox.net.status() === 'online', null, { timeout: 120000, polling: 250 }).catch(() => null);
+    check('voice chat: the phone joins the online Hub on its own', (await p.evaluate(() => window.__toybox.net.status())) === 'online');
+    const measure = async (w, h, label, file) => {
+      await p.setViewportSize({ width: w, height: h });
+      await p.waitForTimeout(1200);
+      const mb = await p.$eval('[data-testid=voice-mic]', (e) => { const r = e.getBoundingClientRect(); return { x: r.x, y: r.y, width: e.offsetWidth, height: e.offsetHeight }; }).catch(() => null);
+      const others = await p.$$eval('.touch-pause, .hud-sign, .hud-secrets, .hud-cogs, .online-chip, .hub-lobbies, .tickets .ticket, .lobby-alert, .hubplay-score, [data-testid=emote-button], .touch-btn--jump, .touch-btn--interact, .prompt, .look-hint', (els) => els.map((e) => { const r = e.getBoundingClientRect(); return { c: e.className, x: r.x, y: r.y, w: r.width, h: r.height }; }));
+      const hits = mb ? others.filter((b) => b.w && mb.x < b.x + b.w && b.x < mb.x + mb.width && mb.y < b.y + b.h && b.y < mb.y + mb.height).map((b) => b.c) : [];
+      check(`voice chat (${label}): mic button ≥ 56 px, top right, on screen, clear of the other HUD buttons`, !!mb && mb.width >= 56 && mb.height >= 56 && mb.x >= w / 2 && mb.x + mb.width <= w && mb.y >= 0 && mb.y < h / 3 && hits.length === 0, JSON.stringify({ mb, hits }));
+      await p.screenshot({ path: `${OUT}/${file}` });
+    };
+    await measure(412, 915, 'portrait', 'mobile-12-voice-mic-portrait.png');
+    await measure(915, 412, 'landscape', 'mobile-13-voice-mic-landscape.png');
+    check('voice chat: no microphone request before the mic button is pressed', (await p.evaluate(() => window.__gum)) === 0);
+    await p.tap('[data-testid=voice-mic]');
+    await p.waitForFunction(() => window.__toybox.voice.state().mic === 'on', null, { timeout: 30000, polling: 100 }).catch(() => null);
+    const v = await p.evaluate(() => window.__toybox.voice.state());
+    check('voice chat: tapping the mic button asks once and opens the mic (push to talk: not sending on the first tap)', v.mic === 'on' && !v.transmitting && (await p.evaluate(() => window.__gum)) === 1, JSON.stringify({ mic: v.mic, tx: v.transmitting }));
+    await p.waitForTimeout(4500); // let the "Mic ready" ticket go
+    await p.screenshot({ path: `${OUT}/mobile-14-voice-mic-on-landscape.png` });
+    check('voice chat: no page errors on the online phone', errs.length === 0, errs.slice(0, 3).join(' | '));
+  } finally {
+    await ctx.close();
+    server?.kill('SIGTERM');
+  }
+}

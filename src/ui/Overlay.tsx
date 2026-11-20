@@ -28,6 +28,7 @@ import { useWelcome } from '../game/welcome';
 import { HubPlayHud } from './HubPlayHud';
 import { HubChat, WhoAmIChip } from './ChatUI';
 import { isTypingTarget } from '../game/input';
+import { PauseVoice, VoiceMicButton } from './VoiceUI';
 
 // ---------------------------------------------------------------- HUD
 function Prompt() {
@@ -119,9 +120,22 @@ function Controls() {
         <KeyCap k="3" />
         <KeyCap k="4" /> emotes
       </div>
+      <VoiceControlsRow />
       <div className="controls__row">
         <KeyCap k="Esc" wide /> pause · <KeyCap k="H" /> hide
       </div>
+    </div>
+  );
+}
+
+/** Online only: push to talk for voice chat (src/net/voiceChat.ts). */
+function VoiceControlsRow() {
+  const online = useNet((n) => n.status === 'online');
+  const mode = useGame((s) => s.micMode);
+  if (!online) return null;
+  return (
+    <div className="controls__row">
+      <KeyCap k="V" /> {mode === 'ptt' ? 'hold to talk (voice chat)' : 'mic on / off (voice chat)'}
     </div>
   );
 }
@@ -207,6 +221,7 @@ function Hud() {
       <Prompt />
       <HubPlayHud />
       <OnlineChip />
+      <VoiceMicButton />
       <HubLobbies />
       <HubLobbyAlert />
       <Tickets />
@@ -254,6 +269,7 @@ function PauseMenu() {
         </div>
         <PauseShop />
         <PauseOnline />
+        <PauseVoice />
         <AccountSettingsRow />
       </div>
     </div>

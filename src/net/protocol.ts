@@ -18,11 +18,12 @@ import { CHAT_RAW_MAX } from './chatFilter';
  * v4: hub play: the shared marble and basketball (`kick`, `ball`, snapshot `hp`, `play` events).
  * v5: Hub text chat (`chat` both ways, `chatNote`) and Who Am I? cards at the suspicious box
  *     (`card` both ways, `cards`).
+ * v6: proximity voice chat: mic state (`mic`, `mics`) and WebRTC signalling (`sig`).
  */
-export const PROTOCOL_VERSION = 5;
+export const PROTOCOL_VERSION = 6;
 
 // ---------------------------------------------------------------- limits and rates
-/** Largest client → server frame the server accepts (bytes). Bigger frames close the socket. */
+/** Largest client → server message the server accepts (bytes), except voice signalling (`sig`). */
 export const MAX_MESSAGE_BYTES = 2048;
 /** Server → client snapshot rate. */
 export const SNAPSHOT_HZ = 15;
@@ -401,7 +402,7 @@ export interface CardActionMsg {
   t: 'card';
   a: 'deal' | 'peel';
 }
-export type ClientMsg = HelloMsg | MoveMsg | EmoteMsg | ActivityMsg | LookMsg | LeaveMsg | LobbyMsg | InputMsg | AuthMsg | KickMsg | BallMsg | HubPlayDebugMsg | ChatSendMsg | CardActionMsg;
+export type ClientMsg = HelloMsg | MoveMsg | EmoteMsg | ActivityMsg | LookMsg | LeaveMsg | LobbyMsg | InputMsg | AuthMsg | KickMsg | BallMsg | HubPlayDebugMsg | ChatSendMsg | CardActionMsg | MicMsg | SignalMsg;
 
 // ---------------------------------------------------------------- server → client
 export interface WelcomeMsg {
@@ -506,7 +507,10 @@ export type ServerMsg =
   | ChatLineMsg
   | ChatNoteMsg
   | CardEventMsg
-  | CardsMsg;
+  | CardsMsg
+  | MicEventMsg
+  | MicsMsg
+  | SignalEventMsg;
 
 /**
  * A chat line, as this recipient may see it: `name` comes from the server's roster, `text` is
@@ -657,7 +661,7 @@ function parseJoin(v: unknown): JoinRequest | null {
  * or activities. Semantic checks (bounds, speed, rate limits, cosmetics) happen in the room logic.
  */
 export function parseClientMessage(raw: unknown): ClientMsg | null {
-  return validateClientMessage(parseJson(raw, MAX_MESSAGE_BYTES));
+  return validateClientMessage(parseJson(raw, MAX_SIGNAL_BYTES));
 }
 
 /** Byte size of a message once JSON-encoded (UTF-8). */
@@ -679,7 +683,7 @@ export function encodedSize(msg: unknown): number {
 
 /** The same checks as `parseClientMessage` for an already-parsed value. Oversized messages are rejected too. */
 export function validateClientMessage(m: unknown): ClientMsg | null {
-  if (!isObj(m) || encodedSize(m) > MAX_MESSAGE_BYTES) return null;
+  if (!isObj(m) || encodedSize(m) > (m.t === 'sig' ? MAX_SIGNAL_BYTES : MAX_MESSAGE_BYTES)) return null;
   switch (m.t) {
     case 'hello': {
       if (!isNum(m.v) || !isStr(m.name, 64)) return null;
@@ -731,6 +735,13 @@ export function validateClientMessage(m: unknown): ClientMsg | null {
       return isStr(m.text, CHAT_RAW_MAX) ? { t: 'chat', text: m.text } : null;
     case 'card':
       return m.a === 'deal' || m.a === 'peel' ? { t: 'card', a: m.a } : null;
+    case 'mic':
+      return typeof m.on === 'boolean' ? { t: 'mic', on: m.on } : null;
+    case 'sig': {
+      if (!isPlayerId(m.to)) return null;
+      const body = parseSignalBody(m);
+      return body ? { t: 'sig', to: m.to, ...body } : null;
+    }
     default:
       return null;
   }
@@ -1075,9 +1086,110 @@ export function validateServerMessage(m: unknown): ServerMsg | null {
       }
       return { t: 'cards', c };
     }
+    case 'mic':
+      return isPlayerId(m.id) && typeof m.on === 'boolean' ? { t: 'mic', id: m.id, on: m.on } : null;
+    case 'mics':
+      return Array.isArray(m.on) ? { t: 'mics', on: m.on.filter(isPlayerId) } : null;
+    case 'sig': {
+      if (!isPlayerId(m.from)) return null;
+      const body = parseSignalBody(m);
+      return body ? { t: 'sig', from: m.from, ...body } : null;
+    }
     default:
       return null;
   }
+}
+
+// ---------------------------------------------------------------- proximity voice chat (v5)
+/*
+ * Voice itself never touches the server: browsers send audio to each other over WebRTC. The server
+ * only (1) keeps each player's mic state (on = they are willing to send audio) and tells the room,
+ * and (2) relays the WebRTC handshake (`sig`) between two players in the same Hub room. Each audio
+ * link is one-way, speaker → listener, and the listener starts it (an offer with a receive-only
+ * transceiver), so hearing needs no microphone and no permission.
+ */
+/** Largest `sig` frame the server accepts (bytes). Everything else stays under MAX_MESSAGE_BYTES. */
+export const MAX_SIGNAL_BYTES = 8192;
+/** Longest SDP (offer or answer) in characters. An audio-only Opus offer is about 1.5–3 KB. */
+export const MAX_SDP_LENGTH = 6000;
+/** Most ICE candidates in one `sig` message (clients batch them). */
+export const MAX_ICE_PER_MSG = 8;
+/** Longest ICE candidate line (characters). */
+export const MAX_ICE_LENGTH = 512;
+/** Link ids (`c`) are positive integers below this. */
+export const MAX_SIGNAL_CONN = 2 ** 31;
+
+export const SIGNAL_KINDS = ['offer', 'answer', 'ice', 'bye'] as const;
+export type SignalKind = (typeof SIGNAL_KINDS)[number];
+/** One ICE candidate: `c` candidate line, `m` sdpMid, `i` sdpMLineIndex. */
+export interface IceWire {
+  c: string;
+  m: string | null;
+  i: number | null;
+}
+/**
+ * The handshake of one audio link. `c` is the link id (chosen by the listener, unique among its
+ * links); `s` is 1 when the sender is the speaker side of that link, 0 when it is the listener
+ * side. `d` is the SDP (offer, answer) or a batch of candidates (ice); a bye has none.
+ */
+export interface SignalBody {
+  c: number;
+  s: 0 | 1;
+  k: SignalKind;
+  d?: string | IceWire[];
+}
+/** Client → server: my mic is on (willing to send audio) or off. */
+export interface MicMsg {
+  t: 'mic';
+  on: boolean;
+}
+/** Client → server: relay this to player `to` in my room. */
+export type SignalMsg = { t: 'sig'; to: string } & SignalBody;
+/** Server → client: player `id`'s mic is on or off (sent to the others; to yourself only when the server overrode you). */
+export interface MicEventMsg {
+  t: 'mic';
+  id: string;
+  on: boolean;
+}
+/** Server → client, right after `welcome`: the players in the room whose mic is on. */
+export interface MicsMsg {
+  t: 'mics';
+  on: string[];
+}
+/** Server → client: a relayed handshake message; `from` is set by the server. */
+export type SignalEventMsg = { t: 'sig'; from: string } & SignalBody;
+
+function parseIce(v: unknown): IceWire | null {
+  if (!isObj(v) || !isStr(v.c, MAX_ICE_LENGTH)) return null;
+  const m = v.m === null || v.m === undefined ? null : isStr(v.m, 32) ? v.m : undefined;
+  const i = v.i === null || v.i === undefined ? null : isInt(v.i) && v.i >= 0 && v.i < 64 ? v.i : undefined;
+  return m === undefined || i === undefined ? null : { c: v.c, m, i };
+}
+
+/** The shared part of `sig` in both directions; null if any field is malformed or too big. */
+export function parseSignalBody(m: Obj): SignalBody | null {
+  if (!isInt(m.c) || m.c <= 0 || m.c >= MAX_SIGNAL_CONN || (m.s !== 0 && m.s !== 1) || !isOneOf(SIGNAL_KINDS, m.k)) return null;
+  const base = { c: m.c, s: m.s as 0 | 1, k: m.k };
+  switch (m.k) {
+    case 'offer':
+    case 'answer':
+      // The listener offers, the speaker answers.
+      if (m.s !== (m.k === 'offer' ? 0 : 1) || !isStr(m.d, MAX_SDP_LENGTH) || !m.d.startsWith('v=0')) return null;
+      return { ...base, d: m.d };
+    case 'ice': {
+      if (!Array.isArray(m.d) || m.d.length === 0 || m.d.length > MAX_ICE_PER_MSG) return null;
+      const list: IceWire[] = [];
+      for (const x of m.d) {
+        const c = parseIce(x);
+        if (!c) return null;
+        list.push(c);
+      }
+      return { ...base, d: list };
+    }
+    case 'bye':
+      return base;
+  }
+  return null;
 }
 
 /** Every emote id, re-exported for UIs that list them. */
