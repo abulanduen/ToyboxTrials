@@ -7,7 +7,7 @@ import { create } from 'zustand';
 import { isBuildable } from './board';
 import { canMergeTowers, towerAt, type TdInput, type TdPlayer } from './rules';
 
-export type TdPanel = 'quests' | 'odds' | 'players' | null;
+export type TdPanel = 'quests' | 'odds' | null;
 export interface TumbleUI {
   /** Selected square (a tower or an empty buildable square), or null. */
   selected: number | null;
@@ -15,11 +15,13 @@ export interface TumbleUI {
   cursor: number;
   /** Square of the tower being dragged, and the square under the pointer. */
   dragging: number | null; dragOver: number | null;
-  /** Board being watched while knocked out (null = the first one still in). */
+  /** Board being viewed from the player rail (null = your own). Read-only. */
   watching: string | null;
   panel: TdPanel;
+  /** The knocked-out popup: 'open' after you are knocked out, until you watch or dismiss it. */
+  offer: 'none' | 'open' | 'closed';
 }
-const blank: TumbleUI = { selected: null, cursor: 27, dragging: null, dragOver: null, watching: null, panel: null };
+const blank: TumbleUI = { selected: null, cursor: 27, dragging: null, dragOver: null, watching: null, panel: null, offer: 'none' };
 export const useTumbleUI = create<TumbleUI>(() => ({ ...blank }));
 export const resetTumbleUI = () => useTumbleUI.setState({ ...blank });
 

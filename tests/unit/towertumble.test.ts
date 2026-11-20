@@ -3,12 +3,12 @@ import { seededRng, subSeed } from '../../src/minigames/rng';
 import type { BotDifficulty, Contestant } from '../../src/minigames/types';
 import { BUILD_ORDER, BUILDABLE, GLIDE, PATH_CELLS, WALK, isBuildable } from '../../src/minigames/towertumble/board';
 import {
-  BOSSES, BUILD_COST, BUILDER, ENEMIES, LUCKY_CAP, MAX_TIER, QUESTS, START_GOLD, START_LIVES, TIER_POOLS, TOWERS, WAVES,
-  bossBounty, sellValue, waveBonus, waveBounty, waveHp,
+  BOSSES, BUILD_COST, BUILDER, DAMAGE_CHECK, ENEMIES, LUCKY_CAP, MAX_TIER, QUESTS, START_GOLD, START_LIVES, TIER_POOLS, TOWERS, WAVES,
+  bossBounty, questReward, sellValue, waveBonus, waveBounty, waveHp,
 } from '../../src/minigames/towertumble/catalogue';
 import { createTumbleBot } from '../../src/minigames/towertumble/bot';
 import {
-  allHumansOut, cycleWatch, questProgress, rollBuild, rollMerge, tumbleRules, viewedBoard, watchable,
+  allHumansOut, cycleWatch, inCheck, questProgress, rollBuild, rollMerge, stillGoing, tumbleRules, viewedBoard, watchable,
   type TdInput, type TdPlayer, type TdState, type Tower,
 } from '../../src/minigames/towertumble/rules';
 import { eventCue } from '../../src/minigames/towertumble/sounds';
@@ -316,7 +316,7 @@ describe('Toy Tower Tumble rules', () => {
     expect(p(t, 'you').lives).toBe(START_LIVES + QUESTS.first6.lives!);
   });
 
-  it('bosses on waves 5, 10 and 15 drop free tier-4, tier-5 and tier-5 towers; wave 15 also levels the builder; wave 20 pays 500', () => {
+  it('bosses on waves 5, 10, 15 and 20 drop free tier-4, tier-5, tier-5 and tier-6 towers; wave 15 also levels the builder; wave 20 pays 500', () => {
     const reward = (wave: number) => {
       const s = tumbleRules.init(field(1), 20 + wave), me = p(s);
       s.wave = wave;
@@ -339,7 +339,7 @@ describe('Toy Tower Tumble rules', () => {
     expect(fifteen.me.builder).toBe(fifteen.builder + 1);
     const twenty = reward(20);
     expect(twenty.me.bonus).toBe(500);
-    expect(twenty.me.towers.some((t) => t.how === 'gift')).toBe(false);
+    expect(twenty.me.towers.filter((t) => t.how === 'gift').map((t) => tier(t.def))).toEqual([6]);
     // On a full board the gift waits for a free square.
     const s = tumbleRules.init(field(1), 99), me = p(s);
     s.wave = 5;
@@ -386,15 +386,17 @@ describe('Toy Tower Tumble rules', () => {
     expect(s.victory).toBe(false);
   });
 
-  it('spectators cycle through the boards still in, and fast-forward only once every human is out', () => {
+  it('any board can be viewed (read-only); knocked-out players stay on their own board until they choose; fast-forward once every human is out', () => {
     const s = tumbleRules.init(field(4), 40);
     expect(watchable(s)).toEqual(['you', 'bot-1', 'bot-2', 'bot-3']);
-    expect(viewedBoard(s, 'you', 'bot-2')).toBe('you'); // still in: you see your own board
+    expect(viewedBoard(s, 'you', null)).toBe('you');
+    expect(viewedBoard(s, 'you', 'bot-2')).toBe('bot-2'); // still in, viewing another board from the rail
+    expect(viewedBoard(s, 'you', 'nobody')).toBe('you');
     p(s, 'you').out = true; p(s, 'bot-2').out = true;
     expect(watchable(s)).toEqual(['bot-1', 'bot-3']);
-    expect(viewedBoard(s, 'you', null)).toBe('bot-1');
+    expect(viewedBoard(s, 'you', null)).toBe('you'); // never moved off your own board automatically
     expect(viewedBoard(s, 'you', 'bot-3')).toBe('bot-3');
-    expect(viewedBoard(s, 'you', 'bot-2')).toBe('bot-1'); // a board that went out is skipped
+    expect(viewedBoard(s, 'you', 'bot-2')).toBe('bot-2'); // a board that went out can still be looked at
     expect(cycleWatch(s, 'bot-1', 1)).toBe('bot-3');
     expect(cycleWatch(s, 'bot-3', 1)).toBe('bot-1');
     expect(cycleWatch(s, 'bot-1', -1)).toBe('bot-3');
@@ -419,6 +421,88 @@ describe('Toy Tower Tumble rules', () => {
     expect(eventCue({ type: 'td-build', id: 'bot-1' }, 'you', 'bot-1')).toBeNull();
     expect(eventCue({ type: 'td-leak', id: 'bot-1' }, 'you', 'bot-1')).toBe('leak');
     expect(eventCue({ type: 'td-merge', id: 'you', lucky: true }, 'you', 'you')).toBe('lucky');
+  });
+
+  it('pays each board its round rewards the moment it clears its own wave, while slower boards are still going', () => {
+    const s = tumbleRules.init(field(2), 31), me = p(s), slow = p(s, 'bot-1');
+    put(s, me, 'quill-marshal', 0); put(s, me, 'quill-marshal', 2); put(s, me, 'prism-conductor', 16);
+    slow.lives = 99;
+    startWave(s);
+    const events: { type: string; id?: unknown; gold?: unknown }[] = [];
+    // Run until your board has nothing left; the other board (no towers) still has walkers on the path.
+    while (!me.waveDone) { step(s); events.push(...tumbleRules.drainEvents(s)); }
+    expect(s.phase).toBe('wave');
+    expect(me.cleared).toBe(1);
+    expect(me.gold).toBe(START_GOLD + 10 * waveBounty(1) + waveBonus(1));
+    expect(events).toContainEqual(expect.objectContaining({ type: 'td-board-clear', id: 'you', gold: waveBonus(1) }));
+    expect(stillGoing(s, me)).toBe(false);
+    expect(stillGoing(s, slow)).toBe(true);
+    expect(slow.cleared).toBe(0);
+    // No double pay when the wave ends for everyone.
+    while (s.phase === 'wave') step(s);
+    expect(me.gold).toBe(START_GOLD + 10 * waveBounty(1) + waveBonus(1));
+    expect(slow.cleared).toBe(1);
+    expect(stillGoing(s, slow)).toBe(false);
+  });
+
+  it('some quests also give a free random tower of a set tier', () => {
+    const withTower = Object.entries(QUESTS).filter(([, q]) => q.tower);
+    expect(withTower.map(([id, q]) => [id, q.tower])).toEqual([['triple2', 2], ['order2', 3], ['album', 4]]);
+    expect(questReward(QUESTS.album)).toBe('50 gold + a free tier-4 tower');
+    const s = tumbleRules.init(field(1), 32), me = p(s);
+    s.orders.t2 = 'gum-frog';
+    [17, 18, 19].forEach((c) => put(s, me, 'gum-frog', c));
+    step(s);
+    expect(me.quests.order2 && me.quests.triple2).toBe(true);
+    const gifts = me.towers.filter((t) => t.how === 'gift').map((t) => tier(t.def)).sort();
+    expect(gifts).toEqual([2, 3]);
+    expect(me.gold).toBe(START_GOLD + QUESTS.order2.gold + QUESTS.triple2.gold);
+    // The rolls come from your own board's stream: the same seed gives the same towers.
+    const again = tumbleRules.init(field(1), 32), me2 = p(again);
+    again.orders.t2 = 'gum-frog';
+    [17, 18, 19].forEach((c) => put(again, me2, 'gum-frog', c));
+    step(again);
+    expect(me2.towers.filter((t) => t.how === 'gift').map((t) => t.def)).toEqual(me.towers.filter((t) => t.how === 'gift').map((t) => t.def));
+  });
+
+  it('after the final wave: a 15 s prep, then the damage check crosses every board, counts damage, costs no lives and never changes placements', () => {
+    const s = tumbleRules.init(field(3), 33, { waves: 2 }), me = p(s), b1 = p(s, 'bot-1'), b2 = p(s, 'bot-2');
+    put(s, me, 'last-monarch', 0); put(s, me, 'patchwork-wyrm', 2); put(s, me, 'endless-jack', 16);
+    put(s, b1, 'tin-sentry', 0); put(s, b1, 'paper-popper', 2); put(s, b1, 'quill-marshal', 16);
+    b2.lives = 99;
+    startWave(s); while (s.phase === 'wave') step(s);
+    startWave(s); while (s.phase === 'wave') step(s);
+    // Wave 2 was the last: the match goes on into the damage check's build phase.
+    expect(s.victory).toBe(true);
+    expect(tumbleRules.isOver(s)).toBe(false);
+    expect(inCheck(s)).toBe(true);
+    expect(s.phase).toBe('build');
+    expect(s.phaseEnds - s.t).toBeCloseTo(DAMAGE_CHECK.prepMs, -2);
+    const before = tumbleRules.result(s).placements;
+    const lives = s.players.map((x) => x.lives), damage = s.players.map((x) => x.damage), gold = s.players.map((x) => x.gold);
+    const events: { type: string; check?: unknown; id?: unknown }[] = [];
+    startWave(s);
+    events.push(...tumbleRules.drainEvents(s));
+    expect(events).toContainEqual(expect.objectContaining({ type: 'td-wave', check: true }));
+    const target = me.enemies[0];
+    expect(target.check).toBe(true);
+    expect(me.enemies.length).toBe(1);
+    while (!tumbleRules.isOver(s)) { step(s); events.push(...tumbleRules.drainEvents(s)); }
+    expect(me.checkDamage).toBeGreaterThan(b1.checkDamage);
+    expect(b1.checkDamage).toBeGreaterThan(0);
+    expect(b2.checkDamage).toBe(0);
+    expect(target.hp).toBe(0); // walked off
+    expect(events.filter((e) => e.type === 'td-check-done').map((e) => e.id).sort()).toEqual(['bot-1', 'bot-2', 'you']);
+    expect(s.players.map((x) => x.lives)).toEqual(lives);
+    expect(s.players.map((x) => x.damage)).toEqual(damage);
+    expect(s.players.map((x) => x.gold)).toEqual(gold);
+    const after = tumbleRules.result(s);
+    expect(after.placements).toEqual(before);
+    expect(after.stats!.damageCheck).toBe(Math.round(me.checkDamage));
+    // Deterministic, and off when configured off.
+    const off = tumbleRules.init(field(1), 33, { waves: 1, damageCheck: false });
+    startWave(off); while (off.phase === 'wave') step(off);
+    expect(tumbleRules.isOver(off)).toBe(true);
   });
 
   it('places by waves survived, then lives, then damage score; ties share a place', () => {

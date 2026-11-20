@@ -2,6 +2,7 @@
 import { RARITIES, ROSTER, type Rarity } from './catalogue';
 import type { Trait } from './kits';
 import type { Fighter, SquadUnit } from './rules';
+import { STATUS_BIT, type StatusKind } from '../shared/statusKinds';
 
 /** Copies of a kind the player owns at one, two and three stars (board and reserves). */
 export function ownedCopies(units: readonly Pick<SquadUnit, 'kind' | 'tier'>[], kind: string): [number, number, number] {
@@ -27,6 +28,28 @@ export function handbookEntries(rarity: Rarity | null = null, trait: Trait | nul
   return Object.keys(ROSTER).filter(id => (!rarity || ROSTER[id].rarity === rarity) && (!trait || ROSTER[id].traits.includes(trait))).sort((a, b) => order(a) - order(b));
 }
 export const toggleFavourite = (favourites: readonly string[], id: string) => favourites.includes(id) ? favourites.filter(f => f !== id) : [...favourites, id];
+
+/** Every debuff a Toy Squad fighter can carry, in legend order. */
+export const SQUAD_STATUSES: readonly StatusKind[] = ['poison', 'stun', 'mark', 'silence', 'slow', 'shred', 'weaken'];
+/**
+ * A fighter's debuffs for the battle tick after `tick`, as a `STATUS_BIT` mask: poison (damage over
+ * time), stun, mark, silence, and net-negative buffs: haste → slow, armour → shred, and damage,
+ * spell power or range → weaken. Reads the fields the way `tickBattle` does.
+ */
+export function fighterStatus(u: Pick<Fighter, 'hp' | 'poison' | 'stunnedUntil' | 'magic'>, tick: number): number {
+  if (u.hp <= 0) return 0;
+  const next = tick + 1, net: Record<string, number> = {};
+  let m = 0;
+  if (u.poison > 0) m |= STATUS_BIT.poison;
+  if (u.stunnedUntil >= next) m |= STATUS_BIT.stun;
+  if (u.magic.markedUntil >= next) m |= STATUS_BIT.mark;
+  if (u.magic.silencedUntil >= next) m |= STATUS_BIT.silence;
+  for (const b of u.magic.buffs) if (b.until >= next) net[b.stat] = (net[b.stat] ?? 0) + b.amount;
+  if ((net.haste ?? 0) < 0) m |= STATUS_BIT.slow;
+  if ((net.armour ?? 0) < 0) m |= STATUS_BIT.shred;
+  if ((net.damage ?? 0) < 0 || (net.spellPower ?? 0) < 0 || (net.range ?? 0) < 0) m |= STATUS_BIT.weaken;
+  return m;
+}
 
 export type DamageMode = 'dealt' | 'taken';
 export interface DamageRow { id: number; kind: string; tier: number; value: number; spell: number; alive: boolean }
