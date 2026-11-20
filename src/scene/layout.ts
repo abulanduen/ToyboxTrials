@@ -10,12 +10,15 @@
  */
 import { addStatic, resetStatic, type Collider } from '../game/collision';
 import { BRIDGE_WALK, BRIDGE_X, GATES_WALK, HUB_WALK, WALK_AREAS } from '../game/hubBounds';
+import { hubPlayColliders } from '../game/hubPlay';
 import { PALETTE } from '../game/palette';
 import { MINIGAMES } from '../minigames/registry';
 import type { MinigameId } from '../minigames/types';
 import { DOMINO } from './domino';
 
 export { BRIDGE_WALK, GATES_WALK, HUB_WALK, WALK_AREAS };
+/** Hub play objects (the shared marble, the football nets, the basketball hoop): src/game/hubPlay.ts. */
+export { BALL, HOOP, MARBLE, NET, NETS, PITCH_AREA, PITCH_CENTRE, hubPlayColliders } from '../game/hubPlay';
 
 /** The spawn table. */
 export const TABLE = { minX: -80, maxX: 80, minZ: -60, maxZ: 46, thickness: 3.5, legHeight: 72 };
@@ -251,10 +254,10 @@ export const TREES: [number, number, number][] = [
   [27, 31.5, 0.8], // kept clear of the menu / Workshop camera paths near spawn
   [-40, 31, 0.8],
   // gates table: the green inside the loop road, and its corners
-  [-36, -126, 1.0],
+  [-30, -138, 1.0], // off the pitch's centre line (the west net is at x = -49)
   [-4, -130, 0.9],
   [52, -130, 0.9],
-  [84, -124, 1.0],
+  [90, -114, 1.0], // off the pitch's centre line (the east net is at x = 101)
   [-61, -157, 0.9],
   [116, -157, 0.9],
   [116, -98, 0.8],
@@ -346,6 +349,7 @@ export function hubColliders(): Collider[] {
   list.push({ kind: 'circle', id: 'mug', x: MUG.x, z: MUG.z, r: MUG.r, top: MUG.top });
   list.push({ kind: 'circle', id: 'mug-handle', x: MUG.x + MUG.handleX, z: MUG.z, r: MUG.handleR, top: MUG.top });
   list.push(...bridgeColliders());
+  list.push(...hubPlayColliders());
   return list;
 }
 

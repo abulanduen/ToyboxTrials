@@ -16,7 +16,8 @@ import { HubTV, TV_AERIAL_TIP } from './HubTV';
 import { Gates } from './Gates';
 import { DustMotes, Fingerpost } from './Ambience';
 import { hubFence, hubPathTiles, TILE_SIZE } from './paths';
-import { JackInTheBox, KeyTower, Marble, MusicBox, PencilLog, Train, TrainTrack } from './Interactive';
+import { JackInTheBox, KeyTower, MusicBox, PencilLog, Train, TrainTrack } from './Interactive';
+import { HubPlay } from './HubPlay';
 import { BLOCKS, BLOCK_SIZE, BRIDGE, GATES, GATE_STAND, PAVILION, SCOREBOARD, SHOP, TREES, TV, WORKSHOP, frontOf, gateLocal, registerHubColliders } from './layout';
 import { exposeDebug } from '../game/debug';
 
@@ -146,7 +147,8 @@ export function Village() {
       <DustMotes />
       <TrainTrack />
       <Train />
-      <Marble />
+      {/* the shared marble, the football nets, the basketball hoop and its ball */}
+      <HubPlay />
       <MusicBox />
       <JackInTheBox />
       <KeyTower />

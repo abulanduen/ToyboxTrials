@@ -1,5 +1,5 @@
 /**
- * Moving and secret props: toy train, rolling marble, music box, jack-in-the-box,
+ * Moving and secret props: toy train, music box, jack-in-the-box,
  * the key tower and the pencil log.
  */
 import { useEffect, useMemo, useRef } from 'react';
@@ -9,9 +9,9 @@ import { RoundedBox } from './RoundedBox';
 import * as THREE from 'three';
 import { PALETTE } from '../game/palette';
 import { events } from '../game/events';
-import { setDynamic, resolve, type Collider } from '../game/collision';
-import { livePositions, keyAvailable } from '../game/interactables';
-import { camBlock, player } from '../game/player';
+import { setDynamic, type Collider } from '../game/collision';
+import { keyAvailable } from '../game/interactables';
+import { camBlock } from '../game/player';
 import { sfx } from '../game/audio';
 import { Dominoes, paintMat, woodMat, feltMat } from './props';
 import { JACK, MUSICBOX, PENCIL, TOWER, TRACK } from './layout';
@@ -147,88 +147,7 @@ export function Train() {
   );
 }
 
-// ---------------- Rolling marble (push with E) ----------------
-export function Marble() {
-  const R = 1.3;
-  const mesh = useRef<THREE.Mesh>(null!);
-  const st = useRef({ pos: { x: -9, z: -6 }, vx: 0, vz: 0 });
-  const q = useMemo(() => new THREE.Quaternion(), []);
-  const axis = useMemo(() => new THREE.Vector3(), []);
-
-  useEffect(
-    () =>
-      events.on('prop:marble-push', ({ dirX, dirZ }) => {
-        st.current.vx += dirX * 22;
-        st.current.vz += dirZ * 22;
-      }),
-    [],
-  );
-
-  useFrame((_, rawDt) => {
-    const dt = Math.min(rawDt, 1 / 20);
-    const s = st.current;
-    const speed = Math.hypot(s.vx, s.vz);
-    if (speed > 0.01) {
-      const prevX = s.pos.x;
-      const prevZ = s.pos.z;
-      const tx = prevX + s.vx * dt;
-      const tz = prevZ + s.vz * dt;
-      s.pos.x = tx;
-      s.pos.z = tz;
-      setDynamic('marble', []);
-      // Bounce off solid things the marble can't roll over.
-      const hit = resolve(s.pos, R, 0);
-      const cx = s.pos.x - tx;
-      const cz = s.pos.z - tz;
-      const cl = Math.hypot(cx, cz);
-      if (hit || cl > 1e-4) {
-        if (cl > 1e-4) {
-          const nx = cx / cl;
-          const nz = cz / cl;
-          const dot = s.vx * nx + s.vz * nz;
-          if (dot < 0) {
-            s.vx -= 1.7 * dot * nx;
-            s.vz -= 1.7 * dot * nz;
-            if (Math.abs(dot) > 4) sfx.bump();
-          }
-        }
-      }
-      // Bump the player out of the way (marble wins).
-      const pdx = player.pos.x - s.pos.x;
-      const pdz = player.pos.z - s.pos.z;
-      const pd = Math.hypot(pdx, pdz);
-      if (pd < R + 0.85 && player.pos.y < 2 && pd > 1e-3) {
-        const dot = s.vx * (pdx / pd) + s.vz * (pdz / pd);
-        if (dot > 0) {
-          s.vx -= 1.2 * dot * (pdx / pd);
-          s.vz -= 1.2 * dot * (pdz / pd);
-        }
-      }
-      const f = Math.exp(-0.9 * dt);
-      s.vx *= f;
-      s.vz *= f;
-      const moved = Math.hypot(s.pos.x - prevX, s.pos.z - prevZ);
-      axis.set(s.vz, 0, -s.vx).normalize();
-      q.setFromAxisAngle(axis, moved / R);
-      mesh.current.quaternion.premultiply(q);
-    }
-    mesh.current.position.set(s.pos.x, R, s.pos.z);
-    livePositions.set('marble', s.pos);
-    setDynamic('marble', [{ kind: 'circle', id: 'marble:0', x: s.pos.x, z: s.pos.z, r: R, top: R * 2 }]);
-  });
-
-  return (
-    <mesh ref={mesh} castShadow>
-      <sphereGeometry args={[R, 28, 20]} />
-      <meshPhysicalMaterial color="#9FD0E6" roughness={0.2} clearcoat={0.6} clearcoatRoughness={0.3} transparent opacity={0.85} />
-      {/* inner swirl */}
-      <mesh rotation={[0.4, 0, 0.8]}>
-        <torusGeometry args={[0.7, 0.16, 6, 20, Math.PI * 1.3]} />
-        <meshStandardMaterial color={PALETTE.honey} emissive={PALETTE.honey} emissiveIntensity={0.25} />
-      </mesh>
-    </mesh>
-  );
-}
+// The rolling marble is now shared by everyone in an online Hub: see HubPlay.tsx and src/hubplay/.
 
 // ---------------- Forgotten music box (behind the pavilion) ----------------
 export function MusicBox() {

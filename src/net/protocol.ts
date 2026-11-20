@@ -14,8 +14,9 @@ import { MINIGAME_IDS, type MinigameId } from '../minigames/ids';
  * v2: looks carry the accessory slots (back/face/neck), six more gesture ids, and a 'shop' activity.
  * v3: tournament lobbies (`lobby`, `lobbies`, `lobbyAlert`, `lobbyErr`), server-run matches (`in`,
  *     `ms`) and the account link for the leaderboard (`auth`).
+ * v4: hub play: the shared marble and basketball (`kick`, `ball`, snapshot `hp`, `play` events).
  */
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 
 // ---------------------------------------------------------------- limits and rates
 /** Largest client → server frame the server accepts (bytes). Bigger frames close the socket. */
@@ -364,7 +365,24 @@ export interface AuthMsg {
   t: 'auth';
   token: string;
 }
-export type ClientMsg = HelloMsg | MoveMsg | EmoteMsg | ActivityMsg | LookMsg | LeaveMsg | LobbyMsg | InputMsg | AuthMsg;
+// ---------------------------------------------------------------- hub play (v4)
+/** Kick (power 1) or push (walking into it, a lower power) the shared marble along (dx, dz). */
+export interface KickMsg {
+  t: 'kick';
+  dx: number;
+  dz: number;
+  /** Power, 0..1. */
+  p: number;
+}
+/** Pick up the basketball, or throw the one you hold (facing `yaw`, power `p` 0..1). */
+export type BallMsg = { t: 'ball'; a: 'grab' } | { t: 'ball'; a: 'throw'; yaw: number; p: number };
+/** Test servers only (MATCH_DEBUG=1): put the marble at (x, z). Ignored otherwise. */
+export interface HubPlayDebugMsg {
+  t: 'hpdebug';
+  x: number;
+  z: number;
+}
+export type ClientMsg = HelloMsg | MoveMsg | EmoteMsg | ActivityMsg | LookMsg | LeaveMsg | LobbyMsg | InputMsg | AuthMsg | KickMsg | BallMsg | HubPlayDebugMsg;
 
 // ---------------------------------------------------------------- server → client
 export interface WelcomeMsg {
@@ -397,6 +415,42 @@ export interface SnapMsg {
   t: 'snap';
   now: number;
   p: PlayerState[];
+  /** The room's shared marble and basketball at `now` (v4). */
+  hp?: HubPlayWire;
+}
+/**
+ * Hub play state in a snapshot. Short keys and arrays: it is sent 15 times a second.
+ * `m` marble [x, z, vx, vz]; `n` 1 while it sits in a net after a goal; `b` ball
+ * [x, y, z, vx, vy, vz]; `h` the ball's holder (player id) or null; `s` goals [Coral, Blue];
+ * `k` baskets scored in the room.
+ */
+export interface HubPlayWire {
+  m: [number, number, number, number];
+  n: 0 | 1;
+  b: [number, number, number, number, number, number];
+  h: string | null;
+  s: [number, number];
+  k: number;
+}
+/** Hub play events since the last message (kicks, goals, baskets, bounces), in order. */
+export interface PlayEventsMsg {
+  t: 'play';
+  e: PlayEventWire[];
+}
+export const PLAY_EVENT_KINDS = ['goal', 'hoop', 'kick', 'grab', 'throw', 'drop', 'rim', 'board', 'bounce', 'wall', 'reset'] as const;
+export interface PlayEventWire {
+  k: (typeof PLAY_EVENT_KINDS)[number];
+  /** Who (player id): kicker, scorer, holder. */
+  by?: string | null;
+  /** Goal: the net it went in ('w' | 'e'). */
+  net?: 'w' | 'e';
+  /** Goal: the score after it. */
+  score?: [number, number];
+  /** Basket: the room's total after it. */
+  total?: number;
+  /** Kick/throw power or impact speed. */
+  p?: number;
+  v?: number;
 }
 export interface EmoteEventMsg {
   t: 'emote';
@@ -428,7 +482,8 @@ export type ServerMsg =
   | LobbyAlertMsg
   | LobbyStateMsg
   | LobbyErrMsg
-  | MatchStateMsg;
+  | MatchStateMsg
+  | PlayEventsMsg;
 
 /** The open lobbies in this Hub room (sent on joining the room and whenever one changes). */
 export interface LobbiesMsg {
@@ -589,6 +644,14 @@ export function validateClientMessage(m: unknown): ClientMsg | null {
     }
     case 'auth':
       return isStr(m.token, 128) && m.token.length > 0 ? { t: 'auth', token: m.token } : null;
+    case 'kick':
+      return isNum(m.dx) && isNum(m.dz) && isNum(m.p) && Math.abs(m.dx) <= 2 && Math.abs(m.dz) <= 2 && m.p >= 0 && m.p <= 1 ? { t: 'kick', dx: m.dx, dz: m.dz, p: m.p } : null;
+    case 'ball':
+      if (m.a === 'grab') return { t: 'ball', a: 'grab' };
+      if (m.a === 'throw' && isNum(m.yaw) && isNum(m.p) && Math.abs(m.yaw) <= 10 && m.p >= 0 && m.p <= 1) return { t: 'ball', a: 'throw', yaw: m.yaw, p: m.p };
+      return null;
+    case 'hpdebug':
+      return isNum(m.x) && isNum(m.z) ? { t: 'hpdebug', x: m.x, z: m.z } : null;
     default:
       return null;
   }
@@ -812,6 +875,27 @@ function parsePlayerState(v: unknown): PlayerState | null {
   };
 }
 
+const numArray = (v: unknown, n: number): v is number[] => Array.isArray(v) && v.length === n && v.every(isNum);
+
+function parseHubPlay(v: unknown): HubPlayWire | null {
+  if (!isObj(v) || !numArray(v.m, 4) || !numArray(v.b, 6) || !numArray(v.s, 2) || !isNum(v.k)) return null;
+  const h = v.h === null || v.h === undefined ? null : isPlayerId(v.h) ? v.h : null;
+  return { m: v.m as HubPlayWire['m'], n: v.n ? 1 : 0, b: v.b as HubPlayWire['b'], h, s: v.s as HubPlayWire['s'], k: v.k };
+}
+
+function parsePlayEvent(v: unknown): PlayEventWire | null {
+  if (!isObj(v) || !isOneOf(PLAY_EVENT_KINDS, v.k)) return null;
+  const e: PlayEventWire = { k: v.k };
+  if (v.by === null) e.by = null;
+  else if (isPlayerId(v.by)) e.by = v.by;
+  if (v.net === 'w' || v.net === 'e') e.net = v.net;
+  if (numArray(v.score, 2)) e.score = v.score as [number, number];
+  if (isNum(v.total)) e.total = v.total;
+  if (isNum(v.p)) e.p = v.p;
+  if (isNum(v.v)) e.v = v.v;
+  return e;
+}
+
 /** Parse a server message on the client. Defensive: a bad frame is dropped rather than thrown. */
 export function parseServerMessage(raw: unknown): ServerMsg | null {
   return validateServerMessage(parseJson(raw, 1 << 20));
@@ -841,7 +925,14 @@ export function validateServerMessage(m: unknown): ServerMsg | null {
     }
     case 'snap': {
       if (!isNum(m.now) || !Array.isArray(m.p)) return null;
-      return { t: 'snap', now: m.now, p: m.p.map(parsePlayerState).filter((p): p is PlayerState => !!p) };
+      const snap: SnapMsg = { t: 'snap', now: m.now, p: m.p.map(parsePlayerState).filter((p): p is PlayerState => !!p) };
+      const hp = parseHubPlay(m.hp);
+      if (hp) snap.hp = hp;
+      return snap;
+    }
+    case 'play': {
+      if (!Array.isArray(m.e)) return null;
+      return { t: 'play', e: m.e.map(parsePlayEvent).filter((e): e is PlayEventWire => !!e) };
     }
     case 'emote':
       return isStr(m.id, 32) && isEmoteId(m.emote) ? { t: 'emote', id: m.id, emote: m.emote } : null;
