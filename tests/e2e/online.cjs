@@ -214,10 +214,11 @@ async function voiceChecks(A, B) {
   check("voice: B's analyser hears A's (fake) microphone (not silent)", heard !== null && heard > LOUD, `peak RMS ${heard}`);
   b = await vstate(B.page);
   check('voice: close by, the voice plays at (near) full volume', (inLink(b, aId)?.gain ?? 0) > 0.6, `gain ${inLink(b, aId)?.gain}`);
-  await B.page.waitForFunction((id) => document.querySelector(`.name-tag[data-player="${id}"] .voice-tag.is-talking`), aId, { timeout: 20000, polling: 50 }).catch(() => null);
+  // (the fake microphone beeps, and a slow software-rendered page samples it only once a frame: give it time)
+  await B.page.waitForFunction((id) => document.querySelector(`.name-tag[data-player="${id}"] .voice-tag.is-talking`), aId, { timeout: 60000, polling: 50 }).catch(() => null);
   check("voice: A's name tag on B's screen shows the mic mark and the speaking ring", await B.page.evaluate((id) => !!document.querySelector(`.name-tag[data-player="${id}"] .voice-tag--on.is-talking`), aId));
   await shot(B.page, 'voice-03-B-hears-A-talking-ring.png');
-  await A.page.waitForFunction(() => document.querySelector('[data-testid=voice-mic]').classList.contains('is-talking'), null, { timeout: 20000, polling: 50 }).catch(() => null);
+  await A.page.waitForFunction(() => document.querySelector('[data-testid=voice-mic]').classList.contains('is-talking'), null, { timeout: 60000, polling: 50 }).catch(() => null);
   check("voice: A's mic button shows A talking", await A.page.evaluate(() => document.querySelector('[data-testid=voice-mic]').classList.contains('is-talking')));
   await shot(A.page, 'voice-04-A-mic-on-talking.png');
 
@@ -254,18 +255,18 @@ async function voiceChecks(A, B) {
   await B.page.keyboard.up('KeyV');
   await A.page.waitForFunction((id) => window.__toybox.voice.state().inbound.some((l) => l.id === id && l.state === 'connected' && l.audio), bId, { timeout: 60000, polling: 250 }).catch(() => null);
   check('voice: A connects to B (B is now a speaker)', inLink(await vstate(A.page), bId)?.state === 'connected');
-  const idle = await loudness(A, bId, 2000);
+  const idle = await loudness(A, bId, 3000);
   check('voice: V not held: A hears nothing from B', idle !== null && idle < QUIET, `peak ${idle}`);
   await B.page.keyboard.down('KeyV');
   await B.page.waitForFunction(() => window.__toybox.voice.state().transmitting, null, { timeout: 10000, polling: 50 }).catch(() => null);
-  const talking = await loudness(A, bId, 4000);
+  const talking = await loudness(A, bId, 5000);
   await shot(B.page, 'voice-06-B-holds-V.png');
   await B.page.keyboard.up('KeyV');
   check('voice: B holds V: B sends and A hears B', (await gum(B.page)) === 1 && talking !== null && talking > LOUD, `peak ${talking}`);
   // B's frame loop sees the release on its next frame (slow under software rendering); then the last packets drain
   await B.page.waitForFunction(() => !window.__toybox.voice.state().transmitting, null, { timeout: 20000, polling: 50 }).catch(() => null);
   await sleep(800);
-  const after = await loudness(A, bId, 2000);
+  const after = await loudness(A, bId, 3000);
   check('voice: B lets go of V: silence again', !(await vstate(B.page)).transmitting && after !== null && after < QUIET, `peak ${after}`);
 
   // A turns the mic off with the button (Always on): B's link from A closes.

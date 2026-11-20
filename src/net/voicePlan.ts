@@ -126,5 +126,8 @@ export function rmsLevel(samples: ArrayLike<number>): number {
   return samples.length ? Math.sqrt(sum / samples.length) : 0;
 }
 
-/** RMS above this counts as speaking (a quiet room reads about 0.002–0.01 after noise suppression). */
-export const SPEAKING_RMS = 0.03;
+/**
+ * RMS above this counts as speaking, for the rings. A guess, not tuned on real microphones: speech
+ * after auto gain is usually well above it, and a quiet room after noise suppression well below.
+ */
+export const SPEAKING_RMS = 0.02;

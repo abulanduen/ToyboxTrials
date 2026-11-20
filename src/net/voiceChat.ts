@@ -655,6 +655,7 @@ export function installVoice() {
         return p;
       },
       mute: (id: string) => toggleMute(id),
+
     },
   });
 }
