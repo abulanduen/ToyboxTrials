@@ -1,5 +1,8 @@
 /* Touch / mobile checks with an emulated phone (real touch events via CDP).
-   Run: BASE_URL=http://localhost:4173/ node tests/e2e/mobile.cjs */
+   Run: BASE_URL=http://localhost:4173/ node tests/e2e/mobile.cjs
+   The online Hub chat sheet (portrait and landscape) also runs when CHAT_BASE_URL points at a
+   preview of a build made with VITE_SERVER_URL=ws://localhost:<CHAT_SERVER_PORT> (default 2567);
+   it starts server-dist/index.cjs itself (npm run server:build first). */
 const { chromium, devices } = require('playwright');
 const path = require('path');
 const fs = require('fs');
@@ -303,6 +306,89 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
   await page.screenshot({ path: `${OUT}/mobile-08-workshop-portrait.png` });
 
   check('no console/page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
+
+  // ---------------------------------------------------------------- online Hub chat sheet (phone)
+  // Needs a client build pointed at a server (CHAT_BASE_URL, built with
+  // VITE_SERVER_URL=ws://localhost:<CHAT_SERVER_PORT>) and server-dist (npm run server:build);
+  // this suite starts the server itself. Skipped without CHAT_BASE_URL.
+  if (process.env.CHAT_BASE_URL) {
+    const { spawn } = require('child_process');
+    const port = Number(process.env.CHAT_SERVER_PORT) || 2567;
+    const srv = spawn(process.execPath, [path.join(__dirname, '../../server-dist/index.cjs')], { env: { ...process.env, PORT: String(port) }, stdio: 'ignore' });
+    try {
+      for (let i = 0; i < 100; i++) {
+        try { if ((await fetch(`http://localhost:${port}/health`)).ok) break; } catch {}
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      for (const [label, w, h] of [['portrait', 390, 844], ['landscape', 844, 390]]) {
+        const cctx = await browser.newContext({ ...phone, viewport: { width: w, height: h }, screen: { width: w, height: h } });
+        const cp = await cctx.newPage();
+        cp.setDefaultTimeout(+process.env.E2E_TIMEOUT || 120000);
+        const cerr = [];
+        cp.on('pageerror', (e) => cerr.push(e.message));
+        await cp.addInitScript((n) => { if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { tourSeen: true, quality: 'low', autoOnline: false, contenderName: n }, version: 2 })); } }, `Phone ${label}`);
+        await cp.goto(process.env.CHAT_BASE_URL + '?debug');
+        await cp.waitForSelector('.loading', { state: 'detached', timeout: 600000 });
+        await cp.tap('[data-testid=menu-online]');
+        await cp.tap('[data-testid=online-public]');
+        await cp.waitForFunction(() => window.__toybox?.net?.status() === 'online', null, { timeout: 120000, polling: 250 }).catch(() => null);
+        const btn = await cp.waitForSelector('[data-testid=chat-button]', { timeout: 60000 }).catch(() => null);
+        const bb = btn ? await btn.evaluate((e) => { const r = e.getBoundingClientRect(); return { w: e.offsetWidth, h: e.offsetHeight, x: r.x, y: r.y, r: r.right, b: r.bottom }; }) : null;
+        check(`chat (${label}): online, a Chat button ≥ 56 px on screen`, !!bb && bb.w >= 56 && bb.h >= 56 && bb.x >= 0 && bb.r <= w && bb.y >= 0 && bb.b <= h, JSON.stringify(bb));
+        if (!btn) { await cctx.close(); continue; }
+        await cp.tap('[data-testid=chat-button]');
+        await cp.waitForSelector('[data-testid=chat-sheet]');
+        const lay = () => cp.evaluate(() => {
+          const vv = window.visualViewport;
+          const box = (sel) => { const e = document.querySelector(sel); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.x, y: r.y, r: r.right, b: r.bottom, w: e.offsetWidth, h: e.offsetHeight }; };
+          return { vvTop: vv ? vv.offsetTop : 0, vvH: vv ? vv.height : innerHeight, vw: innerWidth, sheet: box('[data-testid=chat-sheet]'), input: box('[data-testid=chat-input]'), send: box('[data-testid=chat-send]'), close: box('[data-testid=chat-close]'), people: box('[data-testid=chat-people]'), focused: document.activeElement?.getAttribute('data-testid') };
+        });
+        let L = await lay();
+        const inView = (b, l) => !!b && b.x >= 0 && b.r <= l.vw && b.y >= l.vvTop && b.b <= l.vvTop + l.vvH + 0.5;
+        check(`chat (${label}): the sheet opens with the text box focused, inside the visible viewport`, L.focused === 'chat-input' && inView(L.sheet, L) && inView(L.input, L), JSON.stringify(L));
+        check(`chat (${label}): text box, Send, Close and People are ≥ 56 px`, [L.input, L.send, L.close, L.people].every((b) => b && b.h >= 56 && b.w >= 56), JSON.stringify([L.input, L.send, L.close, L.people]));
+        await cp.fill('[data-testid=chat-input]', `hello from the ${label} phone`);
+        await cp.tap('[data-testid=chat-send]');
+        const echoed = await cp.waitForFunction((t) => window.__toybox.net.chat().lines.some((l) => l.text === t), `hello from the ${label} phone`, { timeout: 30000, polling: 200 }).then(() => true, () => false);
+        check(`chat (${label}): Send posts the message (the server echoes it into the log)`, echoed && (await cp.isVisible('[data-testid=chat-sheet]')));
+        await cp.screenshot({ path: `${OUT}/mobile-13-chat-sheet-${label}.png` });
+        // An on-screen keyboard shrinks the visual viewport: the sheet must follow and keep the box in view.
+        await cp.setViewportSize({ width: w, height: Math.round(h * (label === 'portrait' ? 0.55 : 0.5)) });
+        // (the sheet follows visualViewport resize events; a slow software-rendered page can take a moment)
+        await cp.waitForFunction(() => { const vv = window.visualViewport; const e = document.querySelector('[data-testid=chat-input]'); return !!vv && !!e && e.getBoundingClientRect().bottom <= vv.offsetTop + vv.height + 0.5; }, null, { timeout: 20000, polling: 200 }).catch(() => null);
+        L = await lay();
+        check(`chat (${label}): with the viewport shrunk as by a keyboard, the text box and Send stay visible`, inView(L.sheet, L) && inView(L.input, L) && inView(L.send, L), JSON.stringify(L));
+        await cp.screenshot({ path: `${OUT}/mobile-14-chat-sheet-${label}-keyboard.png` });
+        await cp.setViewportSize({ width: w, height: h });
+        await cp.waitForTimeout(400);
+        await cp.tap('[data-testid=chat-close]');
+        await cp.waitForSelector('[data-testid=chat-sheet]', { state: 'detached', timeout: 20000 }).catch(() => null);
+        check(`chat (${label}): Close returns to play (joystick and Chat button back)`, !(await cp.isVisible('[data-testid=chat-sheet]')) && (await cp.isVisible('[data-testid=chat-button]')) && (await cp.isVisible('.touch-stick-zone')));
+        // Who Am I? on a phone: open the suspicious box (the server deals a card even to a lone player).
+        const spot = await cp.evaluate(() => window.__toybox.interactables().find((i) => i.id === 'jack'));
+        await cp.evaluate(([x, z]) => window.__toybox.teleport(x, z, Math.PI / 2), [spot.x, spot.z]);
+        await cp.waitForTimeout(5000); // the server lets the toy cross the room at walking pace
+        const ib = await cp.waitForSelector('.touch-btn--interact', { timeout: 60000 }).catch(() => null);
+        if (ib) await cp.tap('.touch-btn--interact');
+        const chip = await cp.waitForSelector('[data-testid=whoami-chip]', { timeout: 60000 }).catch(() => null);
+        const cb = chip ? await cp.evaluate(() => [...document.querySelectorAll('[data-testid=whoami-chip], [data-testid=whoami-guess], [data-testid=whoami-peel]')].map((e) => { const r = e.getBoundingClientRect(); return { w: e.offsetWidth, h: e.offsetHeight, x: r.x, r: r.right, y: r.y, b: r.bottom }; })) : [];
+        check(`Who Am I? (${label}): the box deals a card; the chip fits on screen with ≥ 56 px buttons`, cb.length === 3 && cb.every((b) => b.x >= 0 && b.r <= w && b.y >= 0 && b.b <= h) && cb.slice(1).every((b) => b.h >= 56 && b.w >= 56), JSON.stringify(cb));
+        await cp.evaluate(() => window.__toybox.aim(Math.PI / 2, 0.3));
+        await cp.waitForTimeout(1500);
+        await cp.screenshot({ path: `${OUT}/mobile-15-whoami-chip-${label}.png` });
+        if (chip) {
+          await cp.tap('[data-testid=whoami-peel]');
+          await cp.waitForSelector('[data-testid=whoami-chip]', { state: 'detached', timeout: 30000 }).catch(() => null);
+          check(`Who Am I? (${label}): Peel it off removes the card and tells you the answer`, !(await cp.isVisible('[data-testid=whoami-chip]')) && (await cp.evaluate(() => window.__toybox.net.chat().lines.some((l) => l.text.startsWith('You peeled off')))));
+        }
+        check(`chat (${label}): no page errors`, cerr.length === 0, cerr.slice(0, 3).join(' | '));
+        await cctx.close();
+      }
+    } finally {
+      srv.kill('SIGTERM');
+    }
+  } else check('chat sheet: skipped (set CHAT_BASE_URL and CHAT_SERVER_PORT to an online build)', true);
+
   console.log(res.join('\n'));
   await browser.close();
 })().catch(e => { console.log(res.join('\n')); console.error(e); process.exitCode = 1; });

@@ -5,8 +5,10 @@
      npm run server:build
      BASE_URL=http://localhost:4190/ node tests/e2e/online.cjs
    Desktop: A hosts a private room, B joins with the code, C through a #room= link; name tags,
-   movement, emotes, hub play (B sees the marble A kicks; A picks up, throws and sinks the
-   basketball; a goal), reconnect, leave, errors, public Hub. B's save owns shop items (a cape, a
+   movement, emotes, text chat and Who Am I? (A opens the suspicious box; B sees the word on A's
+   card, A only "?"; typing doesn't move the toy; B's hint, A's masked copy of the answer, a wrong
+   then a right guess, Peel it off, mute), hub play (B sees the marble A kicks; A picks up, throws
+   and sinks the basketball; a goal; SKIP_HUBPLAY=1 skips it), reconnect, leave, errors, public Hub. B's save owns shop items (a cape, a
    monocle and the Dance gesture on key 4): A must see B's accessories and B's bought gesture. Phones (portrait + landscape, touch):
    join the public Hub and use the Emote menu. Raw-socket checks: health, origin, version, limits.
    Software rendering is slow: page loads wait up to LOAD_TIMEOUT (default 10 min). */
@@ -33,7 +35,7 @@ const check = (n, ok, d = '') => {
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /** The protocol version this test expects (src/net/protocol.ts PROTOCOL_VERSION). */
-const PROTO = 4; // v4: hub play (the shared marble and basketball)
+const PROTO = 5; // v5: chat and Who Am I? cards (v4: hub play)
 
 // ---------------------------------------------------------------- server
 async function startServer() {
@@ -283,6 +285,144 @@ const shot = (p, file) => p.screenshot({ path: path.join(OUT, file), timeout: T 
     const bLocal = await B.page.evaluate(() => window.__toybox.state().anim.emote);
     check('keys 4 and 3 pressed together: exactly one emote is played and sent', bAfter.emoteEvents === evBefore + 1 && ['dance', 'spin'].includes(bAfter.lastEmote) && bLocal === bAfter.lastEmote, `events +${bAfter.emoteEvents - evBefore}, sent ${bAfter.lastEmote}, B plays ${bLocal}`);
 
+    // ------------------------------------------------------------ text chat and Who Am I? (the suspicious box)
+    {
+      /** Teleport a toy through waypoints, waiting each time until `watcher` sees it there (the server limits travel speed). */
+      const walk = async (P, watcher, pts, yaw) => {
+        for (const [x, z] of pts) {
+          await P.page.evaluate(([x, z, y]) => window.__toybox.teleport(x, z, y), [x, z, yaw]);
+          await watcher.page.waitForFunction(([n, x, z]) => { const r = window.__toybox.net.remotes().find((q) => q.name === n); return r && r.x !== null && Math.hypot(r.x - x, r.z - z) < 0.3; }, [P.name, x, z], { timeout: 120000, polling: 250 }).catch(() => null);
+        }
+      };
+      const chat = (p) => p.evaluate(() => window.__toybox.net.chat());
+      const lines = async (p) => (await chat(p)).lines;
+      const say = async (p, text, key = 'Enter') => {
+        await p.keyboard.press(key);
+        await p.waitForSelector('[data-testid=chat-input]', { timeout: 30000 });
+        await p.keyboard.type(text);
+        await p.keyboard.press('Enter');
+      };
+      const waitLine = (p, pred, timeout = 30000) => p.waitForFunction((src) => window.__toybox.net.chat().lines.some(new Function('l', `return ${src}`)), pred, { timeout, polling: 200 }).catch(() => null);
+      const aId = await net(A.page, 'selfId');
+      const bId = await net(B.page, 'selfId');
+      const spot = await A.page.evaluate(() => window.__toybox.interactables().find((i) => i.id === 'jack'));
+      // A by the box, facing east (its back to the box); B a few steps east, facing A.
+      await walk(A, B, [[spot.x, spot.z]], Math.PI / 2);
+      await walk(B, A, [[spot.x + 7, spot.z]], -Math.PI / 2);
+      await A.page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('suspicious'), null, { timeout: 60000 }).catch(() => null);
+      const cogs0 = await A.page.evaluate(() => JSON.parse(localStorage.getItem('toybox-trials:prototype:v1')).state.profile.wallet.cogs);
+      await A.page.keyboard.press('KeyE');
+      const tagCard = await B.page.waitForSelector(`.name-tag[data-player="${aId}"] [data-testid=name-tag-card]`, { timeout: 60000 }).catch(() => null);
+      const word = tagCard ? ((await tagCard.textContent()) || '').trim().toLowerCase() : '';
+      check('A opens the suspicious box online: B sees a word card on A (name tag)', /^[a-z]+( [a-z]+)?$/.test(word), word);
+      await B.page.waitForFunction((w) => !!window.__toybox.three().scene.getObjectByName(`whoami:card:${w}`), word, { timeout: 60000, polling: 250 }).catch(() => null);
+      check("…and B's scene draws the paper card with that word on A's face", await B.page.evaluate((w) => !!window.__toybox.three().scene.getObjectByName(`whoami:card:${w}`), word));
+      await A.page.waitForSelector('[data-testid=whoami-chip]', { timeout: 60000 }).catch(() => null);
+      check("A's HUD shows the Who Am I? chip", ((await A.page.textContent('[data-testid=whoami-chip]').catch(() => '')) || '').includes("Something's stuck to your face! Ask the others, then guess in chat."));
+      await A.page.waitForFunction(() => !!window.__toybox.three().scene.getObjectByName('whoami:card-hidden'), null, { timeout: 60000, polling: 250 }).catch(() => null);
+      check('A sees a blank card with "?" on its own toy, never the word', await A.page.evaluate((w) => { const sc = window.__toybox.three().scene; let named = false; sc.traverse((o) => { if (o.name === `whoami:card:${w}`) named = true; }); return !!sc.getObjectByName('whoami:card-hidden') && !named; }, word));
+      check("C (also in the room) sees A's card too", await C.page.waitForFunction((id) => !!window.__toybox.net.chat().cards[id], aId, { timeout: 60000, polling: 250 }).then(() => true, () => false));
+      await A.page.evaluate(() => window.__toybox.aim(Math.PI / 2, 0.35));
+      await B.page.evaluate(() => window.__toybox.aim(Math.PI / 2, 0.16));
+      await sleep(1500);
+      await shot(B.page, 'online-11-B-sees-A-card.png');
+      await shot(A.page, 'online-12-A-own-card-is-blank.png');
+
+      // A types in the chat: the toy must not walk, and the chat box releases the keys afterwards.
+      const posA = await A.page.evaluate(() => window.__toybox.state());
+      await A.page.keyboard.press('KeyT');
+      await A.page.waitForSelector('[data-testid=chat-input]', { timeout: 30000 });
+      check('T opens the desktop chat box (focused)', await A.page.evaluate(() => document.activeElement?.getAttribute('data-testid') === 'chat-input'));
+      await A.page.keyboard.type('wasd wasd dddd');
+      await sleep(800);
+      const posA2 = await A.page.evaluate(() => window.__toybox.state());
+      check('typing W A S D in the chat box does not move the toy', Math.hypot(posA2.x - posA.x, posA2.z - posA.z) < 0.05, `moved ${Math.hypot(posA2.x - posA.x, posA2.z - posA.z).toFixed(3)} cm`);
+      check('…and does not pause the game', !(await A.page.isVisible('.pause')));
+      await A.page.keyboard.press('Escape');
+      await A.page.waitForSelector('[data-testid=chat-input]', { state: 'detached', timeout: 30000 }).catch(() => null);
+      check('Esc closes the chat box without sending or pausing', !(await A.page.isVisible('[data-testid=chat-input]')) && !(await A.page.isVisible('.pause')) && !(await lines(A.page)).some((l) => l.text.includes('wasd')));
+
+      // B gives a hint: everyone sees it, with a bubble over B for A.
+      await say(B.page, 'Hint: you live somewhere nice');
+      await waitLine(A.page, "l.name === 'Bravo' && l.text === 'Hint: you live somewhere nice'");
+      check('B chats a hint (Enter, type, Enter): A sees it in the log', (await lines(A.page)).some((l) => l.name === 'Bravo' && l.text === 'Hint: you live somewhere nice'));
+      const bubble = await A.page.evaluate((id) => { const b = document.querySelector(`.name-tag[data-player="${id}"] .name-tag__bubble`); return b ? { text: b.textContent, shown: b.style.display !== 'none' } : null; }, bId);
+      check("…and a speech bubble over B's toy for A", bubble && bubble.shown && bubble.text === 'Hint: you live somewhere nice', JSON.stringify(bubble));
+      check("…and B's own log shows the line once the server echoes it", !!(await waitLine(B.page, "l.name === 'Bravo' && l.text.startsWith('Hint')")));
+      await shot(A.page, 'online-13-A-chat-log-and-bubble.png');
+
+      // B names the answer: A gets it masked, C plainly.
+      const spoiler = `ok fine, you are a ${word}!`;
+      await say(B.page, spoiler, 'KeyT');
+      await waitLine(A.page, "l.name === 'Bravo' && l.text.startsWith('ok fine')");
+      await waitLine(C.page, "l.name === 'Bravo' && l.text.startsWith('ok fine')");
+      const masked = (await lines(A.page)).find((l) => l.name === 'Bravo' && l.text.startsWith('ok fine'));
+      check("A's copy of B's message has the answer masked", masked && masked.masked && !masked.text.toLowerCase().includes(word) && masked.text.includes(`${word[0]}*`), masked?.text);
+      const plain = (await lines(C.page)).find((l) => l.name === 'Bravo' && l.text.startsWith('ok fine'));
+      check('…while C sees it as written', plain && plain.text === spoiler && !plain.masked, plain?.text);
+      await shot(A.page, 'online-14-A-sees-the-answer-masked.png');
+
+      // A guesses wrong (posted), then right (the card comes off for everyone).
+      const wrong = word === 'teapot' ? 'am I a kite?' : 'am I a teapot?';
+      await say(A.page, wrong, 'KeyT');
+      await waitLine(B.page, `l.name === 'Alpha' && l.text === ${JSON.stringify(wrong)}`);
+      check('A guesses wrong: the guess is posted to the room', (await lines(B.page)).some((l) => l.name === 'Alpha' && l.text === wrong));
+      check('…and A still wears the card', (await chat(B.page)).cards[aId] === word);
+      // Before the right guess: nothing A was ever sent, and nothing in A's page, holds the word.
+      const recv = await net(A.page, 'received');
+      // (whole words: a short card such as "cat" must not match "copycat-conductor" in the lobby list)
+      const named = (text) => new RegExp(`\\b${word.replace(/ /g, '[^a-z]*')}(s|es)?\\b`, 'i').test(text);
+      check("no message A received names A's card (before the right guess)", recv.length > 5 && !recv.some(named), `${recv.length} messages`);
+      const pageText = await A.page.evaluate(() => document.body.innerText + JSON.stringify(window.__toybox.net.chat()));
+      check("…and A's page shows it nowhere", !named(pageText));
+      await sleep(1600); // the chat rate limit
+      await say(A.page, `Am I ${word}?`, 'KeyT');
+      await B.page.waitForFunction((id) => !(id in window.__toybox.net.chat().cards), aId, { timeout: 30000, polling: 200 }).catch(() => null);
+      await A.page.waitForSelector('[data-testid=whoami-chip]', { state: 'detached', timeout: 30000 }).catch(() => null);
+      const annB = (await lines(B.page)).find((l) => l.kind === 'announce' && l.text.startsWith('Alpha guessed it'));
+      const annA = (await lines(A.page)).find((l) => l.kind === 'announce' && l.text.startsWith('You guessed it'));
+      check('A guesses right: the card comes off for both, with an announcement', !(aId in (await chat(B.page)).cards) && !(aId in (await chat(A.page)).cards) && !!annB && annB.text.toLowerCase().includes(word) && !!annA, `${annB?.text} | ${annA?.text}`);
+      check('…the right guess is not posted as a chat line', !(await lines(B.page)).some((l) => l.kind === 'say' && l.name === 'Alpha' && l.text.toLowerCase().includes(word)));
+      check("…the card is gone from A's face in B's scene and the name tag", !(await B.page.evaluate((w) => !!window.__toybox.three().scene.getObjectByName(`whoami:card:${w}`), word)) && !(await B.page.isVisible(`.name-tag[data-player="${aId}"] [data-testid=name-tag-card]`)));
+      await sleep(400);
+      await shot(B.page, 'online-15-B-sees-A-guess-it.png');
+      const cogs1 = await A.page.evaluate(() => JSON.parse(localStorage.getItem('toybox-trials:prototype:v1')).state.profile.wallet.cogs);
+      check('…and A earns 5 cogs for it (on top of the secret, if this was the first open)', cogs1 - cogs0 === 5 || cogs1 - cogs0 === 45, `${cogs0} → ${cogs1}`);
+
+      // Peel it off: the answer is revealed to the holder too.
+      await sleep(4200); // the box's cool-down
+      await A.page.keyboard.press('KeyE');
+      await B.page.waitForFunction((id) => !!window.__toybox.net.chat().cards[id], aId, { timeout: 60000, polling: 200 }).catch(() => null);
+      const word2 = (await chat(B.page)).cards[aId];
+      await A.page.waitForSelector('[data-testid=whoami-peel]', { timeout: 30000 }).catch(() => null);
+      await A.page.keyboard.press('KeyE');
+      await A.page.waitForFunction(() => [...document.querySelectorAll('.ticket')].some((t) => t.textContent.includes('already wearing')), null, { timeout: 20000 }).catch(() => null);
+      check('opening the box again while wearing a card says so', await A.page.evaluate(() => [...document.querySelectorAll('.ticket')].some((t) => t.textContent.includes('already wearing'))));
+      check('a second card is a different one', !!word2 && word2 !== word, `${word} then ${word2}`);
+      await A.page.click('[data-testid=whoami-peel]');
+      await waitLine(A.page, "l.kind === 'announce' && l.text.startsWith('You peeled off')");
+      const peelA = (await lines(A.page)).find((l) => l.kind === 'announce' && l.text.startsWith('You peeled off'));
+      check('Peel it off: the card comes off and A is told the answer', !!peelA && !!word2 && peelA.text.toLowerCase().includes(word2) && !(aId in (await chat(B.page)).cards), peelA?.text);
+
+      // Mute: B mutes A from A's line in the log; A's next message doesn't show for B.
+      await B.page.keyboard.press('KeyT');
+      await B.page.waitForSelector('[data-testid=chat-input]', { timeout: 30000 });
+      await B.page.click('.chat-line button.chat-line__name >> text=Alpha');
+      await B.page.click('[data-testid=chat-mute]');
+      check('B mutes A from a line in the open log', (await chat(B.page)).muted.includes(aId));
+      await B.page.keyboard.press('Escape');
+      await sleep(1600);
+      await say(A.page, 'can anyone hear me', 'KeyT');
+      await waitLine(C.page, "l.text === 'can anyone hear me'");
+      await sleep(500);
+      const bShows = await B.page.evaluate(() => [...document.querySelectorAll('[data-testid=chat-line]')].some((e) => e.textContent.includes('can anyone hear me')));
+      check("…B's log hides A's messages (C still gets them)", !bShows && (await lines(C.page)).some((l) => l.text === 'can anyone hear me'));
+      await B.page.evaluate((id) => window.__toybox.net.chat().muted.includes(id), aId);
+      // back where the rest of the test expects them
+      await walk(A, B, [[5, 21.5]], Math.PI);
+      await walk(B, A, [[-2.6, 17.5]], 0);
+    }
+
     // ------------------------------------------------------------ hub play: one shared marble, ball and score per room
     const hp = (p) => p.evaluate(() => window.__toybox.hubplay.state());
     /** Teleport a toy through waypoints, waiting each time until `watcher` sees it there (the server limits travel speed). */
@@ -292,80 +432,82 @@ const shot = (p, file) => p.screenshot({ path: path.join(OUT, file), timeout: T 
         await watcher.page.waitForFunction(([n, x, z]) => { const r = window.__toybox.net.remotes().find((q) => q.name === n); return r && r.x !== null && Math.hypot(r.x - x, r.z - z) < 0.3; }, [P.name, x, z], { timeout: 120000, polling: 250 }).catch(() => null);
       }
     };
-    const TRIALS = [[20, 10], [24, -40], [24, -108]];
-    await Promise.all([A, B].map((P) => P.page.waitForFunction(() => window.__toybox.hubplay.state().newest !== null, null, { timeout: 60000, polling: 250 }).catch(() => null)));
-    let ha = await hp(A.page);
-    let hb = await hp(B.page);
-    check('A and B are each sent the room\'s one marble (online, server state)', ha.mode === 'remote' && hb.mode === 'remote' && ha.newest && hb.newest && Math.abs(ha.newest.m[0] - hb.newest.m[0]) < 0.01 && Math.abs(ha.newest.m[1] - hb.newest.m[1]) < 0.01, JSON.stringify([ha.newest?.m, hb.newest?.m]));
-    const m0 = ha.newest.m;
-    await travel(A, B, [[m0[0] + 2.3, m0[1]]], -Math.PI / 2);
-    await A.page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Kick'), null, { timeout: 60000 }).catch(() => null);
-    await A.page.keyboard.press('KeyE');
-    await B.page.waitForFunction((x) => { const n = window.__toybox.hubplay.state().newest; return n && n.m[0] < x - 4; }, m0[0], { timeout: 60000, polling: 100 }).catch(() => null);
-    await shot(B.page, 'online-07-B-sees-A-kick-the-marble.png');
-    await B.page.waitForFunction(() => { const n = window.__toybox.hubplay.state().newest; return n && n.m[2] === 0 && n.m[3] === 0; }, null, { timeout: 60000, polling: 250 }).catch(() => null);
-    await A.page.waitForFunction(() => { const n = window.__toybox.hubplay.state().newest; return n && n.m[2] === 0 && n.m[3] === 0; }, null, { timeout: 60000, polling: 250 }).catch(() => null);
-    ha = await hp(A.page);
-    hb = await hp(B.page);
-    check('A kicks the marble (E); B sees the same marble roll and stop in the same place', hb.newest.m[0] < m0[0] - 4 && Math.hypot(ha.newest.m[0] - hb.newest.m[0], ha.newest.m[1] - hb.newest.m[1]) < 0.01 && Math.hypot(hb.marble.x - hb.newest.m[0], hb.marble.z - hb.newest.m[1]) < 0.5, `x ${m0[0]} → ${hb.newest.m[0]} (A ${ha.newest.m[0]}, B draws ${hb.marble.x.toFixed(2)})`);
+    if (!process.env.SKIP_HUBPLAY) {
+      const TRIALS = [[20, 10], [24, -40], [24, -108]];
+      await Promise.all([A, B].map((P) => P.page.waitForFunction(() => window.__toybox.hubplay.state().newest !== null, null, { timeout: 60000, polling: 250 }).catch(() => null)));
+      let ha = await hp(A.page);
+      let hb = await hp(B.page);
+      check('A and B are each sent the room\'s one marble (online, server state)', ha.mode === 'remote' && hb.mode === 'remote' && ha.newest && hb.newest && Math.abs(ha.newest.m[0] - hb.newest.m[0]) < 0.01 && Math.abs(ha.newest.m[1] - hb.newest.m[1]) < 0.01, JSON.stringify([ha.newest?.m, hb.newest?.m]));
+      const m0 = ha.newest.m;
+      await travel(A, B, [[m0[0] + 2.3, m0[1]]], -Math.PI / 2);
+      await A.page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Kick'), null, { timeout: 60000 }).catch(() => null);
+      await A.page.keyboard.press('KeyE');
+      await B.page.waitForFunction((x) => { const n = window.__toybox.hubplay.state().newest; return n && n.m[0] < x - 4; }, m0[0], { timeout: 60000, polling: 100 }).catch(() => null);
+      await shot(B.page, 'online-07-B-sees-A-kick-the-marble.png');
+      await B.page.waitForFunction(() => { const n = window.__toybox.hubplay.state().newest; return n && n.m[2] === 0 && n.m[3] === 0; }, null, { timeout: 60000, polling: 250 }).catch(() => null);
+      await A.page.waitForFunction(() => { const n = window.__toybox.hubplay.state().newest; return n && n.m[2] === 0 && n.m[3] === 0; }, null, { timeout: 60000, polling: 250 }).catch(() => null);
+      ha = await hp(A.page);
+      hb = await hp(B.page);
+      check('A kicks the marble (E); B sees the same marble roll and stop in the same place', hb.newest.m[0] < m0[0] - 4 && Math.hypot(ha.newest.m[0] - hb.newest.m[0], ha.newest.m[1] - hb.newest.m[1]) < 0.01 && Math.hypot(hb.marble.x - hb.newest.m[0], hb.marble.z - hb.newest.m[1]) < 0.5, `x ${m0[0]} → ${hb.newest.m[0]} (A ${ha.newest.m[0]}, B draws ${hb.marble.x.toFixed(2)})`);
 
-    // basketball: A picks it up by the hoop (B watches from the pitch), throws it (hold E), then sinks one
-    await travel(B, A, [...TRIALS, [62, -118]], -2.4);
-    await travel(A, B, [...TRIALS, [76, -125.6]], Math.PI);
-    await A.page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Pick up'), null, { timeout: 60000 }).catch(() => null);
-    await A.page.keyboard.press('KeyE');
-    const aId = await net(A.page, 'selfId');
-    await B.page.waitForFunction((id) => window.__toybox.hubplay.state().newest?.h === id, aId, { timeout: 60000, polling: 100 }).catch(() => null);
-    await B.page.waitForFunction(() => window.__toybox.hubplay.state().ball.held, null, { timeout: 60000, polling: 100 }).catch(() => null);
-    hb = await hp(B.page);
-    check('A picks up the ball (E); B sees A holding it', (await hp(A.page)).holding && hb.newest.h === aId && hb.ball.held && hb.ball.holder === aId, JSON.stringify(hb.ball));
-    await B.page.evaluate(() => window.__toybox.aim(-2.4 + Math.PI, 0.15));
-    await sleep(800);
-    await shot(B.page, 'online-08-B-sees-A-hold-the-ball.png');
-    await A.page.keyboard.down('KeyE');
-    await A.page.waitForFunction(() => (window.__toybox.hubplay.state().charge ?? 0) > 0.35, null, { timeout: 60000, polling: 50 }).catch(() => null);
-    await A.page.keyboard.up('KeyE');
-    await B.page.waitForFunction(() => { const n = window.__toybox.hubplay.state().newest; return n && n.h === null && Math.hypot(n.b[3], n.b[4], n.b[5]) > 1; }, null, { timeout: 60000, polling: 50 }).catch(() => null);
-    hb = await hp(B.page);
-    check('A holds E and lets go: the ball is thrown, and B sees it fly', !(await hp(A.page)).holding && hb.newest.h === null, JSON.stringify(hb.newest?.b));
-    await B.page.waitForFunction(() => { const n = window.__toybox.hubplay.state().newest; return n && !n.h && n.b[3] === 0 && n.b[4] === 0 && n.b[5] === 0; }, null, { timeout: 120000, polling: 250 }).catch(() => null);
-    const restB = (await hp(B.page)).newest.b;
-    // stand 2 cm from where it lies, on the side of its spot (always on the pitch)
-    const toSpot = Math.hypot(76 - restB[0], -128 - restB[2]) || 1;
-    await travel(A, B, [[restB[0] + ((76 - restB[0]) / toSpot) * 2, restB[2] + ((-128 - restB[2]) / toSpot) * 2]], Math.atan2(restB[0] - 76, restB[2] + 128));
-    await A.page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Pick up'), null, { timeout: 60000 }).catch(() => null);
-    await A.page.keyboard.press('KeyE');
-    await B.page.waitForFunction((id) => window.__toybox.hubplay.state().newest?.h === id, aId, { timeout: 60000, polling: 100 }).catch(() => null);
-    const shotYaw = Math.atan2(76 - 72, -137.2 + 125);
-    await travel(A, B, [[72, -125]], shotYaw);
-    const sol = await A.page.evaluate(() => window.__toybox.hubplay.solve());
-    await A.page.evaluate(([y, p]) => window.__toybox.hubplay.throw(y, p), [sol.yaw, sol.power]);
-    await B.page.waitForFunction(() => window.__toybox.hubplay.state().hoops >= 1, null, { timeout: 60000, polling: 100 }).catch(() => null);
-    await A.page.waitForFunction(() => window.__toybox.hubplay.state().mine >= 1, null, { timeout: 60000, polling: 100 }).catch(() => null);
-    await sleep(300);
-    await shot(B.page, 'online-09-B-sees-A-score-a-basket.png');
-    ha = await hp(A.page);
-    hb = await hp(B.page);
-    check('A sinks a basket: the room tally is 1 for both, and it counts as A\'s', ha.hoops === 1 && hb.hoops === 1 && ha.mine === 1 && hb.mine === 0, `power ${sol.power}; A ${ha.hoops}/${ha.mine}, B ${hb.hoops}/${hb.mine}`);
-    check('…and both HUDs show it', ((await A.page.textContent('[data-testid=hubplay-baskets]').catch(() => '')) || '').includes('Baskets 1') && ((await B.page.textContent('[data-testid=hubplay-baskets]').catch(() => '')) || '').includes('Baskets 1'));
+      // basketball: A picks it up by the hoop (B watches from the pitch), throws it (hold E), then sinks one
+      await travel(B, A, [...TRIALS, [62, -118]], -2.4);
+      await travel(A, B, [...TRIALS, [76, -125.6]], Math.PI);
+      await A.page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Pick up'), null, { timeout: 60000 }).catch(() => null);
+      await A.page.keyboard.press('KeyE');
+      const aId = await net(A.page, 'selfId');
+      await B.page.waitForFunction((id) => window.__toybox.hubplay.state().newest?.h === id, aId, { timeout: 60000, polling: 100 }).catch(() => null);
+      await B.page.waitForFunction(() => window.__toybox.hubplay.state().ball.held, null, { timeout: 60000, polling: 100 }).catch(() => null);
+      hb = await hp(B.page);
+      check('A picks up the ball (E); B sees A holding it', (await hp(A.page)).holding && hb.newest.h === aId && hb.ball.held && hb.ball.holder === aId, JSON.stringify(hb.ball));
+      await B.page.evaluate(() => window.__toybox.aim(-2.4 + Math.PI, 0.15));
+      await sleep(800);
+      await shot(B.page, 'online-08-B-sees-A-hold-the-ball.png');
+      await A.page.keyboard.down('KeyE');
+      await A.page.waitForFunction(() => (window.__toybox.hubplay.state().charge ?? 0) > 0.35, null, { timeout: 60000, polling: 50 }).catch(() => null);
+      await A.page.keyboard.up('KeyE');
+      await B.page.waitForFunction(() => { const n = window.__toybox.hubplay.state().newest; return n && n.h === null && Math.hypot(n.b[3], n.b[4], n.b[5]) > 1; }, null, { timeout: 60000, polling: 50 }).catch(() => null);
+      hb = await hp(B.page);
+      check('A holds E and lets go: the ball is thrown, and B sees it fly', !(await hp(A.page)).holding && hb.newest.h === null, JSON.stringify(hb.newest?.b));
+      await B.page.waitForFunction(() => { const n = window.__toybox.hubplay.state().newest; return n && !n.h && n.b[3] === 0 && n.b[4] === 0 && n.b[5] === 0; }, null, { timeout: 120000, polling: 250 }).catch(() => null);
+      const restB = (await hp(B.page)).newest.b;
+      // stand 2 cm from where it lies, on the side of its spot (always on the pitch)
+      const toSpot = Math.hypot(76 - restB[0], -128 - restB[2]) || 1;
+      await travel(A, B, [[restB[0] + ((76 - restB[0]) / toSpot) * 2, restB[2] + ((-128 - restB[2]) / toSpot) * 2]], Math.atan2(restB[0] - 76, restB[2] + 128));
+      await A.page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Pick up'), null, { timeout: 60000 }).catch(() => null);
+      await A.page.keyboard.press('KeyE');
+      await B.page.waitForFunction((id) => window.__toybox.hubplay.state().newest?.h === id, aId, { timeout: 60000, polling: 100 }).catch(() => null);
+      const shotYaw = Math.atan2(76 - 72, -137.2 + 125);
+      await travel(A, B, [[72, -125]], shotYaw);
+      const sol = await A.page.evaluate(() => window.__toybox.hubplay.solve());
+      await A.page.evaluate(([y, p]) => window.__toybox.hubplay.throw(y, p), [sol.yaw, sol.power]);
+      await B.page.waitForFunction(() => window.__toybox.hubplay.state().hoops >= 1, null, { timeout: 60000, polling: 100 }).catch(() => null);
+      await A.page.waitForFunction(() => window.__toybox.hubplay.state().mine >= 1, null, { timeout: 60000, polling: 100 }).catch(() => null);
+      await sleep(300);
+      await shot(B.page, 'online-09-B-sees-A-score-a-basket.png');
+      ha = await hp(A.page);
+      hb = await hp(B.page);
+      check('A sinks a basket: the room tally is 1 for both, and it counts as A\'s', ha.hoops === 1 && hb.hoops === 1 && ha.mine === 1 && hb.mine === 0, `power ${sol.power}; A ${ha.hoops}/${ha.mine}, B ${hb.hoops}/${hb.mine}`);
+      check('…and both HUDs show it', ((await A.page.textContent('[data-testid=hubplay-baskets]').catch(() => '')) || '').includes('Baskets 1') && ((await B.page.textContent('[data-testid=hubplay-baskets]').catch(() => '')) || '').includes('Baskets 1'));
 
-    // a goal: the test server lets A put the marble in front of the east net (hpdebug), then A kicks it in
-    await A.page.evaluate(() => window.__toybox.hubplay.place(101 - 11.8, -126));
-    await travel(A, B, [[101 - 14.2, -126]], Math.PI / 2);
-    await A.page.waitForFunction(() => { const n = window.__toybox.hubplay.state().newest; return n && Math.abs(n.m[0] - 89.2) < 0.05; }, null, { timeout: 60000, polling: 100 }).catch(() => null);
-    await A.page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Kick'), null, { timeout: 60000 }).catch(() => null);
-    await A.page.keyboard.press('KeyE');
-    await B.page.waitForFunction(() => window.__toybox.hubplay.state().score[0] === 1, null, { timeout: 60000, polling: 100 }).catch(() => null);
-    await B.page.evaluate(() => window.__toybox.aim(-Math.PI / 2 + 0.3, 0.2));
-    await sleep(500);
-    await shot(B.page, 'online-10-B-sees-the-goal.png');
-    ha = await hp(A.page);
-    hb = await hp(B.page);
-    check('A kicks the marble into the east net: a goal for Coral, 1 – 0 for both', ha.score.join() === '1,0' && hb.score.join() === '1,0' && ((await B.page.textContent('[data-testid=hubplay-goals]').catch(() => '')) || '').replace(/\s/g, '') === '1–0', `A ${ha.score} B ${hb.score}`);
-    await B.page.waitForFunction(() => { const n = window.__toybox.hubplay.state().newest; return n && n.n === 0 && Math.abs(n.m[0] - 26) < 0.01; }, null, { timeout: 60000, polling: 250 }).catch(() => null);
-    check('…and the marble goes back to the centre spot', Math.abs((await hp(B.page)).newest.m[0] - 26) < 0.01);
-    // back to spawn (the rest of the test stands there)
-    await travel(A, B, [[24, -108], [24, -40], [5, 21.5]], Math.PI);
+      // a goal: the test server lets A put the marble in front of the east net (hpdebug), then A kicks it in
+      await A.page.evaluate(() => window.__toybox.hubplay.place(101 - 11.8, -126));
+      await travel(A, B, [[101 - 14.2, -126]], Math.PI / 2);
+      await A.page.waitForFunction(() => { const n = window.__toybox.hubplay.state().newest; return n && Math.abs(n.m[0] - 89.2) < 0.05; }, null, { timeout: 60000, polling: 100 }).catch(() => null);
+      await A.page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Kick'), null, { timeout: 60000 }).catch(() => null);
+      await A.page.keyboard.press('KeyE');
+      await B.page.waitForFunction(() => window.__toybox.hubplay.state().score[0] === 1, null, { timeout: 60000, polling: 100 }).catch(() => null);
+      await B.page.evaluate(() => window.__toybox.aim(-Math.PI / 2 + 0.3, 0.2));
+      await sleep(500);
+      await shot(B.page, 'online-10-B-sees-the-goal.png');
+      ha = await hp(A.page);
+      hb = await hp(B.page);
+      check('A kicks the marble into the east net: a goal for Coral, 1 – 0 for both', ha.score.join() === '1,0' && hb.score.join() === '1,0' && ((await B.page.textContent('[data-testid=hubplay-goals]').catch(() => '')) || '').replace(/\s/g, '') === '1–0', `A ${ha.score} B ${hb.score}`);
+      await B.page.waitForFunction(() => { const n = window.__toybox.hubplay.state().newest; return n && n.n === 0 && Math.abs(n.m[0] - 26) < 0.01; }, null, { timeout: 60000, polling: 250 }).catch(() => null);
+      check('…and the marble goes back to the centre spot', Math.abs((await hp(B.page)).newest.m[0] - 26) < 0.01);
+      // back to spawn (the rest of the test stands there)
+      await travel(A, B, [[24, -108], [24, -40], [5, 21.5]], Math.PI);
+    }
 
     // Reconnect: C's socket drops without a leave; C resumes the same slot.
     const cId = await net(C.page, 'selfId');

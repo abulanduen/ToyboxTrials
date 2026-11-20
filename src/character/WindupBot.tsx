@@ -35,12 +35,14 @@ interface Props {
   keySkin?: KeySkinId;
   /** Back / face / neck accessories (minigame scenes may leave them out). */
   accessories?: Accessories;
+  /** Something stuck on the front of the head (the Hub's Who Am I? card), in head coordinates. */
+  faceStuck?: React.ReactNode;
 }
 
 /** Juggling beads: colours and phase offsets (the juggle gesture). */
 const JUGGLE_BALLS = [PALETTE.coral, PALETTE.honey, PALETTE.toyBlue];
 
-export function WindupBot({ anim, paint, hat = 'none', keySkin = 'classic', accessories = NO_ACCESSORIES }: Props) {
+export function WindupBot({ anim, paint, hat = 'none', keySkin = 'classic', accessories = NO_ACCESSORIES, faceStuck }: Props) {
   const mats = useMemo(() => {
     const plastic = (c: string, rough = 0.42) => new THREE.MeshStandardMaterial({ color: c, roughness: rough, metalness: 0.02 });
     return {
@@ -513,6 +515,7 @@ export function WindupBot({ anim, paint, hat = 'none', keySkin = 'classic', acce
             ))}
           </group>
           <FaceItem id={accessories.face} />
+          {faceStuck}
           {/* side bolts / ears */}
           {[-1, 1].map((side) => (
             <mesh key={side} position={[side * 0.62, 0.45, 0]} rotation={[0, 0, Math.PI / 2]} material={mats.accent} castShadow>

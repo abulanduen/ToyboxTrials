@@ -13,7 +13,11 @@ import { exposeDebug } from './debug';
 import { openPractice } from '../minigames/session';
 import { BALL, MARBLE } from './hubPlay';
 import { ballFree, grab, iHold, kick, startCharge } from '../hubplay/runtime';
-import { GATES, GATE_STAND, JACK, JUKEBOX, MUSICBOX, PAVILION, PIPWICK_HOME, SCOREBOARD, SHOP, TOWER, TV, WORKSHOP, frontOf } from '../scene/layout';
+import { JACK_SPOT } from './whoAmI';
+import { useNet } from '../net/store';
+import { requestCard, wearingCard } from '../net/chat';
+import { CHAT_NOTE_TEXT } from '../net/protocol';
+import { GATES, GATE_STAND, JUKEBOX, MUSICBOX, PAVILION, PIPWICK_HOME, SCOREBOARD, SHOP, TOWER, TV, WORKSHOP, frontOf } from '../scene/layout';
 
 export interface Interactable {
   id: string;
@@ -53,7 +57,7 @@ export const INTERACTABLES: Interactable[] = [
   { id: 'ball', x: BALL.spot.x, z: BALL.spot.z, radius: 3.0, verb: 'Pick up', label: 'the basketball', disabled: () => !ballFree() },
   // (while you hold it: its live spot sits 2.9 cm ahead of you, so a nearer prompt such as a gate wins)
   { id: 'ball-throw', x: BALL.spot.x, z: BALL.spot.z, radius: 3, verb: 'Hold to throw', label: 'the basketball', disabled: () => !iHold() },
-  { id: 'jack', x: JACK.x + 3.2, z: JACK.z + 0.5, radius: 3.4, verb: 'Open', label: 'a suspicious box', secret: true },
+  { id: 'jack', x: JACK_SPOT.x, z: JACK_SPOT.z, radius: JACK_SPOT.radius, verb: 'Open', label: 'a suspicious box', secret: true },
   { id: 'key', x: TOWER.block.x, z: TOWER.block.z, radius: 2.4, verb: 'Grab', label: 'the golden key', secret: true, minY: TOWER.block.top - 0.5, disabled: () => !keyAvailable() },
 ];
 
@@ -140,9 +144,22 @@ export function interact(id: string, facing: { x: number; z: number }) {
       startCharge();
       break;
     case 'jack':
+      if (useNet.getState().status === 'online') {
+        // Online: Who Am I? The jack slaps a card (dealt by the server) on your face; no ambush.
+        if (wearingCard()) {
+          sfx.reject();
+          g.pushTicket({ title: 'Who Am I?', body: CHAT_NOTE_TEXT.card_busy, tone: 'info' });
+          return;
+        }
+        events.emit('prop:jack-card');
+        discover('jack', 'Jack-in-the-box ambush');
+        requestCard();
+        break;
+      }
       events.emit('prop:jack-pop');
       discover('jack', 'Jack-in-the-box ambush');
       // Elimination is triggered by the prop after its pop animation.
+      g.pushTicket({ title: 'Who Am I?', body: 'This box also plays Who Am I? with other players. Join the online Hub to try it.', tone: 'info' });
       break;
     case 'key':
       if (!keyAvailable()) return;

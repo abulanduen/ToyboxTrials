@@ -83,6 +83,10 @@ interface SettingsSlice {
   hubTrack: string;
   /** The first-visit Hub tour has been shown (finished or skipped). */
   tourSeen: boolean;
+  /** Online Hub text chat: the chat log, speech bubbles and chat box (off hides them all). */
+  textChat: boolean;
+  /** When (ms) the last few Who Am I? guesses paid cogs (economy.ts rewardWhoAmI caps them per hour). */
+  whoAmIPaid: number[];
 }
 
 interface SessionSlice {
@@ -163,6 +167,8 @@ export const useGame = create<GameState>()(
       voiceVolume: 0.9,
       hubTrack: 'windowsill-waltz',
       tourSeen: false,
+      textChat: true,
+      whoAmIPaid: [],
 
       // session
       screen: 'menu',
@@ -256,6 +262,8 @@ export const useGame = create<GameState>()(
         voiceVolume: s.voiceVolume,
         hubTrack: s.hubTrack,
         tourSeen: s.tourSeen,
+        textChat: s.textChat,
+        whoAmIPaid: s.whoAmIPaid,
       }),
     },
   ),

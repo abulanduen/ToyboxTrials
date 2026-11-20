@@ -131,6 +131,12 @@ export function SettingsForm() {
           <span>Join the online Hub automatically</span>
         </label>
       )}
+      {onlineAvailable() && (
+        <label className="setting setting--check">
+          <input type="checkbox" checked={s.textChat} onChange={(e) => s.set({ textChat: e.target.checked })} data-testid="setting-text-chat" />
+          <span>Text chat (online Hub)</span>
+        </label>
+      )}
     </div>
   );
 }

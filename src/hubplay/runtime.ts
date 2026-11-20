@@ -72,7 +72,8 @@ export const view = {
 export const fxClock = { goalAt: { w: -1e9, e: -1e9 } as Record<'w' | 'e', number>, hoopAt: -1e9 };
 
 /** Celebrations for the scene to play (goal at a net, basket at the rim). */
-export const fxQueue: { kind: 'goal' | 'hoop'; x: number; y: number; z: number; color: string }[] = [];
+/** Confetti bursts for the scene (HubPlay's Confetti): goals, baskets, and a Who Am I? card guessed (src/net/chat.ts). */
+export const fxQueue: { kind: 'goal' | 'hoop' | 'card'; x: number; y: number; z: number; color: string }[] = [];
 
 const rt = {
   mode: 'local' as 'local' | 'remote',

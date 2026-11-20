@@ -544,6 +544,23 @@ export const sfx = {
     for (let i = 0; i < 6; i++) noise(t + 0.05 + i * 0.03, 0.08, 0.05, 5000 + i * 400, 3);
   },
 
+  // ---- Who Am I? (the suspicious box, online Hub) ----
+
+  /** A paper card slapped onto the face: a soft papery thwack and a little tape squeak. */
+  cardSlap() {
+    const t = now();
+    noise(t, 0.22, 0.06, 900, 0.8, 'lowpass');
+    noise(t + 0.01, 0.12, 0.09, 2600, 1.4);
+    tone(520, t + 0.08, 0.04, 0.08, 'sine', 0.01, 760);
+  },
+  /** The card comes off (guessed): a paper flutter, then two bright tines. */
+  cardOff() {
+    const t = now();
+    for (let i = 0; i < 5; i++) noise(t + i * 0.035, 0.06 - i * 0.008, 0.03, 1800 + i * 500, 2.5);
+    tine(1318.5, t + 0.16, 0.1, 0.4);
+    tine(1760, t + 0.26, 0.09, 0.6);
+  },
+
   // ---- Find the Original ----
 
   /** Spotted the real one: a quick "ta-da" on music-box tines with a tin sparkle. */

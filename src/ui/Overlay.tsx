@@ -26,6 +26,8 @@ import { HubLobbies, HubLobbyAlert, LobbyList, OnlineLeaderboard } from './Lobby
 import { JukeboxList, WelcomeUI } from './WelcomeUI';
 import { useWelcome } from '../game/welcome';
 import { HubPlayHud } from './HubPlayHud';
+import { HubChat, WhoAmIChip } from './ChatUI';
+import { isTypingTarget } from '../game/input';
 
 // ---------------------------------------------------------------- HUD
 function Prompt() {
@@ -71,7 +73,7 @@ function Controls() {
   useEffect(() => {
     const id = window.setTimeout(() => setOpen(false), 14000);
     const onKey = (e: KeyboardEvent) => {
-      if (e.code === 'KeyH') setOpen((o) => !o);
+      if (e.code === 'KeyH' && !isTypingTarget(e.target)) setOpen((o) => !o);
     };
     window.addEventListener('keydown', onKey);
     return () => {
@@ -208,7 +210,18 @@ function Hud() {
       <HubLobbies />
       <HubLobbyAlert />
       <Tickets />
-      {!welcoming && (touch ? <TouchControls /> : <Controls />)}
+      <WhoAmIChip />
+      {touch ? (
+        <>
+          {!welcoming && <TouchControls />}
+          <HubChat placement="touch" />
+        </>
+      ) : (
+        <div className="hud-dock">
+          <HubChat placement="dock" />
+          {!welcoming && <Controls />}
+        </div>
+      )}
       <BoostMeter />
       {!welcoming && (touch ? <LookHint /> : cursorFree ? <div className="look-hint" data-testid="cursor-free">Cursor free: click a button · let go of Alt to look again</div> : !locked && <div className="look-hint">Click the scene to look around · hold Alt for a cursor</div>)}
       <WelcomeUI />

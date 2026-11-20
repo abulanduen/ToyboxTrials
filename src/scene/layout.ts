@@ -12,6 +12,7 @@ import { addStatic, resetStatic, type Collider } from '../game/collision';
 import { BRIDGE_WALK, BRIDGE_X, GATES_WALK, HUB_WALK, WALK_AREAS } from '../game/hubBounds';
 import { hubPlayColliders } from '../game/hubPlay';
 import { PALETTE } from '../game/palette';
+import { JACK_BOX } from '../game/whoAmI';
 import { MINIGAMES } from '../minigames/registry';
 import type { MinigameId } from '../minigames/types';
 import { DOMINO } from './domino';
@@ -62,7 +63,8 @@ export const SCOREBOARD = {
 export const TV = { x: -15.5, z: -16.5, rot: 0.3, w: 9, d: 6, h: 8.4 };
 export const TRACK = { x: 19, z: 21.5, rx: 11, rz: 6.5 };
 export const MUSICBOX = { x: 11, z: -27.5 };
-export const JACK = { x: -35, z: -22 };
+/** The jack-in-the-box: its spot lives in src/game/whoAmI.ts, where the server reads it (Who Am I? cards). */
+export const JACK = JACK_BOX;
 
 /**
  * Signposts: wooden fingerposts with an arrow board per destination (labels and colours in

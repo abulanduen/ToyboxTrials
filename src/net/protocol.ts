@@ -9,14 +9,17 @@
  */
 import { EMOTE_IDS, isEmoteId, type EmoteId } from '../game/emotes';
 import { MINIGAME_IDS, type MinigameId } from '../minigames/ids';
+import { CHAT_RAW_MAX } from './chatFilter';
 
 /**
  * v2: looks carry the accessory slots (back/face/neck), six more gesture ids, and a 'shop' activity.
  * v3: tournament lobbies (`lobby`, `lobbies`, `lobbyAlert`, `lobbyErr`), server-run matches (`in`,
  *     `ms`) and the account link for the leaderboard (`auth`).
  * v4: hub play: the shared marble and basketball (`kick`, `ball`, snapshot `hp`, `play` events).
+ * v5: Hub text chat (`chat` both ways, `chatNote`) and Who Am I? cards at the suspicious box
+ *     (`card` both ways, `cards`).
  */
-export const PROTOCOL_VERSION = 4;
+export const PROTOCOL_VERSION = 5;
 
 // ---------------------------------------------------------------- limits and rates
 /** Largest client → server frame the server accepts (bytes). Bigger frames close the socket. */
@@ -387,7 +390,18 @@ export interface HubPlayDebugMsg {
   x: number;
   z: number;
 }
-export type ClientMsg = HelloMsg | MoveMsg | EmoteMsg | ActivityMsg | LookMsg | LeaveMsg | LobbyMsg | InputMsg | AuthMsg | KickMsg | BallMsg | HubPlayDebugMsg;
+// ---------------------------------------------------------------- chat and Who Am I? (v5)
+/** Say something in the room's chat (the server cleans, filters and rate-limits it). */
+export interface ChatSendMsg {
+  t: 'chat';
+  text: string;
+}
+/** At the suspicious box: ask for a Who Am I? card (`deal`), or give up on yours (`peel`). */
+export interface CardActionMsg {
+  t: 'card';
+  a: 'deal' | 'peel';
+}
+export type ClientMsg = HelloMsg | MoveMsg | EmoteMsg | ActivityMsg | LookMsg | LeaveMsg | LobbyMsg | InputMsg | AuthMsg | KickMsg | BallMsg | HubPlayDebugMsg | ChatSendMsg | CardActionMsg;
 
 // ---------------------------------------------------------------- server → client
 export interface WelcomeMsg {
@@ -488,7 +502,63 @@ export type ServerMsg =
   | LobbyStateMsg
   | LobbyErrMsg
   | MatchStateMsg
-  | PlayEventsMsg;
+  | PlayEventsMsg
+  | ChatLineMsg
+  | ChatNoteMsg
+  | CardEventMsg
+  | CardsMsg;
+
+/**
+ * A chat line, as this recipient may see it: `name` comes from the server's roster, `text` is
+ * cleaned and filtered, and a Who Am I? holder gets their own answer masked (`m` = 1).
+ */
+export interface ChatLineMsg {
+  t: 'chat';
+  /** Sender's player id. */
+  id: string;
+  name: string;
+  text: string;
+  /** Room message number (increasing). */
+  n: number;
+  /** 1 when this copy had a Who Am I? answer masked for you. */
+  m?: 1;
+}
+export const CHAT_NOTE_CODES = ['slow', 'card_busy', 'card_far', 'card_wait', 'card_none', 'card_away'] as const;
+export type ChatNoteCode = (typeof CHAT_NOTE_CODES)[number];
+export const CHAT_NOTE_TEXT: Record<ChatNoteCode, string> = {
+  slow: 'Slow down a little: wait a moment before your next message.',
+  card_busy: "You're already wearing a card. Guess it in chat, or peel it off.",
+  card_far: 'Stand by the suspicious box to open it.',
+  card_wait: 'The jack is winding back up. Try again in a moment.',
+  card_none: "You aren't wearing a card.",
+  card_away: 'Come back to the Hub first.',
+};
+/** Something about your chat or card the server refused (only you get it). `wait`: ms until you may chat again. */
+export interface ChatNoteMsg {
+  t: 'chatNote';
+  code: ChatNoteCode;
+  message: string;
+  wait?: number;
+}
+/**
+ * A Who Am I? card went on, was guessed, peeled off, or fell off (left, went into a trial or the
+ * Workshop, disconnected). `w` (the word) and `ar` (its article) are never sent to the holder
+ * while the card is on: only `solved` and `peeled` reveal it to them. `guess`: the right guess.
+ */
+export interface CardEventMsg {
+  t: 'card';
+  k: 'on' | 'solved' | 'peeled' | 'off';
+  /** The holder's player id. */
+  id: string;
+  name: string;
+  w?: string;
+  ar?: string;
+}
+/** Everyone wearing a card in the room, as this recipient may see it (sent on joining). */
+export interface CardsMsg {
+  t: 'cards';
+  c: { id: string; w?: string }[];
+}
 
 /** The open lobbies in this Hub room (sent on joining the room and whenever one changes). */
 export interface LobbiesMsg {
@@ -657,6 +727,10 @@ export function validateClientMessage(m: unknown): ClientMsg | null {
       return null;
     case 'hpdebug':
       return isNum(m.x) && isNum(m.z) ? { t: 'hpdebug', x: m.x, z: m.z } : null;
+    case 'chat':
+      return isStr(m.text, CHAT_RAW_MAX) ? { t: 'chat', text: m.text } : null;
+    case 'card':
+      return m.a === 'deal' || m.a === 'peel' ? { t: 'card', a: m.a } : null;
     default:
       return null;
   }
@@ -976,6 +1050,30 @@ export function validateServerMessage(m: unknown): ServerMsg | null {
       if (!isInt(m.m) || (m.k !== 0 && m.k !== 1) || !isNum(m.n) || !Array.isArray(m.e) || m.d === undefined) return null;
       const e = m.e.filter((x): x is MatchEventWire => isObj(x) && typeof x.type === 'string');
       return { t: 'ms', m: m.m, k: m.k, d: m.d, e, n: m.n };
+    }
+    case 'chat':
+      if (!isPlayerId(m.id) || !isStr(m.name, 64) || !isStr(m.text, CHAT_RAW_MAX) || !isInt(m.n)) return null;
+      return { t: 'chat', id: m.id, name: m.name, text: m.text, n: m.n, ...(m.m === 1 ? { m: 1 as const } : {}) };
+    case 'chatNote': {
+      if (!isOneOf(CHAT_NOTE_CODES, m.code)) return null;
+      const code = m.code;
+      return { t: 'chatNote', code, message: isStr(m.message, 300) ? m.message : CHAT_NOTE_TEXT[code], ...(isNum(m.wait) ? { wait: m.wait } : {}) };
+    }
+    case 'card': {
+      if ((m.k !== 'on' && m.k !== 'solved' && m.k !== 'peeled' && m.k !== 'off') || !isPlayerId(m.id) || !isStr(m.name, 64)) return null;
+      const ev: CardEventMsg = { t: 'card', k: m.k, id: m.id, name: m.name };
+      if (isStr(m.w, 64)) ev.w = m.w;
+      if (isStr(m.ar, 4)) ev.ar = m.ar;
+      return ev;
+    }
+    case 'cards': {
+      if (!Array.isArray(m.c)) return null;
+      const c: CardsMsg['c'] = [];
+      for (const x of m.c) {
+        if (!isObj(x) || !isPlayerId(x.id)) continue;
+        c.push(isStr(x.w, 64) ? { id: x.id, w: x.w } : { id: x.id });
+      }
+      return { t: 'cards', c };
     }
     default:
       return null;

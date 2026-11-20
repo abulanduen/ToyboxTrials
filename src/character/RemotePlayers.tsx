@@ -11,6 +11,7 @@ import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { WindupBot } from './WindupBot';
+import { FaceCard } from './FaceCard';
 import { stepEmote, type ToyAnim } from './anim';
 import { useNet } from '../net/store';
 import { nameTagEls, remotes, upsertRemote } from '../net/remotes';
@@ -148,7 +149,7 @@ function RemoteToy({ info }: { info: PlayerInfo }) {
   return (
     <>
       <group ref={root} visible={false}>
-        <WindupBot anim={anim} paint={paint} hat={hat} keySkin={keySkin} accessories={accessories} />
+        <WindupBot anim={anim} paint={paint} hat={hat} keySkin={keySkin} accessories={accessories} faceStuck={<FaceCard who={info.id} />} />
       </group>
       <mesh ref={shadow} rotation={[-Math.PI / 2, 0, 0]} scale={3.2} renderOrder={1} visible={false}>
         <planeGeometry args={[1, 1]} />

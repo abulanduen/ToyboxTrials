@@ -42,7 +42,7 @@ describe('client message validation', () => {
     expect(parseClientMessage(J({ t: 'look', look: { paint: 0, hat: 'none', keySkin: 'classic' } }))).toEqual({ t: 'look', look });
     expect(parseClientMessage(J({ t: 'look', look: { ...full, back: 7 } }))).toBeNull();
     expect(parseClientMessage(J({ t: 'look', look: { ...full, neck: 'x'.repeat(40) } }))).toBeNull();
-    expect(PROTOCOL_VERSION).toBe(4); // v4: hub play (v3: lobbies and server-run matches)
+    expect(PROTOCOL_VERSION).toBe(5); // v5: chat and Who Am I? (v4: hub play; v3: lobbies and server-run matches)
     expect(ACTIVITIES).toContain('shop');
   });
 

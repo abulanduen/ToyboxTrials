@@ -36,7 +36,26 @@ export const EARN = {
   tournamentPerTrial: 10,
   /** …plus a bonus for 1st / 2nd / 3rd overall. */
   tournamentPlace: [60, 35, 20] as readonly number[],
+  /** Guessing your Who Am I? card in the online Hub (at most WHOAMI_PAID_PER_HOUR an hour). */
+  whoAmI: 5,
 } as const;
+
+/** Who Am I? guesses that pay, per rolling hour. */
+export const WHOAMI_PAID_PER_HOUR = 3;
+/** A card must have been worn this long before guessing it pays (ms): no instant re-deal farming. */
+export const WHOAMI_MIN_WORN_MS = 8000;
+
+/**
+ * Cogs for guessing your Who Am I? card: EARN.whoAmI, at most WHOAMI_PAID_PER_HOUR times in any
+ * hour, and only for a card worn at least WHOAMI_MIN_WORN_MS. `paid` holds the times (ms) of
+ * earlier paid guesses; the result keeps only the last hour's.
+ */
+export function rewardWhoAmI(paid: readonly number[], now: number, wornMs: number): { reward: Reward; paid: number[] } {
+  const recent = paid.filter((t) => Number.isFinite(t) && t <= now && now - t < 3_600_000);
+  if (wornMs < WHOAMI_MIN_WORN_MS || recent.length >= WHOAMI_PAID_PER_HOUR) return { reward: NO_REWARD, paid: recent };
+  const lines: RewardLine[] = [{ label: 'Who Am I? guessed', cogs: EARN.whoAmI }];
+  return { reward: { lines, total: EARN.whoAmI, firstWin: false }, paid: [...recent, now] };
+}
 
 export interface RewardLine {
   label: string;
