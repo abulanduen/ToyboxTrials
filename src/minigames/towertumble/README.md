@@ -3,8 +3,9 @@
 A 5–10 minute random-merge tower defence for 1–8 players. Every player defends an 8×8 board
 against 20 shared waves of wind-up toys. **Build** pays for a *random* tower; **any two same-tier towers
 merge into a random tower one tier up**, all the way to tier 7. Level your **builder** for better
-odds, finish **quick quests** for gold, beat the **bosses** on waves 5, 10, 15 and 20 for free
-towers, and hold out longer than everyone else. Knocked-out players watch the other boards.
+odds, finish **quick quests** for gold (some give a free tower), beat the **bosses** on waves 5, 10, 15
+and 20 for free towers, and hold out longer than everyone else. After wave 20 comes a just-for-fun
+**damage check**. The **player rail** at the side lists everyone: tap a player to look at their board.
 
 Registry id `toy-tower-tumble` · gate on the gates table (south row at x = 45, between the bridge
 landing and Blink Duel: the mirror of Odd Page Out's spot west of the landing) · tutorial in `tutorials.ts` · browser test `tests/e2e/towertumble.cjs` · unit tests
@@ -25,6 +26,13 @@ landing and Blink Duel: the mirror of Odd Page Out's spot west of the landing) �
 
 Owner revision, 20 November 2026: matching is now by **tier**, not tower identity. **M** merges
 one available pair without a selection; clicking/dragging and bots use the same eligibility.
+
+Owner revision, 20 November 2026 (later): round rewards are paid the moment your own board clears
+its wave, and the rail highlights who is still going; the final boss gives a random tier-6 tower,
+then a 15 s prep and the damage check; three quests also give a free tower; quests show a picture of
+their tower; prices use the top bar's coin style; anyone's board can be viewed from the rail; knocked
+out players stay on their board and are offered (not forced) to watch; status badges over enemies;
+on phones the quests sit left and the rail right, with drag-to-pan and pinch/wheel zoom.
 
 ## The board
 
@@ -51,8 +59,11 @@ one available pair without a selection; clicking/dragging and bots use the same 
    human can press **Next wave** to start early (all humans still in must be ready).
 2. **Wave** — every board spawns the same enemies at the same moments. Building, merging, moving
    and selling stay open during waves.
-3. The wave ends when every board still in has killed or leaked all of its enemies. Survivors are
-   paid the clear bonus. After wave 20 the match ends.
+3. **Your round rewards come the moment your board is clear:** once every enemy of the wave has
+   been killed or has leaked on your board, you are paid the clear bonus at once (and the
+   no-leak streak counts). The wave ends for everyone when every board still in is clear; until
+   then the boards still fighting glow on the player rail, so you can see whom Next wave is
+   waiting for. After wave 20 come the damage check's 15 s prep and the damage check itself.
 4. **Safety cap:** a wave still running 90 s after it started ends anyway, and whatever is left
    leaks. (Slows are capped at 60% and only stuns from hits exist, so this should never trigger.)
 
@@ -197,7 +208,7 @@ wave 10.
 | Rumble Ram | 5 | a free random **tier-4** tower |
 | Tin Juggernaut | 10 | a free random **tier-5** tower |
 | Kite Dragon | 15 | a free random **tier-5** tower **and** a free builder level |
-| The Grand Wind-Up | 20 | a 500-point score bounty (the match ends with this wave) |
+| The Grand Wind-Up | 20 | a free random **tier-6** tower and a 500-point score bounty |
 
 A gift lands on the best free square at once. On a full board it waits and appears as soon as a
 square frees up (sell or merge).
@@ -210,12 +221,18 @@ Always on show (left column on desktop and landscape; the Quests button on portr
 |---|---|
 | Own all 5 different tier-1 towers at once | 40 gold |
 | Own 3 × the ordered tier-1 tower | 25 gold |
-| Own 3 of the same tier-2 tower | 60 gold |
-| Own 3 × the ordered tier-2 tower | 50 gold |
+| Own 3 of the same tier-2 tower | 30 gold + a free random **tier-2** tower |
+| Own 3 × the ordered tier-2 tower | 30 gold + a free random **tier-3** tower |
 | Own 3 × the ordered tier-3 tower | 80 gold + a free builder level |
 | Clear 5 waves in a row without a leak | 50 gold |
-| Own a tier-3+ tower of every family at once | 100 gold |
+| Own a tier-3+ tower of every family at once | 50 gold + a free random **tier-4** tower |
 | **Be the first in the lobby to own a tier-6 tower** | 150 gold + 5 lives |
+
+Free quest towers are rolled from your own board's stream and placed like boss gifts (a full board
+keeps them until a square frees). Balance reasoning, provisional: a tier-2 tower is two builds (40
+gold), a tier-3 four (80), a tier-4 eight (160), so each of those quests is worth a little more than
+before (60, 50 and 100 gold), more so the later it tends to land; the gold part is cut so the gift is
+the draw. Each quest shows a picture: the ordered tower's own portrait, or a tier tile.
 
 - The owner's "3 of a specific tier-1, tier-2 and tier-3" is three quests: the **ordered** towers
   are picked per match from the seed and are the same for everyone (fair, and named in the HUD).
@@ -224,6 +241,17 @@ Always on show (left column on desktop and landscape; the Quests button on portr
 - Added beyond the brief: *clean sweep* (5 waves without a leak) and *family album* (a tier-3+
   tower of every family at once), to reward defence and variety.
 
+## The damage check (after the final wave)
+
+Just for fun. When wave 20 ends, everyone still in gets a **15 s** build phase (Next wave starts it
+early), then **The Tally Bear**, a huge wind-up practice target, walks the path of every board still
+in at boss speed (slows half as well, no stuns). It has **no health bar** and can't be toppled; a
+sign above it counts the damage it has taken, the bar shows yours (and per second), and the player
+rail turns into a damage leaderboard. When it walks off the board it costs **no lives**. When every
+board's bear is off (or after 60 s) the match ends. The damage goes into `checkDamage`, never into the
+score, so it **never changes placements**; the best total is the match's `damageCheck` stat. Bots
+play it like any build phase. `damageCheck: false` in the config skips it.
+
 ## Scoring and placement
 
 Placement order: **waves survived** (cleared), then **lives left**, then **score** (damage dealt / 10,
@@ -231,14 +259,22 @@ plus the final boss's 500 bounty). Equal on all three shares a place. Clearing w
 several boards clear it, lives and score separate them. The record unit is *waves*. Not in
 tournaments (too long), like Toy Squad.
 
-## Knockout and spectating
+## The player rail, knockout and spectating
 
-At 0 lives a board is out: its enemies vanish, its towers stay for anyone watching. A knocked-out
-human gets the spectator bar: **‹ Prev / Next ›** cycle through the boards still in (or, if nobody
-is, every board), and the Players list rows become watch buttons. Once **every** human is out,
-the spectator bar also offers **×1 / ×2 / ×4**: the rules themselves run 1, 2 or 4 sub-steps per
-step (a `speed` input, accepted only from a human and only then), so it stays deterministic and
-works the same on a server. `watchable`, `cycleWatch` and `viewedBoard` in `rules.ts` are pure.
+The shared **player rail** (`shared/PlayerRail.tsx`) lists every player at the side of the screen:
+lives, best tier and score (during the damage check: damage, highest first). Click or tap a row
+(or Tab to it and press Enter) to view that board, read-only: a "Watching X · Back to my board"
+banner appears (Escape also goes back), squares only select on your own board, and your dock still
+builds on yours. Rows of boards still fighting the current wave glow.
+
+At 0 lives a board is out: its enemies vanish, its towers stay. You are **not** moved anywhere: a
+popup offers **Watch other players** or **Dismiss**. Watching puts **‹ ›** in the banner to cycle
+through the boards still in; the rail works too. Once **every** human is out, the knocked-out bar
+also offers **×1 / ×2 / ×4**: the rules themselves run 1, 2 or 4 sub-steps per step (a `speed`
+input, accepted only from a human and only then), so it stays deterministic and works the same on
+a server. `watchable`, `cycleWatch`, `viewedBoard` and `stillGoing` in `rules.ts` are pure. Online,
+every board is already in the public view (only the seed and each board's roll stream are hidden),
+so viewing another board needs nothing extra from the server.
 
 ## Multiplayer readiness
 
@@ -255,20 +291,35 @@ tower if there is room, level the builder to a per-wave plan, build on the squar
 most path (easy bots build anywhere), sell their weakest tier-1/2 tower when the board is full, and
 hard bots move their strongest tower to the best empty square.
 
-## Phones: why tap-to-select plus a sheet
+## Layout, pan and zoom, and why tap-to-select plus a sheet
 
-On a 390 px portrait screen the 8×8 board is about 44 px a square: below the 56 px rule. So squares
-**only select** (a wrong tap just selects another square, and is undone by Close), and every action
-that changes the board is a **≥ 56 px button** in the sheet that opens for the selected square:
-*Build here*, *Merge tier N at B3* (up to three partner choices), *Sell* and *Close*. The
-selected square has a white ring and its same-tier partners glow gold, so tapping a glowing partner (or dragging
-onto it) also merges; those are shortcuts, never the only way. Portrait puts the board in a square
-under the top bar, the sheet below it (never covering it) and the dock at the bottom; landscape
-puts quests left, the dock right and the sheet over the quests while a square is selected. The 3D
-camera fits the board into the HUD's `.td-board-slot` with `setViewOffset`, so the board is always
-framed in the free space whatever the layout. Keyboard: arrows move a cursor, Enter selects or
-merges, B builds, U levels the builder, M automatically merges a same-tier pair without selection,
-Q sells, N or Space starts the wave. Same-tier partner highlights also apply to different tower kinds.
+Every layout has the quests on the left and the player rail on the right (as on desktop). On
+phones both are slim 56–64 px columns: the quest column is a strip of quest pictures with progress
+(tap it for the full list), the rail a column of player chips. The 3D camera fits the board into
+the HUD's `.td-board-slot` (the space left between the bar, the columns and the dock) with
+`setViewOffset`, so the board is **centred** in it on every layout; on a tall, narrow slot it fits
+the tray only (the toy box tucks under the quest strip), so the squares get every pixel of width.
+
+**Pan and zoom** (`shared/panZoom.ts`, Tower Tumble's `camera.ts`): a drag that does not start on one
+of your towers pans the board; two fingers pinch-zoom and the mouse wheel zooms, toward the fingers
+or the cursor; zoom runs 1–3.2 × and the look-at point is clamped near the board, so it can't be
+lost. A press that moves less than 10 px is a tap, so selecting and building work as before, also
+while zoomed. **Reset view** appears whenever the view has moved. The canvas has `touch-action:
+none`, so the browser's own pinch and scroll never fire over the game.
+
+On a phone a square is small (about 28 px in portrait at the fitted zoom): below the 56 px rule. So
+squares **only select** (a wrong tap just selects another square, and is undone by Close), and every
+action that changes the board is a **≥ 56 px button** in the sheet that opens for the selected
+square: *Build here*, *Merge tier N at B3* (up to three partner choices), *Sell* and *Close*. The
+selected square has a white ring and its same-tier partners glow gold, so tapping a glowing partner
+(or dragging onto it) also merges; those are shortcuts, never the only way. Portrait puts the sheet
+above the dock at full width and the board moves up into the space above it; landscape puts the
+sheet over the quest strip. The dock (Build, Builder, Odds, Next wave) is at the bottom in portrait,
+in thumb reach, and at the right in landscape. Prices on the dock and in the sheet use the top
+bar's coin and Fredoka 17 px figure. Keyboard: arrows move a cursor, Enter selects or merges, B
+builds, U levels the builder, M automatically merges a same-tier pair without selection, Q sells,
+N or Space starts the wave; Tab reaches the rail. Same-tier partner highlights also apply to
+different tower kinds.
 
 ## Rendering and performance
 
@@ -278,6 +329,11 @@ Q sells, N or Space starts the wave. Same-tier partner highlights also apply to 
 - Effects (`Fx.tsx`) are one fixed pool of 320 particles feeding one InstancedMesh per shape, reading
   each board's fixed **ring buffers** of shots (48) and pops (24). The rules write those in place,
   so a busy wave allocates nothing for presentation; render loops reuse scratch objects.
+- **Status badges** over enemies (slowed, burning, stunned, marked, armour broken) are the shared
+  code-drawn badges (`shared/statusIcons.ts`): one InstancedMesh of camera-facing quads per status
+  kind, filled from `enemyStatus` (`status.ts`, pure and unit-tested) each frame; at most five extra
+  draw calls, none when nothing is debuffed. The legend is under the quests and in the Odds panel.
+- The damage check's sign is one sprite whose canvas is redrawn at most ten times a second.
 - The HUD re-renders 10 times a second; nothing in React changes per frame.
 - Peak renderer counts measured by the browser test are in "Measured" below. This container has no
   GPU (SwiftShader), so there are no frame-rate claims.

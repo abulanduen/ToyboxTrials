@@ -66,7 +66,10 @@ const out = path.join(__dirname,'output'); fs.mkdirSync(out,{recursive:true});
       await page.waitForSelector('.prompt'); if(mobile) await page.locator('.prompt').tap(); else await page.keyboard.press('KeyE');
       await click('practice-toy-squad');
       // Lazy module load + 0.7 s tap guard on match buttons; then fast-forward the countdown (slow software GL).
-      await page.getByTestId('match-start').waitFor({state:'visible'}); await page.waitForTimeout(900); await click('match-start');
+      await page.getByTestId('match-start').waitFor({state:'visible'}); await page.waitForTimeout(900);
+      // Three bot squads, so the player rail has boards to show.
+      { const three=page.locator('.intro-options .segmented button',{hasText:'3 bots'}); if(mobile) await three.tap(); else await three.click(); }
+      await click('match-start');
       await page.waitForFunction(()=>window.__toybox.match.phase()==='countdown');
       await page.evaluate(()=>window.__toybox.match.timeScale(10));
       // The first frames compile shaders and draw the first shop pictures; on a loaded software-GL machine that can take minutes.
@@ -215,27 +218,57 @@ const out = path.join(__dirname,'output'); fs.mkdirSync(out,{recursive:true});
       await page.screenshot({path:path.join(out,`toysquad-${layout}-build.png`)}); await page.evaluate(()=>window.__toybox.match.timeScale(1));
       await page.keyboard.press('KeyE'); await page.waitForFunction(()=>window.__toybox.match.state().phase==='battle');
       // Give the controlled battle durability and full mana to observe a real cast on all viewports.
-      await page.evaluate(()=>{window.__toybox.match.timeScale(0); for(const u of window.__toybox.match.state().battles[0].fighters){u.hp=u.maxHp=500;u.shield=0;u.magic.mana=u.magic.maxMana;} window.__toybox.match.timeScale(1);});
+      await page.evaluate(()=>{window.__toybox.match.timeScale(0); for(const u of window.__toybox.match.state().battles.find(b=>b.owner==='you').fighters){u.hp=u.maxHp=500;u.shield=0;u.magic.mana=u.magic.maxMana;} window.__toybox.match.timeScale(1);});
       // Damage overview, on the right: open on desktop, folded into a tab on phones so it never covers the board.
       if(mobile) { await page.getByTestId('squad-damage-open').waitFor({state:'visible'}); assert.equal(await page.getByTestId('squad-damage').count(),0); await size56('squad-damage-open'); await click('squad-damage-open'); }
       await page.getByTestId('squad-damage').waitFor({state:'visible'});
-      await page.waitForFunction(()=>window.__toybox.match.state().battles[0].attacks.some(a=>a.spell));
-      await page.waitForFunction(()=>window.__toybox.match.state().battles[0].damages.length>0);
+      await page.waitForFunction(()=>window.__toybox.match.state().battles.find(b=>b.owner==='you').attacks.some(a=>a.spell));
+      await page.waitForFunction(()=>window.__toybox.match.state().battles.find(b=>b.owner==='you').damages.length>0);
       // A row flashes when that toy lands a hit.
       await page.waitForSelector('[data-testid="squad-damage"] li.is-hit');
       await page.evaluate(()=>window.__toybox.match.timeScale(0));
-      assert.ok((await state()).battles[0].fighters[0].magic.casts>0);
+      assert.ok((await state()).battles.find(b=>b.owner==='you').fighters[0].magic.casts>0);
       const damageRowsShown = () => page.evaluate(()=>[...document.querySelectorAll('[data-testid="squad-damage"] li')].map(li=>Number(li.dataset.value)));
-      const tally = mode => page.evaluate(m=>window.__toybox.match.state().battles[0].fighters.filter(u=>u.side===0).map(u=>u.stats[m]).sort((a,b)=>b-a),mode);
-      await page.waitForFunction(()=>{const s=window.__toybox.match.state().battles[0].fighters.filter(u=>u.side===0).map(u=>u.stats.dealt).sort((a,b)=>b-a).join(); return [...document.querySelectorAll('[data-testid="squad-damage"] li')].map(li=>li.dataset.value).join()===s;});
+      const tally = mode => page.evaluate(m=>window.__toybox.match.state().battles.find(b=>b.owner==='you').fighters.filter(u=>u.side===0).map(u=>u.stats[m]).sort((a,b)=>b-a),mode);
+      await page.waitForFunction(()=>{const s=window.__toybox.match.state().battles.find(b=>b.owner==='you').fighters.filter(u=>u.side===0).map(u=>u.stats.dealt).sort((a,b)=>b-a).join(); return [...document.querySelectorAll('[data-testid="squad-damage"] li')].map(li=>li.dataset.value).join()===s;});
       const dealt=await damageRowsShown(); assert.deepEqual(dealt,await tally('dealt')); assert.ok(dealt[0]>0,'the overview lists real damage, highest first');
-      const panel=await page.getByTestId('squad-damage').boundingBox(); assert.ok(panel.x+panel.width>=viewport.width-20,'damage overview sits at the right edge');
+      const panel=await page.getByTestId('squad-damage').boundingBox(), railBox=await page.getByTestId('player-rail').boundingBox();
+      assert.ok(panel.x+panel.width<=railBox.x+2&&panel.x+panel.width>=railBox.x-24,'damage overview sits at the right, beside the player rail');
       await page.screenshot({path:path.join(out,`toysquad-${layout}-damage.png`)});
       await click('squad-damage-taken'); await page.waitForFunction(()=>document.querySelector('[data-testid="squad-damage"]').dataset.mode==='taken');
-      await page.waitForFunction(()=>{const s=window.__toybox.match.state().battles[0].fighters.filter(u=>u.side===0).map(u=>u.stats.taken).sort((a,b)=>b-a).join(); return [...document.querySelectorAll('[data-testid="squad-damage"] li')].map(li=>li.dataset.value).join()===s;});
+      await page.waitForFunction(()=>{const s=window.__toybox.match.state().battles.find(b=>b.owner==='you').fighters.filter(u=>u.side===0).map(u=>u.stats.taken).sort((a,b)=>b-a).join(); return [...document.querySelectorAll('[data-testid="squad-damage"] li')].map(li=>li.dataset.value).join()===s;});
       await page.screenshot({path:path.join(out,`toysquad-${layout}-damage-taken.png`)});
       await click('squad-damage-dealt'); await size56('squad-damage-close');
       if(mobile) { await click('squad-damage-close'); await page.getByTestId('squad-damage-open').waitFor({state:'visible'}); }
+
+      // ── debuff badges over fighters (the shared status icons) ──
+      await page.evaluate(()=>{window.__toybox.match.timeScale(0); const b=window.__toybox.match.state().battles.find(x=>x.owner==='you'); const [a,c]=b.fighters.filter(u=>u.side===1&&u.hp>0); a.poison=3; a.stunnedUntil=b.tick+3; if(c) c.magic.markedUntil=b.tick+3;});
+      await page.waitForFunction(()=>window.__toybox.squadStatus.shown()>=2);
+      const sq=await page.evaluate(()=>window.__toybox.squadStatus.byKind()); assert.ok(sq.poison>=1&&sq.stun>=1,`badges: ${JSON.stringify(sq)}`);
+      await page.screenshot({path:path.join(out,`toysquad-${layout}-badges.png`)});
+      // ── the player rail: standings order, compact on phones, tap a player to view their battle ──
+      const railOrder=()=>page.evaluate(()=>[...document.querySelectorAll('[data-testid="player-rail"] li button')].map(b=>b.dataset.testid.slice(5)));
+      const standing=await page.evaluate(()=>window.__toybox.match.state().players.slice().sort((a,b)=>b.points-a.points||b.health-a.health).map(p=>p.id));
+      assert.deepEqual(await railOrder(),standing);
+      assert.equal(await page.locator('.squad-scoreboard').count(),0,'the old standings box is gone');
+      const other=standing.find(id=>id!=='you'); await size56(`rail-${other}`);
+      if(mobile) assert.ok(railBox.width<=80,`the rail is compact on phones: ${railBox.width}px`);
+      if(layout==='desktop') { await page.getByTestId(`rail-${other}`).focus(); await page.keyboard.press('Enter'); } else await click(`rail-${other}`);
+      await page.getByTestId('watch-banner').waitFor(); await size56('watch-back');
+      if(mobile) await click('squad-damage-open');
+      // The damage overview now lists the viewed player's squad.
+      await page.waitForFunction(o=>{const s=window.__toybox.match.state().battles.find(b=>b.owner===o).fighters.filter(u=>u.side===0).map(u=>u.stats.dealt).sort((a,b)=>b-a).join(); return [...document.querySelectorAll('[data-testid="squad-damage"] li')].map(li=>li.dataset.value).join()===s;},other);
+      await page.screenshot({path:path.join(out,`toysquad-${layout}-rail-view.png`)});
+      if(mobile) await click('squad-damage-close');
+      if(layout==='desktop') await page.keyboard.press('Escape'); else await click('watch-back');
+      await page.getByTestId('watch-banner').waitFor({state:'detached'});
+      // After the battle, every row marks how that player's match went.
+      await page.evaluate(()=>window.__toybox.match.timeScale(30));
+      await page.waitForFunction(()=>window.__toybox.match.state().phase==='recap'||window.__toybox.match.state().round>1);
+      await page.evaluate(()=>window.__toybox.match.timeScale(0));
+      await page.waitForFunction(()=>[...document.querySelectorAll('[data-testid="player-rail"] li button')].every(b=>['win','loss','draw'].includes(b.dataset.result)));
+      await page.screenshot({path:path.join(out,`toysquad-${layout}-rail-results.png`)});
+      await page.evaluate(()=>window.__toybox.match.timeScale(1));
       if(process.env.SQUAD_SMOKE) {
         assert.deepEqual(errors,[]); console.log(`PASS Toy Squad ${layout} final interaction smoke: automatic merges, hover details, Q/R/E, reserve drags/swaps, upgrade highlights and spells; no console/page errors`);
         await page.close(); continue;
