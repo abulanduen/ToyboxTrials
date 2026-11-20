@@ -105,8 +105,10 @@ const field = (bots: number, humans: string[]) => [...humans.map(human), ...make
 describe('server views: every board is public, secrets are not', () => {
   it("Toy Tower Tumble: another board's towers, quests, builder, gold, lives and gifts reach every player; the roll stream and seed do not", () => {
     const run = new GameRun('toy-tower-tumble', field(3, ['p1', 'p2']), 21);
-    while ((run.state as TdState).players[1].towers.length < 2) run.advance(250);
-    const truth = run.state as TdState, rival = truth.players[1];
+    // players[2] is a bot: it builds on its own (the two human seats send nothing here).
+    for (let i = 0; i < 400 && (run.state as TdState).players[2].towers.length < 2; i++) run.advance(250);
+    const truth = run.state as TdState, rival = truth.players[2];
+    expect(rival.towers.length).toBeGreaterThanOrEqual(2);
     rival.quests.collect5 = true; rival.gifts = ['tin-sentry'];
     const view = run.viewFor(run.publicView(), 'p1') as Obj;
     expect(view.seed).toBe(0);
@@ -123,15 +125,16 @@ describe('server views: every board is public, secrets are not', () => {
   it("Toy Squad: another squad's units (so its traits), passives, level, coins and points reach every player; its shop and passive offers do not", () => {
     const run = new GameRun('toy-squad', field(3, ['p1', 'p2']), 77);
     // Through a round so squads have toys, then into round 3's passive choice.
-    while ((run.state as { round: number }).round < 3) run.advance(500);
+    for (let i = 0; i < 2000 && (run.state as { round: number }).round < 3; i++) run.advance(500);
     const truth = run.state as { players: { id: string; units: { kind: string; tier: number; cell: number }[]; passives: string[]; passiveOffers: string[]; shop: unknown[]; level: number; coins: number; points: number }[] };
-    const rival = truth.players.find((p) => p.id === 'p2')!;
+    const rival = truth.players[2]; // a bot seat: it has bought toys (the human seats send nothing here)
     rival.passives.push('bargain');
     expect(rival.units.length).toBeGreaterThan(0);
-    for (const watching of [null, 'p2']) {
+    for (const watching of [null, rival.id]) {
       const view = run.viewFor(run.publicView(), 'p1', watching) as Obj;
-      const seen = (view.players as typeof truth.players).find((p) => p.id === 'p2')!;
-      expect(seen.units).toEqual(rival.units);
+      const seen = (view.players as typeof truth.players).find((p) => p.id === rival.id)!;
+      const unit = (u: { id?: number; kind: string; tier: number; cell: number }) => [u.id, u.kind, u.tier, u.cell].join(); // the wire rounds times
+      expect(seen.units.map(unit)).toEqual(rival.units.map(unit));
       expect(traitCounts(seen.units as never)).toEqual(traitCounts(rival.units as never));
       expect(seen.passives).toEqual(rival.passives);
       expect([seen.level, seen.coins, seen.points]).toEqual([rival.level, rival.coins, rival.points]);

@@ -83,16 +83,18 @@ function QuestArt({ s, q }: { s: TdState; q: QuestId }) {
 }
 
 /**
- * Float `ref` beside `cell`'s square on screen, inside the safe area (`.td-safe`), never over it if
- * there is room. Runs after every render (the HUD re-renders ten times a second), so the popover
- * follows the board when it is panned or zoomed. Absolutely positioned: nothing else moves.
+ * Float `ref` beside `cell`'s square on screen, inside the board's own space (`.td-board-slot`: the
+ * safe area less the bar, the quest column, the player rail and the dock, so those stay reachable),
+ * never over the square if there is room. Runs after every render (the HUD re-renders ten times a
+ * second), so it follows the board when it is panned or zoomed. Absolutely positioned: nothing moves.
  */
 function useFloatAt(ref: RefObject<HTMLElement | null>, cell: number | null) {
   useLayoutEffect(() => {
-    const el = ref.current, hud = el?.closest('.td-hud'), safe = hud?.querySelector('.td-safe');
+    const el = ref.current, hud = el?.closest('.td-hud'), slot = hud?.querySelector('.td-board-slot');
     const anchor = cell === null ? null : tumbleScreen.cellRect?.(cell);
-    if (!el || !hud || !safe || !anchor) return;
-    const h = hud.getBoundingClientRect(), b = safe.getBoundingClientRect();
+    if (!el || !hud || !slot || !anchor) return;
+    const h = hud.getBoundingClientRect(), b = slot.getBoundingClientRect();
+    el.style.maxWidth = `${Math.floor(b.width)}px`; el.style.maxHeight = `${Math.floor(b.height)}px`;
     const at = placePopover(anchor, el.offsetWidth, el.offsetHeight, { left: b.left, top: b.top, right: b.right, bottom: b.bottom }, 10);
     el.style.left = `${at.left - h.left}px`; el.style.top = `${at.top - h.top}px`; el.dataset.side = at.side;
   });
@@ -318,7 +320,6 @@ export function TumbleHud({ getState, localId, contestants }: MinigameSceneProps
 
   return <div className={`td-hud${me.out ? ' is-out' : ''}${showQuests ? '' : ' no-quests'}${readOnly ? ' is-viewing' : ''}`} data-testid="td-hud" data-viewing={readOnly ? board.id : undefined}>
     <div className="td-board-slot" aria-hidden />
-    <div className="td-safe" aria-hidden />
     <header className={`td-bar${flash ? ' is-hit' : ''}${check ? ' is-check' : ''}`} data-testid="td-bar">
       <span className="td-bar__wave" data-testid="td-wave"><b>{check ? 'Bonus' : `Wave ${Math.min(s.wave, s.config.waves)}/${s.config.waves}`}</b>{boss && <i className="td-boss-tag">Boss</i>}</span>
       <span className="td-bar__phase" data-testid="td-phase">{phaseText}<small>{s.phase === 'build' ? waveKinds : ''}</small></span>

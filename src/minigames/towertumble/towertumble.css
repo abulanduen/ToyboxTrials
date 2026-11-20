@@ -64,14 +64,14 @@
 .td-rail { position:absolute; top:calc(var(--top) + 64px); right:var(--r); width:var(--rail-w); max-height:calc(100% - var(--top) - var(--bottom) - var(--dock) - 74px); }
 
 /* Watching another board; reset view */
-.td-watch { position:absolute; z-index:2; bottom:calc(var(--bottom) + var(--dock) + 10px); left:calc(var(--l) + var(--left) + 8px); right:calc(var(--r) + var(--right) + 8px); margin:0 auto; width:fit-content; max-width:calc(100% - var(--l) - var(--r) - var(--left) - var(--right) - 16px); }
+.td-watch { position:absolute; z-index:3; bottom:calc(var(--bottom) + var(--dock) + 10px); left:calc(var(--l) + var(--left) + 8px); right:calc(var(--r) + var(--right) + 8px); margin:0 auto; width:fit-content; max-width:calc(100% - var(--l) - var(--r) - var(--left) - var(--right) - 16px); }
 .td-hud .td-watch button { min-width:56px; }
 .td-hud .td-view-reset { position:absolute; top:calc(var(--top) + var(--bar) + 8px); right:calc(var(--r) + var(--right) + 8px); background:#FFF9EE; font-size:13px; padding:4px 10px; opacity:.92; }
 
-/* The selected square's sheet and the mouse's hover tip: popovers floating beside their square (the HUD sets left/top,
-   clamped inside .td-safe), over everything else. They never take space from the board, the columns or the dock. */
-.td-safe { position:absolute; top:calc(var(--top) + var(--bar) + 4px); bottom:var(--bottom); left:var(--l); right:var(--r); pointer-events:none; visibility:hidden; }
-.td-sheet { position:absolute; z-index:4; pointer-events:auto; left:calc(var(--l) + var(--left) + 8px); top:calc(var(--top) + var(--bar) + 8px); width:min(276px,calc(100% - var(--l) - var(--r))); box-sizing:border-box; max-height:calc(100% - var(--top) - var(--bar) - 4px - var(--bottom)); overflow:auto; overscroll-behavior:contain; background:#FFF9EE; border:3px solid var(--tier,#574D69); border-radius:12px; padding:8px; box-shadow:0 4px 0 #574D69,0 6px 18px rgba(43,36,51,.28); }
+/* The selected square's sheet and the mouse's hover tip: popovers floating beside their square. The HUD sets left/top
+   (and the size limits) so they stay inside .td-board-slot: they never cover the bar, the quests, the rail or the dock,
+   and never take space from them. The Odds, Board and Quests panels open above them. */
+.td-sheet { position:absolute; z-index:2; pointer-events:auto; left:calc(var(--l) + var(--left) + 8px); top:calc(var(--top) + var(--bar) + 8px); width:min(276px,calc(100% - var(--l) - var(--r))); box-sizing:border-box; max-height:calc(100% - var(--top) - var(--bar) - 4px - var(--bottom)); overflow:auto; overscroll-behavior:contain; background:#FFF9EE; border:3px solid var(--tier,#574D69); border-radius:12px; padding:8px; box-shadow:0 4px 0 #574D69,0 6px 18px rgba(43,36,51,.28); }
 .td-tip { pointer-events:none; width:min(250px,calc(100% - var(--l) - var(--r))); padding:6px 8px; }
 .td-sheet__owner { display:block; font:700 11px Nunito,sans-serif; color:#574D69; margin:-2px 0 4px; }
 .td-sheet .is-pair { outline:3px solid #6BA7C8; outline-offset:1px; }
@@ -190,6 +190,8 @@
   .td-hud .td-dock__info { font-size:13px; }
   .td-hud .td-dock__info small { font-size:10px; }
   .td-board-families { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  /* Under the host's pause button, so its Close stays reachable. */
+  .td-odds.td-board-panel { top:calc(var(--top) + 64px); transform:translateX(-50%); max-height:calc(100% - var(--top) - 64px - var(--bottom)); }
   .td-hud .td-view-reset { top:calc(var(--top) + var(--bar) + 6px); }
 }
 
