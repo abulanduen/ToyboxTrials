@@ -193,3 +193,54 @@
   .squad-upgrade-label__full { display:none; }
   .squad-upgrade-label__short { display:inline-flex; align-items:center; gap:1px; white-space:nowrap; }
 }
+
+/* Coins: the game's coin mark (the brass cog, as on every price in Toybox Trials) and the figure. The purse is the
+   big counter at the top of the shop's actions (left of the actions on phones). */
+.squad-coins { display:inline-flex; align-items:center; gap:3px; white-space:nowrap; vertical-align:middle; }
+.squad-coins b { font:600 15px Fredoka,sans-serif; }
+.squad-coins .cog-icon { flex:none; }
+.squad-banner__line { display:flex !important; flex-wrap:wrap; align-items:center; justify-content:center; gap:0 5px; }
+.squad-banner__line .squad-coins b { font-size:16px; }
+.squad-purse { justify-content:center; gap:6px; min-height:44px; padding:2px 10px; box-sizing:border-box; background:#FFF9EE; border:2px solid #EFAE45; border-radius:10px; box-shadow:inset 0 -3px 0 #EFAE45; }
+.squad-purse b { font-size:24px; line-height:1; }
+.squad-hud .squad-card__cost { background:#EFAE45; border-radius:8px; padding:0 5px 0 2px; gap:2px; }
+.squad-hud .squad-card__cost b { font:800 12px Nunito,sans-serif; }
+.squad-shop-actions .squad-coins:not(.squad-purse) b { font-size:15px; }
+.squad-sell-drop .squad-coins b { font-size:18px; }
+
+/* Someone else's squad in the shop dock's place (read-only): who, level, coins, passives and every toy. */
+.squad-viewbench { grid-template-columns:minmax(0,1fr); align-content:start; }
+.squad-viewbench__head { display:flex; flex-wrap:wrap; align-items:center; gap:4px 12px; }
+.squad-viewbench__head > strong { font:600 17px Fredoka,sans-serif; }
+.squad-viewbench__head > span:not(.squad-coins) { font:700 12px Nunito,sans-serif; flex:1; }
+.squad-viewbench__passives { display:flex; flex-wrap:wrap; align-items:center; gap:4px 6px; font-size:12px; }
+.squad-viewbench__passives > b { font:600 13px Fredoka,sans-serif; }
+.squad-passive-chip { display:inline-block; max-width:260px; padding:2px 7px; border-radius:8px; background:#FFF9EE; border:2px solid #9A78C9; }
+.squad-passive-chip strong { font:700 12px Nunito,sans-serif; margin-right:4px; }
+.squad-passive-chip small { display:inline !important; font-size:11px !important; margin:0 !important; }
+.squad-viewbench__units { list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:5px; }
+.squad-hud .squad-viewbench__units button { width:100%; display:grid; grid-template-columns:40px minmax(0,1fr); gap:5px; align-items:center; text-align:left; padding:3px; border:3px solid var(--rarity,#574D69); }
+.squad-viewbench__units .squad-card__picture { width:40px; height:40px; }
+.squad-viewbench__unit { display:block; min-width:0; }
+.squad-viewbench__unit strong { display:block; font-size:12px; line-height:1.1; overflow-wrap:anywhere; }
+.squad-viewbench__unit small { margin:0 !important; font-size:10.5px !important; }
+.squad-viewbench__empty { font-size:12px; padding:6px; }
+.squad-kit__owner { font-weight:700; color:#574D69; }
+@media(max-width:600px) {
+  .squad-shop-actions .squad-purse { flex:0 0 auto; min-width:64px; min-height:56px; flex-direction:column; gap:0; padding:2px 6px; }
+  .squad-shop-actions .squad-purse b { font-size:20px; }
+  .squad-viewbench__units { grid-template-columns:repeat(auto-fill,minmax(104px,1fr)); }
+  .squad-hud .squad-viewbench__units button { grid-template-columns:30px minmax(0,1fr); gap:3px; }
+  .squad-viewbench__units .squad-card__picture { width:30px; height:30px; }
+  .squad-viewbench__unit strong { font-size:10.5px; }
+  .squad-passive-chip small { display:none !important; }
+  .squad-viewbench__head > strong { font-size:15px; }
+}
+@media(max-height:500px) {
+  /* Landscape: the purse spans the actions column above Reroll / Sell / Ready. */
+  .squad-hud .squad-shop-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); align-content:start; }
+  .squad-shop-actions .squad-purse { grid-column:1 / -1; min-height:30px; padding:1px 6px; }
+  .squad-shop-actions .squad-purse b { font-size:19px; }
+  .squad-viewbench__units { grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); }
+  .squad-passive-chip small { display:none !important; }
+}

@@ -2,7 +2,7 @@ import { HUB_BINDINGS, type Action } from '../../game/input';
 import { getMatchState, useMatch } from '../session';
 import type { MinigameModule } from '../types';
 import { GRID } from './board';
-import { tumbleRules, towerAt, type TdInput, type TdState } from './rules';
+import { tumbleRules, towerAt, viewedBoard, type TdInput, type TdState } from './rules';
 import { createTumbleBot } from './bot';
 import { buildHere, drainTumbleInput, tapCell, useTumbleUI } from './local';
 import { TumbleScene } from './Scene';
@@ -19,6 +19,8 @@ const game: MinigameModule<TdState, TdInput> = {
     const inputs = drainTumbleInput();
     const s = getMatchState() as TdState | null, me = s?.kind === 'tower-tumble' ? s.players.find((p) => p.id === useMatch.getState().localId) : undefined;
     if (!me || me.out) return inputs;
+    // Looking at someone else's board is read-only: no shortcut acts until you are back on yours.
+    if (viewedBoard(s!, me.id, useTumbleUI.getState().watching) !== me.id) return inputs;
     for (const action of presses) {
       const ui = useTumbleUI.getState(), step = STEPS[action];
       if (step) {

@@ -143,6 +143,17 @@ function Merge({ touch }: { touch?: boolean }) {
       <Arrow x1={58} y1={34} x2={98} y2={34} bend={-10} w={4} />
       {touch && <Finger x={48} y={70} anim="none" />}
       <Arrow x1={136} y1={76} x2={166} y2={76} w={5} />
+      {/* Touch: taps only select the pair; the sheet's Merge button (two squares into one) merges. */}
+      {touch && (
+        <g>
+          <rect x={126} y={88} width={50} height={28} rx={8} fill={PALETTE.honey} {...line} />
+          <rect x={134} y={97} width={9} height={9} rx={2} fill={TIER[1]} {...thin} />
+          <rect x={146} y={97} width={9} height={9} rx={2} fill={TIER[1]} {...thin} />
+          <path d="M157 101.5h6m-3-3 3 3-3 3" fill="none" stroke={INK} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+          <rect x={164} y={96} width={7} height={11} rx={2} fill={TIER[2]} {...thin} />
+          <Finger x={152} y={110} delay="1.2s" />
+        </g>
+      )}
       <g transform="translate(212 0)">
         <rect x={-30} y={34} width={60} height={70} rx={6} fill={PALETTE.felt} {...line} />
         <Burst x={0} y={70} r={26} fill={TIER[2]} className="ta-pulse" />

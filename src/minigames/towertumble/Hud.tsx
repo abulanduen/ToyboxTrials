@@ -2,20 +2,29 @@
  * Toy Tower Tumble HUD (DOM). Re-renders ten times a second from the live rules state, never per
  * frame. Every committing action is a ≥ 56 px button: the board squares (small on a phone) only
  * select, and the sheet that opens for the selected square carries Build, Merge, Sell and Close.
- * Dragging a tower onto a same-tier partner on the board merges too.
+ * The sheet (and the mouse's hover tip) floats beside its square, clamped inside the safe area: it
+ * never moves the board or the columns. With a mouse, clicking or dragging onto a same-tier partner
+ * merges too; on touch only the sheet's Merge button merges (a tap just selects the pair).
+ *
+ * Looking at a board that is not yours to change (someone else's from the player rail, or the seat
+ * an online spectator follows) is the same HUD read-only: that board's gold, lives, quests, towers
+ * (tap one for its sheet), builder level and odds, and a Board panel with its towers by tier and
+ * by family; every action is off until you are back on your own board.
  *
  * Layout on every screen: quests on the left, the shared player rail on the right (tap a player to
  * view their board, read-only), the board centred between them (drag to look around, pinch or
  * wheel to zoom), the bar on top and the build dock at the bottom (phone landscape: right).
  */
-import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type RefObject } from 'react';
 import { matchBus, pauseMatch, useMatch } from '../session';
 import { unlockAudio } from '../../game/audio';
 import { PALETTE } from '../../game/palette';
+import { useGame } from '../../game/store';
 import type { MinigameSceneProps } from '../types';
 import { subscribePortraits, toyPortrait, portraitCount } from '../toysquad/portraits';
 import { PlayerRail, SpectateOffer, WatchBanner, type RailEntry } from '../shared/PlayerRail';
 import { StatusLegend } from '../shared/StatusIcon';
+import { placePopover } from '../shared/popover';
 import { cellName, isBuildable, isPath } from './board';
 import {
   ABILITY_NAME, ABILITY_TEXT, BOSSES, BUILD_COST, BUILDER, DAMAGE_CHECK, ENEMIES, FAMILY, FAMILIES, MAX_BUILDER, MAX_TIER, QUESTS, QUEST_ORDER, TIER_COLOURS, TOWERS, WAVES,
@@ -26,7 +35,8 @@ import {
   type TdPlayer, type TdState,
 } from './rules';
 import { buildHere, clearTumbleInput, resetTumbleUI, submitTumbleInput, useTumbleUI, type TdPanel } from './local';
-import { tumbleView } from './camera';
+import { tumbleScreen, tumbleView } from './camera';
+import { boardSummary } from './info';
 import { TUMBLE_STATUSES } from './status';
 import './towertumble.css';
 
@@ -72,21 +82,26 @@ function QuestArt({ s, q }: { s: TdState; q: QuestId }) {
   }</span>;
 }
 
-function TowerSheet({ me, cell, send }: { me: TdPlayer; cell: number; send: (i: Parameters<typeof submitTumbleInput>[0]) => void }) {
-  const t = towerAt(me, cell), close = () => useTumbleUI.setState({ selected: null });
-  if (!t) {
-    return <section className="td-sheet" data-testid="td-sheet" aria-label={`Empty square ${cellName(cell)}`}>
-      <header className="td-sheet__head"><strong>Empty square {cellName(cell)}</strong></header>
-      <p className="td-sheet__lead">Build places a random tower here (usually tier 1: see the builder odds).</p>
-      <div className="td-sheet__actions">
-        <button className="td-primary" data-testid="td-build-here" disabled={me.gold < BUILD_COST} onClick={() => send({ type: 'build', cell })}>Build here <Cost gold={BUILD_COST} /></button>
-        <button data-testid="td-sheet-close" onClick={close}>Close</button>
-      </div>
-    </section>;
-  }
-  const d = TOWERS[t.def], f = FAMILY[d.family], twins = twinsOf(me, t);
+/**
+ * Float `ref` beside `cell`'s square on screen, inside the safe area (`.td-safe`), never over it if
+ * there is room. Runs after every render (the HUD re-renders ten times a second), so the popover
+ * follows the board when it is panned or zoomed. Absolutely positioned: nothing else moves.
+ */
+function useFloatAt(ref: RefObject<HTMLElement | null>, cell: number | null) {
+  useLayoutEffect(() => {
+    const el = ref.current, hud = el?.closest('.td-hud'), safe = hud?.querySelector('.td-safe');
+    const anchor = cell === null ? null : tumbleScreen.cellRect?.(cell);
+    if (!el || !hud || !safe || !anchor) return;
+    const h = hud.getBoundingClientRect(), b = safe.getBoundingClientRect();
+    const at = placePopover(anchor, el.offsetWidth, el.offsetHeight, { left: b.left, top: b.top, right: b.right, bottom: b.bottom }, 10);
+    el.style.left = `${at.left - h.left}px`; el.style.top = `${at.top - h.top}px`; el.dataset.side = at.side;
+  });
+}
+
+function TowerFacts({ p, cell }: { p: TdPlayer; cell: number }) {
+  const t = towerAt(p, cell)!, d = TOWERS[t.def], f = FAMILY[d.family];
   const dmg = Math.round(d.damage * (1 + t.auraDamage) * 10) / 10;
-  return <section className="td-sheet" data-testid="td-sheet" style={tierStyle(d.tier)} aria-label={`${d.name}, tier ${d.tier}`}>
+  return <>
     <header className="td-sheet__head">
       <Portrait model={d.model} />
       <span className="td-sheet__title"><strong data-testid="td-sheet-name">{d.name}</strong>
@@ -97,21 +112,84 @@ function TowerSheet({ me, cell, send }: { me: TdPlayer; cell: number; send: (i: 
       {d.aura ? ` · aura: towers within ${d.aura} squares hit ${Math.round(d.auraDamage * 100)}% harder and ${Math.round(d.auraSpeed * 100)}% faster` : ''}</p>
     {d.abilities.length > 0 && <ul className="td-abilities">{d.abilities.map((a) => <li key={a}><b>{ABILITY_NAME[a]}:</b> {ABILITY_TEXT[a]}</li>)}</ul>}
     <small className="td-sheet__dealt">Dealt {fmt(t.dealt)} damage · square {cellName(cell)}</small>
+  </>;
+}
+
+/**
+ * The selected square's sheet, floating beside it. On your own board it carries the actions; on a
+ * board you are only looking at (`owner` names whose) it is read-only: the facts and Close.
+ * `pair` (touch) is the tower selected before this one: its Merge button comes first.
+ */
+function TowerSheet({ p, cell, send, owner, pair }: { p: TdPlayer; cell: number; send: (i: Parameters<typeof submitTumbleInput>[0]) => void; owner?: string; pair: number | null }) {
+  const ref = useRef<HTMLElement>(null);
+  useFloatAt(ref, cell);
+  const t = towerAt(p, cell), close = () => useTumbleUI.setState({ selected: null, pair: null });
+  if (!t) {
+    return <section ref={ref} className="td-sheet" data-testid="td-sheet" aria-label={`Empty square ${cellName(cell)}`}>
+      <header className="td-sheet__head"><strong>Empty square {cellName(cell)}</strong></header>
+      <p className="td-sheet__lead">Build places a random tower here (usually tier 1: see the builder odds).</p>
+      <div className="td-sheet__actions">
+        <button className="td-primary" data-testid="td-build-here" disabled={p.gold < BUILD_COST} onClick={() => send({ type: 'build', cell })}>Build here <Cost gold={BUILD_COST} /></button>
+        <button data-testid="td-sheet-close" onClick={close}>Close</button>
+      </div>
+    </section>;
+  }
+  const d = TOWERS[t.def], twins = twinsOf(p, t).sort((a, b) => Number(b.cell === pair) - Number(a.cell === pair));
+  return <section ref={ref} className={`td-sheet${owner ? ' is-readonly' : ''}`} data-testid="td-sheet" data-readonly={owner ? true : undefined} style={tierStyle(d.tier)} aria-label={`${d.name}, tier ${d.tier}${owner ? `, on ${owner} board` : ''}`}>
+    {owner && <small className="td-sheet__owner" data-testid="td-sheet-owner">{owner} board · read-only</small>}
+    <TowerFacts p={p} cell={cell} />
     <div className="td-sheet__actions">
-      {d.tier >= MAX_TIER ? <span className="td-note">Tier 7: the top.</span>
+      {owner ? null : d.tier >= MAX_TIER ? <span className="td-note">Tier 7: the top.</span>
         : twins.length === 0 ? <span className="td-note">No partner yet: any other tier {d.tier} tower can merge.</span>
-          : twins.slice(0, 3).map((o) => <button key={o.id} className="td-primary" data-testid={`td-merge-${o.cell}`} onClick={() => send({ type: 'merge', from: o.cell, to: cell })}>
-            Merge tier {d.tier} at {cellName(o.cell)}<small>→ random tier {d.tier + 1} · shortcut M</small></button>)}
-      <button className="td-sell" data-testid="td-sell" onClick={() => { send({ type: 'sell', cell }); close(); }}>Sell +<Cost gold={sellValue(d.tier)} /></button>
+          : twins.slice(0, 3).map((o) => <button key={o.id} className={`td-primary${o.cell === pair ? ' is-pair' : ''}`} data-testid={`td-merge-${o.cell}`} onClick={() => { send({ type: 'merge', from: o.cell, to: cell }); useTumbleUI.setState({ pair: null }); }}>
+            Merge tier {d.tier} {o.cell === pair ? 'with' : 'at'} {cellName(o.cell)}<small>→ random tier {d.tier + 1} · shortcut M</small></button>)}
+      {!owner && <button className="td-sell" data-testid="td-sell" onClick={() => { send({ type: 'sell', cell }); close(); }}>Sell +<Cost gold={sellValue(d.tier)} /></button>}
       <button data-testid="td-sheet-close" onClick={close}>Close</button>
     </div>
   </section>;
 }
 
-function OddsPanel({ me, onClose }: { me: TdPlayer; onClose: () => void }) {
+/** A mouse resting on a tower: its facts, floating beside it (no buttons; click for the sheet). */
+function TowerTip({ p, cell }: { p: TdPlayer; cell: number }) {
+  const ref = useRef<HTMLElement>(null);
+  useFloatAt(ref, cell);
+  const d = TOWERS[towerAt(p, cell)!.def];
+  return <aside ref={ref} className="td-sheet td-tip" data-testid="td-tip" style={tierStyle(d.tier)} aria-hidden><TowerFacts p={p} cell={cell} /></aside>;
+}
+
+/**
+ * Everything on one board, read-only: gold, lives, builder and odds, towers by tier, the tower
+ * families (the game's traits), gifts waiting and the quests. Opened from the dock.
+ */
+function BoardPanel({ s, p, who, onClose }: { s: TdState; p: TdPlayer; who: string; onClose: () => void }) {
+  const sum = boardSummary(p), odds = BUILDER[p.builder - 1];
+  const done = QUEST_ORDER.filter((q) => p.quests[q]).length;
+  return <aside className="td-panel td-odds td-board-panel" data-testid="td-board-panel" aria-label={`${who}: board details`}>
+    <header className="td-panel__head"><strong>{who}</strong><button data-testid="td-board-close" onClick={onClose}>Close</button></header>
+    <dl className="td-board-stats" data-testid="td-board-stats">
+      <div><dt>Gold</dt><dd><Coin /> <span data-testid="td-board-gold">{p.gold}</span></dd></div>
+      <div><dt>Lives</dt><dd><Heart /> {Math.max(0, p.lives)}</dd></div>
+      <div><dt>Score</dt><dd>{boardScore(p)}</dd></div>
+      <div><dt>Waves</dt><dd>{p.out ? `out on ${p.outWave}` : p.cleared}</dd></div>
+      <div><dt>Best tier</dt><dd>{p.maxTier || '–'}</dd></div>
+      <div><dt>Merges</dt><dd>{p.merges}{p.luckyMerges ? ` (${p.luckyMerges} lucky)` : ''}</dd></div>
+    </dl>
+    <p className="td-board-builder" data-testid="td-board-builder"><b>Builder {p.builder}/{MAX_BUILDER}</b> · builds {odds.build.map((n, i) => (n ? `T${i + 1} ${n}%` : '')).filter(Boolean).join(' ')} · lucky merge {odds.lucky}%</p>
+    <h3>Families <small>(towers · best tier)</small></h3>
+    <ul className="td-board-families" data-testid="td-board-families">{sum.families.map((f) => <li key={f.family} data-family={f.family} data-count={f.count} className={f.count ? undefined : 'is-none'} style={f.best ? tierStyle(f.best) : undefined}>
+      <b>{FAMILY[f.family].name}</b><small>{FAMILY[f.family].role}</small><span>{f.count} · {f.best ? `T${f.best}` : '–'}</span></li>)}</ul>
+    <h3>Towers <small>({sum.towers} on the board{p.gifts.length ? `, ${p.gifts.length} free waiting for a square` : ''})</small></h3>
+    {sum.tiers.length === 0 ? <p className="td-note">No towers yet.</p> : <ol className="td-board-towers" data-testid="td-board-towers">{sum.tiers.map((g) => <li key={g.tier} style={tierStyle(g.tier)}>
+      <b className="td-tier">T{g.tier}</b><span>{g.towers.map((t) => <span key={t.def} className="td-board-tower" data-def={t.def}><Portrait model={TOWERS[t.def].model} />{TOWERS[t.def].name}{t.count > 1 ? ` ×${t.count}` : ''}</span>)}</span></li>)}</ol>}
+    <h3>Quests <small>({done}/{QUEST_ORDER.length} done)</small></h3>
+    <div data-testid="td-board-quests"><QuestList s={s} me={p} /></div>
+  </aside>;
+}
+
+function OddsPanel({ me, who, onClose }: { me: TdPlayer; who?: string; onClose: () => void }) {
   return <aside className="td-panel td-odds" data-testid="td-odds" aria-label="Builder odds">
-    <header className="td-panel__head"><strong>Builder odds</strong><button data-testid="td-odds-close" onClick={onClose}>Close</button></header>
-    <p>Build places a random tower of the tier rolled below. A lucky merge jumps two tiers instead of one (never past tier 5). Your level is highlighted.</p>
+    <header className="td-panel__head"><strong>Builder odds{who ? ` · ${who}` : ''}</strong><button data-testid="td-odds-close" onClick={onClose}>Close</button></header>
+    <p>Build places a random tower of the tier rolled below. A lucky merge jumps two tiers instead of one (never past tier 5). {who ? `${who}'s level (${me.builder}) is highlighted.` : 'Your level is highlighted.'}</p>
     <table><thead><tr><th>Level</th><th>Cost</th><th>Tier 1</th><th>Tier 2</th><th>Tier 3</th><th>Lucky</th></tr></thead>
       <tbody>{BUILDER.map((l) => <tr key={l.level} className={l.level === me.builder ? 'is-current' : undefined} data-testid={`td-odds-${l.level}`}>
         <td>{l.level}</td><td>{l.cost || '–'}</td><td>{l.build[0]}%</td><td>{l.build[1]}%</td><td>{l.build[2]}%</td><td>{l.lucky}%</td></tr>)}</tbody></table>
@@ -206,18 +284,27 @@ export function TumbleHud({ getState, localId, contestants }: MinigameSceneProps
 
   const watchingId = viewedBoard(s, localId, ui.watching), board = s.players.find((p) => p.id === watchingId) ?? me;
   const viewing = board !== me;
-  const canAct = !me.out && s.phase !== 'over' && !paused && hostPhase === 'playing';
+  // An online spectator follows a seat: its board, read-only (the host never sends a spectator's input).
+  const spectator = !contestants.find((c) => c.id === localId)?.isLocal;
+  const readOnly = viewing || spectator, who = name(board.id);
+  const canAct = !readOnly && !me.out && s.phase !== 'over' && !paused && hostPhase === 'playing';
   const send = (input: Parameters<typeof submitTumbleInput>[0]) => { if (canAct || input.type === 'speed') { unlockAudio(); submitTumbleInput(input); } };
   const setPanel = (panel: TdPanel) => useTumbleUI.setState({ panel: ui.panel === panel ? null : panel });
-  const view = (id: string) => useTumbleUI.setState({ watching: id === localId ? null : id, selected: id === localId ? ui.selected : null });
+  const view = (id: string) => useTumbleUI.setState({ watching: id === localId ? null : id, selected: null, pair: null, hover: null, panel: ui.panel === 'quests' ? null : ui.panel });
   const seconds = Math.max(0, Math.ceil((s.phaseEnds - s.t) / 1000));
   const check = inCheck(s);
   const left = s.phase === 'wave' ? board.enemies.length + Math.max(0, s.spawns.length - board.spawnIdx) : 0;
   const cost = builderCost(me), boss = !check && isBossWave(s.wave) ? BOSSES[s.wave] : null;
   const waveKinds = check ? DAMAGE_CHECK.name : [...new Set(WAVES[Math.min(s.wave, WAVES.length) - 1].map((g) => (g.kind === 'boss' ? boss?.name ?? 'Boss' : ENEMIES[g.kind].name)))].join(', ');
-  const questsDone = QUEST_ORDER.filter((q) => me.quests[q]).length;
+  const questsDone = QUEST_ORDER.filter((q) => board.quests[q]).length;
   const flash = s.t - board.lastLeakAt < 700;
-  const selected = !viewing && ui.selected !== null && !me.out && (towerAt(me, ui.selected) || (isBuildable(ui.selected) && !isPath(ui.selected))) ? ui.selected : null;
+  // Your own board: a tower or an empty felt square (the action sheet). A board you only look at: a tower (read-only).
+  const looking = readOnly || me.out;
+  const selected = ui.selected === null ? null : looking ? (towerAt(board, ui.selected) ? ui.selected : null)
+    : towerAt(me, ui.selected) || (isBuildable(ui.selected) && !isPath(ui.selected)) ? ui.selected : null;
+  const touch = useGame.getState().touchUI;
+  const hover = !touch && ui.hover !== null && ui.hover !== selected && ui.dragging === null && towerAt(board, ui.hover) ? ui.hover : null;
+  const showQuests = !me.out || viewing;
   // Damage per second on the viewed board over the last second or so.
   const r = rate.current;
   if (r.board !== board.id) { r.board = board.id; r.samples = []; }
@@ -229,8 +316,9 @@ export function TumbleHud({ getState, localId, contestants }: MinigameSceneProps
   const offer = me.out && ui.offer !== 'closed' && s.phase !== 'over';
   const others = watchable(s).filter((id) => id !== localId);
 
-  return <div className={`td-hud${me.out ? ' is-out' : ''}${selected !== null ? ' has-sheet' : ''}${viewing ? ' is-viewing' : ''}`} data-testid="td-hud">
+  return <div className={`td-hud${me.out ? ' is-out' : ''}${showQuests ? '' : ' no-quests'}${readOnly ? ' is-viewing' : ''}`} data-testid="td-hud" data-viewing={readOnly ? board.id : undefined}>
     <div className="td-board-slot" aria-hidden />
+    <div className="td-safe" aria-hidden />
     <header className={`td-bar${flash ? ' is-hit' : ''}${check ? ' is-check' : ''}`} data-testid="td-bar">
       <span className="td-bar__wave" data-testid="td-wave"><b>{check ? 'Bonus' : `Wave ${Math.min(s.wave, s.config.waves)}/${s.config.waves}`}</b>{boss && <i className="td-boss-tag">Boss</i>}</span>
       <span className="td-bar__phase" data-testid="td-phase">{phaseText}<small>{s.phase === 'build' ? waveKinds : ''}</small></span>
@@ -241,10 +329,10 @@ export function TumbleHud({ getState, localId, contestants }: MinigameSceneProps
         <span className="td-bar__stat td-bar__score" title="Score"><b>{boardScore(board)}</b> pts</span></>}
     </header>
 
-    {!me.out && <aside className={`td-side td-side--quests${ui.panel === 'quests' ? ' is-open' : ''}`} aria-label="Quests">
-      <header className="td-panel__head"><strong>Quests {questsDone}/{QUEST_ORDER.length}</strong>
+    {showQuests && <aside className={`td-side td-side--quests${ui.panel === 'quests' ? ' is-open' : ''}`} aria-label={readOnly ? `${who}'s quests` : 'Quests'} data-testid="td-quest-column" data-owner={board.id}>
+      <header className="td-panel__head"><strong>Quests {questsDone}/{QUEST_ORDER.length}{readOnly && <small className="td-side__owner"> · {who}</small>}</strong>
         {ui.panel === 'quests' && <button className="td-quests-close" data-testid="td-quests-close" onClick={() => setPanel(null)}>Close</button>}</header>
-      <QuestList s={s} me={me} />
+      <QuestList s={s} me={board} />
       {/* Phones: the column is a strip of quest pictures; tapping it opens the full list. */}
       <button className="td-quests-open" data-testid="td-quests-open" aria-label={`Quests ${questsDone} of ${QUEST_ORDER.length} done. Show the list`} aria-pressed={ui.panel === 'quests'} onClick={() => setPanel('quests')} />
       <div className="td-quests-key"><StatusLegend kinds={TUMBLE_STATUSES} /></div>
@@ -263,7 +351,16 @@ export function TumbleHud({ getState, localId, contestants }: MinigameSceneProps
       <strong>Knocked out on wave {me.outWave}{viewing ? '' : '. Tap a player to watch their board.'}</strong>
       <div className="td-spectate__row">
         {!viewing && others.length > 0 && <button data-testid="td-watch-others" onClick={() => view(others[0])}>Watch other players</button>}
+        <button data-testid="td-view-board" aria-pressed={ui.panel === 'board'} onClick={() => setPanel('board')}>Board<small>{board.towers.length} towers</small></button>
         {allHumansOut(s) && SPEEDS.map((k) => <button key={k} data-testid={`td-speed-${k}`} aria-pressed={s.speed === k} onClick={() => send({ type: 'speed', speed: k })}>×{k}</button>)}
+      </div>
+    </section> : readOnly ? <section className="td-dock td-dock--view" data-testid="td-dock" aria-label={`${who}'s board, read-only`}>
+      {/* Looking, not touching: the same dock, showing that board's builder, odds and progress. */}
+      <div className="td-dock__row">
+        <button className="td-primary" data-testid="td-view-board" aria-pressed={ui.panel === 'board'} onClick={() => setPanel('board')}>Board<small>{board.towers.length} towers · best T{board.maxTier || '–'}</small></button>
+        <span className="td-dock__info" data-testid="td-view-builder">Builder {board.builder}/{MAX_BUILDER}<small>{board.gifts.length ? `${board.gifts.length} free waiting` : `${board.merges} merges`}</small></span>
+        <button data-testid="td-odds-open" aria-pressed={ui.panel === 'odds'} onClick={() => setPanel('odds')}>Odds<small>Lv {board.builder}: {BUILDER[board.builder - 1].build.filter(Boolean).map((n, i) => `T${i + 1} ${n}%`).join(' ')}</small></button>
+        <span className="td-dock__info" data-testid="td-view-status">{board.out ? 'Out' : s.phase === 'build' ? (board.ready ? 'Ready' : 'Building') : board.waveDone ? 'Cleared' : 'Fighting'}<small>{board.out ? `on wave ${board.outWave}` : `${board.cleared} waves cleared`}</small></span>
       </div>
     </section> : <section className="td-dock" data-testid="td-dock" aria-label="Build controls">
       <div className="td-dock__row">
@@ -277,8 +374,10 @@ export function TumbleHud({ getState, localId, contestants }: MinigameSceneProps
       </div>
     </section>}
 
-    {selected !== null && <TowerSheet me={me} cell={selected} send={send} />}
-    {ui.panel === 'odds' && <OddsPanel me={me} onClose={() => setPanel(null)} />}
+    {selected !== null && <TowerSheet p={looking ? board : me} cell={selected} send={send} owner={looking ? (board === me && !spectator ? 'Your' : `${who}'s`) : undefined} pair={looking ? null : ui.pair} />}
+    {hover !== null && <TowerTip p={board} cell={hover} />}
+    {ui.panel === 'odds' && <OddsPanel me={readOnly ? board : me} who={readOnly ? who : undefined} onClose={() => setPanel(null)} />}
+    {ui.panel === 'board' && <BoardPanel s={s} p={board} who={readOnly ? `${who}'s board` : 'Your board'} onClose={() => setPanel(null)} />}
     {offer && <SpectateOffer title={`Knocked out on wave ${me.outWave}`} body={others.length ? 'Your towers stay on your board. Watch the others play on, or stay here.' : 'Nobody else is still in.'}
       onWatch={() => { useTumbleUI.setState({ offer: 'closed' }); if (others.length) view(others[0]); }} onDismiss={() => useTumbleUI.setState({ offer: 'closed' })} />}
     <ol className="td-toasts" aria-live="polite">{toasts.map((t) => <li key={t.key} className={`td-toast td-toast--${t.tone}`}>{t.text}</li>)}</ol>

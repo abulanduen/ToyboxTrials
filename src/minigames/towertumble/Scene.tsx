@@ -9,7 +9,10 @@
  *
  * Input is plain DOM pointer events on the canvas: a press on one of your towers can drag it (move,
  * swap, merge); any other press pans the camera once it moves; a press that barely moves is a tap
- * (select); two fingers pinch-zoom and the wheel zooms, toward the fingers or the cursor.
+ * (select); two fingers pinch-zoom and the wheel zooms, toward the fingers or the cursor. On touch
+ * (the shared `touchUI` setting) a tap or drop on a same-tier tower selects the pair instead of
+ * merging: only the sheet's Merge button merges. On a board you are only looking at, a tap inspects
+ * a tower (read-only), and with a mouse, hovering one shows its floating tip.
  */
 import { useEffect, useMemo, useRef, type RefObject } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
@@ -17,6 +20,7 @@ import * as THREE from 'three';
 import { PALETTE } from '../../game/palette';
 import { playToyCue, sfx, unlockAudio } from '../../game/audio';
 import { exposeDebug } from '../../game/debug';
+import { useGame } from '../../game/store';
 import { matchBus, useMatch } from '../session';
 import type { MinigameSceneProps } from '../types';
 import { drawQueuedPortrait } from '../toysquad/portraits';
@@ -27,10 +31,10 @@ import { BOSSES, DAMAGE_CHECK, MAX_TIER, TIER_COLOURS, TOWERS, type EnemyKind } 
 import { ENEMY_PARTS, ENEMY_SCALE, FLY_HEIGHT } from './models';
 import { canMergeTowers, inCheck, towerAt, viewedBoard, type TdPlayer, type TdState } from './rules';
 import { enemyStatus } from './status';
-import { tumbleView } from './camera';
+import { tumbleScreen, tumbleView } from './camera';
 import { StatusIconBatch } from '../shared/statusIcons';
 import { TAP_SLOP, type Ground } from '../shared/panZoom';
-import { canMergeCells, submitTumbleInput, tapCell, useTumbleUI } from './local';
+import { canMergeCells, inspectCell, submitTumbleInput, tapCell, useTumbleUI } from './local';
 import { BRIDGE, CELL, bw, groundY, worldCell } from './space';
 import { TumbleFxLayer, tumbleFxRef } from './Fx';
 import { eventCue, SHOT_VOICE, SHOT_VOICES_PER_TICK } from './sounds';
@@ -306,7 +310,8 @@ function Markers({ drag }: { drag: RefObject<Drag | null> }) {
   useFrame(() => {
     const v = view, ui = useTumbleUI.getState(), mine = !!v.me && v.board === v.me && !v.me.out;
     const pulse = reduced.current ? 1 : 1 + Math.sin(v.now * 6) * 0.06;
-    putRing(select.current, ui.selected, CELL * 0.5 * pulse, mine);
+    // The selected square on your own board, or the tower being inspected on a board you are looking at.
+    putRing(select.current, ui.selected, CELL * 0.5 * pulse, mine || (!!v.board && ui.selected !== null && !!towerAt(v.board, ui.selected)));
     putRing(cursor.current, ui.cursor !== ui.selected ? ui.cursor : null, CELL * 0.44, mine);
     let n = 0;
     const from = drag.current?.moved ? drag.current.from : ui.selected;
@@ -427,6 +432,13 @@ export function TumbleScene({ getState, localId }: MinigameSceneProps<TdState>) 
       const d = drag.current;
       if (d && e.pointerId === d.pointer) { dragMove(d, e.clientX, e.clientY); return; }
       const p = press.current;
+      // A mouse resting over a tower of the viewed board: its floating tip (never on touch).
+      if (!p && e.pointerType === 'mouse' && e.buttons === 0) {
+        const v = readView(getState, localId), cell = pickCell(rayAt(e.clientX, e.clientY), v.board);
+        const hover = cell !== null && v.board && towerAt(v.board, cell) ? cell : null;
+        if (useTumbleUI.getState().hover !== hover) useTumbleUI.setState({ hover });
+        return;
+      }
       if (!p || e.pointerId !== p.pointer) return;
       if (!p.panned && Math.hypot(e.clientX - p.sx, e.clientY - p.sy) > TAP_SLOP) { p.panned = true; tumbleView.startPan(p.sx, p.sy, ground); el.style.cursor = 'grabbing'; }
       if (p.panned) tumbleView.move(e.pointerId, e.clientX, e.clientY, ground, apply);
@@ -440,25 +452,30 @@ export function TumbleScene({ getState, localId }: MinigameSceneProps<TdState>) 
         dragMove(d, e.clientX, e.clientY);
         const v = readView(getState, localId);
         if (editable(v) && v.me) {
-          if (!d.moved) tapCell(v.me, d.from);
+          if (!d.moved) tapCell(v.me, d.from, useGame.getState().touchUI);
           else if (d.over !== null && d.over !== d.from) {
-            if (canMergeCells(v.me, d.from, d.over)) { submitTumbleInput({ type: 'merge', from: d.from, to: d.over }); useTumbleUI.setState({ selected: d.over, cursor: d.over }); }
+            // Touch: dropping on a same-tier tower selects the pair; its sheet's Merge button merges.
+            if (canMergeCells(v.me, d.from, d.over) && useGame.getState().touchUI) useTumbleUI.setState({ selected: d.over, cursor: d.over, pair: d.from });
+            else if (canMergeCells(v.me, d.from, d.over)) { submitTumbleInput({ type: 'merge', from: d.from, to: d.over }); useTumbleUI.setState({ selected: d.over, cursor: d.over, pair: null }); }
             else if (isBuildable(d.over)) { submitTumbleInput({ type: 'move', from: d.from, to: d.over }); useTumbleUI.setState({ selected: d.over, cursor: d.over }); }
           }
         }
         cancel();
       } else if (p && e.pointerId === p.pointer) {
         press.current = null; el.style.cursor = '';
-        // A tap (not a pan, not the end of a pinch) selects on your own board.
+        // A tap (not a pan, not the end of a pinch) selects on your own board, and inspects a tower on one you are only looking at.
         const v = readView(getState, localId);
-        if (!p.panned && !wasPinch && editable(v) && v.me) { if (p.cell === null) useTumbleUI.setState({ selected: null }); else tapCell(v.me, p.cell); }
+        if (!p.panned && !wasPinch && editable(v) && v.me) { if (p.cell === null) useTumbleUI.setState({ selected: null, pair: null }); else tapCell(v.me, p.cell, useGame.getState().touchUI); }
+        else if (!p.panned && !wasPinch && v.board && (v.board !== v.me || v.me.out)) inspectCell(v.board, p.cell);
       }
     };
     const onCancel = (e: PointerEvent) => { tumbleView.up(e.pointerId); if (drag.current?.pointer === e.pointerId) cancel(); if (press.current?.pointer === e.pointerId) { press.current = null; el.style.cursor = ''; } };
+    const onLeave = () => { if (useTumbleUI.getState().hover !== null) useTumbleUI.setState({ hover: null }); };
     const onWheel = (e: WheelEvent) => { e.preventDefault(); tumbleView.wheel(e.deltaY, e.deltaMode, e.clientX, e.clientY, ground, apply); };
     const previousTouch = el.style.touchAction; el.style.touchAction = 'none';
     el.addEventListener('pointerdown', onDown); el.addEventListener('pointermove', onMove); el.addEventListener('pointerup', onUp);
     el.addEventListener('pointercancel', onCancel); el.addEventListener('lostpointercapture', onCancel); el.addEventListener('wheel', onWheel, { passive: false });
+    el.addEventListener('pointerleave', onLeave);
     const off = useMatch.subscribe((s) => { if (s.paused || s.phase !== 'playing') { cancel(); press.current = null; tumbleView.cancelAll(); } });
     const blur = () => { cancel(); press.current = null; tumbleView.cancelAll(); }; window.addEventListener('blur', blur);
     tumbleView.reset(); tumbleView.cancelAll();
@@ -471,7 +488,7 @@ export function TumbleScene({ getState, localId }: MinigameSceneProps<TdState>) 
     return () => {
       off(); window.removeEventListener('blur', blur); cancel(); press.current = null; tumbleView.cancelAll();
       el.removeEventListener('pointerdown', onDown); el.removeEventListener('pointermove', onMove); el.removeEventListener('pointerup', onUp);
-      el.removeEventListener('pointercancel', onCancel); el.removeEventListener('lostpointercapture', onCancel); el.removeEventListener('wheel', onWheel);
+      el.removeEventListener('pointercancel', onCancel); el.removeEventListener('lostpointercapture', onCancel); el.removeEventListener('wheel', onWheel); el.removeEventListener('pointerleave', onLeave);
       el.style.touchAction = previousTouch; el.style.cursor = '';
       cam.clearViewOffset();
     };
@@ -500,6 +517,22 @@ export function TumbleScene({ getState, localId }: MinigameSceneProps<TdState>) 
       case 'cleared': sfx.musicBox(); break;
     }
   }), [getState, localId]);
+
+  // The HUD anchors its floating popovers to a square's screen box (the felt plus the tower's height).
+  useEffect(() => {
+    const p = new THREE.Vector3();
+    tumbleScreen.cellRect = (cell) => {
+      const r = gl.domElement.getBoundingClientRect(), x = bw(cell % 8), z = bw(Math.floor(cell / 8)), h = CELL / 2;
+      let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
+      for (const [dx, y, dz] of [[-h, 0, -h], [h, 0, -h], [-h, 0, h], [h, 0, h], [0, 3.2, 0]]) {
+        p.set(x + dx, y, z + dz).project(camera);
+        const sx = r.left + ((p.x + 1) / 2) * r.width, sy = r.top + ((1 - p.y) / 2) * r.height;
+        left = Math.min(left, sx); right = Math.max(right, sx); top = Math.min(top, sy); bottom = Math.max(bottom, sy);
+      }
+      return Number.isFinite(left) ? { left, top, right, bottom } : null;
+    };
+    return () => { tumbleScreen.cellRect = null; };
+  }, [camera, gl]);
 
   useEffect(() => {
     exposeDebug({ tumble: {

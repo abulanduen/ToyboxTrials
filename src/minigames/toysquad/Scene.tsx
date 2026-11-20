@@ -23,9 +23,10 @@ type PointerHandler = (e: ThreeEvent<PointerEvent>, id?: number) => void;
 const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.1);
 /** The board on show: your own, or another player's picked from the player rail (read-only). */
 const viewId = (s: SquadState, localId: string) => viewedSquad(s.players, localId, useSquadUI.getState().watching);
-/** Squad edits are open: your own board on show, build phase, not readied, not paused, and no passive choice waiting. */
+/** Squad edits are open: your own board on show (not a seat you only follow as a spectator), build phase, not readied, not paused, and no passive choice waiting. */
 const editable = (s: SquadState | null, id: string) => {
-  if (s?.kind !== 'toy-squad' || s.phase !== 'build' || useMatch.getState().paused || useMatch.getState().phase !== 'playing' || viewId(s, id) !== id) return false;
+  const m = useMatch.getState();
+  if (s?.kind !== 'toy-squad' || s.phase !== 'build' || m.paused || m.phase !== 'playing' || viewId(s, id) !== id || !m.contestants.find(c => c.id === id)?.isLocal) return false;
   const p = s.players.find(p => p.id === id); return !!p && !p.ready && !p.passiveOffers.length;
 };
 /** Debuff badges over the fighters: one shared batch, begun before the pieces' frame callbacks and drawn after them. */
@@ -244,7 +245,15 @@ export function SquadScene({ getState, localId }: MinigameSceneProps<SquadState>
     if (d.sell !== useSquadUI.getState().overShop) useSquadUI.setState({ overShop: d.sell });
   };
   const down: PointerHandler = (e, id) => {
-    if (id === undefined || drag.current || !editable(getState(), localId)) return;
+    if (id === undefined || drag.current) return;
+    if (!editable(getState(), localId)) {
+      // A board you are only looking at: a tap picks a toy to read its kit (never moves or merges anything).
+      const s = getState();
+      if (s?.kind === 'toy-squad' && (viewId(s, localId) !== localId || !useMatch.getState().contestants.find(c => c.id === localId)?.isLocal) && view.player?.units.some(u => u.id === id)) {
+        e.stopPropagation(); useSquadUI.setState({ selected: useSquadUI.getState().selected === id ? null : id, hovered: null, shopSlot: null });
+      }
+      return;
+    }
     e.stopPropagation(); unlockAudio();
     useSquadUI.setState({ selected: id, hovered: null, shopSlot: null });
     const target = e.target as unknown as { setPointerCapture(id: number): void; releasePointerCapture(id: number): void };
@@ -309,9 +318,9 @@ export function SquadScene({ getState, localId }: MinigameSceneProps<SquadState>
     if (gallery) { const x = boardToWorld(gallery.x), z = boardToWorld(gallery.z); camera.position.set(x, gallery.distance, z + gallery.distance * 0.58); camera.lookAt(x, 0, z); }
     if (drag.current && !editable(getState(), localId)) cancel();
     const d = drag.current; highlight.current.visible = !!d && !d.sell;
-    // A white ring marks the selected toy (the one Sell, Q and the arrow keys act on).
-    const s = getState(), picked = building && s?.kind === 'toy-squad' && viewId(s, localId) === localId ? useSquadUI.getState().selected : null;
-    const chosen = picked !== null && s?.kind === 'toy-squad' && d?.unit !== picked ? s.players.find(p => p.id === localId)?.units.find(u => u.id === picked) : undefined;
+    // A white ring marks the selected toy (the one Sell, Q and the arrow keys act on; on a board you only look at, the one whose kit shows).
+    const s = getState(), picked = building && s?.kind === 'toy-squad' ? useSquadUI.getState().selected : null;
+    const chosen = picked !== null && s?.kind === 'toy-squad' && d?.unit !== picked ? s.players.find(p => p.id === viewId(s, localId))?.units.find(u => u.id === picked) : undefined;
     selection.current.visible = !!chosen;
     if (chosen) { const pos = placementPosition(chosen.cell); selection.current.position.set(boardToWorld(pos.x), 0.26, boardToWorld(pos.z)); }
     if (d) {

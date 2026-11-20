@@ -1,5 +1,6 @@
 /* Full ten-round shop/merge/passive loop, with actual 3D mouse or touch dragging: shop pictures and rarity colours,
-   the Sell button, drag-to-sell, keyboard placement and the blocking passive choice. */
+   the coin purse (the coin mark and the right number), the Sell button, drag-to-sell, keyboard placement, the blocking
+   passive choice, and viewing a bot's squad read-only (its traits, passives, coins and toys; no actions). */
 const { chromium } = require('playwright');
 const assert = require('node:assert/strict'); const fs = require('node:fs'); const path = require('node:path');
 const out = path.join(__dirname,'output'); fs.mkdirSync(out,{recursive:true});
@@ -84,6 +85,15 @@ const out = path.join(__dirname,'output'); fs.mkdirSync(out,{recursive:true});
       await page.evaluate(()=>{window.__toybox.match.state().players[0].shop=['soldier','soldier','soldier','soldier','robot'];});
       await page.waitForFunction(()=>document.querySelector('[data-testid="squad-buy-0"]').textContent.includes('Tin Volley'));
       await click('squad-buy-0'); await page.waitForFunction(()=>window.__toybox.match.state().players[0].units.length===1);
+      // The purse: the coin mark and the coins left (10 − 1), beside the shop's actions; prices carry the mark too.
+      const purseShows = () => page.waitForFunction(()=>{const c=document.querySelector('[data-testid="squad-coins"]'); return !!c&&!!c.querySelector('svg.cog-icon')&&Number(c.querySelector('b').textContent)===window.__toybox.match.state().players[0].coins&&Number(c.dataset.value)===window.__toybox.match.state().players[0].coins;});
+      await purseShows(); assert.equal((await state()).players[0].coins,9);
+      assert.match(await page.getByTestId('squad-coins').textContent(),/9 coins/);
+      assert.equal(await page.locator('[data-testid="squad-banner-coins"] svg.cog-icon').count(),1);
+      assert.equal(await page.locator('[data-testid="squad-buy-1"] .squad-card__cost svg.cog-icon').count(),1);
+      assert.equal(await page.locator('[data-testid="squad-reroll"] svg.cog-icon').count(),1);
+      { const r=await page.getByTestId('squad-coins').boundingBox(), w=await page.getByTestId('squad-workbench').boundingBox(); assert.ok(r.width>=40&&r.height>=28&&r.x>=w.x&&r.x+r.width<=w.x+w.width+1&&r.y>=w.y&&r.y+r.height<=w.y+w.height+1,`the purse is readable and inside the dock: ${JSON.stringify(r)}`); }
+      await page.screenshot({path:path.join(out,`toysquad-${layout}-coins.png`)});
       // Nothing is selected yet, so Sell (between Reroll and Ready) is disabled. The old Formation & traits drawer is gone.
       assert.equal(await page.getByTestId('squad-sell').isDisabled(),true);
       assert.deepEqual(await page.locator('.squad-shop-actions button').evaluateAll(bs=>bs.map(b=>b.dataset.testid)),['squad-reroll','squad-sell','squad-ready']);
@@ -156,7 +166,7 @@ const out = path.join(__dirname,'output'); fs.mkdirSync(out,{recursive:true});
       await page.waitForSelector('[data-testid="squad-kit"]');
       assert.match(await page.getByTestId('squad-kit').textContent(),/Paper Medic/);
       // Tapping a toy selects it: Sell names it and shows the refund.
-      assert.equal(await page.getByTestId('squad-sell').isDisabled(),false); assert.match(await page.getByTestId('squad-sell').textContent(),/\+1c.*Paper Medic/);
+      assert.equal(await page.getByTestId('squad-sell').isDisabled(),false); assert.match(await page.getByTestId('squad-sell').textContent(),/\+1 coin.*Paper Medic/);
       await page.keyboard.press('KeyQ'); await page.waitForFunction(()=>window.__toybox.match.state().players[0].units.length===3);
       await page.waitForFunction(()=>document.querySelector('[data-testid="squad-sell"]').disabled);
       // Rarity colours on the cards: grey, green, blue, purple, yellow.
@@ -179,7 +189,7 @@ const out = path.join(__dirname,'output'); fs.mkdirSync(out,{recursive:true});
       // Sell button: select the fox, sell it for the quoted refund.
       const fox=await page.evaluate(()=>window.__toybox.squad.point(0,8.65,1.4)), purse=(await state()).players[0].coins;
       if(mobile) await page.touchscreen.tap(fox.x,fox.y); else await page.mouse.click(fox.x,fox.y);
-      await page.waitForFunction(()=>/\+1c.*Felt Fox/.test(document.querySelector('[data-testid="squad-sell"]').textContent));
+      await page.waitForFunction(()=>/\+1 coin.*Felt Fox/.test(document.querySelector('[data-testid="squad-sell"]').textContent));
       // The details of the selected toy have a Close button; closing clears the selection.
       await page.waitForFunction(()=>document.querySelector('[data-testid="squad-kit"]')?.textContent.includes('Felt Fox')); await size56('squad-kit-close');
       assert.deepEqual(await page.locator('[data-testid="squad-kit"] svg[data-trait]').evaluateAll(a=>a.map(e=>e.dataset.trait)),['Felt','Trickster']);
@@ -187,7 +197,7 @@ const out = path.join(__dirname,'output'); fs.mkdirSync(out,{recursive:true});
       await click('squad-kit-close'); await page.getByTestId('squad-kit').waitFor({state:'detached'});
       await page.waitForFunction(()=>document.querySelector('[data-testid="squad-sell"]').disabled);
       if(mobile) await page.touchscreen.tap(fox.x,fox.y); else await page.mouse.click(fox.x,fox.y);
-      await page.waitForFunction(()=>/\+1c.*Felt Fox/.test(document.querySelector('[data-testid="squad-sell"]').textContent));
+      await page.waitForFunction(()=>/\+1 coin.*Felt Fox/.test(document.querySelector('[data-testid="squad-sell"]').textContent));
       await click('squad-sell'); await page.waitForFunction(()=>window.__toybox.match.state().players[0].units.length===4);
       assert.equal((await state()).players[0].coins,purse+1); assert.equal((await state()).players[0].units.some(u=>u.kind==='felt-fox'),false);
       await page.waitForFunction(()=>document.querySelector('[data-testid="squad-sell"]').disabled);
@@ -213,6 +223,33 @@ const out = path.join(__dirname,'output'); fs.mkdirSync(out,{recursive:true});
         await page.evaluate(()=>{window.__toybox.match.state().players[0].shop[0]='hare';});
         await page.waitForFunction(()=>document.querySelector('[data-testid="squad-kit"]')?.textContent.includes('Spring Hare'));
       }
+      await purseShows();
+      // ── view a bot's squad while building: its traits, passives, coins and toys, read-only ──
+      const watched=(await state()).players[1].id;
+      await page.evaluate(id=>{const s=window.__toybox.match.state(), b=s.players.find(p=>p.id===id);
+        b.units=[{id:8001,kind:'hare',tier:1,cell:0},{id:8002,kind:'soldier',tier:2,cell:1},{id:8003,kind:'felt-fox',tier:1,cell:-1}];
+        b.passives=['bargain']; b.coins=17; b.ready=true;},watched); // ready: the bot leaves its squad alone
+      if(mobile) await click(`rail-${watched}`); else await page.getByTestId(`rail-${watched}`).click();
+      await page.getByTestId('squad-viewbench').waitFor({state:'visible'});
+      assert.equal(await page.getByTestId('squad-workbench').count(),0,'no shop, Reroll, Sell or Ready while viewing');
+      await page.waitForFunction(id=>document.querySelector('[data-testid="squad-traits"]')?.dataset.owner===id,watched);
+      assert.deepEqual(await page.locator('[data-testid="squad-traits"] button').evaluateAll(a=>a.map(e=>e.dataset.testid+' '+e.textContent).sort()),['squad-trait-Felt 1/2','squad-trait-Ranger 1/2','squad-trait-Tin 1/2','squad-trait-Vanguard 1/2']);
+      assert.match(await page.getByTestId('squad-view-passives').textContent(),/Bargain Bin/);
+      assert.equal(await page.getByTestId('squad-view-coins').getAttribute('data-value'),'17');
+      assert.equal(await page.locator('[data-testid="squad-view-coins"] svg.cog-icon').count(),1);
+      assert.equal(await page.getByTestId('squad-banner-coins').getAttribute('data-value'),'17');
+      assert.deepEqual(await page.locator('[data-testid="squad-view-units"] button').evaluateAll(a=>a.map(e=>`${e.dataset.kind}:${e.dataset.tier}:${e.textContent.includes('Reserve')?'R':'B'}`)),['hare:1:B','soldier:2:B','felt-fox:1:R']);
+      await size56('squad-view-unit-8002');
+      await click('squad-view-unit-8002'); await page.waitForFunction(()=>/read-only/.test(document.querySelector('[data-testid="squad-kit"]')?.textContent||''));
+      assert.match(await page.getByTestId('squad-kit').textContent(),/Tin Soldier/);
+      // A tap on one of their toys on the board picks it too (and never moves it).
+      { const at=await page.evaluate(()=>window.__toybox.squad.point(0,4,1.4)); if(mobile) await page.touchscreen.tap(at.x,at.y); else await page.mouse.click(at.x,at.y); }
+      await page.waitForFunction(()=>/Spring Hare/.test(document.querySelector('[data-testid="squad-kit"]')?.textContent||''));
+      assert.deepEqual((await state()).players.find(p=>p.id===watched).units.map(u=>u.cell),[0,1,-1]);
+      await page.screenshot({path:path.join(out,`toysquad-${layout}-view-squad.png`)});
+      { const coins=(await state()).players[0].coins; await page.keyboard.press('KeyR'); await page.waitForTimeout(400); assert.equal((await state()).players[0].coins,coins,'shortcuts do nothing while viewing'); }
+      await click('watch-back');
+      await page.getByTestId('squad-workbench').waitFor({state:'visible'}); await purseShows();
       await page.getByRole('button',{name:'Pause',exact:true}).click(); await page.waitForSelector('.pause');
       const t=(await state()).t; await page.waitForTimeout(250); assert.equal((await state()).t,t); await page.keyboard.press('Escape');
       await page.waitForSelector('.pause',{state:'detached'}); await page.evaluate(()=>window.__toybox.match.timeScale(0));
@@ -256,6 +293,9 @@ const out = path.join(__dirname,'output'); fs.mkdirSync(out,{recursive:true});
       if(mobile) assert.ok(railBox.width<=80,`the rail is compact on phones: ${railBox.width}px`);
       if(layout==='desktop') { await page.getByTestId(`rail-${other}`).focus(); await page.keyboard.press('Enter'); } else await click(`rail-${other}`);
       await page.getByTestId('watch-banner').waitFor(); await size56('watch-back');
+      // Spectating their battle: the banner and trait column are theirs.
+      await page.waitForFunction(o=>document.querySelector('[data-testid="squad-banner-passives"]')?.dataset.passives===window.__toybox.match.state().players.find(p=>p.id===o).passives.join(),other);
+      if((await state()).players.find(p=>p.id===other).units.some(u=>u.cell>=0)) await page.waitForFunction(o=>document.querySelector('[data-testid="squad-traits"]')?.dataset.owner===o,other);
       if(mobile) await click('squad-damage-open');
       // The damage overview now lists the viewed player's squad.
       await page.waitForFunction(o=>{const s=window.__toybox.match.state().battles.find(b=>b.owner===o).fighters.filter(u=>u.side===0).map(u=>u.stats.dealt).sort((a,b)=>b-a).join(); return [...document.querySelectorAll('[data-testid="squad-damage"] li')].map(li=>li.dataset.value).join()===s;},other);
