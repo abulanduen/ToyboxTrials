@@ -92,6 +92,14 @@ try{for(const layout of(process.env.SPELLBOX_LAYOUTS||'desktop,portrait,landscap
       assert.ok((await state()).players[0].moveZ<0,'still steering after the cast');}
     finally{await stick.release();}
     await page.evaluate(()=>window.__toybox.match.timeScale(0));
+  }else{
+    // Right click casts E (and left click casts Q, covered elsewhere).
+    await page.evaluate(()=>{const s=window.__toybox.match.state();s.projectiles=[];Object.assign(s.players[0],{x:0,z:-8,vx:0,vz:0,cast:null,cooldowns:[1e9,0,1e9],nextAction:0,stunnedUntil:0});window.__toybox.match.timeScale(.5);});
+    const before=(await state()).players[0].casts,p=await page.evaluate(()=>window.__toybox.spellbox.point(6,-8));
+    await page.mouse.move(p.x,p.y);await page.mouse.click(p.x,p.y,{button:'right'});
+    await page.waitForFunction(n=>window.__toybox.match.state().players[0].casts>n,before);
+    {const st=await state();assert.ok(st.players[0].cooldowns[1]>st.t,'right click cast the E spell');assert.equal(st.players[0].cooldowns[0],1e9,'and not Q');}
+    await page.evaluate(()=>window.__toybox.match.timeScale(0));
   }
   {const now=await page.evaluate(()=>window.__toybox.spellbox.audio()),n=c=>(now.byCue[c]??0)-(heard.byCue[c]??0);
    assert.ok(n('zip')>=1&&n('thump')>=1&&n('impact')>=1,`audio bus got zip/thump/impact (${JSON.stringify(now.byCue)})`);assert.equal(now.loudest.zip,1,'own Blink zip at full level');}

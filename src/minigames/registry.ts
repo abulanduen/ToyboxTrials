@@ -284,7 +284,7 @@ export const MINIGAMES: MinigameDefinition[] = [
     eligibility: { tournament: true, ranked: true, casual: true },
     scoring: 'elimination-order',
     tieBreak: 'Out later ranks higher',
-    controls: [{keys:'WASD / arrows',action:'Move and face; mouse / tap arena aims'},{keys:'Q / E / R',action:'Cast your equipped spells; click also casts Q'},{keys:'Build cards',action:'Choose one of three options for each button, then lock your build'}],
+    controls: [{keys:'WASD / arrows',action:'Move and face; mouse / tap arena aims'},{keys:'Q / E / R',action:'Cast your equipped spells; left click also casts Q, right click casts E'},{keys:'Build cards',action:'Choose one of three options for each button, then lock your build'}],
     inputs:['keyboard','mouse','touch'],bots:'available',recordUnit:'seconds',
     touch:{movement:'joystick',look:'none',orientation:'any',buttons:[{id:'slot1',label:'Spell Q'},{id:'slot2',label:'Spell E'},{id:'slot3',label:'Spell R'}],notes:'Each spell button has three draft choices. Steer with the floating joystick (lower left), tap the arena to aim, and tap spells to cast while your other thumb holds the stick. Larger fields start on larger rings. After eliminations, a 10s warning marks the next smaller edge. Stay inside; last toy wins.'},
     // The draft has no timer and its own "Fight in 3…" count once everyone locks in.

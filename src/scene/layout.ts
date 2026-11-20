@@ -370,6 +370,13 @@ export function hubColliders(): Collider[] {
   list.push({ kind: 'box', id: 'books', x: BOOKS.x, z: BOOKS.z, hx: BOOKS.hx, hz: BOOKS.hz, rot: 0, top: BOOKS.top });
   list.push({ kind: 'circle', id: 'mug', x: MUG.x, z: MUG.z, r: MUG.r, top: MUG.top });
   list.push({ kind: 'circle', id: 'mug-handle', x: MUG.x + MUG.handleX, z: MUG.z, r: MUG.handleR, top: MUG.top });
+  // The desk things on the table's margin (Tabletop.tsx). The domino fence parts round them, so a toy
+  // can reach them. The lamp's base is a low brass disc (2.4 cm: a hop lands on it) with the post rising
+  // from its middle; the pencil pot is a wall. (The cactus and the sticky notes are drawn only above the
+  // Low tier, so they stay without colliders: collision must match on every tier and on the server.)
+  list.push({ kind: 'circle', id: 'lamp-base', x: DESK.lampBase.x, z: DESK.lampBase.z, r: DESK.lampBase.r, top: 2.4 });
+  list.push({ kind: 'circle', id: 'lamp-post', x: DESK.lampBase.x, z: DESK.lampBase.z, r: 2.4, top: 40 });
+  list.push({ kind: 'circle', id: 'pencil-pot', x: DESK.pencilPot.x, z: DESK.pencilPot.z, r: DESK.pencilPot.r, top: 10.8 });
   list.push(...bridgeColliders());
   list.push(...hubPlayColliders());
   return list;

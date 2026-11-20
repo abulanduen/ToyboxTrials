@@ -124,11 +124,16 @@ export function SpellboxScene({getState,localId,contestants}:MinigameSceneProps<
     const active=()=>{const s=getState();return s?.kind==='spellbox-showdown'&&s.phase==='arena'&&s.players.find(p=>p.id===localId)?.alive&&!useMatch.getState().paused&&useMatch.getState().phase==='playing';};
     const aim=(e:PointerEvent)=>{if(!active())return;const r=gl.domElement.getBoundingClientRect();ndc.set((e.clientX-r.left)/r.width*2-1,1-(e.clientY-r.top)/r.height*2);cursor.current=ndc.clone();touchAim.current=e.pointerType==='touch';ray.setFromCamera(ndc,camera);if(ray.ray.intersectPlane(plane,hit)){pointer.current=hit.clone();const p=getState()!.players.find(p=>p.id===localId)!;setSpellboxAim({x:hit.x-p.x,z:hit.z-p.z});}};
     const retain=()=>{const p=getState()?.players.find(p=>p.id===localId);if(active()&&pointer.current&&p)queueSpellboxInput({type:'aim',x:pointer.current.x-p.x,z:pointer.current.z-p.z});};
-    const down=(e:PointerEvent)=>{aim(e);retain();if(active()&&e.pointerType==='mouse'&&e.button===0){unlockAudio();queueSpellboxInput({type:'cast',slot:0});}};
+    // Mouse: left button casts Q, right button casts E. A second button pressed while one is held arrives
+    // as a pointermove with `button` set (a chorded press), so both events are checked.
+    const mouseCast=(e:PointerEvent)=>{if(!active()||e.pointerType!=='mouse')return;const slot=e.button===0?0:e.button===2?1:-1;if(slot<0)return;unlockAudio();queueSpellboxInput({type:'cast',slot});};
+    const down=(e:PointerEvent)=>{aim(e);retain();mouseCast(e);};
+    const move=(e:PointerEvent)=>{aim(e);if(e.button===0&&e.buttons&1||e.button===2&&e.buttons&2)mouseCast(e);};
+    const menu=(e:MouseEvent)=>{if(active())e.preventDefault();};
     const clear=()=>{pointer.current=null;cursor.current=null;clearSpellboxInput();};const leave=(e:PointerEvent)=>{if(e.pointerType==='touch')return;retain();pointer.current=null;cursor.current=null;setSpellboxAim(null);};
     const off=useMatch.subscribe(s=>{if(s.paused||s.phase!=='playing')clear();});const old=gl.domElement.style.touchAction;gl.domElement.style.touchAction='none';
-    gl.domElement.addEventListener('pointermove',aim);gl.domElement.addEventListener('pointerdown',down);gl.domElement.addEventListener('pointerleave',leave);window.addEventListener('blur',clear);
-    return()=>{off();clear();gl.domElement.style.touchAction=old;gl.domElement.removeEventListener('pointermove',aim);gl.domElement.removeEventListener('pointerdown',down);gl.domElement.removeEventListener('pointerleave',leave);window.removeEventListener('blur',clear);};
+    gl.domElement.addEventListener('pointermove',move);gl.domElement.addEventListener('pointerdown',down);gl.domElement.addEventListener('contextmenu',menu);gl.domElement.addEventListener('pointerleave',leave);window.addEventListener('blur',clear);
+    return()=>{off();clear();gl.domElement.style.touchAction=old;gl.domElement.removeEventListener('pointermove',move);gl.domElement.removeEventListener('pointerdown',down);gl.domElement.removeEventListener('contextmenu',menu);gl.domElement.removeEventListener('pointerleave',leave);window.removeEventListener('blur',clear);};
   },[camera,gl,getState,localId,pointerRay,floorPlane]);
   useEffect(()=>matchBus.on('event',createSpellboxAudio(localId,getState)),[localId,getState]);
   useEffect(()=>{exposeDebug({spellbox:{
