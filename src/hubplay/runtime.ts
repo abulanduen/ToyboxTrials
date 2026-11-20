@@ -535,6 +535,15 @@ useGame.subscribe((s, p) => {
   }
 });
 
+function ballResting(): boolean {
+  if (rt.mode === 'local') {
+    const b = rt.local.ball;
+    return !b.holder && b.vx === 0 && b.vy === 0 && b.vz === 0;
+  }
+  const n = rt.buf[rt.buf.length - 1];
+  return !!n && !n.h && n.b[3] === 0 && n.b[4] === 0 && n.b[5] === 0 && !rt.pred;
+}
+
 // ?debug only (tests): read the state, act through the same paths as the controls.
 exposeDebug({
   hubplay: {
@@ -550,6 +559,8 @@ exposeDebug({
       events: rt.events,
       charge: chargePower(),
       newest: rt.buf.length ? { ...rt.buf[rt.buf.length - 1] } : null,
+      /** The ball lies still (not held, not moving), in the authority's state. */
+      ballRest: ballResting(),
     }),
     kick: (dx: number, dz: number, p = 1) => kick(dx, dz, p),
     grab: () => grab(),

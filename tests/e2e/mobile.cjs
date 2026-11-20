@@ -206,7 +206,7 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
 
   // Hub play in portrait: pick the ball up wherever it landed and charge a throw; the score chip
   // and the meter stay on screen, clear of the touch buttons.
-  await page.waitForFunction(() => window.__toybox.hubplay.state().ball.y < 1.2, null, { timeout: 120000, polling: 250 }).catch(() => null);
+  await page.waitForFunction(() => window.__toybox.hubplay.state().ballRest, null, { timeout: 400000, polling: 250 }).catch(() => null);
   const bl = (await hp()).ball;
   await page.evaluate(([x, z]) => window.__toybox.teleport(x, z + 2, Math.PI), [bl.x, bl.z]);
   await btnText('Pick');

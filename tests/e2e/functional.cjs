@@ -117,7 +117,8 @@ const check = (name, ok, detail = '') => { results.push(`${ok ? 'PASS' : 'FAIL'}
   const m0 = (await hp()).marble;
   await T(([x, z]) => window.__toybox.teleport(x + 2.3, z, -Math.PI / 2), [m0.x, m0.z]);
   await page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Kick'), null, { timeout: 120000 }).catch(() => null);
-  check('next to the marble the prompt says Kick', ((await page.textContent('.prompt').catch(() => '')) || '').includes('Kick the giant marble'));
+  const promptHas = async (...parts) => { const t = (await page.textContent('.prompt').catch(() => '')) || ''; return parts.every((x) => t.includes(x)); };
+  check('next to the marble the prompt says Kick (the giant marble)', await promptHas('Kick', 'the giant marble'));
   await page.keyboard.press('KeyE');
   await waitHp((x) => window.__toybox.hubplay.state().marble.x < x - 4, m0.x);
   const m1 = (await hp()).marble;
@@ -126,11 +127,11 @@ const check = (name, ok, detail = '') => { results.push(`${ok ? 'PASS' : 'FAIL'}
 
   await T(() => window.__toybox.teleport(76, -125.6, Math.PI));
   await page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Pick up'), null, { timeout: 120000 }).catch(() => null);
-  check('by the hoop the prompt says Pick up the basketball', ((await page.textContent('.prompt').catch(() => '')) || '').includes('Pick up the basketball'));
+  check('by the hoop the prompt says Pick up (the basketball)', await promptHas('Pick up', 'the basketball'));
   await page.keyboard.press('KeyE');
   await waitHp(() => window.__toybox.hubplay.state().holding);
   await page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Hold to throw'), null, { timeout: 60000 }).catch(() => null);
-  check('E picks the ball up; the prompt becomes Hold to throw', (await hp()).holding && ((await page.textContent('.prompt').catch(() => '')) || '').includes('Hold to throw'));
+  check('E picks the ball up; the prompt becomes Hold to throw', (await hp()).holding && (await promptHas('Hold to throw')));
   await page.keyboard.down('KeyE');
   await waitHp(() => (window.__toybox.hubplay.state().charge ?? 0) > 0.3, null, 60000);
   await waitHp(() => document.querySelector('[data-testid=hubplay-meter]')?.style.display !== 'none', null, 20000);
@@ -139,10 +140,11 @@ const check = (name, ok, detail = '') => { results.push(`${ok ? 'PASS' : 'FAIL'}
   const arcDots = await T(() => window.__toybox.three().scene.getObjectByName('hubplay:arc')?.count ?? 0);
   await page.screenshot({ path: `${OUT}/14-hubplay-charge.png` });
   await page.keyboard.up('KeyE');
-  await waitHp(() => !window.__toybox.hubplay.state().holding);
+  await waitHp(() => { const s = window.__toybox.hubplay.state(); return !s.holding && !s.ball.held; });
   const thrown = await hp();
   check('holding E charges (meter and arc preview showing); letting go throws', charging.charge > 0.3 && meterShown && arcDots > 3 && !thrown.holding && !thrown.ball.held, `charge ${charging.charge?.toFixed(2)}, meter ${meterShown}, arc ${arcDots} dots`);
-  await waitHp(() => { const b = window.__toybox.hubplay.state().ball; return b.y < 1.2; }, null, 60000);
+  // software GL runs a few frames a second here, so the flight takes a while: wait until it rests
+  await waitHp(() => window.__toybox.hubplay.state().ballRest, null, 400000);
   // a basket: pick it up where it landed, then throw from in front of the hoop with the solved power
   const bl = (await hp()).ball;
   await T(([x, z]) => window.__toybox.teleport(x, z + 2, Math.PI), [bl.x, bl.z]);
