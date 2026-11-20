@@ -94,6 +94,7 @@ node tests/e2e/spotdiff.cjs     # Odd Page Out (spot the difference), desktop + 
 node tests/e2e/towertumble.cjs  # Toy Tower Tumble, desktop + phone portrait/landscape (arg: desktop,portrait,landscape)
 node tests/e2e/welcome.cjs      # Pipwick's first-visit Hub tour, greeters, jukebox, music/voice settings (desktop + phone portrait)
 node tests/e2e/siege.cjs        # Toybox Siege, desktop + phone portrait/landscape (ONLY=desktop|portrait|landscape; slow under software GL)
+node tests/e2e/hoopclash.cjs    # Hoop Clash (team basketball), desktop + phone portrait/landscape (ONLY=desktop|portrait|landscape)
 npm test                        # vitest unit tests for rules cores, scoring, tournament selection
 npm run server:dev              # online Hub server on ws://localhost:2567, rebuilt on change (dev builds connect to it)
 npm run server:build            # typecheck + esbuild bundle → server-dist/index.cjs (Railway runs this)

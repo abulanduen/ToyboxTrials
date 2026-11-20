@@ -377,6 +377,14 @@ online"). The other choice in both places is the existing **practice with bots**
   here and validated by its own rules core, so changes to its inputs keep working online. Like
   practice, it skips the 3 s countdown and opens on its draft (`skipStartCountdown`, mirrored in
   `src/minigames/facts.ts`).
+- **Hoop Clash** (team basketball) runs through the same path, in one-trial lobbies only (it is
+  not eligible for tournaments). Its input is the stick and the held action button, sent every
+  frame (`{ type: 'in', ax, ay, run, act }`) and latched by the rules, which see the button's
+  presses and releases in order (so a charge lasts as long as the button was held), plus
+  `{ type: 'pass', to? }`. Humans are split evenly between Red and Blue; bots, then AI "filler"
+  toys the rules core drives itself, make both teams full; a player who forfeits is handed to the
+  same AI so the teams stay even (their seat still forfeits). Toys and the ball are smoothed in the
+  Scene between snapshots. Its own Hub-ball core is `src/minigames/shared/courtBall.ts`.
 - **New trials** join online play by adding an entry to `src/minigames/facts.ts` and
   `server/games.ts` (input validator, hidden-information filter). A trial without them is shown
   as "Not online yet" in the host's picker and is never drawn for an online tournament.
@@ -392,6 +400,8 @@ online"). The other choice in both places is the existing **practice with bots**
 - **Every game with a seed** (Midnight Hunger, Find the Original, Blink Duel, Spellbox, Toy Squad,
   Odd Page Out, Toy Tower Tumble): the seed is not sent (it would predict batteries, crowds,
   shops, matchups and later pictures).
+- **Hoop Clash:** the seed and the rules' own random stream (`rng`, the filler toys' AI) are not
+  sent.
 - **Toy Tower Tumble:** each board's random-draw state (`rng`) is not sent (it would tell which
   tower the next Build gives).
 - **Blink Duel, Spellbox:** other players' queued inputs (`pending`) are not sent.
