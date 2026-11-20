@@ -752,6 +752,27 @@ canvas {
 .touch-stick--on {
   opacity: 1;
 }
+/* Floating mode: the whole bottom half is the zone; the stick shows only under a finger. */
+.touch-stick-zone.touch-stick-zone--half,
+.mv-touch .touch-stick-zone.touch-stick-zone--half {
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 50%;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+.touch-stick--float {
+  opacity: 0;
+  visibility: hidden;
+  transition: none;
+}
+.touch-stick--float.touch-stick--on {
+  opacity: 1;
+  visibility: visible;
+}
 .touch-stick__ring {
   position: absolute;
   inset: 0;

@@ -45,7 +45,7 @@ describe('server match runner: every trial runs headless with bots', () => {
       expect(r.placements.map((p) => p.contestantId).sort()).toEqual(run.seats.map((c) => c.id).sort());
       expect(Math.min(...r.placements.map((p) => p.place))).toBe(1);
       expect(ms).toBeGreaterThan(0);
-    });
+    }, 30000); // the longer trials (Toybox Siege's run and arena, Toy Squad) simulate several minutes
   }
 
   it('is deterministic: the same seed and inputs give the same result', () => {

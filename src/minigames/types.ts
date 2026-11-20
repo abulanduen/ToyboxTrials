@@ -142,8 +142,8 @@ export interface MinigameDefinition {
   status: 'playable' | 'planned';
   /**
    * Skip the host's 3-2-1 countdown: Start goes straight to playing. For games whose rules open
-   * with their own untimed pre-phase (e.g. Spellbox Showdown's build draft) and count in the action
-   * themselves. Default false.
+   * with their own untimed pre-phase (e.g. Spellbox Showdown's build draft, Toybox Siege's class
+   * pick) and count in the action themselves. Default false.
    */
   skipStartCountdown?: boolean;
   /** Lazy so each minigame is code-split and loaded only when entered. */

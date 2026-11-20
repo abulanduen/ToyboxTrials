@@ -13,11 +13,15 @@
  * Time: `t` counts the whole match, `runT` the run after every toy has picked a class (the
  * clock players see). Each board also has its own clock `bt`, which stands still while that
  * player is choosing a card or deciding whether to revive: the board freezes, the run clock
- * (elites, the boss, the 5:00 end) does not.
+ * (elites, the boss, the 5:00 cut-off) does not. `arenaT` counts the final arena.
+ *
+ * Phases: `pick` (class cards) → `run` (one board per toy; a toy that slays the boss, or is still
+ * standing at 5:00, moves to its `prep` window) → `arena` (every toy still in, on one shared
+ * board, `s.arena`) → `over`. See FINALE in config.ts and the README.
  */
 import type { Contestant, MatchEvent, Placement, RulesCore } from '../types';
 import {
-  ARENA_HALF, BASE_PICKUP, BIGS, BOSS_AT, BOSS_SUMMON_AT, BOSS_SUMMON_COUNT, CLASSES, CLASS_IDS, DEFAULT_CONFIG, ELITE_SCHEDULE, HORN, HORN_MAX,
+  ARENA_HALF, BASE_PICKUP, BIGS, BOSS_AT, BOSS_SUMMON_AT, BOSS_SUMMON_COUNT, CLASSES, CLASS_IDS, DEFAULT_CONFIG, ELITE_SCHEDULE, FINALE, HORN, HORN_MAX, overtime,
   MAX_LEVEL, MAX_PASSIVES, MAX_WEAPONS, MOBS, PASSIVE_IDS, PASSIVE_PER_LEVEL, PLAYER_RADIUS, POINTS, SENT_GEM_XP, SENT_HP, SNACK_CHANCE,
   SNACK_HEAL, SPAWN_DIST, WAVE_MS, WEAPONS, WEAPON_IDS, dmgScale, hpScale, reviveCost, sentEliteFor, spawnRate, waveSize, xpToNext,
   type BigId, type ClassId, type PassiveId, type SiegeConfig, type WeaponId, type WeaponStats,
@@ -31,16 +35,16 @@ export interface Mob { on: boolean; serial: number; kind: number; x: number; z: 
   hp: number; maxHp: number; speed: number; dmg: number; r: number; xp: number; pts: number; hurt: number; yo: number; timer: number }
 export interface Big { on: boolean; serial: number; type: BigId; x: number; z: number; hp: number; maxHp: number; r: number; speed: number; dmg: number; xp: number; pts: number;
   sent: boolean; from: string | null; mode: 0 | 1 | 2; modeT: number; dashT: number; ringT: number; summonT: number; aimX: number; aimZ: number; hurt: number; yo: number; summons: number }
-/** Player projectiles. kind 0 = cork, 1 = paper plane. */
+/** Player projectiles. kind 0 = cork, 1 = paper plane. `own`: the shooter's player index in the arena (−1 on a board). */
 export interface Proj { on: boolean; kind: number; x: number; z: number; vx: number; vz: number; r: number; dmg: number; pierce: number; life: number;
-  ox: number; oz: number; range: number; back: boolean; hits: number[]; nh: number }
-/** Enemy bullets. */
-export interface Shot { on: boolean; x: number; z: number; vx: number; vz: number; r: number; dmg: number; life: number }
+  ox: number; oz: number; range: number; back: boolean; hits: number[]; nh: number; own: number }
+/** Enemy bullets (in the arena: a summoned boss's, `own` = its owner's player index). */
+export interface Shot { on: boolean; x: number; z: number; vx: number; vz: number; r: number; dmg: number; life: number; own: number }
 /** kind 0 = experience gem, 1 = biscuit (heals). */
 export interface Gem { on: boolean; kind: number; x: number; z: number; v: number; pull: boolean }
 export interface Chest { on: boolean; x: number; z: number }
 /** Area hits. kind 0 sweep (instant), 1 chime (short fuse), 2 marble (falls), 3 revive shockwave. `age` counts up, damage lands at `delay`. */
-export interface Blast { on: boolean; kind: number; x: number; z: number; r: number; ang: number; arc: number; delay: number; age: number; life: number; dmg: number; knock: number; done: boolean }
+export interface Blast { on: boolean; kind: number; x: number; z: number; r: number; ang: number; arc: number; delay: number; age: number; life: number; dmg: number; knock: number; done: boolean; own: number }
 
 export interface Board {
   bt: number;
@@ -62,7 +66,12 @@ export type Option =
 export interface Choice { kind: 'level' | 'treasure'; options: Option[]; at: number }
 
 export interface Stats { maxHp: number; armour: number; speed: number; dmg: number; cd: number; area: number; projSpeed: number; pickup: number; xp: number }
-export type Status = 'picking' | 'alive' | 'downed' | 'ghost' | 'victor';
+/**
+ * picking → alive (the run) ⇄ downed → ghost (out). A toy that slays the boss, or is still standing
+ * at 5:00, goes to `prep` (a cleared board, cards only), then to `arena` when the arena opens.
+ * Knocked out of the arena: ghost again (with `inArena` set).
+ */
+export type Status = 'picking' | 'alive' | 'downed' | 'ghost' | 'prep' | 'arena';
 
 export interface SiegePlayer {
   id: string;
@@ -80,14 +89,20 @@ export interface SiegePlayer {
   /** Board time until which hits are ignored. */
   invuln: number;
   downedAt: number; revived: boolean;
-  /** Run time at which this toy finished (ghost or victory); -1 while still in. */
+  /** Run time at which this toy was knocked out of the run (-1 if never); run time it slew the boss (-1 if never). */
   outAt: number; victoryAt: number;
+  /** Run time when the prep window's cards are settled (-1 before prep). */
+  prepUntil: number;
+  /** Took part in the final arena; arena time it was knocked out there (-1 = still standing); rivals it knocked out. */
+  inArena: boolean; arenaOutAt: number; arenaKOs: number;
+  /** Arena: who hit this toy last (credited with the knockout), and when it last sounded hurt. */
+  lastHitBy: string | null; hurtAt: number;
   /** Preferred target for sent elites (null = the leader). */
   target: string | null;
   sendReadyAt: number; protectedUntil: number;
   /** Elites on their way to this board (from = sender id, at = run time of arrival). */
   incoming: { from: string; at: number }[];
-  /** Spectating (ghost or finished): whose board, and the ghost's offset from that toy. */
+  /** Spectating (only once the player chooses to, as a ghost or while waiting for the arena): whose board (null = your own), and the ghost's offset from that toy. */
   watching: string | null; gx: number; gz: number;
   board: Board;
 }
@@ -95,8 +110,12 @@ export interface SiegePlayer {
 export interface SiegeState {
   kind: 'toybox-siege';
   seed: number; rng: number;
-  phase: 'pick' | 'run' | 'over';
-  t: number; runT: number;
+  phase: 'pick' | 'run' | 'arena' | 'over';
+  t: number; runT: number; arenaT: number;
+  /** The final arena: one shared board (no swarm, no gems), null until it opens. */
+  arena: Board | null;
+  /** Arena yo-yo hit gaps per (attacker, victim) pair: arena time of the last hit, index attacker × players + victim. */
+  arenaYo: number[];
   config: SiegeConfig;
   players: SiegePlayer[];
   events: MatchEvent[];
@@ -110,7 +129,9 @@ export type SiegeInput =
   | { type: 'target'; id: string | null }
   | { type: 'revive' }
   | { type: 'giveup' }
-  | { type: 'watch'; dir: 1 | -1; id?: string };
+  | { type: 'watch'; dir: 1 | -1; id?: string }
+  /** Out (or waiting for the arena): start watching other boards, or go back to your own. */
+  | { type: 'spectate'; on: boolean };
 
 // ---------------------------------------------------------------- helpers
 
@@ -129,18 +150,18 @@ const emit = (s: SiegeState, e: MatchEvent) => { if (s.events.length < 256) s.ev
 
 const blankStats = (): Stats => ({ maxHp: 100, armour: 0, speed: 10, dmg: 1, cd: 1, area: 1, projSpeed: 1, pickup: BASE_PICKUP, xp: 1 });
 
-function newBoard(c: SiegeConfig): Board {
+function newBoard(c: Pick<SiegeConfig, 'mobCap' | 'bigCap' | 'projectileCap' | 'shotCap' | 'gemCap' | 'chestCap' | 'blastCap'>): Board {
   const n = <T>(k: number, f: () => T) => Array.from({ length: k }, f);
   return {
     bt: 0,
     mobs: n(c.mobCap, () => ({ on: false, serial: 0, kind: 0, x: 0, z: 0, vx: 0, vz: 0, kx: 0, kz: 0, hp: 0, maxHp: 0, speed: 0, dmg: 0, r: 0, xp: 0, pts: 0, hurt: -1e9, yo: -1e9, timer: 0 })),
     bigs: n(c.bigCap, () => ({ on: false, serial: 0, type: 'bear' as BigId, x: 0, z: 0, hp: 0, maxHp: 0, r: 0, speed: 0, dmg: 0, xp: 0, pts: 0, sent: false, from: null as string | null,
       mode: 0 as 0 | 1 | 2, modeT: 0, dashT: 0, ringT: 0, summonT: 0, aimX: 0, aimZ: 1, hurt: -1e9, yo: -1e9, summons: 0 })),
-    projs: n(c.projectileCap, () => ({ on: false, kind: 0, x: 0, z: 0, vx: 0, vz: 0, r: 0, dmg: 0, pierce: 0, life: 0, ox: 0, oz: 0, range: 0, back: false, hits: [0, 0, 0, 0, 0, 0, 0, 0], nh: 0 })),
-    shots: n(c.shotCap, () => ({ on: false, x: 0, z: 0, vx: 0, vz: 0, r: 0, dmg: 0, life: 0 })),
+    projs: n(c.projectileCap, () => ({ on: false, kind: 0, x: 0, z: 0, vx: 0, vz: 0, r: 0, dmg: 0, pierce: 0, life: 0, ox: 0, oz: 0, range: 0, back: false, hits: [0, 0, 0, 0, 0, 0, 0, 0], nh: 0, own: -1 })),
+    shots: n(c.shotCap, () => ({ on: false, x: 0, z: 0, vx: 0, vz: 0, r: 0, dmg: 0, life: 0, own: -1 })),
     gems: n(c.gemCap, () => ({ on: false, kind: 0, x: 0, z: 0, v: 0, pull: false })),
     chests: n(c.chestCap, () => ({ on: false, x: 0, z: 0 })),
-    blasts: n(c.blastCap, () => ({ on: false, kind: 0, x: 0, z: 0, r: 0, ang: 0, arc: 0, delay: 0, age: 0, life: 0, dmg: 0, knock: 0, done: false })),
+    blasts: n(c.blastCap, () => ({ on: false, kind: 0, x: 0, z: 0, r: 0, ang: 0, arc: 0, delay: 0, age: 0, life: 0, dmg: 0, knock: 0, done: false, own: -1 })),
     spawnAcc: 0, waveT: WAVE_MS, nextElite: 0, bossUp: false, bossDown: false, serial: 0, gemCursor: 0,
   };
 }
@@ -215,7 +236,7 @@ function makePlayer(c: Contestant, config: SiegeConfig): SiegePlayer {
     id: c.id, cls: null, status: 'picking', x: 0, z: 0, fx: 0, fz: 1, ax: 0, ay: 0,
     hp: 100, stat: blankStats(), level: 1, xp: 0, xpNext: xpToNext(1), kills: 0, points: 0, elites: 0,
     weapons: [], passives: [], horn: null, choice: null, pendingLevels: 0, pendingChests: 0, invuln: 0,
-    downedAt: -1, revived: false, outAt: -1, victoryAt: -1, target: null, sendReadyAt: 0, protectedUntil: 0, incoming: [],
+    downedAt: -1, revived: false, outAt: -1, victoryAt: -1, prepUntil: -1, inArena: false, arenaOutAt: -1, arenaKOs: 0, lastHitBy: null, hurtAt: -1e9, target: null, sendReadyAt: 0, protectedUntil: 0, incoming: [],
     watching: null, gx: 0, gz: 0, board: newBoard(config),
   };
 }
@@ -355,9 +376,9 @@ function hitBig(s: SiegeState, p: SiegePlayer, g: Big, dmg: number) {
   const b = p.board;
   if (g.type === 'baron') {
     b.bossDown = true;
-    p.status = 'victor'; p.victoryAt = s.runT; p.outAt = s.runT; p.points += POINTS.victory; p.choice = null;
-    p.watching = defaultWatch(s, p);
+    p.victoryAt = s.runT; p.points += POINTS.victory;
     emit(s, { type: 'siege-victory', id: p.id });
+    enterPrep(s, p, FINALE.bossChests, g.x, g.z);
     return;
   }
   p.elites++;
@@ -384,14 +405,18 @@ function hurtPlayer(s: SiegeState, p: SiegePlayer, dmg: number) {
   } else becomeGhost(s, p);
 }
 
+/** Out of the run for good. The ghost stays on its own board until its player chooses to watch the others. */
 function becomeGhost(s: SiegeState, p: SiegePlayer) {
   p.status = 'ghost'; p.outAt = s.runT; p.choice = null; p.incoming.length = 0; p.gx = 0; p.gz = 0;
-  p.watching = defaultWatch(s, p);
+  p.watching = null;
   emit(s, { type: 'siege-ghost', id: p.id });
 }
-/** Spectators start on the leader's board (or anyone's, once nobody is left in). */
+const stillIn = (q: SiegePlayer) => q.status === 'alive' || q.status === 'downed' || q.status === 'prep' || q.status === 'arena';
+/** Who a spectator watches first: in the arena the best-placed fighter, else the leader still in (or anyone, once nobody is). */
 function defaultWatch(s: SiegeState, p: SiegePlayer): string | null {
-  return standings(s, p)[0]?.id ?? s.players.find((q) => q !== p)?.id ?? null;
+  const pool = s.players.filter((q) => q !== p && (s.phase === 'arena' ? q.status === 'arena' : stillIn(q)));
+  pool.sort((a, b) => b.points - a.points || b.level - a.level || (a.id < b.id ? -1 : 1));
+  return pool[0]?.id ?? s.players.find((q) => q !== p)?.id ?? null;
 }
 
 function revive(s: SiegeState, p: SiegePlayer) {
@@ -448,7 +473,8 @@ export function treasureOptions(s: SiegeState, p: SiegePlayer): Option[] {
     while (items.length < 2 && can.length) items.push(can.splice(Math.floor(rand(s) * can.length), 1)[0]);
     first = items.length ? { kind: 'bundle', items } : { kind: 'heal' };
   }
-  return s.players.length > 1 ? [first, { kind: 'send' }] : [first];
+  // Skipping a chest to send an elite only makes sense mid-run (not for the boss's chests).
+  return s.players.length > 1 && p.status === 'alive' ? [first, { kind: 'send' }] : [first];
 }
 
 function addWeapon(p: SiegePlayer, id: WeaponId) {
@@ -480,7 +506,7 @@ function applyOption(s: SiegeState, p: SiegePlayer, o: Option, target: string | 
 
 function choose(s: SiegeState, p: SiegePlayer, index: number, target: string | null | undefined) {
   const c = p.choice;
-  if (!c || p.status !== 'alive') return;
+  if (!c || (p.status !== 'alive' && p.status !== 'prep')) return;
   const o = c.options[index];
   if (!o) return;
   if (!applyOption(s, p, o, target)) return; // a blocked send keeps the card open
@@ -490,7 +516,7 @@ function choose(s: SiegeState, p: SiegePlayer, index: number, target: string | n
   openChoice(s, p);
 }
 function openChoice(s: SiegeState, p: SiegePlayer) {
-  if (p.choice || p.status !== 'alive') return;
+  if (p.choice || (p.status !== 'alive' && p.status !== 'prep')) return;
   if (p.pendingLevels > 0) p.choice = { kind: 'level', options: levelOptions(s, p), at: s.t };
   else if (p.pendingChests > 0) { p.choice = { kind: 'treasure', options: treasureOptions(s, p), at: s.t }; emit(s, { type: 'siege-chest', id: p.id }); }
   if (p.choice) emit(s, { type: 'siege-choice', id: p.id, kind: p.choice.kind });
@@ -506,16 +532,16 @@ function gainXp(s: SiegeState, p: SiegePlayer, v: number) {
 
 // ---------------------------------------------------------------- weapons
 
-function addBlast(b: Board, kind: number, x: number, z: number, r: number, ang: number, arc: number, delay: number, life: number, dmg: number, knock: number) {
+function addBlast(b: Board, kind: number, x: number, z: number, r: number, ang: number, arc: number, delay: number, life: number, dmg: number, knock: number, own = -1) {
   for (const k of b.blasts) if (!k.on) {
-    k.on = true; k.kind = kind; k.x = x; k.z = z; k.r = r; k.ang = ang; k.arc = arc; k.delay = delay; k.age = 0; k.life = life; k.dmg = dmg; k.knock = knock; k.done = false;
+    k.on = true; k.kind = kind; k.x = x; k.z = z; k.r = r; k.ang = ang; k.arc = arc; k.delay = delay; k.age = 0; k.life = life; k.dmg = dmg; k.knock = knock; k.done = false; k.own = own;
     return k;
   }
   return null;
 }
-function addProj(b: Board, kind: number, x: number, z: number, vx: number, vz: number, r: number, dmg: number, pierce: number, life: number, range: number) {
+function addProj(b: Board, kind: number, x: number, z: number, vx: number, vz: number, r: number, dmg: number, pierce: number, life: number, range: number, own = -1) {
   for (const q of b.projs) if (!q.on) {
-    q.on = true; q.kind = kind; q.x = x; q.z = z; q.vx = vx; q.vz = vz; q.r = r; q.dmg = dmg; q.pierce = pierce; q.life = life; q.ox = x; q.oz = z; q.range = range; q.back = false; q.nh = 0;
+    q.on = true; q.kind = kind; q.x = x; q.z = z; q.vx = vx; q.vz = vz; q.r = r; q.dmg = dmg; q.pierce = pierce; q.life = life; q.ox = x; q.oz = z; q.range = range; q.back = false; q.nh = 0; q.own = own;
     return q;
   }
   return null;
@@ -548,44 +574,50 @@ function randomEnemy(s: SiegeState, p: SiegePlayer, range: number): boolean {
   return false;
 }
 
-function fire(s: SiegeState, p: SiegePlayer, w: WeaponSlot, st: WeaponStats) {
-  const b = p.board, area = st.area * p.stat.area, dmg = st.dmg * p.stat.dmg, face = Math.atan2(p.fx, p.fz);
+/**
+ * Fire one volley. On a board (`own` −1) weapons aim at the swarm; in the arena (`own` = the
+ * shooter's player index) at rival toys and their summoned bosses, and every hit carries `own`.
+ */
+function fire(s: SiegeState, p: SiegePlayer, w: WeaponSlot, st: WeaponStats, b: Board = p.board, own = -1) {
+  const area = st.area * p.stat.area, dmg = st.dmg * p.stat.dmg, face = Math.atan2(p.fx, p.fz);
+  const nearestFoe = (range: number) => (own < 0 ? nearestEnemy(p, range) : foeNearest(s, p, range));
+  const randomFoe = (range: number) => (own < 0 ? randomEnemy(s, p, range) : foeRandom(s, p, range));
   switch (w.id) {
     case 'sweep': {
       // Swings at the nearest enemy in reach (auto-aim), else the way the toy faces.
-      const base = nearestEnemy(p, area + 3) ? Math.atan2(aim.x - p.x, aim.z - p.z) : face;
+      const base = nearestFoe(area + 3) ? Math.atan2(aim.x - p.x, aim.z - p.z) : face;
       for (let k = 0; k < st.count; k++) {
         const ang = base + k * Math.PI;
-        addBlast(b, 0, p.x, p.z, area, ang, st.arc, 0, 260, dmg, st.knock);
+        addBlast(b, 0, p.x, p.z, area, ang, st.arc, 0, 260, dmg, st.knock, own);
       }
       break;
     }
     case 'popgun': {
-      const target = nearestEnemy(p, 30);
+      const target = nearestFoe(30);
       const base = target ? Math.atan2(aim.x - p.x, aim.z - p.z) : face, sp = st.speed * p.stat.projSpeed;
       for (let k = 0; k < st.count; k++) {
         const a = base + (k - (st.count - 1) / 2) * 0.14;
-        addProj(b, 0, p.x, p.z, Math.sin(a) * sp, Math.cos(a) * sp, st.area, dmg, st.pierce, st.range, 0);
+        addProj(b, 0, p.x, p.z, Math.sin(a) * sp, Math.cos(a) * sp, st.area, dmg, st.pierce, st.range, 0, own);
       }
       break;
     }
     case 'chime':
       for (let k = 0; k < st.count; k++) {
-        if (!randomEnemy(s, p, st.range)) { const a = rand(s) * Math.PI * 2, d = 4 + rand(s) * 8; aim.x = p.x + Math.cos(a) * d; aim.z = p.z + Math.sin(a) * d; }
-        addBlast(b, 1, aim.x, aim.z, area, 0, 360, 150, 420, dmg, 3);
+        if (!randomFoe(st.range)) { const a = rand(s) * Math.PI * 2, d = 4 + rand(s) * 8; aim.x = p.x + Math.cos(a) * d; aim.z = p.z + Math.sin(a) * d; }
+        addBlast(b, 1, aim.x, aim.z, area, 0, 360, 150, 420, dmg, 3, own);
       }
       break;
     case 'marbles':
       for (let k = 0; k < st.count; k++) {
-        if (!randomEnemy(s, p, st.range)) { const a = rand(s) * Math.PI * 2, d = 3 + rand(s) * 10; aim.x = p.x + Math.cos(a) * d; aim.z = p.z + Math.sin(a) * d; }
-        addBlast(b, 2, aim.x + (rand(s) - 0.5), aim.z + (rand(s) - 0.5), area, 0, 360, 450, 700, dmg, 2);
+        if (!randomFoe(st.range)) { const a = rand(s) * Math.PI * 2, d = 3 + rand(s) * 10; aim.x = p.x + Math.cos(a) * d; aim.z = p.z + Math.sin(a) * d; }
+        addBlast(b, 2, aim.x + (rand(s) - 0.5), aim.z + (rand(s) - 0.5), area, 0, 360, 450, 700, dmg, 2, own);
       }
       break;
     case 'planes': {
       const sp = st.speed * p.stat.projSpeed, spread = w.evolved ? (Math.PI * 2) / st.count : 0.45;
       for (let k = 0; k < st.count; k++) {
         const a = w.evolved ? face + k * spread : face + (k - (st.count - 1) / 2) * spread;
-        addProj(b, 1, p.x, p.z, Math.sin(a) * sp, Math.cos(a) * sp, st.area * p.stat.area, dmg, -1, 6000, st.range * p.stat.area);
+        addProj(b, 1, p.x, p.z, Math.sin(a) * sp, Math.cos(a) * sp, st.area * p.stat.area, dmg, -1, 6000, st.range * p.stat.area, own);
       }
       break;
     }
@@ -634,17 +666,20 @@ function weapons(s: SiegeState, p: SiegePlayer, dt: number) {
 
 // ---------------------------------------------------------------- board step
 
+/** Player movement (the latched stick / keys), inside a square of half-size `half`. */
+function movePlayer(p: SiegePlayer, sec: number, half: number) {
+  const m2 = len(p.ax, p.ay), mag = Math.min(1, m2);
+  if (mag <= 0.05) return;
+  const nx = p.ax / m2, nz = -p.ay / m2;
+  p.x = clamp(p.x + nx * mag * p.stat.speed * sec, -half + PLAYER_RADIUS, half - PLAYER_RADIUS);
+  p.z = clamp(p.z + nz * mag * p.stat.speed * sec, -half + PLAYER_RADIUS, half - PLAYER_RADIUS);
+  p.fx = nx; p.fz = nz;
+}
+
 function stepBoard(s: SiegeState, p: SiegePlayer, dt: number) {
   const b = p.board, c = s.config, sec = dt / 1000;
   b.bt += dt;
-  // Player movement (the latched stick / keys).
-  const m2 = len(p.ax, p.ay), mag = Math.min(1, m2);
-  if (mag > 0.05) {
-    const nx = p.ax / m2, nz = -p.ay / m2;
-    p.x = clamp(p.x + nx * mag * p.stat.speed * sec, -ARENA_HALF + PLAYER_RADIUS, ARENA_HALF - PLAYER_RADIUS);
-    p.z = clamp(p.z + nz * mag * p.stat.speed * sec, -ARENA_HALF + PLAYER_RADIUS, ARENA_HALF - PLAYER_RADIUS);
-    p.fx = nx; p.fz = nz;
-  }
+  movePlayer(p, sec, ARENA_HALF);
 
   // The run's schedule: one elite a minute, the boss at 4:00, and elites sent by rivals.
   if (b.nextElite < ELITE_SCHEDULE.length && s.runT >= ELITE_SCHEDULE[b.nextElite].at) { if (spawnBig(s, p, ELITE_SCHEDULE[b.nextElite].elite, false, null)) b.nextElite++; }
@@ -756,7 +791,7 @@ function stepBoard(s: SiegeState, p: SiegePlayer, dt: number) {
           const a = off + (k / d.ringCount) * Math.PI * 2;
           const shot = b.shots.find((x) => !x.on);
           if (!shot) break;
-          shot.on = true; shot.x = g.x; shot.z = g.z; shot.vx = Math.cos(a) * d.ringSpeed; shot.vz = Math.sin(a) * d.ringSpeed; shot.r = 0.7; shot.dmg = d.ringDmg; shot.life = 4000;
+          shot.on = true; shot.x = g.x; shot.z = g.z; shot.vx = Math.cos(a) * d.ringSpeed; shot.vz = Math.sin(a) * d.ringSpeed; shot.r = 0.7; shot.dmg = d.ringDmg; shot.life = 4000; shot.own = -1;
         }
       }
     }
@@ -875,12 +910,320 @@ function stepBoard(s: SiegeState, p: SiegePlayer, dt: number) {
   openChoice(s, p);
 }
 
+// ---------------------------------------------------------------- prep: after the boss, or at 5:00
+
+/**
+ * The boss fell (`chests` = FINALE.bossChests at the boss) or the run ended (`chests` 0): clear the
+ * board, pull every gem and chest to the toy, and give it `prepMs` to take its cards. Cards stay
+ * open as they are; the board does not freeze for them (nothing on it can hurt you any more).
+ */
+function enterPrep(s: SiegeState, p: SiegePlayer, chests: number, x: number, z: number) {
+  const b = p.board;
+  for (const m of b.mobs) m.on = false;
+  for (const g of b.bigs) g.on = false;
+  for (const sh of b.shots) sh.on = false;
+  for (const q of b.projs) q.on = false;
+  for (const k of b.blasts) k.on = false;
+  b.bossDown = true;
+  for (let i = 0; i < chests; i++) {
+    const c = b.chests.find((q) => !q.on);
+    const a = (i / Math.max(1, chests)) * Math.PI * 2;
+    if (c) { c.on = true; c.x = clamp(x + Math.cos(a) * 3, -ARENA_HALF + 1, ARENA_HALF - 1); c.z = clamp(z + Math.sin(a) * 3, -ARENA_HALF + 1, ARENA_HALF - 1); }
+    else p.pendingChests++;
+  }
+  for (const g of b.gems) if (g.on) g.pull = true;
+  p.status = 'prep'; p.prepUntil = s.runT + s.config.prepMs; p.incoming.length = 0; p.invuln = 0; p.watching = null;
+  emit(s, { type: 'siege-prep', id: p.id, chests });
+}
+
+/** Collect everything still on the board at once and settle every card with its first option. */
+function flushPrep(s: SiegeState, p: SiegePlayer) {
+  const b = p.board;
+  for (const g of b.gems) if (g.on) { g.on = false; if (g.kind === 1) p.hp = p.stat.maxHp; else gainXp(s, p, g.v); }
+  for (const c of b.chests) if (c.on) { c.on = false; p.pendingChests++; }
+  for (let n = 0; n < 200 && (p.choice || p.pendingLevels > 0 || p.pendingChests > 0); n++) {
+    if (!p.choice) openChoice(s, p);
+    if (!p.choice) break;
+    choose(s, p, 0, null);
+  }
+}
+
+function stepPrep(s: SiegeState, p: SiegePlayer, dt: number) {
+  const b = p.board, sec = dt / 1000;
+  b.bt += dt;
+  if (!p.choice) movePlayer(p, sec, ARENA_HALF);
+  const step = FINALE.vacuumSpeed * sec;
+  for (const g of b.gems) {
+    if (!g.on) continue;
+    const dx = p.x - g.x, dz = p.z - g.z, dl = len(dx, dz);
+    if (dl < 1.3 + step) { g.on = false; if (g.kind === 1) p.hp = Math.min(p.stat.maxHp, p.hp + p.stat.maxHp * SNACK_HEAL); else gainXp(s, p, g.v); continue; }
+    g.pull = true; g.x += (dx / dl) * step; g.z += (dz / dl) * step;
+  }
+  for (const c of b.chests) {
+    if (!c.on) continue;
+    const dx = p.x - c.x, dz = p.z - c.z, dl = len(dx, dz), cs = step * 0.5; // chests drift in a little slower than gems
+    if (dl < 2.6 + cs) { c.on = false; p.pendingChests++; emit(s, { type: 'siege-chest-pick', id: p.id }); continue; }
+    c.x += (dx / dl) * cs; c.z += (dz / dl) * cs;
+  }
+  for (const k of b.blasts) if (k.on) { k.age += dt; if (k.age >= k.life) k.on = false; }
+  if (s.runT >= p.prepUntil) flushPrep(s, p);
+  else openChoice(s, p);
+}
+
+// ---------------------------------------------------------------- the final arena
+
+/** Arena pools: no swarm, gems or chests; room for every toy's volleys and one summoned boss each. */
+function arenaBoard(c: SiegeConfig, players: number): Board {
+  return newBoard({ mobCap: 0, gemCap: 0, chestCap: 0, bigCap: Math.max(1, players), projectileCap: c.projectileCap * 2, shotCap: c.shotCap * 2, blastCap: c.blastCap * 2 });
+}
+
+/** Open the arena for every toy in prep (downed toys that have not revived become ghosts). Fewer than two: no arena, the match ends. */
+function openArena(s: SiegeState) {
+  for (const p of s.players) if (p.status === 'downed') becomeGhost(s, p);
+  const fighters = s.players.filter((p) => p.status === 'prep');
+  for (const p of fighters) flushPrep(s, p);
+  if (fighters.length < 2) { s.phase = 'over'; emit(s, { type: 'siege-over' }); return; }
+  s.phase = 'arena'; s.arenaT = 0;
+  s.arena = arenaBoard(s.config, s.players.length);
+  s.arenaYo = new Array(s.players.length * s.players.length).fill(-1e9);
+  fighters.forEach((p, k) => {
+    const a = (k / fighters.length) * Math.PI * 2 + Math.PI / 4;
+    p.x = Math.cos(a) * FINALE.startRadius; p.z = Math.sin(a) * FINALE.startRadius;
+    const d = len(p.x, p.z) || 1; p.fx = -p.x / d; p.fz = -p.z / d;
+    p.status = 'arena'; p.inArena = true; p.arenaOutAt = -1; p.hp = p.stat.maxHp; p.invuln = 0; p.lastHitBy = null; p.hurtAt = -1e9;
+    p.choice = null; p.watching = null;
+    for (const w of p.weapons) { w.cd = 500 + k * 60; w.aux = 0; }
+    if (p.horn) p.horn.readyAt = FINALE.ally.firstReadyMs;
+  });
+  for (const p of s.players) if (p.status === 'ghost' && p.watching && playerById(s, p.watching)?.status !== 'arena') p.watching = null;
+  emit(s, { type: 'siege-arena', fighters: fighters.length });
+}
+
+/** Nearest rival toy or rival's summoned boss within `range` (sets `aim`). */
+function foeNearest(s: SiegeState, p: SiegePlayer, range: number): boolean {
+  let best = range * range, found = false;
+  for (const q of s.players) if (q !== p && q.status === 'arena') { const d = (q.x - p.x) ** 2 + (q.z - p.z) ** 2; if (d < best) { best = d; aim.x = q.x; aim.z = q.z; found = true; } }
+  for (const g of s.arena!.bigs) if (g.on && g.from !== p.id) { const d = (g.x - p.x) ** 2 + (g.z - p.z) ** 2; if (d < best) { best = d; aim.x = g.x; aim.z = g.z; found = true; } }
+  aim.d = Math.sqrt(best);
+  return found;
+}
+/** A random rival toy or rival's summoned boss within `range` (sets `aim`). */
+function foeRandom(s: SiegeState, p: SiegePlayer, range: number): boolean {
+  const r2 = range * range;
+  let n = 0;
+  for (const q of s.players) if (q !== p && q.status === 'arena' && (q.x - p.x) ** 2 + (q.z - p.z) ** 2 <= r2) n++;
+  for (const g of s.arena!.bigs) if (g.on && g.from !== p.id && (g.x - p.x) ** 2 + (g.z - p.z) ** 2 <= r2) n++;
+  if (!n) return false;
+  let pick = Math.floor(rand(s) * n);
+  for (const q of s.players) if (q !== p && q.status === 'arena' && (q.x - p.x) ** 2 + (q.z - p.z) ** 2 <= r2 && pick-- === 0) { aim.x = q.x; aim.z = q.z; return true; }
+  for (const g of s.arena!.bigs) if (g.on && g.from !== p.id && (g.x - p.x) ** 2 + (g.z - p.z) ** 2 <= r2 && pick-- === 0) { aim.x = g.x; aim.z = g.z; return true; }
+  return false;
+}
+
+/** Damage a toy in the arena: overtime and armour apply; at 0 it is knocked out of the arena. */
+function arenaHurt(s: SiegeState, v: SiegePlayer, dmg: number, from: SiegePlayer | undefined) {
+  if (v.status !== 'arena' || dmg <= 0) return;
+  v.hp -= dmg * overtime(s.arenaT) * (1 - Math.min(FINALE.armourCap, v.stat.armour * FINALE.armourPct));
+  if (from && from !== v) v.lastHitBy = from.id;
+  if (s.arenaT - v.hurtAt >= 300) { v.hurtAt = s.arenaT; emit(s, { type: 'siege-hurt', id: v.id }); }
+  if (v.hp > 0) return;
+  v.hp = 0; v.status = 'ghost'; v.arenaOutAt = s.arenaT; v.watching = null; v.gx = 0; v.gz = 0;
+  for (const g of s.arena!.bigs) if (g.on && g.from === v.id) g.on = false;
+  const by = playerById(s, v.lastHitBy);
+  if (by && by.status === 'arena') { by.arenaKOs++; by.points += FINALE.koPoints; }
+  emit(s, { type: 'siege-ko', id: v.id, by: by?.id ?? null });
+}
+/** Damage a summoned boss. */
+function allyHurt(s: SiegeState, g: Big, dmg: number) {
+  if (!g.on) return;
+  g.hp -= dmg * overtime(s.arenaT); g.hurt = s.arenaT;
+  if (g.hp <= 0) { g.on = false; emit(s, { type: 'siege-ally-down', id: g.from }); }
+}
+
+/** The Rally Horn in the arena: a Boiler Baron fights for its owner (one at a time, then a cooldown). */
+function summonAlly(s: SiegeState, p: SiegePlayer) {
+  const a = s.arena!, A = FINALE.ally;
+  if (!p.horn || s.arenaT < p.horn.readyAt || a.bigs.some((g) => g.on && g.from === p.id)) return;
+  const g = a.bigs.find((x) => !x.on);
+  if (!g) return;
+  const lv = p.horn.level;
+  g.on = true; g.serial = ++a.serial; g.type = 'baron'; g.sent = false; g.from = p.id;
+  g.x = clamp(p.x + p.fx * 3, -FINALE.half + 2, FINALE.half - 2); g.z = clamp(p.z + p.fz * 3, -FINALE.half + 2, FINALE.half - 2);
+  g.hp = g.maxHp = A.hp[lv - 1]; g.r = A.r; g.speed = A.speed; g.dmg = A.contact; g.xp = 0; g.pts = 0;
+  g.mode = 0; g.modeT = 0; g.dashT = A.dashEvery * 0.5; g.ringT = A.ringEvery * 0.5; g.summonT = 0; g.aimX = p.fx; g.aimZ = p.fz; g.hurt = -1e9; g.yo = -1e9; g.summons = 0;
+  p.horn.readyAt = s.arenaT + A.cooldowns[lv - 1];
+  emit(s, { type: 'siege-ally', id: p.id });
+}
+
+function arenaWeapons(s: SiegeState, p: SiegePlayer, own: number, dt: number) {
+  const a = s.arena!, n = s.players.length, mul = FINALE.weaponMul;
+  for (const w of p.weapons) {
+    const st = weaponStats(w);
+    if (w.id === 'yoyo') {
+      w.aux = (w.aux + st.speed * (dt / 1000)) % (Math.PI * 2);
+      const dmg = st.dmg * p.stat.dmg * mul, gap = st.cd * p.stat.cd;
+      for (let k = 0; k < st.count; k++) {
+        yoyoAt(p, w, k, yo);
+        for (let j = 0; j < n; j++) {
+          const v = s.players[j];
+          if (j === own || v.status !== 'arena' || a.bt - s.arenaYo[own * n + j] < gap || len(v.x - yo.x, v.z - yo.z) > PLAYER_RADIUS + 0.9) continue;
+          s.arenaYo[own * n + j] = a.bt;
+          arenaHurt(s, v, dmg, p);
+        }
+        for (const g of a.bigs) if (g.on && g.from !== p.id && a.bt - g.yo >= gap && len(g.x - yo.x, g.z - yo.z) < g.r + 0.9) { g.yo = a.bt; allyHurt(s, g, dmg); }
+      }
+      continue;
+    }
+    w.cd -= dt;
+    if (w.cd > 0) continue;
+    w.cd += Math.max(120, st.cd * p.stat.cd);
+    if (w.cd < 0) w.cd = 0;
+    fire(s, p, w, st, a, own);
+  }
+}
+
+function stepAllies(s: SiegeState, dt: number) {
+  const a = s.arena!, A = FINALE.ally, sec = dt / 1000;
+  for (const g of a.bigs) {
+    if (!g.on) continue;
+    const owner = playerById(s, g.from);
+    if (!owner || owner.status !== 'arena') { g.on = false; continue; }
+    const own = s.players.indexOf(owner);
+    let t: SiegePlayer | null = null, best = Infinity;
+    for (const q of s.players) if (q !== owner && q.status === 'arena') { const d = (q.x - g.x) ** 2 + (q.z - g.z) ** 2; if (d < best) { best = d; t = q; } }
+    if (!t) continue;
+    let dx = t.x - g.x, dz = t.z - g.z;
+    const dist = len(dx, dz) || 1;
+    dx /= dist; dz /= dist;
+    if (g.mode === 0) {
+      g.x += dx * g.speed * sec; g.z += dz * g.speed * sec;
+      g.dashT -= dt;
+      if (g.dashT <= 0 && dist < 20) { g.mode = 1; g.modeT = A.windup; g.aimX = dx; g.aimZ = dz; }
+    } else if (g.mode === 1) {
+      g.modeT -= dt;
+      if (g.modeT <= 0) { g.mode = 2; g.modeT = A.dashMs; }
+    } else {
+      g.x += g.aimX * A.dashSpeed * sec; g.z += g.aimZ * A.dashSpeed * sec;
+      g.modeT -= dt;
+      if (g.modeT <= 0) { g.mode = 0; g.dashT = A.dashEvery; }
+    }
+    g.x = clamp(g.x, -FINALE.half + g.r, FINALE.half - g.r); g.z = clamp(g.z, -FINALE.half + g.r, FINALE.half - g.r);
+    g.ringT -= dt;
+    if (g.ringT <= 0) {
+      g.ringT += A.ringEvery;
+      const off = rand(s) * Math.PI;
+      for (let k = 0; k < A.ringCount; k++) {
+        const shot = a.shots.find((x) => !x.on);
+        if (!shot) break;
+        const ang = off + (k / A.ringCount) * Math.PI * 2;
+        shot.on = true; shot.x = g.x; shot.z = g.z; shot.vx = Math.cos(ang) * A.ringSpeed; shot.vz = Math.sin(ang) * A.ringSpeed; shot.r = 0.7; shot.dmg = A.ringDmg; shot.life = 3000; shot.own = own;
+      }
+    }
+    for (const q of s.players) {
+      if (q === owner || q.status !== 'arena' || a.bt < q.invuln || len(q.x - g.x, q.z - g.z) >= g.r + PLAYER_RADIUS) continue;
+      q.invuln = a.bt + 500;
+      arenaHurt(s, q, A.contact, owner);
+    }
+  }
+}
+
+function stepArena(s: SiegeState, dt: number) {
+  const a = s.arena!, sec = dt / 1000, mul = FINALE.weaponMul, half = FINALE.half;
+  s.arenaT += dt; a.bt = s.arenaT;
+  s.players.forEach((p, i) => {
+    if (p.status !== 'arena') return;
+    movePlayer(p, sec, half);
+    arenaWeapons(s, p, i, dt);
+  });
+  stepAllies(s, dt);
+
+  // Projectiles: corks and planes hit rival toys and their summoned bosses.
+  for (const q of a.projs) {
+    if (!q.on) continue;
+    const owner = s.players[q.own];
+    if (!owner || owner.status !== 'arena') { q.on = false; continue; }
+    q.life -= dt;
+    if (q.kind === 1) {
+      if (!q.back && (q.x - q.ox) ** 2 + (q.z - q.oz) ** 2 >= q.range * q.range) { q.back = true; q.nh = 0; }
+      if (q.back) {
+        const dx = owner.x - q.x, dz = owner.z - q.z, dl = len(dx, dz) || 1, sp = len(q.vx, q.vz);
+        q.vx = (dx / dl) * sp; q.vz = (dz / dl) * sp;
+        if (dl < 1.5) { q.on = false; continue; }
+      }
+    }
+    q.x += q.vx * sec; q.z += q.vz * sec;
+    if (q.life <= 0 || Math.abs(q.x) > half + 4 || Math.abs(q.z) > half + 4) { q.on = false; continue; }
+    for (let j = 0; j < s.players.length && q.on; j++) {
+      const v = s.players[j];
+      if (j === q.own || v.status !== 'arena' || (v.x - q.x) ** 2 + (v.z - q.z) ** 2 > (PLAYER_RADIUS + q.r) ** 2) continue;
+      if (!markHit(q, -(j + 1))) continue;
+      arenaHurt(s, v, q.dmg * mul, owner);
+      if (q.pierce >= 0) { if (q.pierce === 0) q.on = false; else q.pierce--; }
+    }
+    for (const g of a.bigs) {
+      if (!q.on || !g.on || g.from === owner.id || (g.x - q.x) ** 2 + (g.z - q.z) ** 2 > (g.r + q.r) ** 2) continue;
+      if (!markHit(q, g.serial)) continue;
+      allyHurt(s, g, q.dmg * mul);
+      if (q.pierce >= 0) { if (q.pierce === 0) q.on = false; else q.pierce--; }
+    }
+  }
+
+  // Area hits (sweeps, chimes, marbles).
+  for (const k of a.blasts) {
+    if (!k.on) continue;
+    k.age += dt;
+    if (!k.done && k.age >= k.delay) {
+      k.done = true;
+      const owner = s.players[k.own], half2 = (k.arc / 2) * (Math.PI / 180);
+      const inArc = (x: number, z: number, r: number, slack: number) => {
+        const dx = x - k.x, dz = z - k.z, dd = len(dx, dz);
+        if (dd > k.r + r) return false;
+        if (k.arc >= 360 || dd <= 0.5) return true;
+        let da = Math.atan2(dx, dz) - k.ang; da = Math.atan2(Math.sin(da), Math.cos(da));
+        return Math.abs(da) <= half2 + slack;
+      };
+      if (owner && owner.status === 'arena') {
+        s.players.forEach((v, j) => { if (j !== k.own && v.status === 'arena' && inArc(v.x, v.z, PLAYER_RADIUS, 0.3)) arenaHurt(s, v, k.dmg * mul, owner); });
+        for (const g of a.bigs) if (g.on && g.from !== owner.id && inArc(g.x, g.z, g.r, 0.3)) allyHurt(s, g, k.dmg * mul);
+      }
+    }
+    if (k.age >= k.life) k.on = false;
+  }
+
+  // A summoned boss's bullets.
+  for (const sh of a.shots) {
+    if (!sh.on) continue;
+    sh.x += sh.vx * sec; sh.z += sh.vz * sec; sh.life -= dt;
+    if (sh.life <= 0 || Math.abs(sh.x) > half + 2 || Math.abs(sh.z) > half + 2) { sh.on = false; continue; }
+    const owner = s.players[sh.own];
+    for (let j = 0; j < s.players.length && sh.on; j++) {
+      const v = s.players[j];
+      if (j === sh.own || v.status !== 'arena' || (sh.x - v.x) ** 2 + (sh.z - v.z) ** 2 >= (sh.r + PLAYER_RADIUS) ** 2) continue;
+      sh.on = false;
+      arenaHurt(s, v, sh.dmg, owner);
+    }
+  }
+
+  const left = s.players.filter((p) => p.status === 'arena');
+  if (left.length <= 1 || s.arenaT >= s.config.arenaMs) {
+    if (left.length === 1) { left[0].points += FINALE.championPoints; emit(s, { type: 'siege-champion', id: left[0].id }); }
+    s.phase = 'over';
+    emit(s, { type: 'siege-over' });
+  }
+}
+/** Remember that projectile `q` hit `id` (false if it already had). Planes pierce forever: they keep the newest hits only. */
+function markHit(q: Proj, id: number): boolean {
+  for (let h = 0; h < q.nh; h++) if (q.hits[h] === id) return false;
+  if (q.nh < q.hits.length) q.hits[q.nh++] = id; else q.hits[0] = id;
+  return true;
+}
+
 // ---------------------------------------------------------------- the rules
 
 export const siegeRules: RulesCore<SiegeState, SiegeInput, Partial<SiegeConfig>> = {
   init(contestants, seed, config) {
     const cfg = { ...DEFAULT_CONFIG, ...(config ?? {}) };
-    return { kind: 'toybox-siege', seed, rng: seed >>> 0, phase: 'pick', t: 0, runT: 0, config: cfg, players: contestants.map((c) => makePlayer(c, cfg)), events: [] };
+    return { kind: 'toybox-siege', seed, rng: seed >>> 0, phase: 'pick', t: 0, runT: 0, arenaT: 0, arena: null, arenaYo: [], config: cfg, players: contestants.map((c) => makePlayer(c, cfg)), events: [] };
   },
 
   step(s, inputs, dtMs) {
@@ -895,25 +1238,32 @@ export const siegeRules: RulesCore<SiegeState, SiegeInput, Partial<SiegeConfig>>
       if (s.config.pickTimeoutMs > 0 && s.t >= s.config.pickTimeoutMs) for (const p of s.players) if (!p.cls) pickClass(s, p, CLASS_IDS[0]);
       return s;
     }
+    if (s.phase === 'arena') { stepArena(s, dtMs); return s; }
     s.runT += dtMs;
     for (const p of s.players) {
+      // The run ends at 5:00: anyone still fighting is pulled out to prepare for the arena.
+      if (p.status === 'alive' && s.runT >= s.config.durationMs) enterPrep(s, p, 0, p.x, p.z);
       if (p.status === 'alive') {
         if (p.choice) {
           if (s.config.choiceTimeoutMs > 0 && s.t - p.choice.at >= s.config.choiceTimeoutMs) choose(s, p, 0, null);
           continue; // the board waits while you choose
         }
         stepBoard(s, p, dtMs);
+      } else if (p.status === 'prep') {
+        if (p.choice && s.config.choiceTimeoutMs > 0 && s.t - p.choice.at >= s.config.choiceTimeoutMs) choose(s, p, 0, null);
+        stepPrep(s, p, dtMs);
       } else if (p.status === 'downed') {
         if (s.runT - p.downedAt >= s.config.reviveWindowMs) becomeGhost(s, p);
       }
     }
     moveGhosts(s, dtMs);
-    // Spectators keep watching someone who is still worth watching.
-    for (const p of s.players) if ((p.status === 'ghost' || p.status === 'victor') && !playerById(s, p.watching)) p.watching = defaultWatch(s, p);
-    const live = s.players.some((p) => p.status === 'alive' || p.status === 'downed');
-    if (s.runT >= s.config.durationMs || !live) {
+    const inRun = s.players.some((p) => p.status === 'alive' || p.status === 'downed');
+    const prepping = s.players.filter((p) => p.status === 'prep');
+    if (!inRun && !prepping.length) {
       s.phase = 'over';
       emit(s, { type: 'siege-over' });
+    } else if (prepping.length && (s.runT >= s.config.durationMs + s.config.prepMs || (!inRun && prepping.every((p) => s.runT >= p.prepUntil)))) {
+      openArena(s);
     }
     return s;
   },
@@ -929,7 +1279,7 @@ export const siegeRules: RulesCore<SiegeState, SiegeInput, Partial<SiegeConfig>>
       placements.push({ contestantId: p.id, place: tie ? placements[i - 1].place : i + 1, score: Math.round(p.points), eliminated: p.status === 'ghost' });
     });
     const me = s.players[0];
-    return { placements, durationMs: s.t, stats: { kills: me?.kills ?? 0, level: me?.level ?? 1, survivedSec: Math.round(survival(s, me) / 1000), bossDefeated: me?.status === 'victor' ? 1 : 0 } };
+    return { placements, durationMs: s.t, stats: { kills: me?.kills ?? 0, level: me?.level ?? 1, survivedSec: Math.round(survival(s, me) / 1000), bossDefeated: (me?.victoryAt ?? -1) >= 0 ? 1 : 0, arenaKOs: me?.arenaKOs ?? 0 } };
   },
 
   drainEvents(s) {
@@ -940,6 +1290,9 @@ export const siegeRules: RulesCore<SiegeState, SiegeInput, Partial<SiegeConfig>>
   },
 };
 
+/** Out of the action (a ghost, or waiting for the arena with no card open): may watch other boards. */
+const canSpectate = (p: SiegePlayer) => p.status === 'ghost' || (p.status === 'prep' && !p.choice);
+
 function applyInput(s: SiegeState, p: SiegePlayer, i: SiegeInput) {
   switch (i.type) {
     case 'move':
@@ -948,6 +1301,7 @@ function applyInput(s: SiegeState, p: SiegePlayer, i: SiegeInput) {
     case 'class': pickClass(s, p, i.cls); break;
     case 'choose': if (s.phase === 'run') choose(s, p, i.index, i.target); break;
     case 'skill':
+      if (s.phase === 'arena') { if (p.status === 'arena') summonAlly(s, p); break; }
       if (s.phase === 'run' && p.status === 'alive' && p.horn && !p.choice && s.runT >= p.horn.readyAt) {
         if (trySend(s, p, i.target)) p.horn.readyAt = s.runT + HORN.cooldowns[p.horn.level - 1];
       }
@@ -955,11 +1309,17 @@ function applyInput(s: SiegeState, p: SiegePlayer, i: SiegeInput) {
     case 'target': p.target = i.id && playerById(s, i.id) && i.id !== p.id ? i.id : null; break;
     case 'revive': if (s.phase === 'run') revive(s, p); break;
     case 'giveup': if (s.phase === 'run' && p.status === 'downed') becomeGhost(s, p); break;
+    case 'spectate':
+      if (!canSpectate(p)) break;
+      p.watching = i.on ? defaultWatch(s, p) : null;
+      p.gx = 0; p.gz = 0;
+      break;
     case 'watch': {
-      if (p.status !== 'ghost' && p.status !== 'victor') break;
-      const others = s.players.filter((q) => q !== p);
+      if (!canSpectate(p)) break;
+      const others = s.players.filter((q) => q !== p && (s.phase !== 'arena' || q.status === 'arena'));
       if (!others.length) break;
       if (i.id && others.some((q) => q.id === i.id)) { p.watching = i.id; break; }
+      if (!p.watching) { p.watching = defaultWatch(s, p); break; } // the first press starts watching
       const at = others.findIndex((q) => q.id === p.watching);
       p.watching = others[(at + i.dir + others.length * 2) % others.length].id;
       break;
@@ -971,7 +1331,7 @@ function applyInput(s: SiegeState, p: SiegePlayer, i: SiegeInput) {
 export const GHOST_RADIUS = 9;
 export function moveGhosts(s: SiegeState, dtMs: number) {
   for (const p of s.players) {
-    if (p.status !== 'ghost') continue;
+    if (p.status !== 'ghost' || !p.watching) continue;
     p.gx = clamp(p.gx + p.ax * 12 * dtMs / 1000, -GHOST_RADIUS, GHOST_RADIUS);
     p.gz = clamp(p.gz - p.ay * 12 * dtMs / 1000, -GHOST_RADIUS, GHOST_RADIUS);
   }
@@ -979,16 +1339,25 @@ export function moveGhosts(s: SiegeState, dtMs: number) {
 
 // ---------------------------------------------------------------- placement
 
-/** How long a toy lasted in the run (victors count to their win, survivors to the end). */
+/** How long a toy lasted in the run: boss slayers count to their kill, toys that reached the arena (or 5:00) the whole run. */
 export function survival(s: SiegeState, p: SiegePlayer | undefined): number {
   if (!p) return 0;
-  if (p.status === 'victor') return p.victoryAt;
-  if (p.status === 'ghost') return p.outAt;
-  return s.runT;
+  if (p.victoryAt >= 0) return p.victoryAt;
+  if (p.status === 'ghost' && !p.inArena) return p.outAt;
+  if (p.status === 'alive' || p.status === 'downed') return Math.min(s.runT, s.config.durationMs);
+  return s.config.durationMs;
 }
-/** Victory first (earlier boss kill first), then survival time, then kills, then points. */
+/**
+ * Arena toys first, by arena survival (still standing, then later knockouts first); then the run:
+ * victory (earlier boss kill first), survival time, knockouts, points.
+ */
 export function compare(s: SiegeState, a: SiegePlayer, b: SiegePlayer): number {
-  const va = a.status === 'victor', vb = b.status === 'victor';
+  if (a.inArena !== b.inArena) return a.inArena ? -1 : 1;
+  if (a.inArena) {
+    const ao = a.arenaOutAt < 0 ? Infinity : a.arenaOutAt, bo = b.arenaOutAt < 0 ? Infinity : b.arenaOutAt;
+    if (ao !== bo) return ao > bo ? -1 : 1;
+  }
+  const va = a.victoryAt >= 0, vb = b.victoryAt >= 0;
   if (va !== vb) return va ? -1 : 1;
   if (va && vb && a.victoryAt !== b.victoryAt) return a.victoryAt - b.victoryAt;
   return survival(s, b) - survival(s, a) || b.kills - a.kills || b.points - a.points;
@@ -996,11 +1365,47 @@ export function compare(s: SiegeState, a: SiegePlayer, b: SiegePlayer): number {
 const sameRank = (s: SiegeState, a: SiegePlayer, b: SiegePlayer) => compare(s, a, b) === 0;
 export const ranking = (s: SiegeState) => s.players.slice().sort((a, b) => compare(s, a, b) || (a.id < b.id ? -1 : 1));
 
-/** The board on screen for the local player: their own, or the one they are watching. */
+/**
+ * The toy on screen for the local player: their own, or the one they chose to watch. In the arena,
+ * a toy that never reached it watches a fighter (there is no board of its own to show any more).
+ */
 export function viewedPlayer(s: SiegeState, localId: string): SiegePlayer | undefined {
   const me = s.players.find((p) => p.id === localId);
-  if (me && (me.status === 'ghost' || me.status === 'victor') && me.watching) return s.players.find((p) => p.id === me.watching) ?? me;
-  return me;
+  if (!me) return undefined;
+  let v = me;
+  if ((me.status === 'ghost' || me.status === 'prep') && me.watching) v = playerById(s, me.watching) ?? me;
+  if (s.phase === 'arena' && !v.inArena) v = s.players.find((p) => p.status === 'arena') ?? s.players.find((p) => p.inArena) ?? v;
+  return v;
+}
+
+/** The board a viewer sees: the arena once it is open, else the viewed toy's own board. */
+export const viewedBoard = (s: SiegeState, v: SiegePlayer): Board => (s.phase === 'arena' || (s.phase === 'over' && s.arena && v.inArena) ? s.arena! : v.board);
+
+export type EvoHint =
+  /** Taking this card completes a weapon's evolution pair: the next chest evolves it. */
+  | { kind: 'ready'; weapon: WeaponId }
+  /** Taking this card pairs a weapon with its partner passive (the weapon still needs level 5). */
+  | { kind: 'pair'; weapon: WeaponId; levelsLeft: number }
+  /** The weapon reaches level 5 but still needs its partner passive. */
+  | { kind: 'needs'; weapon: WeaponId }
+  /** The evolution itself (a treasure card). */
+  | { kind: 'evolve'; weapon: WeaponId };
+/** What a card does for the "secret upgrade" (a weapon's evolution), for the card's badge. Null = nothing. */
+export function evolutionHint(p: SiegePlayer, o: Option): EvoHint | null {
+  if (o.kind === 'evolve') return { kind: 'evolve', weapon: o.id };
+  if (o.kind === 'weapon') {
+    if (owned(p, o.id)?.evolved) return null;
+    const paired = passiveLevel(p, WEAPONS[o.id].partner) > 0;
+    if (o.level >= MAX_LEVEL) return paired ? { kind: 'ready', weapon: o.id } : { kind: 'needs', weapon: o.id };
+    return paired ? { kind: 'pair', weapon: o.id, levelsLeft: MAX_LEVEL - o.level } : null;
+  }
+  if (o.kind === 'passive' && o.level === 1) {
+    // A new passive that is the partner of a weapon you hold. (Upgrading a partner you already have changes nothing.)
+    const w = p.weapons.find((x) => !x.evolved && WEAPONS[x.id].partner === o.id);
+    if (!w) return null;
+    return w.level >= MAX_LEVEL ? { kind: 'ready', weapon: w.id } : { kind: 'pair', weapon: w.id, levelsLeft: MAX_LEVEL - w.level };
+  }
+  return null;
 }
 
 /** Debug/test helper: total live entities on a board. */

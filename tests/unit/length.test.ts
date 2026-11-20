@@ -16,9 +16,9 @@ describe('length classes', () => {
     expect(lengthClassOf(d(300, 600))).toBe('long'); // a 5–10 minute tower defence
   });
 
-  it('today Toy Squad and Toy Tower Tumble are long, Toybox Siege is medium; every other trial is short', () => {
-    const long = ['toy-squad', 'toy-tower-tumble'];
-    const medium = ['toybox-siege'];
+  it('today Toy Squad, Toy Tower Tumble and Toybox Siege (with its final arena) are long; every other trial is short', () => {
+    const long = ['toy-squad', 'toy-tower-tumble', 'toybox-siege'];
+    const medium: string[] = [];
     for (const g of MINIGAMES) expect(lengthClassOf(g), g.id).toBe(long.includes(g.id) ? 'long' : medium.includes(g.id) ? 'medium' : 'short');
   });
 
@@ -38,7 +38,7 @@ describe('length classes', () => {
     expect(byLength(games).map((g) => g.id)).toEqual(['b', 'd', 'c', 'a']);
     const sorted = byLength(MINIGAMES).map((g) => g.id);
     const long = MINIGAMES.filter((g) => lengthClassOf(g) === 'long').map((g) => g.id);
-    expect(long).toEqual(['toy-squad', 'toy-tower-tumble']);
+    expect(long).toEqual(['toy-squad', 'toy-tower-tumble', 'toybox-siege']);
     expect(sorted).toEqual([...MINIGAMES.filter((g) => lengthClassOf(g) !== 'long').map((g) => g.id), ...long]);
   });
 });

@@ -3,7 +3,7 @@ import { PAINT_JOBS } from '../../src/game/palette';
 import type { BotDifficulty, Contestant } from '../../src/minigames/types';
 import { seededRng, subSeed } from '../../src/minigames/rng';
 import {
-  ARENA_HALF, BOSS_AT, DEFAULT_CONFIG, ELITE_SCHEDULE, HASH, MAX_LEVEL, PASSIVE_IDS, WEAPONS, WEAPON_IDS, boardCounts, evolutionReady, levelOptions,
+  ARENA_HALF, BOSS_AT, DEFAULT_CONFIG, ELITE_SCHEDULE, FINALE, HASH, MAX_LEVEL, PASSIVE_IDS, WEAPONS, WEAPON_IDS, boardCounts, evolutionHint, evolutionReady, len, levelOptions,
   ranking, reviveCost, sendBlock, siegeRules, spawnMob, spawnRate, standings, treasureOptions, viewedPlayer, xpToNext,
   type SiegeConfig, type SiegeInput, type SiegePlayer, type SiegeState,
 } from '../../src/minigames/siege/rules';
@@ -37,7 +37,7 @@ function botMatch(n: number, seed: number, skill: BotDifficulty = 'normal') {
   const rngs = new Map(people.map((p) => [p.id, seededRng(subSeed(seed, p.id))]));
   const events: string[] = [];
   let steps = 0;
-  while (!siegeRules.isOver(s) && steps < 25000) {
+  while (!siegeRules.isOver(s) && steps < 30000) {
     const inputs: Record<string, SiegeInput[]> = {};
     for (const c of people) { const out = bot.decide(s, c, STEP, rngs.get(c.id)!); if (out.length) inputs[c.id] = out; }
     siegeRules.step(s, inputs, STEP);
@@ -344,12 +344,18 @@ describe('Toybox Siege: down, revive once, ghosts', () => {
     expect(b1.status).toBe('ghost');
   });
 
-  it('ghosts watch the leader, cycle boards, drift around and see each other', () => {
+  it('a ghost stays on its own board until its player chooses to watch the others', () => {
     const s = started(['you', 'b1', 'b2', 'b3']);
     const me = P(s, 'you'), b1 = P(s, 'b1'), b2 = P(s, 'b2'), b3 = P(s, 'b3');
     b2.points = 900; b1.points = 10; b3.points = 0; me.points = 0;
     knockOut(s, me);
     expect(me.status).toBe('ghost');
+    expect(me.watching).toBeNull();
+    expect(viewedPlayer(s, 'you')).toBe(me); // no automatic spectating
+    run(s, 3000);
+    expect(viewedPlayer(s, 'you')).toBe(me);
+    // The popup's "Watch other players": the leader first.
+    siegeRules.step(s, { you: [{ type: 'spectate', on: true }] }, STEP);
     expect(me.watching).toBe('b2');
     expect(viewedPlayer(s, 'you')).toBe(b2);
     siegeRules.step(s, { you: [{ type: 'watch', dir: 1 }] }, STEP);
@@ -359,6 +365,11 @@ describe('Toybox Siege: down, revive once, ghosts', () => {
     expect(me.watching).toBe('b1');
     siegeRules.step(s, { you: [{ type: 'watch', dir: 1, id: 'b3' }] }, STEP);
     expect(me.watching).toBe('b3');
+    // Back to your own board, and the keyboard path: the first Next press starts watching.
+    siegeRules.step(s, { you: [{ type: 'spectate', on: false }] }, STEP);
+    expect(me.watching).toBeNull();
+    siegeRules.step(s, { you: [{ type: 'watch', dir: 1 }] }, STEP);
+    expect(me.watching).toBe('b2');
     siegeRules.step(s, { you: [{ type: 'watch', dir: 1, id: 'b1' }] }, STEP);
     siegeRules.step(s, { you: [{ type: 'move', x: 1, y: 0 }] }, STEP);
     run(s, 2000);
@@ -368,56 +379,295 @@ describe('Toybox Siege: down, revive once, ghosts', () => {
     // Both ghosts can be on the same board; the renderer draws every ghost watching it.
     b3.watching = 'b1';
     expect(s.players.filter((p) => p.status === 'ghost' && p.watching === 'b1').map((p) => p.id).sort()).toEqual(['b3', 'you']);
-    // A ghost does not move its old board and is never sent elites.
+    // A ghost does not move its old board and is never sent elites; toys still in cannot spectate.
     expect(sendBlock(s, b1, me)).toBe('out');
+    siegeRules.step(s, { b1: [{ type: 'spectate', on: true }] }, STEP);
+    expect(b1.watching).toBeNull();
   });
 });
 
-describe('Toybox Siege: victory and placement', () => {
-  it('slaying the boss wins the run', () => {
+/** Slay the boss on `p`'s board (it arrives at 4:00 unless `at` says otherwise). */
+function slayBoss(s: SiegeState, p: SiegePlayer) {
+  if (s.runT < BOSS_AT) s.runT = BOSS_AT - STEP;
+  for (let i = 0; i < 10 && !p.board.bigs.some((g) => g.on && g.type === 'baron'); i++) siegeRules.step(s, {}, STEP);
+  const boss = p.board.bigs.find((g) => g.on && g.type === 'baron')!;
+  expect(boss).toBeTruthy();
+  boss.hp = 1; boss.x = p.x + 3; boss.z = p.z; boss.mode = 0;
+  for (let i = 0; i < 600 && p.status === 'alive'; i++) siegeRules.step(s, p.choice ? { [p.id]: [{ type: 'choose', index: 0 }] } : {}, STEP);
+  siegeRules.drainEvents(s);
+}
+/** Take every card on offer (first option) until the toy has none left. */
+function takeCards(s: SiegeState, p: SiegePlayer) {
+  for (let i = 0; i < 200 && (p.choice || p.pendingLevels || p.pendingChests); i++) siegeRules.step(s, p.choice ? { [p.id]: [{ type: 'choose', index: 0 }] } : {}, STEP);
+}
+
+describe('Toybox Siege: the finale', () => {
+  it('slaying the boss drops three chests, pulls every gem and chest to the toy and clears the board', () => {
     const s = started(['you', 'b1']);
     const me = P(s, 'you');
-    immortal(me);
-    s.runT = BOSS_AT - STEP;
-    run(s, 2 * STEP);
-    const boss = me.board.bigs.find((g) => g.on && g.type === 'baron')!;
-    expect(boss).toBeTruthy();
-    boss.hp = 1; boss.x = me.x + 3; boss.z = me.z;
-    for (let i = 0; i < 600 && me.status === 'alive'; i++) siegeRules.step(s, me.choice ? { you: [{ type: 'choose', index: 0 }] } : {}, STEP);
-    expect(me.status).toBe('victor');
+    immortal(me); immortal(P(s, 'b1'));
+    s.runT = BOSS_AT - 5000;
+    run(s, 4000);
+    // Gems scattered over the board, far from the toy.
+    me.board.gems.slice(0, 20).forEach((g, i) => Object.assign(g, { on: true, kind: 0, v: 3, x: -40 + i * 4, z: 40, pull: false }));
+    slayBoss(s, me);
+    expect(me.status).toBe('prep');
     expect(me.victoryAt).toBeGreaterThanOrEqual(BOSS_AT);
-    expect(siegeRules.result(s).placements[0]).toMatchObject({ contestantId: 'you', place: 1 });
+    expect(me.prepUntil).toBe(me.victoryAt + s.config.prepMs);
+    const c = boardCounts(me.board);
+    expect(c.mobs).toBe(0); expect(c.bigs).toBe(0); expect(c.shots).toBe(0);
+    expect(c.chests + me.pendingChests).toBe(FINALE.bossChests);
+    expect(me.board.gems.filter((g) => g.on).every((g) => g.pull)).toBe(true);
+    // The magnet: everything reaches the toy well inside the prep window (cards open as it does).
+    const xp = me.level * 1000 + me.xp;
+    for (let i = 0; i < 300; i++) siegeRules.step(s, me.choice ? { you: [{ type: 'choose', index: 0 }] } : {}, STEP);
+    expect(boardCounts(me.board).gems).toBe(0);
+    expect(boardCounts(me.board).chests).toBe(0);
+    expect(me.level * 1000 + me.xp).toBeGreaterThan(xp);
+    // Nothing on the board hurts any more, and the boss's chests never offer "send an elite".
+    expect(me.board.bigs.some((g) => g.on)).toBe(false);
+    me.pendingChests = 1; me.pendingLevels = 0;
+    if (me.choice) me.choice = null;
+    siegeRules.step(s, {}, STEP);
+    expect(me.choice?.kind).toBe('treasure');
+    expect(me.choice!.options.some((o) => o.kind === 'send')).toBe(false);
   });
 
-  it('orders by victory (earlier first), then survival, then knockouts, then points; equal rows share a place', () => {
-    const s = started(['a', 'b', 'c', 'd', 'e', 'f', 'g']);
-    s.runT = 300000;
-    const set = (id: string, v: Partial<SiegePlayer>) => Object.assign(P(s, id), v);
-    set('a', { status: 'ghost', outAt: 100000, kills: 900, points: 9000 });
-    set('b', { status: 'victor', victoryAt: 290000, kills: 10, points: 10 });
-    set('c', { status: 'victor', victoryAt: 260000, kills: 5, points: 5 });
-    set('d', { status: 'alive', kills: 50, points: 50 });
-    set('e', { status: 'alive', kills: 80, points: 20 });
-    set('f', { status: 'ghost', outAt: 200000, kills: 1, points: 1 });
-    set('g', { status: 'ghost', outAt: 200000, kills: 1, points: 1 });
-    s.phase = 'over';
-    expect(ranking(s).map((p) => p.id)).toEqual(['c', 'b', 'e', 'd', 'f', 'g', 'a']);
-    const places = Object.fromEntries(siegeRules.result(s).placements.map((p) => [p.contestantId, p.place]));
-    expect(places).toEqual({ c: 1, b: 2, e: 3, d: 4, f: 5, g: 5, a: 7 });
+  it('a boss chest evolves a ready weapon', () => {
+    const s = started(['you', 'b1']);
+    const me = P(s, 'you');
+    immortal(me); immortal(P(s, 'b1'));
+    me.weapons[0].level = MAX_LEVEL; // Bayonet Sweep
+    me.passives.push({ id: 'plating', level: 1 });
+    slayBoss(s, me);
+    let evolved = false;
+    for (let i = 0; i < 400 && !evolved; i++) {
+      const o = me.choice?.options[0];
+      siegeRules.step(s, me.choice ? { you: [{ type: 'choose', index: 0 }] } : {}, STEP);
+      if (o?.kind === 'evolve') evolved = true;
+    }
+    expect(evolved).toBe(true);
+    expect(me.weapons[0].evolved).toBe(true);
   });
 
-  it('ends at 5:00, or as soon as nobody is left in', () => {
+  it('cards still open when the prep window ends are settled with their first option', () => {
+    const s = started(['you', 'b1']);
+    const me = P(s, 'you');
+    immortal(me); immortal(P(s, 'b1'));
+    slayBoss(s, me);
+    me.pendingLevels += 3;
+    run(s, 2000);
+    expect(me.choice).not.toBeNull();
+    run(s, s.config.prepMs);
+    expect(me.choice).toBeNull();
+    expect(me.pendingLevels).toBe(0);
+    expect(me.pendingChests).toBe(0);
+  });
+
+  it('at 5:00 toys still fighting are pulled out too (no chests); the arena waits for every prep, and opens 15 s after 5:00 at the latest', () => {
+    const s = started(['you', 'b1', 'b2', 'b3']);
+    const [me, b1, b2, b3] = ['you', 'b1', 'b2', 'b3'].map((id) => P(s, id));
+    for (const p of s.players) immortal(p);
+    slayBoss(s, me); // the boss falls at about 4:00
+    takeCards(s, me);
+    run(s, s.config.prepMs + 1000);
+    expect(me.status).toBe('prep'); // ready, but rivals are still fighting
+    expect(s.phase).toBe('run');
+    // b3 is down and undecided when the arena opens: it misses the arena.
+    s.runT = s.config.durationMs - STEP;
+    siegeRules.step(s, b1.choice ? { b1: [{ type: 'choose', index: 0 }] } : {}, STEP);
+    expect(b1.status).toBe('prep');
+    expect(b2.status).toBe('prep');
+    expect(boardCounts(b1.board).chests + b1.pendingChests).toBe(0);
+    expect(b1.victoryAt).toBe(-1);
+    b3.status = 'downed'; b3.downedAt = s.runT; b3.hp = 0;
+    run(s, s.config.prepMs - 2000);
+    expect(s.phase).toBe('run');
+    run(s, 2100);
+    expect(s.phase).toBe('arena');
+    expect(s.runT).toBeLessThanOrEqual(s.config.durationMs + s.config.prepMs + STEP);
+    expect([me, b1, b2].map((p) => p.status)).toEqual(['arena', 'arena', 'arena']);
+    expect(b3.status).toBe('ghost');
+    expect(b3.inArena).toBe(false);
+    // Everyone starts at full health on a ring, with no cards left over.
+    for (const p of [me, b1, b2]) { expect(p.hp).toBe(p.stat.maxHp); expect(p.choice).toBeNull(); expect(len(p.x, p.z)).toBeCloseTo(FINALE.startRadius, 3); }
+  });
+
+  it('opens the arena early once every toy still in has finished its prep', () => {
+    const s = started(['you', 'b1']);
+    const me = P(s, 'you'), b1 = P(s, 'b1');
+    immortal(me); immortal(b1);
+    slayBoss(s, me);
+    slayBoss(s, b1);
+    run(s, s.config.prepMs + 500);
+    expect(s.phase).toBe('arena');
+    expect(s.runT).toBeLessThan(s.config.durationMs);
+  });
+
+  it('with fewer than two toys left there is no arena: the match ends after the prep window', () => {
     const s = started(['you']);
     immortal(P(s, 'you'));
     P(s, 'you').board.bigs.forEach((g) => { g.dmg = 0; });
     s.runT = DEFAULT_CONFIG.durationMs - 1000;
     run(s, 1100);
+    expect(P(s, 'you').status).toBe('prep');
+    expect(siegeRules.isOver(s)).toBe(false);
+    run(s, s.config.prepMs + 100);
     expect(siegeRules.isOver(s)).toBe(true);
+    expect(s.arena).toBeNull();
+    // ... and as soon as nobody is left in at all.
     const t = started(['you', 'b1']);
     P(t, 'you').points = 0; P(t, 'b1').points = 0;
     for (const p of t.players) { p.hp = 0.5; spawnMob(t, p, 0, p.x + 0.5, p.z); }
     siegeRules.step(t, {}, STEP);
     expect(siegeRules.isOver(t)).toBe(true);
+  });
+
+  /** Two toys straight into the arena. */
+  function arena(ids = ['you', 'b1'], seed = 7) {
+    const s = started(ids, seed);
+    for (const p of s.players) immortal(p);
+    s.runT = DEFAULT_CONFIG.durationMs - STEP;
+    siegeRules.step(s, {}, STEP);
+    for (const p of s.players) takeCards(s, p);
+    s.runT = DEFAULT_CONFIG.durationMs + DEFAULT_CONFIG.prepMs;
+    siegeRules.step(s, {}, STEP);
+    siegeRules.drainEvents(s);
+    expect(s.phase).toBe('arena');
+    return s;
+  }
+
+  it('in the arena weapons hurt rival toys, not the shooter, and a duel of starting toys is not instant', () => {
+    const s = arena(['you', 'b1', 'b2']);
+    const [me, b1, b2] = ['you', 'b1', 'b2'].map((id) => P(s, id));
+    me.weapons = [{ id: 'popgun', level: 3, evolved: false, cd: 0, aux: 0 }];
+    b1.weapons = []; b2.weapons = [];
+    b1.x = me.x + 8; b1.z = me.z; b2.x = -15; b2.z = 15;
+    const before = b1.hp, mine = me.hp;
+    run(s, 2000);
+    expect(b1.hp).toBeLessThan(before);
+    expect(me.hp).toBe(mine);
+    // Two fresh level-1 toys standing still, face to face: the duel takes a while.
+    const t = arena(['you', 'b1']);
+    const [x, y] = [P(t, 'you'), P(t, 'b1')];
+    x.x = -3; x.z = 0; y.x = 3; y.z = 0;
+    let ms = 0;
+    while (t.phase === 'arena' && ms < 120000) { siegeRules.step(t, {}, STEP); ms += STEP; }
+    expect(ms).toBeGreaterThan(15000);
+    expect(t.phase).toBe('over'); // overtime makes sure it ends
+  });
+
+  it('a knockout is credited, ends the arena for that toy (it can watch), and placement follows arena survival', () => {
+    const s = arena(['you', 'b1', 'b2', 'b3']);
+    const [me, b1, b2, b3] = ['you', 'b1', 'b2', 'b3'].map((id) => P(s, id));
+    for (const p of s.players) p.weapons = [];
+    me.weapons = [{ id: 'popgun', level: 5, evolved: true, cd: 0, aux: 0 }];
+    // b3 slew the boss and has far more points, but falls first; then b2, then b1.
+    b3.victoryAt = 250000; b3.points = 9999; b3.kills = 999;
+    const ko = (p: SiegePlayer) => { p.hp = 0.01; p.x = me.x + 5; p.z = me.z; for (let i = 0; i < 300 && p.status === 'arena'; i++) siegeRules.step(s, {}, STEP); };
+    for (const p of [b1, b2, b3]) { p.x = 20; p.z = -20; }
+    const pts = me.points;
+    ko(b3);
+    expect(b3.status).toBe('ghost');
+    expect(b3.inArena).toBe(true);
+    expect(b3.arenaOutAt).toBeGreaterThan(0);
+    expect(me.arenaKOs).toBe(1);
+    expect(me.points).toBe(pts + FINALE.koPoints);
+    expect(viewedPlayer(s, 'b3')).toBe(b3); // stays on its spot until it chooses to watch
+    siegeRules.step(s, { b3: [{ type: 'spectate', on: true }] }, STEP);
+    expect(['you', 'b1', 'b2']).toContain(b3.watching);
+    ko(b2);
+    ko(b1);
+    expect(s.phase).toBe('over');
+    expect(me.points).toBe(pts + 3 * FINALE.koPoints + FINALE.championPoints);
+    expect(ranking(s).map((p) => p.id)).toEqual(['you', 'b1', 'b2', 'b3']);
+    expect(siegeRules.result(s).placements[0]).toMatchObject({ contestantId: 'you', place: 1, eliminated: false });
+  });
+
+  it('the Rally Horn summons a Boiler Baron that fights for its owner: one at a time, then a cooldown', () => {
+    const s = arena(['you', 'b1']);
+    const me = P(s, 'you'), b1 = P(s, 'b1');
+    me.weapons = []; b1.weapons = [];
+    me.horn = { level: 2, readyAt: FINALE.ally.firstReadyMs };
+    siegeRules.step(s, { you: [{ type: 'skill' }] }, STEP);
+    expect(s.arena!.bigs.some((g) => g.on)).toBe(false); // not ready yet
+    run(s, FINALE.ally.firstReadyMs);
+    siegeRules.step(s, { you: [{ type: 'skill' }], b1: [{ type: 'skill' }] }, STEP); // b1 has no horn
+    const allies = s.arena!.bigs.filter((g) => g.on);
+    expect(allies.length).toBe(1);
+    expect(allies[0]).toMatchObject({ type: 'baron', from: 'you', hp: FINALE.ally.hp[1] });
+    siegeRules.step(s, { you: [{ type: 'skill' }] }, STEP);
+    expect(s.arena!.bigs.filter((g) => g.on).length).toBe(1); // one at a time
+    expect(me.horn.readyAt).toBeGreaterThan(s.arenaT);
+    // It goes for the rival and hurts only the rival.
+    b1.stat.maxHp = b1.hp = 2000; // so the duel outlasts the test
+    const mine = me.hp, theirs = b1.hp;
+    me.x = -18; me.z = -18; b1.x = 10; b1.z = 10;
+    run(s, 8000);
+    expect(me.hp).toBe(mine);
+    expect(b1.hp).toBeLessThan(theirs);
+    // The rival's weapons can bring it down.
+    b1.weapons = [{ id: 'popgun', level: 5, evolved: true, cd: 0, aux: 0 }];
+    for (const g of s.arena!.bigs) if (g.on) { g.hp = 0.5; g.x = b1.x + 4; g.z = b1.z; }
+    run(s, 1500);
+    expect(s.arena!.bigs.some((g) => g.on)).toBe(false);
+  });
+
+  it('keeps the arena state plain JSON', () => {
+    const s = arena(['you', 'b1', 'b2']);
+    P(s, 'you').horn = { level: 1, readyAt: 0 };
+    siegeRules.step(s, { you: [{ type: 'skill' }] }, STEP);
+    run(s, 3000);
+    const copy = JSON.parse(JSON.stringify(s)) as SiegeState;
+    expect(copy).toEqual(s);
+    run(s, 3000); run(copy, 3000);
+    expect(JSON.stringify(copy)).toBe(JSON.stringify(s));
+  });
+});
+
+describe('Toybox Siege: card badges', () => {
+  it('marks the cards that make, pair or need a secret upgrade (evolution)', () => {
+    const s = started(['you']);
+    const me = P(s, 'you'); // Tin Soldier: Bayonet Sweep, partner Tin Plating
+    me.weapons[0].level = 3;
+    // A new partner passive for a weapon you hold: a pair, two levels to go.
+    expect(evolutionHint(me, { kind: 'passive', id: 'plating', level: 1 })).toEqual({ kind: 'pair', weapon: 'sweep', levelsLeft: 2 });
+    expect(evolutionHint(me, { kind: 'passive', id: 'crayon', level: 1 })).toBeNull();
+    expect(evolutionHint(me, { kind: 'weapon', id: 'sweep', level: 4 })).toBeNull();
+    me.weapons[0].level = 4;
+    expect(evolutionHint(me, { kind: 'weapon', id: 'sweep', level: 5 })).toEqual({ kind: 'needs', weapon: 'sweep' });
+    me.passives.push({ id: 'plating', level: 1 });
+    expect(evolutionHint(me, { kind: 'weapon', id: 'sweep', level: 5 })).toEqual({ kind: 'ready', weapon: 'sweep' });
+    expect(evolutionHint(me, { kind: 'passive', id: 'plating', level: 2 })).toBeNull(); // already paired
+    // A new weapon whose partner you already have.
+    me.passives.push({ id: 'gears', level: 2 });
+    expect(evolutionHint(me, { kind: 'weapon', id: 'popgun', level: 1 })).toEqual({ kind: 'pair', weapon: 'popgun', levelsLeft: 4 });
+    // The partner of a maxed weapon completes the pair.
+    me.weapons.push({ id: 'marbles', level: 5, evolved: false, cd: 0, aux: 0 });
+    expect(evolutionHint(me, { kind: 'passive', id: 'crayon', level: 1 })).toEqual({ kind: 'ready', weapon: 'marbles' });
+    expect(evolutionHint(me, { kind: 'evolve', id: 'marbles' })).toEqual({ kind: 'evolve', weapon: 'marbles' });
+    me.weapons[0].evolved = true;
+    expect(evolutionHint(me, { kind: 'weapon', id: 'sweep', level: 5 })).toBeNull();
+  });
+});
+
+describe('Toybox Siege: placement', () => {
+  it('orders arena toys by arena survival, then victory (earlier first), survival, knockouts and points; equal rows share a place', () => {
+    const s = started(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']);
+    s.runT = 300000;
+    const set = (id: string, v: Partial<SiegePlayer>) => Object.assign(P(s, id), v);
+    set('a', { status: 'ghost', outAt: 100000, kills: 900, points: 9000 });
+    set('b', { status: 'ghost', inArena: true, arenaOutAt: 20000, victoryAt: 290000, kills: 10, points: 10 });
+    set('c', { status: 'ghost', inArena: true, arenaOutAt: 20000, victoryAt: 260000, kills: 5, points: 5 });
+    set('d', { status: 'ghost', inArena: true, arenaOutAt: 9000, kills: 50, points: 50 });
+    set('e', { status: 'arena', inArena: true, arenaOutAt: -1, kills: 80, points: 20 });
+    set('f', { status: 'ghost', outAt: 200000, kills: 1, points: 1 });
+    set('g', { status: 'ghost', outAt: 200000, kills: 1, points: 1 });
+    set('h', { status: 'ghost', inArena: true, arenaOutAt: 9000, kills: 50, points: 50 });
+    s.phase = 'over';
+    expect(ranking(s).map((p) => p.id)).toEqual(['e', 'c', 'b', 'd', 'h', 'f', 'g', 'a']);
+    const places = Object.fromEntries(siegeRules.result(s).placements.map((p) => [p.contestantId, p.place]));
+    expect(places).toEqual({ e: 1, c: 2, b: 3, d: 4, h: 4, f: 6, g: 6, a: 8 });
   });
 });
 
@@ -457,13 +707,19 @@ describe('Toybox Siege: performance guards', () => {
     expect(many).toBeLessThanOrEqual(MAX_VOICES * 2);
   });
 
-  it('runs a full five-minute match of eight bots headless in reasonable CPU time', () => {
+  it('runs a full match of eight bots (the run, the prep and the arena) headless in reasonable CPU time', () => {
     const t0 = performance.now();
     const { s, events, steps } = botMatch(8, 2026, 'normal');
     const ms = performance.now() - t0;
-    console.log(`[siege] 8-bot 5:00 headless match: ${steps} steps in ${Math.round(ms)} ms CPU; ${s.players.filter((p) => p.status === 'victor').length} victories, ${s.players.filter((p) => p.status === 'ghost').length} ghosts, ${events.filter((e) => e === 'siege-sent').length} elites sent`);
+    console.log(`[siege] 8-bot headless match: ${steps} steps (${(s.t / 1000).toFixed(0)} s, arena ${(s.arenaT / 1000).toFixed(1)} s) in ${Math.round(ms)} ms CPU; ${s.players.filter((p) => p.victoryAt >= 0).length} boss kills, ${s.players.filter((p) => p.inArena).length} in the arena, ${events.filter((e) => e === 'siege-ally').length} summoned bosses, ${events.filter((e) => e === 'siege-sent').length} elites sent`);
     expect(siegeRules.isOver(s)).toBe(true);
-    expect(s.runT).toBeLessThanOrEqual(DEFAULT_CONFIG.durationMs + STEP);
+    expect(s.runT).toBeLessThanOrEqual(DEFAULT_CONFIG.durationMs + DEFAULT_CONFIG.prepMs + STEP);
+    expect(s.arenaT).toBeLessThanOrEqual(DEFAULT_CONFIG.arenaMs + STEP);
+    // Bots reach the arena, fight it out with their builds and leave one toy standing.
+    expect(events).toContain('siege-arena');
+    expect(events).toContain('siege-ko');
+    expect(s.players.filter((p) => p.status === 'arena').length).toBeLessThanOrEqual(1);
+    expect(ranking(s)[0].inArena).toBe(true);
     expect(siegeRules.result(s).placements).toHaveLength(8);
     expect(events).toContain('siege-elite');
     expect(events).toContain('siege-boss');
