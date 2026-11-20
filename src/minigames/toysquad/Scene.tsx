@@ -8,7 +8,9 @@ import { matchBus, useMatch } from '../session';
 import type { MinigameSceneProps } from '../types';
 import { BENCH_SIZE, MAX_UNITS, ROSTER, purchaseUpgradeTargets, type Battle, type Fighter, type SquadPlayer, type SquadState, type SquadUnit } from './rules';
 import { boardToWorld, CELL_SIZE, placementPosition, reservePosition, worldToDeployment } from './board';
-import { setLocalPlayer, submitSquadInput, useSquadUI } from './local';
+import { setLocalPlayer, submitSquadInput, useSquadUI, viewedSquad } from './local';
+import { fighterStatus } from './info';
+import { StatusIconBatch } from '../shared/statusIcons';
 import { drawQueuedPortrait } from './portraits';
 import { audibleBattle, combatVoices, eventCue, type CombatVoice } from './sounds';
 import { RARITY_COLOURS } from './catalogue';
@@ -19,11 +21,15 @@ import { SquadFx, cueKey, unitCues } from './Fx';
 interface Drag { unit: number; pointer: number; x: number; z: number; cell: number | null; shop: DOMRect | null; sell: boolean; sx: number; sy: number; moved: boolean; release: () => void }
 type PointerHandler = (e: ThreeEvent<PointerEvent>, id?: number) => void;
 const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.1);
-/** Squad edits are open: build phase, not readied, not paused, and no passive choice waiting. */
+/** The board on show: your own, or another player's picked from the player rail (read-only). */
+const viewId = (s: SquadState, localId: string) => viewedSquad(s.players, localId, useSquadUI.getState().watching);
+/** Squad edits are open: your own board on show, build phase, not readied, not paused, and no passive choice waiting. */
 const editable = (s: SquadState | null, id: string) => {
-  if (s?.kind !== 'toy-squad' || s.phase !== 'build' || useMatch.getState().paused || useMatch.getState().phase !== 'playing') return false;
+  if (s?.kind !== 'toy-squad' || s.phase !== 'build' || useMatch.getState().paused || useMatch.getState().phase !== 'playing' || viewId(s, id) !== id) return false;
   const p = s.players.find(p => p.id === id); return !!p && !p.ready && !p.passiveOffers.length;
 };
+/** Debuff badges over the fighters: one shared batch, begun before the pieces' frame callbacks and drawn after them. */
+const badges = { batch: null as StatusIconBatch | null };
 // Shared by every piece: one pick volume (never drawn), bars and the upgrade ring.
 const PICK_GEOMETRY = new THREE.BoxGeometry(2.7, 2.5, 2.7);
 const PICK_MATERIAL = new THREE.MeshBasicMaterial({ visible: false });
@@ -36,15 +42,17 @@ const MANA_MATERIAL = new THREE.MeshBasicMaterial({ color: PALETTE.toyBlue });
 const reducedMotion = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const easeInOut = (t: number) => t * t * (3 - 2 * t);
 
-/** The local player's units and battle, split once per frame so 28 pieces do not each re-filter them. */
-interface View { state: SquadState | null; t: number; phase: string; player: SquadPlayer | undefined; battle: Battle | undefined; sides: [Fighter[], Fighter[]]; board: SquadUnit[]; reserve: SquadUnit[] }
-const view: View = { state: null, t: -1, phase: '', player: undefined, battle: undefined, sides: [[], []], board: [], reserve: [] };
+/** The viewed board's units and battle, split once per frame so 28 pieces do not each re-filter them. */
+interface View { state: SquadState | null; t: number; phase: string; id: string; player: SquadPlayer | undefined; battle: Battle | undefined; sides: [Fighter[], Fighter[]]; board: SquadUnit[]; reserve: SquadUnit[] }
+const view: View = { state: null, t: -1, phase: '', id: '', player: undefined, battle: undefined, sides: [[], []], board: [], reserve: [] };
 let viewStamp = -1;
 function readView(s: SquadState, localId: string, stamp: number): View {
-  if (stamp === viewStamp && view.state === s && view.t === s.t && view.phase === s.phase) return view;
-  viewStamp = stamp; view.state = s; view.t = s.t; view.phase = s.phase;
-  view.player = s.players.find(p => p.id === localId); view.battle = s.battles.find(b => b.owner === localId);
-  setLocalPlayer(view.player ?? null);
+  const id = viewId(s, localId);
+  if (stamp === viewStamp && view.state === s && view.t === s.t && view.phase === s.phase && view.id === id) return view;
+  viewStamp = stamp; view.state = s; view.t = s.t; view.phase = s.phase; view.id = id;
+  view.player = s.players.find(p => p.id === id); view.battle = s.battles.find(b => b.owner === id);
+  // Keyboard shortcuts always act on your own squad.
+  setLocalPlayer(s.players.find(p => p.id === localId) ?? null);
   view.sides[0].length = 0; view.sides[1].length = 0; view.board.length = 0; view.reserve.length = 0;
   for (const u of view.battle?.fighters ?? []) view.sides[u.side].push(u);
   for (const u of view.player?.units ?? []) (u.cell < 0 ? view.reserve : view.board).push(u);
@@ -130,6 +138,10 @@ function Piece({ slot, side, getState, localId, drag, down, move, up, cancel }: 
       m.position.x = Math.sin(yaw.current) * lunge; m.position.z = Math.cos(yaw.current) * lunge; m.rotation.y += yaw.current + spin;
     }
     const alive = !!buildUnit || fighter!.hp > 0;
+    if (!buildUnit && alive && v.battle && badges.batch) {
+      const r = root.current, k = r.scale.x;
+      badges.batch.add(fighterStatus(fighter!, v.battle.tick), r.position.x, r.position.y + 5.1 * k, r.position.z);
+    }
     hp.current.visible = alive; stars.current.visible = alive;
     hp.current.scale.x = buildUnit ? 1 : Math.max(0.01, fighter!.hp / fighter!.maxHp);
     mana.current.visible = !buildUnit && alive;
@@ -169,6 +181,17 @@ function ToyGallery({ yaw }: { yaw: number }) {
   </group>)}</group>;
 }
 
+function BadgesBegin() {
+  const batch = useMemo(() => new StatusIconBatch(48, 1.5), []);
+  useEffect(() => { badges.batch = batch; exposeDebug({ squadStatus: { shown: () => batch.shown, byKind: () => batch.shownByKind() } }); return () => { if (badges.batch === batch) badges.batch = null; batch.dispose(); }; }, [batch]);
+  useFrame(() => batch.begin());
+  return <primitive object={batch.group} />;
+}
+function BadgesEnd() {
+  useFrame(({ camera }) => badges.batch?.end(camera));
+  return null;
+}
+
 function DamageNumbers({ getState, localId }: { getState: () => SquadState | null; localId: string }) {
   const group = useMemo(() => new THREE.Group(), []);
   const sprites = useMemo(() => Array.from({ length: 40 }, () => { const s = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, depthTest: false })); s.visible = false; group.add(s); return s; }), [group]);
@@ -177,8 +200,8 @@ function DamageNumbers({ getState, localId }: { getState: () => SquadState | nul
   const reduced = useRef(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   useEffect(() => () => { sprites.forEach(s => s.material.dispose()); textures.current.forEach(t => t.dispose()); }, [sprites]);
   useFrame(() => {
-    const s = getState(), b = s?.kind === 'toy-squad' && s.phase !== 'build' ? s.battles.find(b => b.owner === localId) : undefined;
-    const now = s?.kind === 'toy-squad' ? s.t / 1000 : 0, key = b && s ? `${s.round}:${b.tick}` : '';
+    const s = getState(), b = s?.kind === 'toy-squad' && s.phase !== 'build' ? s.battles.find(b => b.owner === viewId(s, localId)) : undefined;
+    const now = s?.kind === 'toy-squad' ? s.t / 1000 : 0, key = b && s ? `${s.round}:${b.owner}:${b.tick}` : '';
     if (key !== seen.current) { seen.current = key; for (const hit of b?.damages ?? []) values.current.push({ ...hit, born: now }); }
     values.current = b ? values.current.filter(v => now - v.born < 0.9).slice(-40) : [];
     sprites.forEach((sprite, i) => {
@@ -205,6 +228,7 @@ export function SquadScene({ getState, localId }: MinigameSceneProps<SquadState>
   const point = useRef(new THREE.Vector3());
   const selection = useRef<THREE.Mesh>(null!);
   const heard = useRef<{ battle: Battle | null; tick: number }>({ battle: null, tick: 0 });
+  const rail = useRef({ px: 0, frame: 0 });
   const cancel = () => {
     const previous = drag.current; drag.current = null; gl.domElement.style.cursor = ''; previous?.release();
     if (useSquadUI.getState().dragging !== null) useSquadUI.setState({ dragging: null, overShop: false });
@@ -243,7 +267,7 @@ export function SquadScene({ getState, localId }: MinigameSceneProps<SquadState>
     const previousTouch = gl.domElement.style.touchAction; gl.domElement.style.touchAction = 'none';
     const off = useMatch.subscribe(s => { if (s.paused || s.phase !== 'playing') cancel(); });
     const blur = () => cancel(); window.addEventListener('blur', blur);
-    return () => { off(); window.removeEventListener('blur', blur); cancel(); setLocalPlayer(null); gl.domElement.style.touchAction = previousTouch; };
+    return () => { off(); window.removeEventListener('blur', blur); cancel(); setLocalPlayer(null); gl.domElement.style.touchAction = previousTouch; (camera as THREE.PerspectiveCamera).clearViewOffset(); };
   }, [gl]);
   // Only your own purchases and upgrades make a sound; the other contenders' boards stay silent.
   useEffect(() => matchBus.on('event', e => {
@@ -271,14 +295,22 @@ export function SquadScene({ getState, localId }: MinigameSceneProps<SquadState>
     // Battles have no shop dock, so narrow (portrait) screens can frame the board tighter than the build view.
     // Phone landscape: the shop dock takes the lower third, so aim further forward to keep the reserves above it.
     const short = size.height < 500;
-    const distance = Math.max(building ? short ? 68 : 53 : 42, (building ? 31 : 23) / aspect);
+    // Phones keep the player rail at the right edge: frame the board in the space left of it.
+    if (rail.current.frame++ % 15 === 0) rail.current.px = document.querySelector('.squad-rail')?.getBoundingClientRect().width ?? 0;
+    const railPx = rail.current.px, narrow = size.width <= 600 || short;
+    const room = narrow && railPx ? Math.max(0.6, (size.width - railPx - 12) / size.width) : 1;
+    const distance = Math.max(building ? short ? 68 : 53 : 42, (building ? 31 : 23) / aspect / room);
     camera.position.set(0, distance, distance * 0.58);
     camera.lookAt(0, 0, building ? short ? 15 : 11 : 2.5);
+    const cam = camera as THREE.PerspectiveCamera, shift = room < 1 ? Math.round((railPx + 12) / 2) : 0;
+    if (shift !== (cam.view?.enabled ? cam.view.offsetX : 0) || (shift && cam.view && (cam.view.fullWidth !== size.width || cam.view.fullHeight !== size.height))) {
+      if (shift) cam.setViewOffset(size.width, size.height, shift, 0, size.width, size.height); else cam.clearViewOffset();
+    }
     if (gallery) { const x = boardToWorld(gallery.x), z = boardToWorld(gallery.z); camera.position.set(x, gallery.distance, z + gallery.distance * 0.58); camera.lookAt(x, 0, z); }
     if (drag.current && !editable(getState(), localId)) cancel();
     const d = drag.current; highlight.current.visible = !!d && !d.sell;
     // A white ring marks the selected toy (the one Sell, Q and the arrow keys act on).
-    const picked = building ? useSquadUI.getState().selected : null, s = getState();
+    const s = getState(), picked = building && s?.kind === 'toy-squad' && viewId(s, localId) === localId ? useSquadUI.getState().selected : null;
     const chosen = picked !== null && s?.kind === 'toy-squad' && d?.unit !== picked ? s.players.find(p => p.id === localId)?.units.find(u => u.id === picked) : undefined;
     selection.current.visible = !!chosen;
     if (chosen) { const pos = placementPosition(chosen.cell); selection.current.position.set(boardToWorld(pos.x), 0.26, boardToWorld(pos.z)); }
@@ -302,7 +334,9 @@ export function SquadScene({ getState, localId }: MinigameSceneProps<SquadState>
     <mesh ref={highlight} rotation={[-Math.PI / 2, 0, 0]} raycast={() => {}}><planeGeometry args={[3.3, 3.3]} /><meshBasicMaterial transparent opacity={0.5} depthWrite={false} /></mesh>
     {/* Effects subscribe to the frame loop first, so pieces read this frame's animation cues. */}
     <SquadFx getState={getState} localId={localId} />
+    <BadgesBegin />
     {gallery ? <ToyGallery yaw={gallery.yaw} /> : ([0, 1] as const).flatMap(side => Array.from({ length: MAX_UNITS + (side === 0 ? BENCH_SIZE : 0) }, (_, slot) => <Piece key={`${side}:${slot}`} slot={slot} side={side} getState={getState} localId={localId} drag={drag} down={down} move={move} up={up} cancel={cancel} />))}
+    <BadgesEnd />
     <DamageNumbers getState={getState} localId={localId} />
   </group>;
 }

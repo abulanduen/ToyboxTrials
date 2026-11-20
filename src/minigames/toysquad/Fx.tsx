@@ -17,6 +17,7 @@ import { TOY_COLOURS, type ToyPart } from './models';
 import type { AttackEffect, Battle, Fighter, SquadState } from './rules';
 import { effectsFor } from './spellcraft';
 import { bakeParts, UNLIT_VERTEX_MATERIAL } from './toys';
+import { useSquadUI, viewedSquad } from './local';
 
 /** Per-fighter animation cues for the toy models (simulation seconds). Written here, read by `Scene.tsx`. */
 export interface UnitCue { attackAt: number; castAt: number; hurtAt: number; diedAt: number; ranged: boolean }
@@ -396,7 +397,7 @@ class FxEngine {
 
   frame(s: SquadState | null, localId: string) {
     const live = s?.kind === 'toy-squad' && s.phase !== 'build' ? s.battles.find(b => b.owner === localId) : undefined;
-    const now = s ? s.t / 1000 : 0, battle = live && s ? `${s.seed}:${s.round}` : '';
+    const now = s ? s.t / 1000 : 0, battle = live && s ? `${s.seed}:${s.round}:${live.owner}` : '';
     if (battle !== this.battle) { this.battle = battle; this.clear(); }
     if (live && s) { const key = `${battle}:${live.tick}`; if (key !== this.seen) { this.seen = key; this.tick(live, now); } }
     this.counts.fill(0);
@@ -420,6 +421,6 @@ export function SquadFx({ getState, localId }: { getState: () => SquadState | nu
   const engine = useMemo(() => new FxEngine(typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches), []);
   useEffect(() => () => { engine.clear(); engine.dispose(); }, [engine]);
   useEffect(() => { exposeDebug({ squadFx: { active: () => engine.active, draws: () => engine.draws } }); }, [engine]);
-  useFrame(() => engine.frame(getState(), localId));
+  useFrame(() => { const s = getState(); engine.frame(s, s?.kind === 'toy-squad' ? viewedSquad(s.players, localId, useSquadUI.getState().watching) : localId); });
   return <primitive object={engine.group} />;
 }

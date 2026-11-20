@@ -186,6 +186,13 @@ describe('hidden information never leaves the server', () => {
     const fight = run.viewFor(run.publicView(), 'p1').battles as { owner: string }[];
     expect((run.state as { battles: unknown[] }).battles.length).toBeGreaterThan(1);
     expect(fight.map((b) => b.owner)).toEqual(['p1']);
+    // Viewing another board from the player rail adds that board's battle, still nobody else's shop.
+    const other = (run.state as { battles: { owner: string }[] }).battles.find((b) => b.owner !== 'p1')!.owner;
+    const viewing = run.viewFor(run.publicView(), 'p1', other);
+    expect((viewing.battles as { owner: string }[]).map((b) => b.owner).sort()).toEqual(['p1', other].sort());
+    for (const p of (viewing.players as { id: string; shop: unknown[]; passiveOffers: unknown[]; units: unknown[] }[]).filter((p) => p.id !== 'p1')) {
+      expect(p.shop).toEqual([]); expect(p.passiveOffers).toEqual([]); expect(Array.isArray(p.units)).toBe(true);
+    }
   });
 });
 
@@ -261,6 +268,26 @@ describe('lobby tournaments on the server', () => {
     // Each trial starts with a keyframe for the player, then patches.
     expect(snapshots.filter((m) => m.k === 1).length).toBe(3);
     expect(snapshots.some((m) => m.k === 0)).toBe(true);
+  });
+
+  it("a seated player viewing another seat's board gets that board's battle in their own snapshots", () => {
+    const settings: LobbySettings = { ...DEFAULT_LOBBY_SETTINGS, mode: 'single', game: 'toy-squad', cap: 3, botFill: true };
+    const members = [member('p1'), member('p2')];
+    const flow = new MatchFlow(settings, members, 8, 0, 1, 20);
+    let now = 0;
+    const owners = () => {
+      const r = flow.tick((now += 33), members);
+      const key = r.snapshots.find((s) => s.to === 'p1' && s.msg.k === 1);
+      return key ? ((key.msg.d as { battles: { owner: string }[] }).battles.map((b) => b.owner).sort()) : null;
+    };
+    while (!(flow.phase === 'playing' && (flow as unknown as { run: { state: { phase: string } } }).run.state.phase === 'battle')) flow.tick((now += 33), members);
+    members[0].watch = 'p2'; flow.resync('p1');
+    let seen = owners(); for (let i = 0; i < 4 && !seen; i++) seen = owners();
+    expect(seen).toEqual(['p1', 'p2']);
+    // Back to their own board: only their own battle again.
+    members[0].watch = 'p1'; flow.resync('p1');
+    seen = owners(); for (let i = 0; i < 4 && !seen; i++) seen = owners();
+    expect(seen).toEqual(['p1']);
   });
 
   it('bots never share a name with a human in the field', () => {

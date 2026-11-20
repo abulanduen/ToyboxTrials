@@ -57,6 +57,11 @@ const rt = {
 
 remoteHost.getState = () => rt.display;
 remoteHost.tick = tickRemote;
+// A seated player viewing another board from a game's player rail (spectators use watchSeat).
+remoteHost.follow = (id) => {
+  if (!rt.seated || !rt.you) return;
+  netLink.send({ t: 'lobby', a: 'watch', id: id ?? rt.you });
+};
 
 export const remoteDebug = () => ({ stateSeq: rt.stateSeq, seated: rt.seated, watch: rt.watch, pendingInputs: rt.pending.length, hasState: !!rt.state });
 

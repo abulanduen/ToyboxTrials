@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
-import { pauseMatch, useMatch } from '../session';
+import { followBoard, pauseMatch, useMatch } from '../session';
 import { useGame } from '../../game/store';
 import { unlockAudio } from '../../game/audio';
 import type { MinigameSceneProps } from '../types';
-import { clearSquadInput, resetSquadUI, submitSquadInput, useSquadUI } from './local';
-import { boardLimit, canBuy, purchaseUpgradeTargets, rerollPrice, sellValue, type SquadInput, type SquadState } from './rules';
+import { clearSquadInput, resetSquadUI, submitSquadInput, useSquadUI, viewedSquad } from './local';
+import { boardLimit, canBuy, purchaseUpgradeTargets, rerollPrice, sellValue, standings, type SquadInput, type SquadState } from './rules';
 import { ABILITIES, PASSIVES, RARITY_COLOURS, ROSTER, type Rarity } from './catalogue';
 import { TRAIT_BONUSES, type Trait } from './kits';
 import { traitCounts } from './spellcraft';
-import { handbookEntries, ownedCopies, ownedSummary, sortTraits, traitProgress } from './info';
+import { SQUAD_STATUSES, handbookEntries, ownedCopies, ownedSummary, sortTraits, traitProgress } from './info';
+import { PlayerRail, WatchBanner, type RailEntry } from '../shared/PlayerRail';
+import { StatusLegend } from '../shared/StatusIcon';
 import { toyPortrait } from './portraits';
 import { Handbook } from './Handbook';
 import { DamagePanel } from './DamagePanel';
@@ -20,13 +22,13 @@ const stars = (n: number) => Array.from({ length: n }, (_, i) => <StarIcon key={
 
 export function SquadHud({ getState, localId, contestants }: MinigameSceneProps<SquadState>) {
   const [, refresh] = useState(0);
-  const { selected, hovered, shopSlot, dragging, overShop } = useSquadUI();
+  const { selected, hovered, shopSlot, dragging, overShop, watching } = useSquadUI();
   const paused = useMatch(s => s.paused), hostPhase = useMatch(s => s.phase);
   const favourites = useGame(s => s.squadFavourites);
   const [openTrait, setOpenTrait] = useState<Trait | null>(null), [handbook, setHandbook] = useState(false);
   const closeHandbook = useCallback(() => setHandbook(false), []);
   const firstPassive = useRef<HTMLButtonElement>(null);
-  useEffect(() => { resetSquadUI(); const timer = window.setInterval(() => refresh(n => n + 1), 100); return () => { window.clearInterval(timer); clearSquadInput(); resetSquadUI(); }; }, []);
+  useEffect(() => { resetSquadUI(); const timer = window.setInterval(() => refresh(n => n + 1), 100); return () => { window.clearInterval(timer); clearSquadInput(); resetSquadUI(); followBoard(null); }; }, []);
   useEffect(() => { if (paused) { clearSquadInput(); useSquadUI.setState({ hovered: null, shopSlot: null }); } }, [paused]);
   const s = getState(), me = s?.kind === 'toy-squad' ? s.players.find(p => p.id === localId) : undefined;
   const choosing = !!me && s?.phase === 'build' && me.passiveOffers.length > 0;
@@ -53,11 +55,20 @@ export function SquadHud({ getState, localId, contestants }: MinigameSceneProps<
   const detail = shopKind ? ROSTER[shopKind] : picked ? ROSTER[picked.kind] : null;
   const boardCount = me.units.filter(u => u.cell >= 0).length;
   const counts = traitCounts(me.units), traits = sortTraits(counts), fight = s.battles.find(b => b.owner === localId);
+  // The player rail: anyone's board, read-only. Their battle (online: sent once you pick them) shows in the damage overview.
+  const viewId = viewedSquad(s.players, localId, watching), viewing = viewId !== localId, shownFight = s.battles.find(b => b.owner === viewId);
+  const view = (id: string) => { const other = id === localId ? null : id; useSquadUI.setState({ watching: other, selected: null, hovered: null }); followBoard(other); };
   const send = (input: SquadInput) => { if (input.type === 'passive' ? canAct : editable) { unlockAudio(); submitSquadInput(input); } };
   const name = (id: string) => contestants.find(c => c.id === id)?.name || 'Clockwork Squad';
+  const rail: RailEntry[] = standings(s).map(p => ({
+    id: p.id, name: name(p.id), stat: String(p.points), statLabel: 'pts', detail: `${p.wins} win${p.wins === 1 ? '' : 's'} · ${p.health} health kept`,
+    result: p.last, busy: building && !p.ready, busyLabel: 'still building',
+  }));
   const seconds = Math.ceil(Math.max(0, s.phaseEnds - s.t) / 1000);
   const tier = shopKind ? 1 : picked?.tier ?? 1;
-  return <div className="squad-hud">
+  return <div className={`squad-hud${building ? ' is-building' : ''}${viewing ? ' is-viewing' : ''}`}>
+    <PlayerRail className="squad-rail" title="Standings" label="Standings: view a player's board" entries={rail} localId={localId} viewing={viewId} onView={view} ranked />
+    {viewing && <WatchBanner className="squad-watch" name={name(viewId)} onBack={() => view(localId)} />}
     <div className="squad-banner">
       <strong>Round {s.round}/{s.config.rounds} · Level {me.level} · {building ? 'Build your squad' : s.phase === 'battle' ? 'Auto-battle' : 'Round results'}</strong>
       <span>{seconds}s · {me.points} points · {me.coins} coins · Board {boardCount}/{boardLimit(me.level)}</span>
@@ -123,11 +134,12 @@ export function SquadHud({ getState, localId, contestants }: MinigameSceneProps<
       {dragged && <div className={`squad-sell-drop${overShop ? ' is-over' : ''}`} data-testid="squad-sell-drop" data-over={overShop} aria-live="polite">
         <strong>{overShop ? 'Release to sell' : 'Drop here to sell'}</strong><span>{ROSTER[dragged.kind].name} · +{sellValue(dragged)} coin{sellValue(dragged) === 1 ? '' : 's'}</span>
       </div>}
-    </section> : <section className="squad-scoreboard" aria-label="Squad standings">{s.players.map(p => <span key={p.id}>{name(p.id)} · {p.points} points · {p.wins} wins</span>)}<small>Win 3 · Draw 1 · Loss 0 · Surviving health breaks ties</small>
-      <details className="squad-combat-kits"><summary>Unit spells & mana</summary><small>Attacks generate 20 mana; losing health generates 8 per tick. Full mana casts automatically. Silence blocks spells; stun blocks actions.</small>{fight?.fighters.filter(u => u.side === 0).map(u => <p key={u.id}><strong>{ROSTER[u.kind].name}</strong> · {u.hp > 0 ? `${u.magic.mana}/${u.magic.maxMana} mana` : 'Defeated'} · {u.magic.casts} casts · {u.magic.lastSpell || ROSTER[u.kind].spell.name}</p>)}</details>
-    </section>}
-    {/* Opposite the trait column: who is doing and taking the damage, during the battle and the recap after it. */}
-    {!building && fight && !handbook && <DamagePanel battle={fight} t={s.t} />}
+    </section> : <details className="squad-combat-kits" data-testid="squad-combat-kits"><summary>Spells, mana & badges</summary>
+      <small>Win 3 · Draw 1 · Loss 0 · Surviving health breaks ties. Attacks generate 20 mana; losing health generates 8 per tick. Full mana casts automatically. Silence blocks spells; stun blocks actions.</small>
+      <StatusLegend kinds={SQUAD_STATUSES} />
+      {shownFight?.fighters.filter(u => u.side === 0).map(u => <p key={u.id}><strong>{ROSTER[u.kind].name}</strong> · {u.hp > 0 ? `${u.magic.mana}/${u.magic.maxMana} mana` : 'Defeated'} · {u.magic.casts} casts · {u.magic.lastSpell || ROSTER[u.kind].spell.name}</p>)}</details>}
+    {/* Beside the rail: who is doing and taking the damage, during the battle and the recap after it (the viewed board's battle). */}
+    {!building && shownFight && !handbook && <DamagePanel key={shownFight.owner} battle={shownFight} t={s.t} />}
     {handbook && !choosing && <Handbook onClose={closeHandbook} />}
     {choosing && <div className="squad-modal" data-testid="squad-passive-modal" role="dialog" aria-modal="true" aria-labelledby="squad-passive-title">
       <div className="squad-modal__card">

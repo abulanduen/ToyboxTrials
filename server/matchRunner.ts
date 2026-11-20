@@ -146,9 +146,9 @@ export class GameRun {
     return v;
   }
 
-  /** What one player (or a spectator following them) may see, from `publicView()`. */
-  viewFor(base: Obj, viewer: string | null): Obj {
-    return this.def.viewFor ? this.def.viewFor(base, viewer) : base;
+  /** What one player (or a spectator following them) may see, from `publicView()`; `watching` is a board they are viewing. */
+  viewFor(base: Obj, viewer: string | null, watching: string | null = null): Obj {
+    return this.def.viewFor ? this.def.viewFor(base, viewer, watching) : base;
   }
 
   result(): MinigameResult {

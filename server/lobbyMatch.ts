@@ -368,8 +368,12 @@ export class MatchFlow {
       if (!m.connected) continue;
       const seated = this.isSeated(m.id) && !this.gone.has(m.id);
       const viewer = seated ? m.id : m.watch && this.field.some((c) => c.id === m.watch) ? m.watch : firstHuman;
-      let view = views.get(viewer);
-      if (!view) views.set(viewer, (view = run.viewFor(base, viewer)));
+      // A seated player may be looking at another seat's board (a game's player rail): games that
+      // send other boards only on request (Toy Squad's battles) add that one.
+      const watching = seated && m.watch && m.watch !== m.id && this.field.some((c) => c.id === m.watch) ? m.watch : null;
+      const key = watching ? `${viewer}\u0000${watching}` : viewer;
+      let view = views.get(key);
+      if (!view) views.set(key, (view = run.viewFor(base, viewer, watching)));
       const last = this.sent.get(m.id);
       let msg: MatchStateMsg;
       if (!last || last.seq !== this.seq) msg = { t: 'ms', m: this.seq, k: 1, d: view, e: events, n: this.lastNow };

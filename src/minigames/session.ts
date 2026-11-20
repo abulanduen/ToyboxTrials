@@ -117,7 +117,18 @@ export const remoteHost = {
   active: false,
   getState: (): unknown => null,
   tick: (_dtRealMs: number): void => {},
+  /** Tell the server whose board this seated player is looking at (null: their own). */
+  follow: (_id: string | null): void => {},
 };
+
+/**
+ * A game's HUD switched which player's board it shows (the player rail). Locally nothing is
+ * needed (every board is in the state); online, the server is told, so games that send other
+ * boards only on request (Toy Squad's battles) include the one being viewed.
+ */
+export function followBoard(id: string | null) {
+  if (remoteHost.active) remoteHost.follow(id);
+}
 
 function localContestant(): Contestant {
   const g = useGame.getState();

@@ -30,9 +30,9 @@
   .player-rail { padding:4px; gap:3px; border-width:2px; }
   .player-rail__title { font-size:11px; text-align:center; padding:0; }
   .player-rail ol { gap:3px; }
-  .player-rail .rail-row button { display:flex; flex-direction:column; justify-content:center; align-items:center; gap:0; min-width:56px; min-height:56px; padding:3px 2px; border-left-width:2px; border-top:5px solid var(--rail-accent,#A9A6AE); text-align:center; }
-  .player-rail .rail-row__rank { position:absolute; left:2px; top:1px; width:15px; height:15px; font-size:9px; border-width:1px; }
-  .player-rail .rail-row__name { max-width:100%; font-size:11px; padding:0 2px; box-sizing:border-box; }
+  .player-rail .rail-row button { display:flex; flex-direction:column; justify-content:flex-end; align-items:center; gap:0; min-width:56px; min-height:60px; padding:14px 2px 3px; border-left-width:2px; border-top:5px solid var(--rail-accent,#A9A6AE); text-align:center; }
+  .player-rail .rail-row__rank { position:absolute; left:2px; top:1px; width:14px; height:14px; font-size:9px; border-width:1px; }
+  .player-rail .rail-row__name { width:100%; font-size:11px; padding:0 1px; box-sizing:border-box; text-align:center; }
   .player-rail .rail-row__you { display:none; }
   .player-rail .rail-row__stat b { font-size:15px; }
   .player-rail .rail-row__stat small { display:block; font-size:9px; margin-top:-2px; }
