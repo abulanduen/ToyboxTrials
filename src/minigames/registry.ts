@@ -437,6 +437,45 @@ export const MINIGAMES: MinigameDefinition[] = [
     status: 'playable',
     load: () => import('./siege').then((m) => m.default),
   },
+  {
+    id: 'hoop-clash',
+    // The working title lives here only: the HUD, results and lobby read it from this entry.
+    title: 'Hoop Clash',
+    tagline: 'Red against Blue on a toy court. Two halves, real baskets.',
+    description:
+      'A proper game of toy basketball. Two teams in jerseys, Red against Blue, two-a-side or four-a-side (bots fill any gaps). A jump ball starts it. Dribble up, pass, and charge your shot until its arc glows gold: 2 points inside the arc, 3 beyond. Snatch passes and shots out of the air or swipe the ball off a dribbler. A 14-second shot clock, two halves with a switch of ends, and if it is tied, overtime: next basket wins.',
+    category: 'pvp',
+    accent: PALETTE.ballOrange,
+    players: { min: 2, max: 8 },
+    // Four minutes of game clock in two halves, plus the stops: about five minutes (overtime adds up to one).
+    durationSec: [270, 360],
+    inputs: ['keyboard', 'mouse', 'touch'],
+    bots: 'available',
+    // A party trial played from its gate, practice and an online one-trial lobby, but kept out of
+    // tournaments: it is a team game and tournaments rank every toy for itself. Set `tournament`
+    // to true here and in facts.ts to put it in the rotation.
+    eligibility: { tournament: false, ranked: false, casual: true },
+    scoring: 'score',
+    tieBreak: 'The winning team shares 1st place, the losing team the places after; within a team, more points first. A tie after overtime: everyone shares 1st.',
+    recordUnit: 'points',
+    controls: [
+      { keys: 'W A S D', action: 'Move (Shift to sprint)' },
+      { keys: 'Hold E / Space / click', action: 'Charge, let go to shoot (gold arc = in). Without the ball: steal, snatch, pick up' },
+      { keys: 'Q / right click', action: 'Pass to the teammate you face. Without the ball: call for it' },
+    ],
+    touch: {
+      movement: 'joystick',
+      look: 'none',
+      buttons: [
+        { id: 'shoot', label: 'Shoot (hold) / Steal', colour: PALETTE.ballOrange, hold: true },
+        { id: 'pass', label: 'Pass', colour: PALETTE.toyBlue },
+      ],
+      orientation: 'any',
+      notes: 'The floating joystick (left thumb, lower left) moves; push it all the way to sprint. On the right, hold Shoot to charge and let go to shoot; without the ball it becomes Steal or Grab. Pass throws to the teammate you face, or calls for the ball. Both buttons work while the other thumb holds the stick.',
+    },
+    status: 'playable',
+    load: () => import('./hoopclash').then((m) => m.default),
+  },
 ];
 
 export const gameById = (id: MinigameId) => MINIGAMES.find((g) => g.id === id)!;

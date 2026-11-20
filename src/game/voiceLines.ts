@@ -120,6 +120,12 @@ export const GREETERS: Record<MinigameId, Speaker & { line: string }> = {
     direction: 'A tiny toy knight with a plumed helmet and shield. Gallant and hearty.',
     line: 'Well met! Pick a hero and hold your patch of table against swarms of dust bunnies for five whole minutes. Want to have a go?',
   },
+  'hoop-clash': {
+    id: 'greeter-hoop-clash',
+    name: 'Ref Rookie',
+    direction: 'A toy referee in a striped shirt with a whistle on a cord. Brisk, fair and sporty, with a short blast of energy.',
+    line: 'Teams, take the court! Red against Blue, two halves, jerseys on. Pass, shoot, and mind the shot clock. Want to have a go?',
+  },
 };
 
 /**

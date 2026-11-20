@@ -121,6 +121,7 @@ export function hubPathLines(): PathLine[] {
   const loop: Pt[] = [
     landing,
     roadPoint(gate('odd-page-out')),
+    roadPoint(gate('hoop-clash')), // a short detour inside the loop to the court gate on the pitch
     roadPoint(gate('midnight-hunger')),
     roadPoint(gate('find-the-original')),
     roadPoint(gate('inferno-escape')),

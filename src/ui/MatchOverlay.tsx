@@ -400,6 +400,7 @@ function Results() {
           ))}
         </ol>
       )}
+      {m.module?.ResultsExtra && <m.module.ResultsExtra getState={getMatchState} contestants={m.contestants} localId={LOCAL_ID} />}
       {!solo && m.newBest && <p className="intro-record"><StarSticker size={18} /> New personal best: {mine?.score} {unit(def.recordUnit, mine?.score ?? 0)}</p>}
       <CogsEarned reward={m.reward} unlocked={m.unlocked} testId="results-cogs" />
       <div className="pause__actions">

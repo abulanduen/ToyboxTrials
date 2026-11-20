@@ -42,6 +42,8 @@ import { createTumbleBot } from '../src/minigames/towertumble/bot';
 import { createJackBot } from '../src/minigames/jackbox/bot';
 import { siegeRules, CLASS_IDS as SIEGE_CLASSES } from '../src/minigames/siege/rules';
 import { createSiegeBot } from '../src/minigames/siege/bot';
+import { hoopRules } from '../src/minigames/hoopclash/rules';
+import { createHoopBot } from '../src/minigames/hoopclash/bot';
 
 type Obj = Record<string, unknown>;
 
@@ -316,6 +318,23 @@ const GAMES: ServerGame[] = [
     // The finale needs no extra timer: the prep window settles its own cards after 15 s, the arena
     // opens 15 s after 5:00 at the latest, and the arena itself ends by 90 s.
     config: { pickTimeoutMs: 60_000, choiceTimeoutMs: 20_000 },
+  },
+  {
+    id: 'hoop-clash',
+    rules: hoopRules as RulesCoreAny,
+    createBot: createHoopBot as () => BotPolicy,
+    // The stick and the held action button, sampled every frame (the rules latch the newest and
+    // see the button's presses and releases in order), and passes.
+    validate(i) {
+      if (i.type === 'in') return num(i.ax, 1.5) && num(i.ay, 1.5) && typeof i.run === 'boolean' && typeof i.act === 'boolean' ? { type: 'in', ax: i.ax, ay: i.ay, run: i.run, act: i.act } : null;
+      if (i.type === 'pass') return i.to === undefined ? { type: 'pass' } : typeof i.to === 'string' && i.to.length <= 64 ? { type: 'pass', to: i.to } : null;
+      return null;
+    },
+    // The rules' random stream (the fillers' AI) and the seed are nobody's business.
+    publicView(v) {
+      hideSeed(v);
+      v.rng = 0;
+    },
   },
 ];
 

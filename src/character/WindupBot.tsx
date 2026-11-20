@@ -18,6 +18,7 @@ import { NO_ACCESSORIES, type Accessories, type HatId, type KeySkinId } from '..
 import { HAT_HIDES_ANTENNA, Hat, KeyBow } from './Cosmetics';
 import { BackItem, FaceItem, KEY_BACK_OFFSET, NeckItem } from './Accessories';
 import { EMOTE_DURATION } from '../game/emotes';
+import { Jersey, type JerseyLook } from './Jersey';
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const damp = (cur: number, target: number, lambda: number, dt: number) =>
@@ -37,12 +38,14 @@ interface Props {
   accessories?: Accessories;
   /** Something stuck on the front of the head (the Hub's Who Am I? card), in head coordinates. */
   faceStuck?: React.ReactNode;
+  /** A team jersey over the body (Hoop Clash). Unset: none. */
+  jersey?: JerseyLook;
 }
 
 /** Juggling beads: colours and phase offsets (the juggle gesture). */
 const JUGGLE_BALLS = [PALETTE.coral, PALETTE.honey, PALETTE.toyBlue];
 
-export function WindupBot({ anim, paint, hat = 'none', keySkin = 'classic', accessories = NO_ACCESSORIES, faceStuck }: Props) {
+export function WindupBot({ anim, paint, hat = 'none', keySkin = 'classic', accessories = NO_ACCESSORIES, faceStuck, jersey }: Props) {
   const mats = useMemo(() => {
     const plastic = (c: string, rough = 0.42) => new THREE.MeshStandardMaterial({ color: c, roughness: rough, metalness: 0.02 });
     return {
@@ -482,6 +485,8 @@ export function WindupBot({ anim, paint, hat = 'none', keySkin = 'classic', acce
             </mesh>
           </group>
         ))}
+
+        {jersey && <Jersey look={jersey} fit="full" />}
 
         {/* ---- accessories: back and neck ---- */}
         <BackItem id={accessories.back} />

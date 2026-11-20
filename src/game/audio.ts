@@ -150,7 +150,7 @@ export function playToyCue(cue: ToyCue, volume = 1) {
  * Hub play cues: the shared marble (football) and the basketball (src/hubplay/). `volume` is the
  * mix gain (0–1): the caller makes distant ones quieter.
  */
-export type HubCue = 'kick' | 'push' | 'clack' | 'goal' | 'swish' | 'rim' | 'board' | 'bounce' | 'grab' | 'throw';
+export type HubCue = 'kick' | 'push' | 'clack' | 'goal' | 'swish' | 'rim' | 'board' | 'bounce' | 'grab' | 'throw' | 'buzzer' | 'whistle';
 export function playHubCue(cue: HubCue, volume = 1) {
   if (!live()) return;
   const t = now(), k = Math.max(0, Math.min(1, volume));
@@ -173,6 +173,53 @@ export function playHubCue(cue: HubCue, volume = 1) {
     case 'bounce': tone(jitter(330, .05), t, .13*k, .09, 'sine', .004, 190); noise(t, .05*k, .03, 600, .6, 'lowpass'); break;
     case 'grab': tone(520, t, .08*k, .07, 'sine', .006, 760); noise(t, .04*k, .03, 1200, .7, 'lowpass'); break;
     case 'throw': noise(t, .1*k, .2, 1100, .7, 'bandpass'); tone(380, t, .05*k, .16, 'sine', .01, 620); break;
+    case 'buzzer': { // a scoreboard buzzer: a low, buzzy square chord with a firm edge, about 0.7 s
+      const c = live();
+      if (!c) break;
+      const g = c.createGain();
+      const f = c.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.value = 1500;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(.09*k, t + .02);
+      g.gain.setValueAtTime(.09*k, t + .62);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + .75);
+      f.connect(g).connect(master!);
+      for (const fr of [146, 220, 293]) {
+        const o = c.createOscillator();
+        o.type = 'square';
+        o.frequency.value = fr;
+        o.connect(f);
+        o.start(t);
+        o.stop(t + .8);
+      }
+      break;
+    }
+    case 'whistle': { // the referee's pea whistle: a short trill
+      const c = live();
+      if (!c) break;
+      for (const fr of [2300, 2560]) {
+        const o = c.createOscillator();
+        const lfo = c.createOscillator();
+        const lg = c.createGain();
+        const g = c.createGain();
+        o.type = 'triangle';
+        o.frequency.setValueAtTime(fr, t);
+        lfo.frequency.value = 34;
+        lg.gain.value = 80;
+        lfo.connect(lg).connect(o.frequency);
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(.08*k, t + .015);
+        g.gain.setValueAtTime(.08*k, t + .2);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + .3);
+        o.connect(g).connect(master!);
+        o.start(t);
+        lfo.start(t);
+        o.stop(t + .34);
+        lfo.stop(t + .34);
+      }
+      break;
+    }
   }
 }
 

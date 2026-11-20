@@ -29,6 +29,9 @@ export const PALETTE = {
   steel: '#C9CED6',
   /** The hub's basketball (src/scene/HubPlay.tsx). */
   ballOrange: '#E8893F',
+  /** Team jerseys (Hoop Clash): deeper than the coral and toy-blue paint jobs, so a jersey always reads on any toy. */
+  teamRed: '#CF4038',
+  teamBlue: '#2F6DB5',
 
   // Room scale (muted, slightly desaturated so the toy layer reads first)
   roomWall: '#B7A99A',

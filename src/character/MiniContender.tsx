@@ -7,6 +7,7 @@ import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { PALETTE, type PaintJob } from '../game/palette';
+import { Jersey, type JerseyLook } from './Jersey';
 
 export interface MiniAnim {
   /** Seconds since the last hop (e.g. pressed a note), or large. */
@@ -36,7 +37,8 @@ const inkMat = new THREE.MeshStandardMaterial({ color: PALETTE.ink, roughness: 0
 const brassMat = new THREE.MeshStandardMaterial({ color: PALETTE.brass, roughness: 0.32, metalness: 0.85 });
 const greyMat = new THREE.MeshStandardMaterial({ color: '#8E8A93', roughness: 0.8 });
 
-export function MiniContender({ paint, anim, scale = 1 }: { paint: PaintJob; anim: React.RefObject<MiniAnim>; scale?: number }) {
+/** `jersey`: a team jersey over the body (Hoop Clash); unset, none. */
+export function MiniContender({ paint, anim, scale = 1, jersey }: { paint: PaintJob; anim: React.RefObject<MiniAnim>; scale?: number; jersey?: JerseyLook }) {
   const mats = useMemo(
     () => ({
       body: new THREE.MeshStandardMaterial({ color: paint.body, roughness: 0.45 }),
@@ -92,6 +94,7 @@ export function MiniContender({ paint, anim, scale = 1 }: { paint: PaintJob; ani
         <mesh geometry={geo.turret} position={[0, 2.85, 0.02]} material={mats.accent} castShadow />
         <mesh geometry={geo.eye} position={[0, 2.85, 0.28]} material={eyeMat} />
         <mesh geometry={geo.pupil} position={[0, 2.85, 0.29]} material={inkMat} />
+        {jersey && <Jersey look={jersey} fit="mini" />}
         <group ref={keyRef} position={[0, 1.2, -0.75]}>
           <mesh geometry={geo.key} position={[0.25, 0, 0]} material={brassMat} />
           <mesh geometry={geo.key} position={[-0.25, 0, 0]} material={brassMat} />
