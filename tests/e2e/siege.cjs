@@ -247,7 +247,7 @@ async function run(name) {
         if (w) Object.assign(w, { level: 5, evolved: true, cd: 0 }); else if (p.weapons.length < 4) p.weapons.push({ id, level: 5, evolved: true, cd: 0, aux: 0 });
         else Object.assign(p.weapons[p.weapons.length - 1], { id, level: 5, evolved: true, cd: 0, aux: 0 });
       }
-      p.horn = { level: 3, readyAt: 1e12, evolved: true, cd: 0, aux: 0 };
+      p.horn = { level: 3, readyAt: 0, evolved: true, cd: 0, aux: 0 };
     });
     await page.evaluate(() => window.__toybox.match.timeScale(1));
     await page.waitForFunction(new Function(`const b = ${me}.board; return b.blasts.some(k => k.on && k.kind === 4) && b.fires.some(f => f.on) && b.projs.some(q => q.on && q.kind === 2)`));

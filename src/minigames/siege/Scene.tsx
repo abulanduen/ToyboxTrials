@@ -88,7 +88,7 @@ const glow = (opacity: number) => new THREE.MeshBasicMaterial({ color: PALETTE.w
 const BEAM_GLOW = glow(0.55);
 const BEAM_CORE = glow(0.95);
 /** Flame pools: a soft burning disc and a brighter rim. */
-const FIRE_SOFT = fade(0.5);
+const FIRE_SOFT = fade(0.68);
 const FIRE_RIM = fade(0.75);
 
 interface Particle { on: boolean; x: number; y: number; z: number; vx: number; vy: number; vz: number; age: number; life: number; size: number; shape: number; colour: THREE.Color; spin: number }
@@ -424,14 +424,15 @@ class SiegeView {
       if (!f.on) continue;
       const grow = Math.min(1, f.age / 180), fadeOut = Math.min(1, (f.life - f.age) / 450), k = grow * fadeOut;
       const flick = 0.5 + 0.5 * Math.sin(sec * 13 + i * 1.7);
-      this.mix.copy(tint(FX.flame)).lerp(tint(FX.flameCore), flick * 0.6);
+      this.mix.copy(tint(FX.flame)).lerp(tint(FX.flameCore), flick * 0.35);
       obj.position.set(f.x, 0.13 + i * 0.001, f.z); obj.rotation.set(0, 0, 0); obj.scale.setScalar(f.r * k);
       this.put(this.fireDiscs, nf, this.mix);
       obj.position.y = 0.15; obj.scale.setScalar(f.r * k * (0.97 + 0.05 * flick)); this.put(this.fireRims, nf++, tint(FX.flameCore));
       for (let j = 0; j < per; j++) {
-        const a = j * ((Math.PI * 2) / per) + f.age * 0.0012 + i, d = f.r * 0.45 * (j === 0 ? 0.3 : 1);
+        // Flame tongues about a centimetre and a half across and up to three tall, licking up and down.
+        const a = j * ((Math.PI * 2) / per) + f.age * 0.0012 + i, d = f.r * 0.5 * (j === 0 ? 0.25 : 1);
         const h = (0.75 + 0.35 * Math.sin(sec * 9 + i * 2.3 + j * 1.9)) * k;
-        obj.position.set(f.x + Math.cos(a) * d, 0.35 * h, f.z + Math.sin(a) * d); obj.rotation.set(0, a, 0); obj.scale.set(1.1 * k, 1.9 * h, 1.1 * k);
+        obj.position.set(f.x + Math.cos(a) * d, 0.9 * h, f.z + Math.sin(a) * d); obj.rotation.set(0, a, 0); obj.scale.set(1.9 * k, 3.1 * h, 1.9 * k);
         this.put(this.flames, nt++, tint(j % 2 ? FX.flameCore : FX.flame));
       }
     }
