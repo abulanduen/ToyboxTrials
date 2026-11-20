@@ -70,7 +70,9 @@ fs.mkdirSync(OUT, { recursive: true });
             if (i === 2) { s.holder = p.id; s.fuseMs = 1; step({}, 16); }
           } else if (id === 'find-the-original') {
             if (i === 0) until('study');
-            if (i === 1) until('search');
+            // The look-alikes pop up one after another over the first ~0.5 s of the search:
+            // let them all arrive, or the photo shows an empty tray.
+            if (i === 1) { until('search'); step({}, 700); }
             if (i === 2) { until('reveal'); }
           } else if (id === 'red-light-green-light') {
             if (i === 0) { until('go'); s.players.forEach((q, k) => { q.m.z = -22 + k * 5; }); }
