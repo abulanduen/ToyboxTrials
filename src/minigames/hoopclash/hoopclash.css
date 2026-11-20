@@ -104,8 +104,8 @@
   .hc-you i { width: 28px; height: 28px; font-size: 14px; }
   .hc-ball { top: calc(64px + env(safe-area-inset-top)); font-size: 12px; }
   .hc-banner strong { font-size: 28px; }
-  .hc-tip { bottom: calc(190px + env(safe-area-inset-bottom)); }
-  .hc-meter { bottom: calc(160px + env(safe-area-inset-bottom)); }
+  .hc-tip { bottom: calc(236px + env(safe-area-inset-bottom)); }
+  .hc-meter { bottom: calc(196px + env(safe-area-inset-bottom)); }
 }
 /* Phones in landscape: everything a little smaller, the team chip at the top left. */
 @media (max-height: 500px) and (orientation: landscape) {

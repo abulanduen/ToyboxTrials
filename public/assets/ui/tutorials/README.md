@@ -1,6 +1,6 @@
 # Quick tutorial gameplay photos
 
-One 960×540 WebP for each of the 46 steps across 14 games. These are screenshots of Toybox
+One 960×540 WebP for each of the 50 steps across 15 games. These are screenshots of Toybox
 Trials itself, with deterministic examples staged using existing rules and the `?debug` hooks.
 They are project-owned gameplay captures, not AI illustrations. Captions and emphasized phrases
 live in `src/minigames/tutorials.ts`; the keyboard and touch instructions share the same photo.
