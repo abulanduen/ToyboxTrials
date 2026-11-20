@@ -1,6 +1,14 @@
 /* Build selection (no host countdown before the draft), Blink, real keyboard/mouse/touch casting, damage knockback, audio cues, ring-out and host lifecycle. */
 const{chromium}=require('playwright');const assert=require('node:assert/strict');const fs=require('node:fs');const path=require('node:path');
 const out=path.join(__dirname,'output');fs.mkdirSync(out,{recursive:true});
+/** Hold the touch joystick (CDP touch point 1) pushed in a direction. While it is held, `tap(testId)` taps a
+ *  button with a second finger (touch point 2), the way a phone player casts without letting go of the stick. */
+async function holdStick(page,[dx,dy]){const cdp=await page.context().newCDPSession(page);const zone=await page.locator('.touch-stick-zone').boundingBox();const x=zone.x+zone.width*0.4,y=zone.y+zone.height*0.55;
+  const stick=[x+dx*60,y+dy*60],send=(type,pts)=>cdp.send('Input.dispatchTouchEvent',{type,touchPoints:pts.map(([px,py,id])=>({x:px,y:py,id}))});
+  await send('touchStart',[[x,y,1]]);await send('touchMove',[[x+dx*20,y+dy*20,1]]);await send('touchMove',[[...stick,1]]);
+  return{async tap(testId){const b=await page.getByTestId(testId).boundingBox(),bx=b.x+b.width/2,by=b.y+b.height/2;
+      await send('touchStart',[[...stick,1],[bx,by,2]]);await send('touchEnd',[[...stick,1]]);},
+    async release(){await send('touchEnd',[]);await cdp.detach();}};}
 /** Push the touch joystick (CDP touch events) in a direction until `until(arg)` holds, then let go. */
 async function stickUntil(page,[dx,dy],until,arg){const cdp=await page.context().newCDPSession(page);const zone=await page.locator('.touch-stick-zone').boundingBox();const x=zone.x+zone.width*0.4,y=zone.y+zone.height*0.55;
   const send=(type,pts)=>cdp.send('Input.dispatchTouchEvent',{type,touchPoints:pts.map(([px,py])=>({x:px,y:py,id:1}))});
@@ -73,6 +81,16 @@ try{for(const layout of(process.env.SPELLBOX_LAYOUTS||'desktop,portrait,landscap
    assert.equal(bot.damage,35,'shockwave damage');assert.ok(bot.vx>5,`shockwave pushed the bot outward (${bot.vx})`);assert.equal(me.damage,0);
    assert.deepEqual(['depart','trail','wave'].filter(k=>s.effects.some(e=>e.kind===k)),['depart','trail','wave']);assert.ok(me.cooldowns[2]>s.t,'Blink is on cooldown');}
   await page.screenshot({path:path.join(out,`spellbox-${layout}-blink.png`),timeout:240000});
+  if(mobile){
+    // Two thumbs: hold the joystick and cast with the other finger, without letting go of the stick.
+    await page.evaluate(()=>{const s=window.__toybox.match.state();s.projectiles=[];Object.assign(s.players[0],{x:0,z:-8,vx:0,vz:0,cast:null,cooldowns:[0,1e9,1e9],nextAction:0,stunnedUntil:0});window.__toybox.match.timeScale(.5);});
+    const before=(await state()).players[0].casts,stick=await holdStick(page,[0,-1]);
+    try{await page.waitForFunction(()=>window.__toybox.match.state().players[0].moveZ<0);
+      await stick.tap('spellbox-cast-0');await page.waitForFunction(n=>window.__toybox.match.state().players[0].casts>n,before);
+      assert.ok((await state()).players[0].moveZ<0,'still steering after the cast');}
+    finally{await stick.release();}
+    await page.evaluate(()=>window.__toybox.match.timeScale(0));
+  }
   {const now=await page.evaluate(()=>window.__toybox.spellbox.audio()),n=c=>(now.byCue[c]??0)-(heard.byCue[c]??0);
    assert.ok(n('zip')>=1&&n('thump')>=1&&n('impact')>=1,`audio bus got zip/thump/impact (${JSON.stringify(now.byCue)})`);assert.equal(now.loudest.zip,1,'own Blink zip at full level');}
   // Repair (set on R through the debug state) still casts through the real adapter.

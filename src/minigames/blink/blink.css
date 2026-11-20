@@ -9,8 +9,6 @@
 .blink-roster { position:absolute; top:140px; left:max(10px,env(safe-area-inset-left)); display:flex; flex-direction:column; gap:3px; }
 .blink-roster span { background:#F4E8CE; padding:3px 7px; border-radius:5px; font-size:11px; }
 .blink-roster .out { opacity:.5; text-decoration:line-through; }
-.blink-move { position:absolute; bottom:max(14px,env(safe-area-inset-bottom)); left:max(12px,env(safe-area-inset-left)); text-align:center; }
-.blink-move>div { display:flex; gap:4px; margin-top:4px; }
 .blink-hud button { pointer-events:auto; min-width:56px; min-height:56px; border:3px solid #574D69; border-radius:10px; color:#2B2433; background:#F4E8CE; font:600 14px Fredoka,sans-serif; touch-action:none; user-select:none; box-shadow:0 3px 0 #574D69; }
 .blink-hud button:focus-visible { outline:3px solid #6BA7C8; outline-offset:3px; }
 .blink-hud button:disabled { opacity:.55; box-shadow:none; }
@@ -29,3 +27,8 @@
 .blink-toast--out { background:#E76B62; color:#FFF9EE; }
 @keyframes blink-toast-pop { from { transform:translate(-50%,-50%) scale(.6); opacity:0; } to { transform:translate(-50%,-50%) scale(1); opacity:1; } }
 @media (prefers-reduced-motion: reduce) { .blink-toast { animation:none; } }
+
+/* Touch movement: the shared floating joystick in the lower-left, leaving the arena free for tap-to-aim. */
+.blink-stick .touch-stick-zone { width: 38%; height: 42%; }
+/* Action buttons fire on touch-down so they work while the other thumb holds the joystick. */
+.blink-actions button { touch-action: none; -webkit-user-select: none; user-select: none; }

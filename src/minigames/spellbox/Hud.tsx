@@ -8,6 +8,7 @@ import { SLOT_OPTIONS, SPELLS, spellStats } from './spells';
 import type { SpellboxState } from './rules';
 import { SpellIcon } from './SpellIcon';
 import { MoveTouch } from '../shared/MoveTouch';
+import { tapButton } from '../shared/tapButton';
 import './spellbox.css';
 const directions:Action[]=['forward','back','left','right'];
 export function SpellboxHud({getState,localId,contestants}:MinigameSceneProps<SpellboxState>){
@@ -43,7 +44,7 @@ export function SpellboxHud({getState,localId,contestants}:MinigameSceneProps<Sp
     </section></div>:<>
       <div className="spellbox-roster" aria-label="Contender damage">{s.players.map(p=><span key={p.id} className={p.alive?'':'out'}>{p.id===localId?'You':contestants.find(c=>c.id===p.id)?.name} · {p.alive?`${Math.round(p.damage)}%`:'Out'}</span>)}</div>
       {playing&&<div className="spellbox-stick"><MoveTouch jump={false}/></div>}
-      {playing&&<div className="spellbox-casts" onKeyDown={e=>{if(e.key==='Enter'||e.key===' ')e.stopPropagation();}}>{me.build.map((id,i)=>{const d=SPELLS[id],left=Math.max(0,me.cooldowns[i]-s.t);return<button key={i} data-testid={`spellbox-cast-${i}`} disabled={left>0||!!me.cast||s.t<me.stunnedUntil||s.t<me.nextAction} onClick={()=>{unlockAudio();tapVirtual((`slot${i+1}`) as Action);}} style={{borderColor:d.colour}}><SpellIcon spell={id}/><span className="spellbox-cast-copy"><strong>{['Q','E','R'][i]} · {d.name}</strong><small>{left>0?`${(left/1000).toFixed(1)}s`:'Ready'}</small></span></button>;})}</div>}
+      {playing&&<div className="spellbox-casts" onKeyDown={e=>{if(e.key==='Enter'||e.key===' ')e.stopPropagation();}}>{me.build.map((id,i)=>{const d=SPELLS[id],left=Math.max(0,me.cooldowns[i]-s.t);return<button key={i} data-testid={`spellbox-cast-${i}`} disabled={left>0||!!me.cast||s.t<me.stunnedUntil||s.t<me.nextAction} {...tapButton(()=>{unlockAudio();tapVirtual((`slot${i+1}`) as Action);})} style={{borderColor:d.colour}}><SpellIcon spell={id}/><span className="spellbox-cast-copy"><strong>{['Q','E','R'][i]} · {d.name}</strong><small>{left>0?`${(left/1000).toFixed(1)}s`:'Ready'}</small></span></button>;})}</div>}
       <div className="spellbox-hint">WASD / arrows · Mouse or tap to aim · Q / E / R cast · Click casts slot Q</div>
     </>}
   </div>;

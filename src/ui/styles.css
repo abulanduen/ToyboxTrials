@@ -1431,6 +1431,15 @@ textarea,
   inset: 0;
   pointer-events: none;
 }
+/* The game's own HUD is one self-contained layer: whatever z-index a game uses inside it (Odd Page
+   Out's pages, Tower Tumble's sheets) stays inside, so the pause menu, results and other cards that
+   follow it in the match layer always draw on top. */
+.match-hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  isolation: isolate;
+}
 .match-layer .modal-layer,
 .match-layer button {
   pointer-events: auto;

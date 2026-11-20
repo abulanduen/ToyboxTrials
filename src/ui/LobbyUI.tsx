@@ -680,7 +680,7 @@ export function OnlineMatchOverlay() {
   const Hud = m.module?.Hud;
   return (
     <div className="match-layer" data-testid="online-match" data-phase={m.phase}>
-      {inPlay && Hud && seated && <Hud getState={getMatchState} contestants={m.contestants} localId={m.localId} />}
+      {inPlay && Hud && seated && <div className="match-hud"><Hud getState={getMatchState} contestants={m.contestants} localId={m.localId} /></div>}
       {inPlay && (
         <button className="match-pause" aria-label="Menu" onClick={() => pauseMatch(true)}>
           <GearIcon size={26} color="#2B2433" />

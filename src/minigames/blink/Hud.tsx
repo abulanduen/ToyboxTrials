@@ -1,20 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import { pressVirtual, releaseVirtual, tapVirtual, type Action } from '../../game/input';
+import { releaseVirtual, tapVirtual, type Action } from '../../game/input';
 import { unlockAudio } from '../../game/audio';
 import { useMatch } from '../session';
 import type { MinigameSceneProps } from '../types';
 import { clearBlinkInput } from './local';
 import { inSwing, type BlinkState } from './rules';
 import { dangerCharge } from './Feedback';
+import { MoveTouch } from '../shared/MoveTouch';
+import { tapButton } from '../shared/tapButton';
 import './blink.css';
 
 const directions:Action[]=['forward','back','left','right'];
-function MoveButton({action,label}:{action:Action;label:string}) {
-  useEffect(()=>()=>releaseVirtual(action),[action]);
-  return <button aria-label={label} onPointerDown={e=>{e.preventDefault();unlockAudio();e.currentTarget.setPointerCapture(e.pointerId);pressVirtual(action);}}
-    onPointerUp={()=>releaseVirtual(action)} onPointerCancel={()=>releaseVirtual(action)} onLostPointerCapture={()=>releaseVirtual(action)} onBlur={()=>releaseVirtual(action)}
-    onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();if(!e.repeat)pressVirtual(action);}}} onKeyUp={()=>releaseVirtual(action)}>{label}</button>;
-}
 export function BlinkHud({getState,localId,contestants}:MinigameSceneProps<BlinkState>) {
   const [,refresh]=useState(0); const paused=useMatch(s=>s.paused),hostPhase=useMatch(s=>s.phase);
   useEffect(()=>{const timer=window.setInterval(()=>refresh(n=>n+1),80);return()=>{window.clearInterval(timer);clearBlinkInput();directions.forEach(releaseVirtual);};},[]);
@@ -41,8 +37,8 @@ export function BlinkHud({getState,localId,contestants}:MinigameSceneProps<Blink
     </div>
     {toast.current.text&&s.t<toast.current.until&&<div className={`blink-toast${me.alive?'':' blink-toast--out'}`} role="status" data-testid="blink-toast">{toast.current.text}</div>}
     <div className="blink-roster" aria-label="Duel standings">{s.players.map(p=><span key={p.id} className={p.alive?'':'out'}>{p.id===localId?'You':contestants.find(c=>c.id===p.id)?.name} · {p.alive?'In':'Out'}</span>)}</div>
-    {active&&<div className="blink-move" aria-label="Movement"><MoveButton action="forward" label="Up"/><div><MoveButton action="left" label="Left"/><MoveButton action="back" label="Down"/><MoveButton action="right" label="Right"/></div></div>}
-    {active&&<div className="blink-actions" onKeyDown={e=>{if(e.key==='Enter'||e.key===' ')e.stopPropagation();}}><button data-testid="blink-attack" disabled={busy} onClick={()=>action('slot2')}>Swing [J]</button><button data-testid="blink-blink" onClick={()=>action('slot1')}>Blink [Space]<small>No cooldown</small></button></div>}
+    {active&&<div className="blink-stick"><MoveTouch jump={false}/></div>}
+    {active&&<div className="blink-actions" onKeyDown={e=>{if(e.key==='Enter'||e.key===' ')e.stopPropagation();}}><button data-testid="blink-attack" disabled={busy} {...tapButton(()=>action('slot2'))}>Swing [J]</button><button data-testid="blink-blink" {...tapButton(()=>action('slot1'))}>Blink [Space]<small>No cooldown</small></button></div>}
     <div className="blink-hint">{me.alive?'Tap arena / mouse to aim. Striped cones warn of a strike. Blink out before they fill.':'Watch the remaining toys. Dead toys cannot attack or block.'}</div>
   </div>;
 }

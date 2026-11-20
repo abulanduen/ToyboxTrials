@@ -104,7 +104,7 @@ export function MatchOverlay() {
 
   return (
     <div className="match-layer">
-      {inPlay && Hud && <Hud getState={getMatchState} contestants={m.contestants} localId={LOCAL_ID} />}
+      {inPlay && Hud && <div className="match-hud"><Hud getState={getMatchState} contestants={m.contestants} localId={LOCAL_ID} /></div>}
       {inPlay && (
         <button className="match-pause" aria-label="Pause" onClick={() => pauseMatch(true)}>
           <GearIcon size={26} color="#2B2433" />

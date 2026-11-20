@@ -174,8 +174,8 @@ export const MINIGAMES: MinigameDefinition[] = [
     tieBreak: 'Out later ranks higher',
     controls: [{ keys: 'WASD / arrows', action: 'Move and face; mouse / tap arena aims' }, { keys: 'Space', action: 'Blink forward instantly; no cooldown. Cancels your wind-up.' }, { keys: 'J / left click', action: 'Commit a telegraphed sword swing; one hit eliminates' }],
     inputs: ['keyboard','mouse','touch'], bots: 'available', recordUnit: 'seconds',
-    touch: { movement: 'none', look: 'none', orientation: 'any', buttons: [{id:'forward',label:'Up',hold:true},{id:'left',label:'Left',hold:true},{id:'back',label:'Down',hold:true},{id:'right',label:'Right',hold:true},{id:'slot1',label:'Blink'},{id:'slot2',label:'Swing'}],
-      notes: 'Hold direction pads to move/face, or tap the arena to aim. Tap Blink repeatedly with no cooldown; Swing has a visible 0.95-second wind-up. Blinking cancels it. Last toy standing wins; simultaneous eliminations and timeout survivors tie.' },
+    touch: { movement: 'joystick', look: 'none', orientation: 'any', buttons: [{id:'slot1',label:'Blink'},{id:'slot2',label:'Swing'}],
+      notes: 'Steer with the floating joystick (lower left) and tap the arena to aim. Blink and Swing work while your other thumb holds the stick. Tap Blink repeatedly with no cooldown; Swing has a visible 0.95-second wind-up. Blinking cancels it. Last toy standing wins; simultaneous eliminations and timeout survivors tie.' },
     status: 'playable', load: () => import('./blink').then(m => m.default),
   },
   {
@@ -286,7 +286,7 @@ export const MINIGAMES: MinigameDefinition[] = [
     tieBreak: 'Out later ranks higher',
     controls: [{keys:'WASD / arrows',action:'Move and face; mouse / tap arena aims'},{keys:'Q / E / R',action:'Cast your equipped spells; click also casts Q'},{keys:'Build cards',action:'Choose one of three options for each button, then lock your build'}],
     inputs:['keyboard','mouse','touch'],bots:'available',recordUnit:'seconds',
-    touch:{movement:'none',look:'none',orientation:'any',buttons:[{id:'forward',label:'Up',hold:true},{id:'left',label:'Left',hold:true},{id:'back',label:'Down',hold:true},{id:'right',label:'Right',hold:true},{id:'slot1',label:'Spell Q'},{id:'slot2',label:'Spell E'},{id:'slot3',label:'Spell R'}],notes:'Each spell button has three draft choices. Hold pads to move, tap arena to aim, then tap spells to cast. Larger fields start on larger rings. After eliminations, a 10s warning marks the next smaller edge. Stay inside; last toy wins.'},
+    touch:{movement:'joystick',look:'none',orientation:'any',buttons:[{id:'slot1',label:'Spell Q'},{id:'slot2',label:'Spell E'},{id:'slot3',label:'Spell R'}],notes:'Each spell button has three draft choices. Steer with the floating joystick (lower left), tap the arena to aim, and tap spells to cast while your other thumb holds the stick. Larger fields start on larger rings. After eliminations, a 10s warning marks the next smaller edge. Stay inside; last toy wins.'},
     // The draft has no timer and its own "Fight in 3…" count once everyone locks in.
     skipStartCountdown:true,
     status:'playable',load:()=>import('./spellbox').then(m=>m.default),

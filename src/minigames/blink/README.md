@@ -51,7 +51,8 @@ All numbers below are provisional `BlinkConfig` values, not additional owner-spe
 - **Mouse / tap arena:** aim. Touch taps retain a world target; mouse aim follows the cursor.
 - **Space:** blink; release and press again for another instant blink.
 - **J / left click:** start a sword swing. Repeated presses cannot bypass wind-up or recovery.
-- **Touch:** hold direction pads; tap the arena to aim; use Blink and Swing buttons. All buttons
+- **Touch:** steer with the shared floating joystick (lower left); tap the arena to aim; use the Blink
+  and Swing buttons, which fire on touch-down so they work while the other thumb holds the stick. All buttons
   are at least 56 px, with both portrait and landscape layouts and safe-area margins.
 - Pause uses the existing host. Local aim/queues and held virtual directions clear on pause,
   blur/unmount; simulation time drives cones, blink bursts and strike flashes. Reduced-motion

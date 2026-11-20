@@ -1,6 +1,14 @@
 /* Real keyboard/mouse and touch adapters, visible wind-up/cancel/dodge, records and host cleanup. */
 const {chromium}=require('playwright');const assert=require('node:assert/strict');const fs=require('node:fs');const path=require('node:path');
 const out=path.join(__dirname,'output');fs.mkdirSync(out,{recursive:true});
+/** Hold the touch joystick (CDP touch point 1) pushed in a direction. While it is held, `tap(testId)` taps a
+ *  button with a second finger (touch point 2), the way a phone player casts without letting go of the stick. */
+async function holdStick(page,[dx,dy]){const cdp=await page.context().newCDPSession(page);const zone=await page.locator('.touch-stick-zone').boundingBox();const x=zone.x+zone.width*0.4,y=zone.y+zone.height*0.55;
+  const stick=[x+dx*60,y+dy*60],send=(type,pts)=>cdp.send('Input.dispatchTouchEvent',{type,touchPoints:pts.map(([px,py,id])=>({x:px,y:py,id}))});
+  await send('touchStart',[[x,y,1]]);await send('touchMove',[[x+dx*20,y+dy*20,1]]);await send('touchMove',[[...stick,1]]);
+  return{async tap(testId){const b=await page.getByTestId(testId).boundingBox(),bx=b.x+b.width/2,by=b.y+b.height/2;
+      await send('touchStart',[[...stick,1],[bx,by,2]]);await send('touchEnd',[[...stick,1]]);},
+    async release(){await send('touchEnd',[]);await cdp.detach();}};}
 (async()=>{
   const browser=await chromium.launch({args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
   try {for(const layout of (process.env.BLINK_LAYOUTS||'desktop,portrait,landscape').split(',')){
@@ -15,9 +23,19 @@ const out=path.join(__dirname,'output');fs.mkdirSync(out,{recursive:true});
     await page.evaluate(()=>window.__toybox.hub.goTo('pavilion'));await page.waitForSelector('.prompt');if(mobile)await page.locator('.prompt').tap();else await page.keyboard.press('KeyE');
     await click('practice-group-party');await click('practice-blink-duel');await page.getByTestId('match-start').waitFor({state:'visible'});await page.waitForTimeout(900);await click('match-start');await page.waitForFunction(()=>window.__toybox.match.phase()==='countdown');await page.evaluate(()=>window.__toybox.match.timeScale(10));await page.waitForFunction(()=>window.__toybox.match.phase()==='playing');await page.evaluate(()=>window.__toybox.match.timeScale(1));
     await page.evaluate(()=>{const s=window.__toybox.match.state();Object.assign(s.players[0],{x:0,z:0,angle:Math.PI/2,aimX:1,aimZ:0});s.players.slice(1).forEach((p,i)=>Object.assign(p,{x:-12,z:-12+i*4,moveX:0,moveZ:0,attack:{x:-12,z:-12+i*4,angle:Math.PI,start:s.t,until:1e9}}));});
-    if(mobile)await page.getByRole('button',{name:'Right',exact:true}).tap();else await page.keyboard.press('KeyD');
-    await page.waitForFunction(()=>Math.abs(window.__toybox.match.state().players[0].angle-Math.PI/2)<.1);
-    for(let n=1;n<=2;n++){if(mobile)await click('blink-blink');else await page.keyboard.press('Space');await page.waitForFunction(n=>window.__toybox.match.state().players[0].blinks===n,n);}
+    if(mobile){
+      // The floating joystick steers (no direction pads), and Blink fires with a second finger while the stick is held.
+      assert.equal(await page.getByRole('button',{name:'Up',exact:true}).count(),0,'no direction pads');
+      const stick=await holdStick(page,[1,0]);
+      try{await page.waitForFunction(()=>Math.abs(window.__toybox.match.state().players[0].angle-Math.PI/2)<.1);
+        for(let n=1;n<=2;n++){await stick.tap('blink-blink');await page.waitForFunction(n=>window.__toybox.match.state().players[0].blinks===n,n);}
+        assert.ok((await state()).players[0].moveX>0,'still steering right after both blinks');}
+      finally{await stick.release();}
+    }else{
+      await page.keyboard.press('KeyD');
+      await page.waitForFunction(()=>Math.abs(window.__toybox.match.state().players[0].angle-Math.PI/2)<.1);
+      for(let n=1;n<=2;n++){await page.keyboard.press('Space');await page.waitForFunction(n=>window.__toybox.match.state().players[0].blinks===n,n);}
+    }
     assert.ok((await state()).players[0].x>14);assert.equal(await page.getByTestId('blink-blink').isDisabled(),false);
     await page.getByRole('button',{name:'Pause',exact:true}).click();await page.waitForSelector('.pause');const t=(await state()).t;await page.waitForTimeout(250);assert.equal((await state()).t,t);await page.keyboard.press('Escape');await page.waitForSelector('.pause',{state:'detached'});
     await page.evaluate(()=>{const s=window.__toybox.match.state(),p=s.players[0];Object.assign(p,{x:0,z:0,moveX:0,moveZ:0,angle:0,aimX:0,aimZ:1,nextAttack:0,attack:null});});
@@ -37,6 +55,6 @@ const out=path.join(__dirname,'output');fs.mkdirSync(out,{recursive:true});
     await page.waitForSelector('.results');const record=await page.evaluate(()=>JSON.parse(localStorage.getItem('toybox-trials:prototype:v1')).state.records['blink-duel']);assert.equal(record.plays,1);
     await page.waitForTimeout(800);await click('results-again');await page.waitForFunction(()=>window.__toybox.match.phase()==='countdown');await page.evaluate(()=>window.__toybox.match.timeScale(10));await page.waitForFunction(()=>window.__toybox.match.phase()==='playing');await page.evaluate(()=>window.__toybox.match.timeScale(1));assert.equal((await state()).players[0].blinks,0);
     await page.getByRole('button',{name:'Pause',exact:true}).click();await page.waitForTimeout(800);await page.locator('.pause__actions .toy-btn').nth(1).click();await page.waitForSelector('.hud-sign');
-    assert.deepEqual(errors,[]);console.log(`PASS Blink ${layout}: entry, movement, consecutive no-cooldown blinks, pause, locked wind-up, sideways cancel, one-hit elimination, results, record, restart, hub return; no console/page errors`);await page.close();
+    assert.deepEqual(errors,[]);console.log(`PASS Blink ${layout}: entry, movement${mobile?' (joystick, blink with a second finger)':''}, consecutive no-cooldown blinks, pause, locked wind-up, sideways cancel, one-hit elimination, results, record, restart, hub return; no console/page errors`);await page.close();
   }}finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

@@ -130,7 +130,8 @@ The following actual dimensions are first-pass tuning; the bands and 10-second w
 ## Controls and implementation
 
 **WASD/arrows** move and face. **Mouse/tap arena** aims. **Q/E/R** cast the three slots; mouse
-left-click also casts Q. Touch uses direction pads and three labelled cooldown buttons (≥56 px),
+left-click also casts Q. Touch uses the shared floating joystick and three labelled cooldown buttons (≥56 px) that fire
+on touch-down, so a spell can be cast while the other thumb holds the stick,
 with both orientations and safe-area placement. Native draft cards and Ready support keyboard
 focus/Enter as well as touch. Reduced-motion removes decorative effect expansion.
 

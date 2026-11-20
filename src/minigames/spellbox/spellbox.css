@@ -41,3 +41,5 @@
 
 /* Touch movement: the shared joystick, kept to the lower-left corner so the rest of the arena stays free for tap-to-aim. */
 .spellbox-stick .touch-stick-zone { width: 38%; height: 42%; }
+/* Spell buttons fire on touch-down so they work while the other thumb holds the joystick. */
+.spellbox-casts button { touch-action: none; -webkit-user-select: none; user-select: none; }
