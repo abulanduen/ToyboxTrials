@@ -4,10 +4,12 @@
  *
  * Each stop has a spot for Pipwick to land on, a camera position and the point it looks at. Between
  * stops Pipwick flies along an arc and the camera glides along a raised arc of its own (high above
- * the table, so it never sweeps through the player's toy), then holds while she talks. The player
- * moves on with Next (or skips the lot); nothing advances on a timer while she is talking.
+ * the table, so it never sweeps through the player's toy), then holds while she talks. With a
+ * recording, the tour moves on by itself shortly after each line ends (welcome.ts); Next moves on at
+ * any time and Skip ends it. Without one, it waits for Next.
  */
 import { JUKEBOX, PAVILION, PIPWICK_HOME, SCOREBOARD, SHOP, TV, WORKSHOP, frontOf } from '../scene/layout';
+import { BALL, HOOP } from './hubPlay';
 import { BRIDGE_X } from './hubBounds';
 import { TOUR_LINES, type TourStopId } from './voiceLines';
 
@@ -27,21 +29,22 @@ const front = (o: { x: number; z: number; rot: number }, d: number, side = 0) =>
   return { x: p.x + Math.cos(o.rot) * side, z: p.z - Math.sin(o.rot) * side };
 };
 
-/** The tour, in order: the plaza's sights, across the bridge to the trials, back for the shops. */
+/** The tour, in the script's order: the plaza, the Pavilion, the trials, the shops, the sights, the pitch. */
 export const TOUR_STOPS: TourStop[] = [
   { id: 'hello', mascot: { x: 2.6, z: 16.5 }, cam: [11, 5, 24], look: [1.6, 2.2, 18] },
+  { id: 'pavilion', mascot: front(PAVILION, PAVILION.d / 2 + 3.2, -3), cam: [12, 8.5, 6], look: [PAVILION.x - 3, 5, PAVILION.z] },
+  { id: 'trials', mascot: { x: BRIDGE_X + 3, z: -121 }, cam: [BRIDGE_X - 4, 26, -100], look: [BRIDGE_X + 6, 0, -136] },
+  { id: 'workshop', mascot: front(WORKSHOP, WORKSHOP.d / 2 + 2.6, 3.6), cam: [-16, 8, 9], look: [WORKSHOP.x + 2, 4, WORKSHOP.z + 1] },
+  { id: 'shop', mascot: front(SHOP, SHOP.d / 2 + 6.2, -3.8), cam: [-21, 8, 25], look: [SHOP.x + 4, 4, SHOP.z + 1] },
   {
     id: 'scoreboard',
     mascot: { x: (SCOREBOARD.x + TV.x) / 2 + 1, z: SCOREBOARD.z + 6 },
     cam: [-2, 7.5, 7],
     look: [-6.5, 5.5, SCOREBOARD.z],
   },
-  { id: 'pavilion', mascot: front(PAVILION, PAVILION.d / 2 + 3.2, -3), cam: [12, 8.5, 6], look: [PAVILION.x - 3, 5, PAVILION.z] },
-  { id: 'trials', mascot: { x: BRIDGE_X + 3, z: -121 }, cam: [BRIDGE_X - 4, 26, -100], look: [BRIDGE_X + 6, 0, -136] },
   { id: 'jukebox', mascot: front(JUKEBOX, JUKEBOX.d / 2 + 2.6, -4.2), cam: [JUKEBOX.x - 2, 8, JUKEBOX.z + 22], look: [JUKEBOX.x - 1.5, 3.4, JUKEBOX.z] },
-  { id: 'workshop', mascot: front(WORKSHOP, WORKSHOP.d / 2 + 2.6, 3.6), cam: [-16, 8, 9], look: [WORKSHOP.x + 2, 4, WORKSHOP.z + 1] },
-  { id: 'shop', mascot: front(SHOP, SHOP.d / 2 + 6.2, -3.8), cam: [-21, 8, 25], look: [SHOP.x + 4, 4, SHOP.z + 1] },
-  { id: 'online', mascot: { x: 5, z: 6 }, cam: [-4, 24, 38], look: [1, 0, -2] },
+  // the hub-play pitch: the ball on its chalk ring and the hoop behind it, the east net off to the right
+  { id: 'play', mascot: { x: BALL.spot.x - 5, z: BALL.spot.z + 3 }, cam: [HOOP.x - 14, 13, BALL.spot.z + 20], look: [HOOP.x + 2, 4, BALL.spot.z - 5] },
   { id: 'bye', mascot: { x: PIPWICK_HOME.x, z: PIPWICK_HOME.z }, cam: [-2.5, 6, 30], look: [5.5, 2.6, 15] },
 ];
 

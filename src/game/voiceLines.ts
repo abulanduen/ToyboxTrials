@@ -122,19 +122,56 @@ export const GREETERS: Record<MinigameId, Speaker & { line: string }> = {
   },
 };
 
-/** Pipwick's tour, in order (stop ids match src/game/tour.ts TOUR_STOPS). */
-export const TOUR_LINES = {
-  hello: "Hello, hello! I'm Pipwick, official Welcomer of the Playroom. You're new, aren't you? Let me show you round. Follow me!",
-  scoreboard: "This is the Scoreboard. It keeps the best scores in the Playroom, and the little telly beside it shows who's online and what's on.",
-  pavilion: "That's the Tournament Pavilion. Play several trials in a row for points and prizes. Online lobbies gather there too.",
-  trials: 'Over the domino bridge is the Trials Table. Every arch is a different game. Walk up to one and its greeter will tell you all about it.',
-  jukebox: 'Ooh, and this is my favourite: the Jukebox! Give it a crank to choose the music you hear around the Hub.',
-  workshop: 'Back on this side is the Workshop. Repaint yourself, try on hats and swap your wind-up key.',
-  shop: 'Trials and secrets pay cogs. Spend them at the Odds and Ends shop on paints, hats, accessories and gestures.',
-  online: "When you play online, other toys share the Playroom with you. Wave hello with your gestures! And keep your eyes peeled: there are four secrets hidden about the place.",
-  bye: "And that's the grand tour! I'll be right here by the fountain if you'd like it again. Off you go, and keep your spring wound!",
-} as const;
-export type TourStopId = keyof typeof TOUR_LINES;
+/**
+ * Pipwick's tour (the owner's "In this town…" script, recorded with ElevenLabs as one take and cut
+ * into a clip per stop: public/assets/audio/voice/pipwick-tour-<stop>.mp3). Each stop's line is a
+ * list of captions with the time (s, into that stop's clip) where Pipwick starts saying it, so the
+ * tour card can follow the voice. Stop ids match src/game/tour.ts TOUR_STOPS, which sets the order.
+ */
+export const TOUR_CAPTIONS = {
+  hello: [
+    { at: 0, text: 'In this town, every toy arrives with a dream.' },
+    { at: 2.42, text: 'Riches. Fame. Power! Want them?' },
+    { at: 5.0, text: 'Then wind yourself up and earn them!' },
+    { at: 6.84, text: 'Although… our riches are cogs, our fame is a name on the scoreboard,' },
+    { at: 10.24, text: 'and our power mostly involves wearing a very impressive hat.' },
+    { at: 13.04, text: 'I’m Pipwick, official Welcomer of the Playroom.' },
+    { at: 15.2, text: 'Self-appointed. Fully qualified.' },
+  ],
+  pavilion: [
+    { at: 0, text: 'See that striped Pavilion, right of the fountain?' },
+    { at: 1.68, text: 'That’s where rivals become legends.' },
+    { at: 3.52, text: 'Choose Blitz for three trials, Normal for five, or Treasure for eight.' },
+    { at: 6.72, text: 'Practise with bots, or gather an online party.' },
+    { at: 8.64, text: 'Most points wins!' },
+  ],
+  trials: [
+    { at: 0, text: 'Prefer one little adventure? Cross the domino bridge to the Trials Table by the window.' },
+    { at: 2.97, text: 'Every arch holds a different game.' },
+    { at: 4.95, text: 'Walk up, press E—or tap the prompt—and choose your challenge.' },
+    { at: 7.76, text: 'Earn cogs. Find secrets. Make a name for yourself.' },
+  ],
+  workshop: [{ at: 0, text: 'Then visit the Workshop, left of the fountain, to put your own stamp on that splendid little body.' }],
+  shop: [{ at: 0, text: 'Odds and Ends, right beside it, has more cosmetics for your hard-earned cogs.' }],
+  scoreboard: [{ at: 0, text: 'Fancy boasting? The scoreboard behind the fountain keeps the evidence.' }],
+  jukebox: [{ at: 0, text: 'Fancy a tune? The jukebox waits by the Music Box arch.' }],
+  play: [
+    { at: 0, text: 'Between trials, explore! Kick a ball. Shoot a basket.' },
+    { at: 2.85, text: 'There are four secrets hiding around here.' },
+  ],
+  bye: [
+    { at: 0, text: 'And whenever you open somewhere new, I’ll show you which buttons do what.' },
+    { at: 2.72, text: 'Now… choose an arch, or start a Blitz.' },
+    { at: 4.72, text: 'In this town, legends don’t arrive ready-made.' },
+    { at: 6.72, text: 'They arrive needing a little winding.' },
+  ],
+} as const satisfies Record<string, readonly { at: number; text: string }[]>;
+
+/** Each stop's whole line (the recording script; shown in full when there's no voice to follow). */
+export const TOUR_LINES = Object.fromEntries(
+  Object.entries(TOUR_CAPTIONS).map(([k, caps]) => [k, caps.map((c) => c.text).join(' ')]),
+) as Record<keyof typeof TOUR_CAPTIONS, string>;
+export type TourStopId = keyof typeof TOUR_CAPTIONS;
 
 /** Talking to Pipwick in the Hub after the tour. */
 export const CHAT_LINES = {

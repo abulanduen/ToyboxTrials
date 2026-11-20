@@ -86,9 +86,9 @@ describe('the welcome tour state machine', () => {
 });
 
 describe('tour stops', () => {
-  it('cover the Hub: the trials, Pavilion, shop, Workshop, Scoreboard and TV, online play, the jukebox; and end at home', () => {
+  it('cover the Hub: the Pavilion, the trials, the Workshop and shop, the Scoreboard, the jukebox, the pitch; and end at home', () => {
     const ids = TOUR_STOPS.map((s) => s.id);
-    for (const id of ['hello', 'trials', 'pavilion', 'shop', 'workshop', 'scoreboard', 'online', 'jukebox', 'bye']) expect(ids).toContain(id);
+    expect(ids).toEqual(['hello', 'pavilion', 'trials', 'workshop', 'shop', 'scoreboard', 'jukebox', 'play', 'bye']);
     expect(ids[0]).toBe('hello');
     expect(ids[ids.length - 1]).toBe('bye');
     const bye = TOUR_STOPS[TOUR_STOPS.length - 1].mascot;

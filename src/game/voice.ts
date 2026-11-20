@@ -17,6 +17,13 @@ import { exposeDebug } from './debug';
 const have = new Set<string>(recorded);
 const cache = new Map<string, Promise<AudioBuffer | null>>();
 let current: { src: AudioBufferSourceNode; gain: GainNode } | null = null;
+/**
+ * The last line asked for and how far it has got: 'loading' (fetching or decoding), 'playing'
+ * (since `startedAt`, AudioContext time), 'ended' (played to the end), or 'none' (no recording,
+ * audio not available yet, stopped early). The tour card follows it for captions and moves on
+ * when a line has ended.
+ */
+let progress: { id: string; state: 'loading' | 'playing' | 'ended' | 'none'; startedAt: number; ctx: AudioContext | null } = { id: '', state: 'none', startedAt: 0, ctx: null };
 let gen = 0;
 /** ?debug test aid: every line asked for, in order, and whether a recording existed. */
 const log: { id: string; recorded: boolean }[] = [];
@@ -46,12 +53,18 @@ export function speak(id: string) {
   log.push({ id, recorded: rec });
   if (log.length > 50) log.shift();
   stopVoice();
+  progress = { id, state: 'none', startedAt: 0, ctx: null };
   if (!rec) return;
   const o = audioOut();
   if (!o) return;
   const mine = ++gen;
+  progress = { id, state: 'loading', startedAt: 0, ctx: o.ctx };
   void load(o.ctx, id).then((buf) => {
-    if (!buf || mine !== gen) return;
+    if (mine !== gen) return;
+    if (!buf) {
+      progress = { id, state: 'none', startedAt: 0, ctx: null };
+      return;
+    }
     const src = o.ctx.createBufferSource();
     src.buffer = buf;
     const gain = o.ctx.createGain();
@@ -61,17 +74,32 @@ export function speak(id: string) {
       if (current?.src === src) {
         current = null;
         duckMusic(false);
+        if (progress.id === id && progress.state === 'playing') progress = { ...progress, state: 'ended' };
       }
     };
     current = { src, gain };
     duckMusic(true);
     src.start();
+    progress = { id, state: 'playing', startedAt: o.ctx.currentTime, ctx: o.ctx };
   });
+}
+
+/**
+ * Where line `id` has got: its state and, while playing, the seconds since it started. Any other
+ * line (or none) reads as 'none'.
+ */
+export function voiceProgress(id: string): { state: 'loading' | 'playing' | 'ended' | 'none'; elapsed: number } {
+  if (progress.id !== id) return { state: 'none', elapsed: 0 };
+  // A suspended context (audio not unlocked yet, tab hidden) isn't going anywhere: read it as no voice.
+  if (progress.ctx && progress.ctx.state !== 'running' && progress.state !== 'ended') return { state: 'none', elapsed: 0 };
+  const elapsed = progress.state === 'playing' && progress.ctx ? Math.max(0, progress.ctx.currentTime - progress.startedAt) : 0;
+  return { state: progress.state, elapsed };
 }
 
 /** Stop whatever line is playing. */
 export function stopVoice() {
   gen++;
+  if (progress.state === 'loading' || progress.state === 'playing') progress = { ...progress, state: 'none' };
   if (!current) return;
   try {
     current.src.stop();

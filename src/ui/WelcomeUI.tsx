@@ -3,10 +3,12 @@
  * speech bubble, and the Jukebox's track list (shown in the shared info panel).
  * Touch targets are ≥ 56 px and the cards sit inside the safe-area insets.
  */
+import { useEffect, useState } from 'react';
 import { useGame } from '../game/store';
-import { CHAT_LINES, GREETERS, PIPWICK, TOUR_LINES } from '../game/voiceLines';
+import { CHAT_LINES, GREETERS, PIPWICK, TOUR_CAPTIONS, TOUR_LINES, tourLineId, type TourStopId } from '../game/voiceLines';
+import { hasRecording, voiceProgress } from '../game/voice';
 import { TOUR_STOPS } from '../game/tour';
-import { chatChoose, greeterBubble, tourNextPressed, tourSkipPressed, useWelcome } from '../game/welcome';
+import { chatChoose, greeterBubble, tourNextPressed, tourRt, tourSkipPressed, useWelcome } from '../game/welcome';
 import { HUB_TRACKS, TRACK_OFF } from '../game/musicScore';
 import { PALETTE } from '../game/palette';
 import { gameById } from '../minigames/registry';
@@ -35,12 +37,45 @@ export function PipwickBadge({ size = 64 }: { size?: number }) {
   );
 }
 
+/**
+ * Which caption of a stop's line to show. With Pipwick's recording playing it follows the voice;
+ * without sound (the browser hasn't allowed audio yet, or the line is still loading) it runs on the
+ * recording's own schedule from when Pipwick lands, so a long line never fills the card at once.
+ * Polled a few times a second; React only re-renders when the caption changes. -1 means the line
+ * has no recording: show it whole.
+ */
+function useTourCaption(id: TourStopId, phase: string): number {
+  const [index, setIndex] = useState(-1);
+  useEffect(() => {
+    const caps = TOUR_CAPTIONS[id];
+    const at = (t: number) => {
+      let i = 0;
+      while (i + 1 < caps.length && t >= caps[i + 1].at) i++;
+      return i;
+    };
+    const pick = () => {
+      const line = tourLineId(id);
+      if (!hasRecording(line)) return -1;
+      if (phase !== 'talk') return 0;
+      const v = voiceProgress(line);
+      if (v.state === 'playing') return at(v.elapsed);
+      if (v.state === 'ended') return caps.length - 1;
+      return at(tourRt.state.t);
+    };
+    setIndex(pick());
+    const timer = window.setInterval(() => setIndex(pick()), 120);
+    return () => window.clearInterval(timer);
+  }, [id, phase]);
+  return index;
+}
+
 function TourCard() {
   const stop = useWelcome((s) => s.stop);
   const phase = useWelcome((s) => s.phase);
   const touch = useGame((s) => s.touchUI);
   const id = TOUR_STOPS[stop].id;
   const last = stop === TOUR_STOPS.length - 1;
+  const caption = useTourCaption(id, phase);
   return (
     <div className="welcome-card" role="dialog" aria-label="Pipwick's tour" data-testid="tour-card" data-stop={id} data-phase={phase}>
       <div className="welcome-card__who">
@@ -53,7 +88,7 @@ function TourCard() {
         </div>
       </div>
       <p className={`welcome-card__text${phase === 'talk' ? '' : ' welcome-card__text--wait'}`} data-testid="tour-text">
-        {TOUR_LINES[id]}
+        {caption >= 0 ? TOUR_CAPTIONS[id][caption].text : TOUR_LINES[id]}
       </p>
       <div className="welcome-card__actions">
         {!last && (

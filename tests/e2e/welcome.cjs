@@ -55,13 +55,16 @@ async function desktop(browser) {
 
   // --- first visit: the tour starts by itself
   await page.waitForSelector('[data-testid=tour-card]', { timeout: 180000 });
+  // Pipwick's lines are recorded: the tour moves on by itself after each one. Hold it still while
+  // the steps below drive it by hand (checked on its own further down).
+  await page.evaluate(() => window.__toybox.welcome.autoAdvance(false));
   await waitPhase(page, 0, 'talk');
   await frames(page, 3);
   let w = await welcome(page);
   check('first visit: Pipwick’s tour starts on its own', w.mode === 'tour' && w.stop === 0, JSON.stringify(w));
-  check('tour card shows Pipwick’s first line', /I'm Pipwick/.test(await page.textContent('[data-testid=tour-text]')));
+  check('tour card opens on Pipwick’s first caption', /^In this town, every toy arrives with a dream\.$/.test((await page.textContent('[data-testid=tour-text]')).trim()), await page.textContent('[data-testid=tour-text]'));
   const log = await page.evaluate(() => window.__toybox.voice.log());
-  check('the first line is asked for by id (silent: not recorded yet)', log.some((l) => l.id === 'pipwick-tour-hello' && l.recorded === false), JSON.stringify(log));
+  check('the first line is asked for by id, and it has a recording', log.some((l) => l.id === 'pipwick-tour-hello' && l.recorded === true), JSON.stringify(log));
   check('movement controls card steps aside during the tour', !(await page.isVisible('.controls')));
   await page.screenshot({ path: `${OUT}/welcome-desktop-01-hello.png` });
 
@@ -73,7 +76,7 @@ async function desktop(browser) {
   const p1 = await pos(page);
   check('the toy stays put while Pipwick talks', Math.hypot(p1.x - p0.x, p1.z - p0.z) < 0.05, `${JSON.stringify(p0)} → ${JSON.stringify(p1)}`);
 
-  // --- Next by keyboard (E): a real flight to the Scoreboard, the camera glides there
+  // --- Next by keyboard (E): a real flight to the Pavilion, the camera glides there
   const c0 = await camPos(page);
   await page.keyboard.press('e');
   await page.waitForFunction(() => window.__toybox.welcome.state().stop === 1, null, { timeout: 60000 });
@@ -81,25 +84,44 @@ async function desktop(browser) {
   await frames(page, 3);
   const c1 = await camPos(page);
   check('E moves on to the next stop, and the camera flies there', Math.hypot(c1[0] - c0[0], c1[1] - c0[1], c1[2] - c0[2]) > 5, `${c0.map((v) => v.toFixed(1))} → ${c1.map((v) => v.toFixed(1))}`);
-  check('the Scoreboard stop is the second', (await page.getAttribute('[data-testid=tour-card]', 'data-stop')) === 'scoreboard');
-  await page.screenshot({ path: `${OUT}/welcome-desktop-02-scoreboard.png` });
+  check('the Pavilion stop is the second', (await page.getAttribute('[data-testid=tour-card]', 'data-stop')) === 'pavilion');
+  // The key press let audio start: the card follows Pipwick's voice a caption at a time.
+  await page.waitForFunction(() => /Pavilion|legends|Blitz|Practise|points/.test(document.querySelector('[data-testid=tour-text]').textContent), null, { timeout: 60000 });
+  const capText = (await page.textContent('[data-testid=tour-text]')).trim();
+  check('the card shows one caption of the line, not the whole line', capText.length < 110 && capText.length > 10, capText);
+  await page.screenshot({ path: `${OUT}/welcome-desktop-02-pavilion.png` });
 
   // --- Next by mouse, twice (the second click cuts the flight short), on to the trials
   await page.click('[data-testid=tour-next]');
   await page.click('[data-testid=tour-next]');
   await waitPhase(page, 2, 'talk');
-  await page.click('[data-testid=tour-next]');
-  await page.click('[data-testid=tour-next]');
-  await waitPhase(page, 3, 'talk');
   await frames(page, 4);
   check('the Trials Table stop', (await page.getAttribute('[data-testid=tour-card]', 'data-stop')) === 'trials');
   await page.screenshot({ path: `${OUT}/welcome-desktop-03-trials.png` });
+  // --- on its own: with auto-advance back on, the Workshop's short line plays and the tour moves on to the shop
   await page.click('[data-testid=tour-next]');
   await page.click('[data-testid=tour-next]');
-  await waitPhase(page, 4, 'talk');
+  await waitPhase(page, 3, 'talk');
+  await page.evaluate(() => window.__toybox.welcome.autoAdvance(true));
+  await page.waitForFunction(() => window.__toybox.welcome.state().stop === 4, null, { timeout: 90000 }).catch(() => null);
+  w = await welcome(page);
+  check('after a recorded line ends, the tour moves on by itself', w.stop === 4, JSON.stringify({ stop: w.stop, phase: w.phase }));
+  await page.evaluate(() => window.__toybox.welcome.autoAdvance(false));
+  // on to the jukebox and the pitch
+  for (const n of [5, 6]) {
+    await page.click('[data-testid=tour-next]');
+    await page.click('[data-testid=tour-next]');
+    await waitPhase(page, n, 'talk');
+  }
   await frames(page, 4);
   check('the Jukebox stop', (await page.getAttribute('[data-testid=tour-card]', 'data-stop')) === 'jukebox');
   await page.screenshot({ path: `${OUT}/welcome-desktop-04-jukebox.png` });
+  await page.click('[data-testid=tour-next]');
+  await page.click('[data-testid=tour-next]');
+  await waitPhase(page, 7, 'talk');
+  await frames(page, 6);
+  check('the pitch stop (ball, hoop and nets)', (await page.getAttribute('[data-testid=tour-card]', 'data-stop')) === 'play');
+  await page.screenshot({ path: `${OUT}/welcome-desktop-04b-play.png` });
 
   // --- Esc skips (the focus is on a button after the clicks: blur it so the key reaches the game)
   await page.evaluate(() => document.activeElement && document.activeElement.blur());
@@ -241,6 +263,7 @@ async function desktop(browser) {
 async function phone(browser) {
   const { ctx, page, errors } = await open(browser, { ...devices['Pixel 7'] }, { state: { tutorials: false }, version: 1 });
   await page.waitForSelector('[data-testid=tour-card]', { timeout: 180000 });
+  await page.evaluate(() => window.__toybox.welcome.autoAdvance(false));
   await waitPhase(page, 0, 'talk');
   await frames(page, 3);
   const vp = page.viewportSize();

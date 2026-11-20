@@ -10,7 +10,7 @@ import * as THREE from 'three';
 import { create } from 'zustand';
 import { useGame } from './store';
 import { tourFlag } from './tourFlag';
-import { speak, stopVoice } from './voice';
+import { speak, stopVoice, voiceProgress } from './voice';
 import { CHAT_LINES, GREETERS, chatLineId, tourLineId } from './voiceLines';
 import { TOUR_STOPS, arcPoint, cameraLift, flyTime, tourNext, tourSkip, tourStart, tourStep, type TourState, type Vec3 } from './tour';
 import { clearInput } from './input';
@@ -34,7 +34,14 @@ interface WelcomeStore {
 export const useWelcome = create<WelcomeStore>()(() => ({ mode: null, stop: 0, phase: 'fly', chat: 'hello', greeter: null }));
 
 /** Per-frame tour state (no React). */
+/** With a recording, the tour moves on this long after a line ends (s). Not after the last stop. */
+export const AFTER_LINE_S = 0.9;
+
 export const tourRt = {
+  /** Move on by itself when a stop's recording ends (tests can turn it off through ?debug). */
+  auto: true,
+  /** Seconds since the current stop's line ended. */
+  endedFor: 0,
   state: tourStart(),
   /** Camera pose the current glide starts from (captured from the live camera at the tour's start). */
   fromCam: [0, 30, 70] as Vec3,
@@ -149,6 +156,14 @@ export function stepWelcome(dt: number) {
   if (tourRt.skip) s = tourSkip(s);
   else if (tourRt.next) s = tourNext(s);
   tourRt.next = tourRt.skip = false;
+  // With a recording, move on shortly after Pipwick finishes the line (the last stop waits for the player).
+  if (s === before && s.phase === 'talk' && tourRt.auto && s.stop < TOUR_STOPS.length - 1) {
+    if (voiceProgress(tourLineId(TOUR_STOPS[s.stop].id)).state === 'ended') {
+      tourRt.endedFor += dt;
+      if (tourRt.endedFor >= AFTER_LINE_S) s = tourNext(s);
+    } else tourRt.endedFor = 0;
+  }
+  if (s !== before) tourRt.endedFor = 0;
   s = tourStep(s, s === before ? dt : 0);
   if (s.phase === 'done') {
     tourRt.state = s;
@@ -219,5 +234,8 @@ exposeDebug({
     next: tourNextPressed,
     skip: tourSkipPressed,
     start: startTour,
+    autoAdvance: (on: boolean) => {
+      tourRt.auto = on;
+    },
   },
 });

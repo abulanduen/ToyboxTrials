@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { CHAT_LINES, GREETERS, SPEAKERS, TOUR_LINES, VOICE_LINES, chatLineId, lineById, tourLineId } from '../../src/game/voiceLines';
+import { CHAT_LINES, GREETERS, SPEAKERS, TOUR_CAPTIONS, TOUR_LINES, VOICE_LINES, chatLineId, lineById, tourLineId } from '../../src/game/voiceLines';
 import { TOUR_STOPS } from '../../src/game/tour';
 import { MINIGAMES } from '../../src/minigames/registry';
 import { STORE_VERSION, migratePersisted } from '../../src/game/economy';
@@ -15,7 +15,8 @@ describe('the voice-line script', () => {
       expect(l.id, l.id).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);
       expect(speakers.has(l.speaker), l.id).toBe(true);
       expect(l.text.trim().length, l.id).toBeGreaterThan(10);
-      expect(l.text.length, l.id).toBeLessThan(220); // short enough to read in a bubble
+      // short enough to read in a bubble (the tour's lines are long, but the card shows them a caption at a time)
+      if (!l.id.startsWith('pipwick-tour-')) expect(l.text.length, l.id).toBeLessThan(220);
       expect(l.text, l.id).not.toMatch(/\s{2}|[\u{1F300}-\u{1FAFF}]/u); // no double spaces or emoji
     }
     for (const s of SPEAKERS) expect(s.direction.length, s.id).toBeGreaterThan(20);
@@ -35,6 +36,29 @@ describe('the voice-line script', () => {
       expect(gr.line, g.id).toMatch(/Want to have a go\?$/);
     }
     expect(new Set(Object.values(GREETERS).map((g) => g.name)).size).toBe(Object.keys(GREETERS).length);
+  });
+
+  it('splits every tour line into short captions, in order, starting as the line starts', () => {
+    for (const s of TOUR_STOPS) {
+      const caps = TOUR_CAPTIONS[s.id];
+      expect(caps[0].at, s.id).toBe(0);
+      for (let i = 1; i < caps.length; i++) expect(caps[i].at, s.id).toBeGreaterThan(caps[i - 1].at);
+      for (const c of caps) expect(c.text.length, c.text).toBeLessThan(110);
+      expect(caps.map((c) => c.text).join(' ')).toBe(TOUR_LINES[s.id]);
+    }
+  });
+
+  it('every recording in public/assets/audio/voice/ is a line of the script with its own manifest entry', () => {
+    const dir = resolve(__dirname, '../../public/assets/audio/voice');
+    const files = readdirSync(dir).filter((f) => f.endsWith('.mp3'));
+    const manifest = JSON.parse(readFileSync(resolve(__dirname, '../../public/assets/asset-manifest.json'), 'utf8')) as { assets: { file?: string }[] };
+    const listed = new Set(manifest.assets.map((a) => a.file));
+    for (const f of files) {
+      expect(lineById(f.replace(/\.mp3$/, '')), f).toBeDefined();
+      expect(listed.has(`audio/voice/${f}`), f).toBe(true);
+    }
+    // the whole tour is recorded
+    for (const s of TOUR_STOPS) expect(files, s.id).toContain(`${tourLineId(s.id)}.mp3`);
   });
 
   it('documents the recording hand-off (docs/VOICE.md) and lists no recording that is not in the manifest', () => {

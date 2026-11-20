@@ -1,7 +1,23 @@
 # Voice lines and background music
 
-Status: **implemented** (text, playback hooks and synthesised music). **No voice line is recorded
-yet**: every line is shown as text and is silent until its recording is added.
+Status: **implemented** (text, playback hooks and synthesised music). **Pipwick's welcome tour is
+recorded** (the owner's "In this town…" script, ElevenLabs voice "Brian – Calm, Collected and
+Steady"); every other line (Pipwick's chat, the 14 greeters) is shown as text and is silent until
+its recording is added.
+
+### How the tour recording was made
+
+The owner recorded the whole tour as **one take** (61.6 s). It was cut into one clip per tour stop
+(`public/assets/audio/voice/pipwick-tour-<stop>.mp3`, mono 80 kbps) at the pauses between
+paragraphs, at the middle of each silent gap, with ffmpeg; each clip was checked by transcribing it
+(faster-whisper) so no word is clipped. The caption timings in `TOUR_CAPTIONS`
+(`src/game/voiceLines.ts`) come from that transcription: the tour card shows the line a caption at a
+time, following the voice, and moves on by itself about 0.9 s after each line ends (Next and Skip
+still work at any time; the last stop waits for the player). With no sound yet (the browser hasn't
+allowed audio), the captions run on the same schedule and the tour waits for Next.
+
+To re-record: record the stops' lines (or the whole script again), replace the clips, and update
+the `at` times in `TOUR_CAPTIONS` (seconds into each clip where each caption starts).
 
 ## Who speaks
 
@@ -41,7 +57,7 @@ the same string, so a recording must match it word for word (or change both toge
 Playback (`src/game/voice.ts`) goes through Web Audio: volume is master × **Voice volume**
 (Settings), which also works on iOS; the background music ducks while a line plays; one line at a
 time. Greeters speak when you walk up (not again for 25 s); Pipwick speaks each tour stop as she
-lands.
+lands, and the tour card follows the recording caption by caption.
 
 ## Background music
 
