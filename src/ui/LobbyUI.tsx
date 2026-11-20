@@ -594,6 +594,7 @@ function OnlineResults({ lobby, you }: { lobby: LobbyState; you: string }) {
           );
         })}
       </ol>
+      {m.module?.ResultsExtra && <m.module.ResultsExtra getState={getMatchState} contestants={m.contestants} localId={you} />}
       <div className="pause__actions">
         <ToyButton armDelay={700} onClick={() => setLobbyReady(true, 'results')} disabled={me?.ready} testId="online-continue">
           {me?.ready ? 'Waiting for the others…' : t && t.round + 1 < t.games.length ? 'Standings' : t ? 'Final standings' : 'Back to the lobby'}

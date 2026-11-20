@@ -171,6 +171,32 @@ fs.mkdirSync(OUT, { recursive: true });
               s.players.forEach(q => { q.ready = true; }); step({}, 16);
               for (let n = 0; n < 180; n++) step({}, 16);
             }
+          } else if (id === 'hoop-clash') {
+            // The jump ball; your charged shot with its gold arc; a swipe at a Blue dribbler; halftime.
+            const R = await import('/src/minigames/hoopclash/rules.ts');
+            const mate = s.players.find(q => q.team === p.team && q !== p);
+            const opp = s.players.filter(q => q.team !== p.team);
+            const live = () => { s.phase = 'live'; s.phaseT = s.t; s.inbound = null; s.next = null; };
+            if (i === 0) { for (let n = 0; n < 40; n++) step({}, 16); }
+            if (i === 1) {
+              live();
+              Object.assign(p, { x: 20, z: 4, vx: 0, vz: 0, yaw: Math.atan2(32 - 20, -4) });
+              Object.assign(mate, { x: 8, z: -10 }); Object.assign(opp[0], { x: 24, z: -6 }); Object.assign(opp[1], { x: 10, z: 8 });
+              Object.assign(s.ball, { holder: p.id, grabT: s.t, lastTeam: p.team }); s.poss = p.team;
+              step({}, 16);
+              p.charge = R.solveShotFor(s, p) * R.CHARGE_MS;
+            }
+            if (i === 2) {
+              live(); p.charge = -1;
+              Object.assign(opp[0], { x: -4, z: 2, yaw: -Math.PI / 2, vx: -6, vz: 0 });
+              Object.assign(p, { x: -9, z: 2.4, yaw: Math.PI / 2, vx: 0, vz: 0, swipeCd: 0 });
+              Object.assign(mate, { x: -14, z: -8 }); Object.assign(opp[1], { x: -16, z: 6 });
+              Object.assign(s.ball, { holder: opp[0].id, grabT: s.t - 2000, lastTeam: opp[0].team }); s.poss = opp[0].team;
+              const drive = { type: 'in', ax: -0.7, ay: 0, run: false, act: false };
+              for (let n = 0; n < 14; n++) step({ [opp[0].id]: [drive], [p.id]: [{ type: 'in', ax: 0, ay: 0, run: false, act: false }] }, 16);
+              for (let n = 0; n < 4; n++) step({ [opp[0].id]: [drive], [p.id]: [{ type: 'in', ax: 0, ay: 0, run: false, act: true }] }, 16);
+            }
+            if (i === 3) { live(); s.ball.holder = null; s.clock = 50; for (let n = 0; n < 20 && s.phase !== 'half'; n++) step({}, 16); }
           } else if (id === 'toybox-siege') {
             // Toys and mobs pop in over the first moments of any phase: every shot steps the rules
             // a little before it is taken, so the picture is never an empty board.

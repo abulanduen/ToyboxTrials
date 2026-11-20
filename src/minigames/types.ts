@@ -105,6 +105,11 @@ export interface MinigameModule<State = unknown, Input = unknown> {
   Hud: ComponentType<MinigameSceneProps<State>>;
   /** Optional game-specific options on the intro card (e.g. Music Box Rhythm's track + timing offset). */
   IntroExtras?: ComponentType<{ practice: boolean }>;
+  /**
+   * Optional extra on the results card, under the placements (local and online), read from the
+   * match's final state: e.g. Hoop Clash's team totals and each toy's points.
+   */
+  ResultsExtra?: ComponentType<MinigameSceneProps<State>>;
 }
 
 /**

@@ -156,6 +156,9 @@ const GATE_SPOTS: Record<MinigameId, { x: number; z: number; rot: number; distri
   'toybox-siege': { x: 46, z: -127, rot: -Math.PI / 2, district: 'east', short: 'Siege' },
   // its mirror west of the avenue, facing it: a little basketball court gate
   'hoop-hustle': { x: 2, z: -131, rot: Math.PI / 2, district: 'west', short: 'Hoops' },
+  // inside the loop on the west half of the pitch, facing east up the pitch (a short detour off the
+  // road between Odd Page Out and Midnight, like the Siege fort's); clear of the west net's mouth
+  'hoop-clash': { x: -23, z: -127, rot: Math.PI / 2, district: 'west', short: 'Hoop Clash' },
 };
 
 const CATEGORY_LABEL: Record<string, string> = { pvp: 'Versus' };

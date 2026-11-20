@@ -13,6 +13,7 @@ import { BLINK_ART } from './blink';
 import { COPYCAT_ART } from './copycat';
 import { FINDORIGINAL_ART } from './findoriginal';
 import { HOOPHUSTLE_ART } from './hoophustle';
+import { HOOPCLASH_ART } from './hoopclash';
 import { HUB_ART } from './hub';
 import { INFERNO_ART } from './inferno';
 import { JACKBOX_ART } from './jackbox';
@@ -42,6 +43,7 @@ export const TUTORIAL_ART = {
   ...TOWERTUMBLE_ART,
   ...SIEGE_ART,
   ...HOOPHUSTLE_ART,
+  ...HOOPCLASH_ART,
   ...HUB_ART,
 } satisfies Record<string, () => JSX.Element>;
 

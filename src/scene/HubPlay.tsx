@@ -24,7 +24,8 @@ import { Kit } from './kit';
 
 // ---------------------------------------------------------------- a net texture (white mesh on clear)
 let netTex: THREE.CanvasTexture | null = null;
-function netTexture() {
+/** Exported for other courts (Hoop Clash), so every net and ball looks alike. */
+export function netTexture() {
   if (netTex) return netTex;
   const c = document.createElement('canvas');
   c.width = c.height = 64;
@@ -63,7 +64,7 @@ function netGeometry(depth: number) {
 }
 
 /** The hoop's net: an open, tapering tube hanging from the rim (its top at the origin). */
-function hoopNetGeometry() {
+export function hoopNetGeometry() {
   const k = new Kit();
   k.add(new THREE.CylinderGeometry(HOOP.rim.r * 0.97, HOOP.rim.r * 0.6, 1.9, 16, 1, true), PALETTE.white, 0, -0.95, 0, {}, [0, 0, 6, 2]);
   return k.build().solid!;
@@ -110,7 +111,7 @@ function staticGeometry() {
 }
 
 /** The basketball, seams and all, as one mesh. */
-function ballGeometry() {
+export function ballGeometry() {
   const k = new Kit();
   k.ball(BALL.r, 0, 0, 0, PALETTE.ballOrange, 20);
   const seam = (xf: { rx?: number; ry?: number }) => k.torus(BALL.r * 1.005, 0.045, 0, 0, 0, PALETTE.ink, xf, Math.PI * 2, 28);

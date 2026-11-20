@@ -178,6 +178,17 @@ const OUTFITS: Record<MinigameId, Outfit> = {
     k.cyl(0.18, 0.18, 0.12, -0.62, 1.15, 0.33, P.honey, 12, { rx: Math.PI / 2 });
     k.cone(0.16, 0.5, 0.8, 1.45, 0.35, P.brass, 10, { rz: -0.9 }); // rally horn
   },
+  'hoop-clash': (k) => {
+    // a referee: a striped shirt, a whistle on a cord, the game ball under one arm
+    pegDoll(k, P.white, P.ink);
+    for (const y of [0.55, 0.85, 1.48]) k.cyl(0.5 + (1.6 - y) * 0.09, 0.5 + (1.6 - y) * 0.09, 0.1, 0, y, 0, P.ink, 14);
+    k.ball(0.49, 0, 2.2, -0.04, P.ink, 12, { s: [1, 0.55, 1] }); // cap
+    k.box(0.6, 0.06, 0.42, 0, 2.27, 0.5, P.ink, { rx: -0.15 }); // peak
+    k.torus(0.4, 0.02, 0, 1.75, 0.1, P.coral, { rx: Math.PI / 2 + 0.45 }, Math.PI * 2, 12); // whistle cord
+    k.cyl(0.07, 0.07, 0.2, 0.06, 1.42, 0.5, P.steel, 8, { rz: Math.PI / 2 }); // whistle
+    k.ball(0.34, 0.86, 1.3, 0.4, P.ballOrange, 12); // the game ball
+    k.torus(0.342, 0.022, 0.86, 1.3, 0.4, P.ink, { ry: Math.PI / 2 }, Math.PI * 2, 12);
+  },
 };
 
 let built: Map<string, THREE.BufferGeometry> | null = null;

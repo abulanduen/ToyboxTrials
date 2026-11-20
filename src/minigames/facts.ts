@@ -63,6 +63,8 @@ export const GAME_FACTS: Partial<Record<MinigameId, GameFacts>> = {
   'toy-tower-tumble': { ...f('toy-tower-tumble', 'strategy', 1, [300, 600], FINALE), group: 'strategy' },
   'hoop-hustle': f('hoop-hustle', 'reflex', 2, [75, 80]),
   'toybox-siege': { ...f('toybox-siege', 'survival', 1, [300, 390], FINALE), group: 'strategy', skipStartCountdown: true },
+  // A team game: one-trial lobbies only, never a tournament round (registry.ts says why).
+  'hoop-clash': f('hoop-clash', 'pvp', 2, [270, 360], { tournament: false }),
 };
 
 /** Every trial the online server can run. */

@@ -16,9 +16,9 @@ describe('length classes', () => {
     expect(lengthClassOf(d(300, 600))).toBe('long'); // a 5–10 minute tower defence
   });
 
-  it('today Toy Squad, Toy Tower Tumble and Toybox Siege (with its final arena) are long; every other trial is short', () => {
+  it('today Toy Squad, Toy Tower Tumble and Toybox Siege (with its final arena) are long; Hoop Clash is medium; every other trial is short', () => {
     const long = ['toy-squad', 'toy-tower-tumble', 'toybox-siege'];
-    const medium: string[] = [];
+    const medium: string[] = ['hoop-clash'];
     for (const g of MINIGAMES) expect(lengthClassOf(g), g.id).toBe(long.includes(g.id) ? 'long' : medium.includes(g.id) ? 'medium' : 'short');
   });
 

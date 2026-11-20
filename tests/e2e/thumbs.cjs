@@ -31,6 +31,8 @@ const MOMENT = {
   'hoop-hustle': 0,
   // Staged (STAGE below): the class pick, then the swarm with every elite and the boss at 4:01.
   'toybox-siege': 0,
+  // Staged (STAGE below): a jump-shot moment under the east hoop, your charge on the gold arc.
+  'hoop-clash': 0,
 };
 
 /**
@@ -43,6 +45,27 @@ const STAGE = {
     await page.evaluate(() => window.__toybox.match.timeScale(4));
     await page.waitForFunction(() => window.__toybox.match.state().t >= 5200 && window.__toybox.match.state().players.find((p) => p.id === 'you').holding, null, { polling: 100 });
     await page.evaluate(() => { window.__toybox.match.timeScale(0); window.__toybox.hoop.charge(window.__toybox.hoop.perfect()); });
+  },
+  'hoop-clash': async (page) => {
+    await page.evaluate(() => window.__toybox.match.timeScale(4));
+    await page.waitForFunction(() => window.__toybox.match.state().t >= 3500, null, { polling: 100 });
+    await page.evaluate(() => {
+      window.__toybox.match.timeScale(0);
+      const s = window.__toybox.match.state();
+      const me = s.players.find((p) => p.id === 'you');
+      const mate = s.players.find((p) => p.team === me.team && p !== me);
+      const opp = s.players.filter((p) => p.team !== me.team);
+      Object.assign(s, { phase: 'live', inbound: null, next: null });
+      Object.assign(me, { x: 19, z: 3, vx: 0, vz: 0, yaw: Math.atan2(13, -3) });
+      Object.assign(mate, { x: 25, z: -9, vx: 0, vz: 0, yaw: 2 });
+      Object.assign(opp[0], { x: 22.5, z: 2.4, vx: 0, vz: 0, yaw: -1.4 });
+      Object.assign(opp[1], { x: 28, z: 6, vx: 0, vz: 0, yaw: -2 });
+      Object.assign(s.ball, { holder: 'you', grabT: s.t, lastTeam: me.team });
+      s.score = [14, 12];
+      me.charge = window.__toybox.hoop.perfect() * 1100;
+    });
+    await page.evaluate(() => window.__toybox.match.timeScale(0.0001));
+    await page.waitForTimeout(1500);
   },
   'toybox-siege': async (page) => {
     await page.click('[data-testid=siege-class-ranger]');

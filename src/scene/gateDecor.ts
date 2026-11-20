@@ -592,8 +592,41 @@ const hoopHustle: Theme = (k) => {
   for (const [x, c] of [[5.6, P.sage], [6.4, P.toyBlue], [7.2, P.coral]] as const) k.disc(0.2, x, DECAL_Y + 0.04, 3.95, c, { rx: -Math.PI / 2 }, 10);
 };
 
+const hoopClash: Theme = (k) => {
+  // hero: a toy scoreboard on a post, Red's half and Blue's half, a honey clock window and bulbs
+  k.push(H.lx, 0, H.lz);
+  k.block(2.0, 0.5, 1.4, 0, 0.25, 0, P.inkPurple, {}, 0.12);
+  k.cyl(0.2, 0.24, 4.6, 0, 2.6, -0.1, P.inkPurple, 10);
+  k.block(3.5, 2.0, 0.5, 0, 5.6, 0, P.ink, {}, 0.12);
+  k.box(1.4, 1.2, 0.08, -0.85, 5.55, 0.27, P.teamRed);
+  k.box(1.4, 1.2, 0.08, 0.85, 5.55, 0.27, P.teamBlue);
+  k.box(0.6, 0.4, 0.09, 0, 6.3, 0.27, P.honey);
+  k.with('glow', () => {
+    for (const x of [-1.4, -0.7, 0.7, 1.4]) k.ball(0.09, x, 6.45, 0.3, P.honey, 6);
+  });
+  k.pop();
+  // side: a team bench with a red and a blue jersey folded on it and the game ball
+  k.push(S.lx, 0, S.lz, -0.2);
+  k.block(2.7, 0.2, 1.0, 0, 0.75, 0, P.woodLight, {}, 0.06);
+  for (const x of [-1.1, 1.1]) k.box(0.25, 0.7, 0.8, x, 0.35, 0, P.woodDark);
+  k.box(0.75, 0.16, 0.6, -0.65, 0.93, 0, P.teamRed);
+  k.box(0.75, 0.16, 0.6, 0.25, 0.93, 0, P.teamBlue);
+  k.with('detail', () => {
+    k.box(0.32, 0.02, 0.26, -0.65, 1.02, 0.05, P.white);
+    k.box(0.32, 0.02, 0.26, 0.25, 1.02, 0.05, P.white);
+  });
+  k.ball(0.45, 1.0, 1.3, 0.05, P.ballOrange, 12);
+  k.with('detail', () => k.torus(0.455, 0.025, 1.0, 1.3, 0.05, P.ink, { ry: Math.PI / 2 }, Math.PI * 2, 14));
+  k.pop();
+  // a little centre circle on the felt, half red, half blue (on the right: the road comes in on the left)
+  k.disc(1.3, 7.0, DECAL_Y, 3.7, P.teamRed, { rx: -Math.PI / 2 }, 20, Math.PI / 2, Math.PI);
+  k.disc(1.3, 7.0, DECAL_Y, 3.7, P.teamBlue, { rx: -Math.PI / 2 }, 20, -Math.PI / 2, Math.PI);
+  k.add(new THREE.RingGeometry(1.3, 1.46, 24), P.white, 7.0, DECAL_Y + 0.02, 3.7, { rx: -Math.PI / 2 });
+};
+
 export const GATE_THEMES: Record<MinigameId, Theme> = {
   'hoop-hustle': hoopHustle,
+  'hoop-clash': hoopClash,
   'toybox-siege': siege,
   'copycat-conductor': copycat,
   'jack-in-the-box': jack,

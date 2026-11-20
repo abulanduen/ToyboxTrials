@@ -122,6 +122,7 @@ export function hubPathLines(): PathLine[] {
     landing,
     roadPoint(gate('hoop-hustle')), // a short detour inside the loop to the court gate facing the avenue
     roadPoint(gate('odd-page-out')),
+    roadPoint(gate('hoop-clash')), // a short detour inside the loop to the court gate on the pitch
     roadPoint(gate('midnight-hunger')),
     roadPoint(gate('find-the-original')),
     roadPoint(gate('inferno-escape')),
