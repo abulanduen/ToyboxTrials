@@ -21,7 +21,7 @@ import { exposeDebug } from '../../game/debug';
 import { FLOOR_Y } from '../layout';
 import { dogArrivalTime, dogPose } from './roomLayout';
 import { irradiance } from './bake';
-import { dogVisit, endVisit, perchStay } from '../../game/dogVisit';
+import { DOG_VISIT, dogVisit, endVisit, perchStay } from '../../game/dogVisit';
 import { player } from '../../game/player';
 
 /** Stand-in dimensions (cm): height at the shoulder and of the head's top when standing. */
@@ -159,6 +159,10 @@ export function RoomDog() {
           st.current.offset = dogArrivalTime('perch')! - early - performance.now() / 1000;
         },
         visit: () => ({ ...dogVisit, hearts: dogVisit.hearts.length }),
+        /** Tests on a slow software renderer: how long it waits after the last pet (s; normally 10). */
+        patience: (sec: number) => {
+          DOG_VISIT.stay = sec;
+        },
         /** Screenshots: show the lick `into` seconds in (it lasts LICK_S). */
         lickAt: (into = LICK_S / 2) => {
           dogVisit.lickAt = performance.now() / 1000 - into;

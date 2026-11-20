@@ -11,7 +11,7 @@
 export const DOG_VISIT = {
   /** Pets that earn a lick. */
   petsToLick: 10,
-  /** The dog stays this long after the last pet (s). */
+  /** The dog stays this long after the last pet (s). (Tests on slow renderers may raise it.) */
   stay: 10,
 };
 
