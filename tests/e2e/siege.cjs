@@ -174,10 +174,12 @@ async function run(name) {
 
     // ---- Fast-forward to the first elite. Keep our toy healthy, and stop further level-ups: at a frame
     // every few seconds a tap meant for a level card could land on the treasure card that replaced it.
-    await state(() => { const p = window.__toybox.match.state().players.find((q) => q.id === 'you'); p.invuln = 1e12; p.xp = 0; p.xpNext = 1e9; });
+    // Our weapons hold fire until the elite is posed: a level-5 Pop-Gun (piercing, homing) can fell the Rag
+    // Bear inside one fast-forwarded frame, before the test sees it.
+    await state(() => { const p = window.__toybox.match.state().players.find((q) => q.id === 'you'); p.invuln = 1e12; p.xp = 0; p.xpNext = 1e9; for (const w of p.weapons) w.cd = 1e9; });
     await skipTo(50000);
     await page.evaluate(() => window.__toybox.match.timeScale(60));
-    for (let i = 0; i < 400; i++) {
+    for (let i = 0; i < 2000; i++) {
       const s = await state(() => { const p = window.__toybox.match.state().players.find((q) => q.id === 'you'); return { elite: p.board.bigs.some((g) => g.on), card: p.choice?.kind ?? null }; });
       if (s.elite) break;
       if (s.card) await tap(page.getByTestId('siege-option-0')).catch(() => {});
@@ -188,6 +190,7 @@ async function run(name) {
     await page.waitForTimeout(1500);
     await step('3-elite');
     await shot('3-elite');
+    await state(() => { for (const w of window.__toybox.match.state().players.find((q) => q.id === 'you').weapons) w.cd = 0; });
 
     // ---- The elite falls, drops a chest; walk onto it: treasure card; skip it to send an elite to a bot
     await state(() => {

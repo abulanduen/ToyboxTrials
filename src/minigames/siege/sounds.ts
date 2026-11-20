@@ -11,8 +11,8 @@ export type SiegeCue = 'kill' | 'sweep' | 'pop' | 'chime' | 'marble' | 'plane' |
 
 /**
  * Minimum time between two plays of the same cue (ms of simulation time). The auto-fire weapons
- * repeat constantly (an evolved Grand Carillon rings four bursts every 1.15 s, a Cork Gatling
- * fires every 0.23 s), so their gaps are long enough that a volley is one sound, not a wall.
+ * repeat constantly (Firebell Meteors ring six meteors every 1.2 s, a Prism Ray zaps every 0.4 s, a Pop-Gun
+ * at full speed fires every 0.2 s or so), so their gaps are long enough that a volley is one sound, not a wall.
  */
 export const CUE_GAP: Record<SiegeCue, number> = {
   kill: 70, sweep: 220, pop: 180, chime: 450, marble: 260, plane: 300, hurt: 180, level: 300, card: 150, elite: 800, boss: 1500, chest: 300,
