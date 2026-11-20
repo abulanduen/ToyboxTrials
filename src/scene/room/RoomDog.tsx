@@ -199,7 +199,8 @@ export function RoomDog() {
       }
     }
     if (p.action === 'perch') {
-      const stay = perchStay(nowS, p.holdLeft);
+      // (never wind back past its arrival: a longer stay is held a frame at a time)
+      const stay = Math.min(DOG_SPOTS.perch.hold, perchStay(nowS, p.holdLeft));
       if (stay > p.holdLeft) {
         s.offset -= stay - p.holdLeft;
         t = nowS + s.offset;
