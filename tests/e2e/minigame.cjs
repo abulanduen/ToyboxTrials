@@ -270,7 +270,7 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
     }
   };
 
-  const runTournament = async (format, trials, pin) => {
+  const runTournament = async (format, trials, pin, tutorials) => {
     await page.evaluate(() => window.__toybox.hub.goTo('pavilion'));
     await page.waitForTimeout(2500);
     await page.keyboard.press('KeyE');
@@ -305,9 +305,11 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
       await page.waitForTimeout(900); // match buttons ignore taps for 0.7 s after appearing
       const game = (await page.textContent('.match-intro h2')).trim();
       games.push(game);
-      // Tutorials are on (the default): every tournament trial opens with its How to play steps, as practice does.
-      const tut = await page.$('[data-testid=tutorial]');
-      check(`${format} trial ${round}: the intro opens How to play (${game})`, !!tut);
+      // The player's tutorial setting decides, exactly as in practice: on, the How to play steps
+      // open by themselves; off (the Copycat check above pressed "Don't show again"), the plain
+      // card offers How to play.
+      if (tutorials) check(`${format} trial ${round}: the intro opens How to play (${game})`, !!(await page.$('[data-testid=tutorial]')));
+      else check(`${format} trial ${round}: tutorials off, the intro offers How to play (${game})`, !(await page.$('[data-testid=tutorial]')) && !!(await page.$('[data-testid=tutorial-open]')));
       if (round === trials && format !== 'blitz') {
         check(`${format}: the last trial is a strategy finale`, STRATEGY.some((t) => game.includes(t)) && (await page.textContent('.match-intro .info-panel__sub')).includes('the finale'), game);
         await page.screenshot({ path: `${OUT}/m4-06b-finale-intro.png` });
@@ -347,8 +349,17 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
     await page.waitForTimeout(1200);
   };
 
-  await runTournament('blitz', 3, 15);
-  if (process.env.SKIP_NORMAL !== '1') await runTournament('normal', 5, Number(process.env.NORMAL_PIN) || 7);
+  await runTournament('blitz', 3, 15, false);
+  if (process.env.SKIP_NORMAL !== '1') {
+    // Tutorials back on (Settings, from the pause sheet) for the Normal tournament.
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('[data-testid=setting-tutorials]', { timeout: SLOW });
+    if (!(await page.isChecked('[data-testid=setting-tutorials]'))) await page.click('[data-testid=setting-tutorials]');
+    check('Settings turns game tutorials back on', await page.isChecked('[data-testid=setting-tutorials]'));
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('[data-testid=setting-tutorials]', { state: 'detached', timeout: SLOW });
+    await runTournament('normal', 5, Number(process.env.NORMAL_PIN) || 7, true);
+  }
 
   check('no console/page errors', errors.length === 0, errors.slice(0, 3).join(' | '));
   console.log(res.join('\n'));
