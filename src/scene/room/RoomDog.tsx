@@ -19,7 +19,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { ROOM } from '../../game/palette';
 import { exposeDebug } from '../../game/debug';
 import { FLOOR_Y } from '../layout';
-import { dogArrivalTime, dogPose } from './roomLayout';
+import { DOG_SPOTS, dogArrivalTime, dogPose } from './roomLayout';
 import { irradiance } from './bake';
 import { DOG_VISIT, dogVisit, endVisit, perchStay } from '../../game/dogVisit';
 import { player } from '../../game/player';
@@ -188,6 +188,16 @@ export function RoomDog() {
     let t = nowS + s.offset;
     let p = dogPose(t);
     // Up at the table: it stays while it's being petted (10 s after the last pet), then strolls on.
+    // A long frame can step the clock past the end of the perch: if a pet still keeps it, step back.
+    if (p.action !== 'perch' && dogVisit.perched && nowS - dogVisit.lastPetAt < DOG_VISIT.stay) {
+      const end = dogArrivalTime('perch')! + DOG_SPOTS.perch.hold;
+      const k = ((t % p.loop) + p.loop) % p.loop;
+      if (k > end) {
+        s.offset -= k - end + 0.01;
+        t = nowS + s.offset;
+        p = dogPose(t);
+      }
+    }
     if (p.action === 'perch') {
       const stay = perchStay(nowS, p.holdLeft);
       if (stay > p.holdLeft) {
