@@ -17,6 +17,7 @@ const BINDINGS: Record<Action, string[]> = {
   interact: [],
   run: [],
   pause: ['Escape'],
+  cancel: [],
   slot1: [],
   slot2: [],
   slot3: [],

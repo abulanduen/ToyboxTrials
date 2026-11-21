@@ -6,7 +6,7 @@
 import { getMoveAxis, isDown, stickRunning, type Action } from '../../game/input';
 import type { HoopInput } from './rules';
 
-/** WASD / arrows move, Shift sprints, E or Space is the action (hold to charge), Q passes. */
+/** WASD / arrows move, Shift sprints, E or Space is the action (hold to charge), Q passes, X cancels a shot. */
 export const HOOP_BINDINGS: Record<Action, string[]> = {
   forward: ['KeyW', 'ArrowUp'],
   back: ['KeyS', 'ArrowDown'],
@@ -16,6 +16,8 @@ export const HOOP_BINDINGS: Record<Action, string[]> = {
   interact: ['KeyE', 'Space'],
   run: ['ShiftLeft', 'ShiftRight'],
   pause: ['Escape', 'KeyP'],
+  // X drops a held shot (right click is the pass here, so it is not a cancel).
+  cancel: ['KeyX'],
   slot1: ['KeyQ'],
   slot2: [],
   slot3: [],
@@ -43,6 +45,8 @@ export function readHoopInput(presses: readonly Action[]): HoopInput[] {
   const run = isDown('run') || stickRunning();
   const act = isDown('interact') || mouse.held;
   const out: HoopInput[] = [];
+  // Cancel (X, or sliding off the touch Shoot button) first, so a let-go in the same frame shoots nothing.
+  if (presses.includes('cancel')) out.push({ type: 'cancel' });
   // A press and release inside one frame still counts: down, then up.
   if (!act && (presses.includes('interact') || mouse.tapped)) out.push({ type: 'in', ax: a.x, ay: a.y, run, act: true });
   mouse.tapped = false;

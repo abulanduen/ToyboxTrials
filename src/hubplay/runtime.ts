@@ -43,14 +43,15 @@ import { useNet } from '../net/store';
 import { remotes } from '../net/remotes';
 import type { NetSample } from '../net/interp';
 import { player } from '../game/player';
-import { playHubCue, type HubCue } from '../game/audio';
+import { playHoopCue, playHubCue, type HubCue } from '../game/audio';
+import { SHOT_SWEEP_MS, shotPower, shotRising } from '../minigames/shared/shotMeter';
 import { useGame } from '../game/store';
 import { PALETTE } from '../game/palette';
 import { exposeDebug } from '../game/debug';
 import { useHubPlay } from './store';
 
-/** Charge time to full power (ms) while the throw button is held. */
-export const CHARGE_MS = 1100;
+/** One sweep of the throw meter (ms): it winds up to full and back while the throw button is held. */
+export const CHARGE_MS = SHOT_SWEEP_MS;
 /** The aim bends to the hoop when it is this close (cm) and within this angle of your facing. */
 const ASSIST_RANGE = 40;
 const ASSIST_ANGLE = 0.75;
@@ -466,9 +467,19 @@ export function startCharge() {
 export function cancelCharge() {
   rt.charge = null;
 }
-/** Charge 0..1, or null when not charging. */
+/** The player cancelled the throw (X, right click, or sliding off the touch button): no throw, a soft unwind. */
+export function dropCharge() {
+  if (!rt.charge) return;
+  rt.charge = null;
+  playHoopCue('uncharge', 0.7);
+}
+/** Power 0..1 on the back-and-forth throw meter (src/minigames/shared/shotMeter.ts), or null when not charging. */
 export function chargePower(): number | null {
-  return rt.charge ? Math.min(1, (performance.now() - rt.charge.t0) / CHARGE_MS) : null;
+  return rt.charge ? shotPower(performance.now() - rt.charge.t0, CHARGE_MS) : null;
+}
+/** The throw meter is winding up (true) or back down (false). */
+export function chargeRising(): boolean {
+  return rt.charge ? shotRising(performance.now() - rt.charge.t0, CHARGE_MS) : true;
 }
 
 /** The facing a throw goes in: yours, bent onto the hoop when it is close and roughly ahead. */
@@ -669,6 +680,8 @@ exposeDebug({
       mine: useHubPlay.getState().mine,
       events: rt.events,
       charge: chargePower(),
+      /** The throw meter is winding up (true) or back down (false). */
+      rising: chargeRising(),
       newest: rt.buf.length ? { ...rt.buf[rt.buf.length - 1] } : null,
       /** The ball lies still (not held, not moving), in the authority's state. */
       ballRest: ballResting(),

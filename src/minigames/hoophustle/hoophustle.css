@@ -64,7 +64,9 @@
 .hh-throw.is-gold { background:#EFAE45; }
 .hh-throw.is-down { transform:translateY(4px); box-shadow:0 1px 0 #574D69; }
 .hh-throw.is-waiting { filter:saturate(.45); }
+.hh-throw.is-cancelled { filter:saturate(.35) brightness(.92); }
 .hh-throw:focus-visible { outline:3px solid #6BA7C8; outline-offset:3px; }
+.hh-meter--touch .hh-meter__label { white-space:normal; }
 .hh-meter--touch { left:auto; right:max(14px,env(safe-area-inset-right)); bottom:calc(max(16px,env(safe-area-inset-bottom)) + 128px); transform:none; width:min(230px,52vw); }
 
 .hh-hint { position:absolute; left:50%; transform:translateX(-50%); bottom:calc(10px + env(safe-area-inset-bottom)); padding:3px 10px; border-radius:8px; background:#F4E8CE; font:700 12px Nunito,sans-serif; white-space:nowrap; }

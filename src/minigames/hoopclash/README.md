@@ -29,7 +29,8 @@ points, rim and backboard sizes and bounces, floor bounce and roll, and the same
 snatch, dribble-steal reach and steal guard (all imported from hubPlaySim and hubPlay, not copied).
 The Hub's own exports and behaviour are untouched (`tests/unit/hub-play*.test.ts`). Its
 `solveCourtShot(distance, angle)` finds the power that sinks a shot from anywhere on the floor
-(cached per 0.5 cm and 4°), for the bots and the tests. The charge time (1.1 s to full), the aim
+(cached per 0.5 cm and 4°), for the bots and the tests. The shot meter (the shared
+`src/minigames/shared/shotMeter.ts`: 1.1 s to full, then back down, back and forth while held), the aim
 assist (bends onto the attacking rim within 40 cm and 0.75 rad of your facing) and the arc preview
 that turns gold when it will drop are the Hub's too.
 
@@ -77,7 +78,10 @@ that turns gold when it will drop are the Hub's too.
   caught. A loose ball on the floor is picked up by walking into it (1.8 cm), or with a swipe at
   the Hub's pick-up reach.
 - **Shooting** roots you: press the action button to plant your feet and charge, let go to shoot.
-  The stick still turns you. A press held through a catch doesn't start a shot: let go and press
+  The meter winds up to full in 1.1 s and back down again while held (owner request, 21 Nov 2026), so
+  the release is timed; the shot goes at the power it shows. A `cancel` input (X, or sliding off the
+  touch Shoot button) drops the charge without a shot (event `uncharge`): you can move again, and a
+  fresh press starts a new charge. The stick still turns you. A press held through a catch doesn't start a shot: let go and press
   again (as in the Hub).
 - **Passing** throws a flat, quick pass (about 55 cm/s, 0.16 to 0.8 s in the air) to the teammate
   nearest your facing (within a wide cone, else the nearest), leading them if they are running.
@@ -91,11 +95,12 @@ that turns gold when it will drop are the Hub's too.
 ## Controls
 
 - **Desktop:** W A S D or arrows move, Shift sprints. Hold E, Space or the left mouse button to
-  charge, let go to shoot. Without the ball the same button swipes (steal, snatch, pick up).
-  Q or right click passes, or calls for the ball.
+  charge, let go to shoot. X cancels a shot you are charging. Without the ball the same button
+  swipes (steal, snatch, pick up). Q or right click passes, or calls for the ball (so the right
+  button is not a cancel here, unlike the Hub and Hoop Hustle).
 - **Touch:** the shared floating joystick on the left (push it all the way to sprint). On the
-  right, Shoot (hold; it reads Steal or Grab without the ball, Pass in when inbounding) and Pass
-  (Call without the ball). Both fire on pointer-down, so they work while the other thumb holds
+  right, Shoot (hold; slide off it to cancel a shot; it reads Steal or Grab without the ball, Pass
+  in when inbounding) and Pass (Call without the ball). Both fire on pointer-down, so they work while the other thumb holds
   the stick.
 
 ## Bots
@@ -121,16 +126,19 @@ their shots, easy bots about a quarter.
 
 `server/games.ts` runs the same rules core. Inputs are the stick and the held action button
 (`{ type: 'in', ax, ay, run, act }`, sent every frame and latched) and passes
-(`{ type: 'pass', to? }`); the rules see the button's presses and releases in order, so charge
-time online is the time you held it. The seed and the rules' random stream are hidden from
-clients. It is a party trial in the online lobby's one-trial mode.
+(`{ type: 'pass', to? }`) and cancelling a charge (`{ type: 'cancel' }`, sent before the frame's
+stick-and-button input, so a cancel and a let-go in one frame shoot nothing); the rules see the
+button's presses and releases in order, so charge time online is the time you held it. The seed
+and the rules' random stream are hidden from clients. It is a team trial in the online lobby's
+one-trial mode.
 
 ## Tournaments
 
-Not eligible: `eligibility.tournament` is `false` in the registry entry and `{ tournament: false }`
-in `src/minigames/facts.ts` (the server's copy; a unit test checks they agree). It is a team game,
-and tournaments rank every toy for itself. To put it in the rotation, set both to `true` (and
-consider how team places should score in a free-for-all table).
+Never: it is the **Team games** section's trial (`group: 'team'` in the registry entry and in
+`src/minigames/facts.ts`, the server's copy; owner decision, 21 Nov 2026), and `poolForFormat` in
+`tournament.ts` leaves team trials out of every tournament, local and online, whatever their
+eligibility says (`tests/unit/tournament.test.ts`). Tournaments rank every toy for itself.
+`eligibility.tournament` is `false` too.
 
 ## Not done / ideas
 

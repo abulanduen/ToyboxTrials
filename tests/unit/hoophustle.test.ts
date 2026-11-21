@@ -163,6 +163,31 @@ describe('Hoop Hustle shooting', () => {
     expect(s.players[0].shots).toBe(1);
   });
 
+  it('the rules\' own meter winds back and forth: a throw with no power of its own uses where it has got to', () => {
+    const s = hoopRules.init(field(2), 11);
+    run(s, 100);
+    let k = 0;
+    // Charge, hold for one and a half sweeps (up to full, back to half), then let go.
+    const hold = Math.round((s.config.chargeMs * 1.5) / STEP_MS);
+    const ev = run(s, (hold + 2) * STEP_MS, () => (++k === 1 ? { you: [{ type: 'charge' }] } : k === hold + 1 ? { you: [{ type: 'throw' }] } : {}));
+    const thrown = ev.find((e) => e.type === 'hh-throw' && e.id === 'you');
+    expect(thrown).toBeDefined();
+    // (the power assist may snap a near-perfect power, so compare against the meter, not exactly)
+    if (!thrown!.perfect) expect(Math.abs((thrown!.power as number) - 0.5)).toBeLessThan(0.03);
+  });
+
+  it('cancel drops a charge without a throw', () => {
+    const s = hoopRules.init(field(2), 11);
+    run(s, 100);
+    let k = 0;
+    const ev = run(s, 900, () => (++k === 1 ? { you: [{ type: 'charge' }] } : k === 30 ? { you: [{ type: 'cancel' }] } : {}));
+    expect(ev.filter((e) => e.type === 'hh-cancel')).toEqual([{ type: 'hh-cancel', id: 'you' }]);
+    expect(ev.some((e) => e.type === 'hh-throw')).toBe(false);
+    expect(s.players[0].charging).toBe(false);
+    expect(s.players[0].holding).toBe(true);
+    expect(s.players[0].shots).toBe(0);
+  });
+
   it('honours a throw let go a little earlier (online lag), up to the limit', () => {
     const a = hoopRules.init(field(2), 21);
     run(a, 1000);

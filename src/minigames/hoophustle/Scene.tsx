@@ -24,6 +24,7 @@ import { matchBus, useMatch } from '../session';
 import type { Contestant, MinigameSceneProps } from '../types';
 import { BALL_GRAVITY, BALL_R, BOARD, POLE, RIM, STEP_MS, predictShot } from './physics';
 import { DEFAULT_CONFIG, assistedThrow, buildSpots, canShoot, hoopXAt, shooterPos, type HoopState } from './rules';
+import { shotPower } from '../shared/shotMeter';
 import { cancelHoopCharge, localAim, localCharge, resetHoopLocal, setHoopMouseYaw, setHoopViewYaw, stageHoopCharge } from './local';
 
 const P = PALETTE;
@@ -244,7 +245,7 @@ function Shooter({ c, getState, ballGeo, goldGeo, ballMat }: { c: Contestant; ge
     // The ball in hand rises as the throw charges.
     ball.current.visible = p.holding && s.phase === 'play';
     if (ball.current.visible) {
-      const charge = c.isLocal ? (localCharge(s) ?? 0) : p.charging ? Math.min(1, (s.t - p.chargeAt) / s.config.chargeMs) : 0;
+      const charge = c.isLocal ? (localCharge(s) ?? 0) : p.charging ? shotPower(s.t - p.chargeAt, s.config.chargeMs) : 0;
       ball.current.position.set(0, HELD.y + hop + charge * 0.9, HELD.fwd - charge * 0.2);
       ball.current.geometry = p.gold ? goldGeo : ballGeo;
     }
@@ -508,6 +509,9 @@ function useSounds(localId: string) {
             break;
           case 'hh-charge':
             if (mine) playHoopCue('charge', 0.7);
+            break;
+          case 'hh-cancel':
+            if (mine) playHoopCue('uncharge', 0.7);
             break;
           case 'hh-swish':
             playHubCue('swish', mine ? 1 : 0.6);

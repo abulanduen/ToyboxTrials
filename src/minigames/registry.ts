@@ -183,7 +183,7 @@ export const MINIGAMES: MinigameDefinition[] = [
     title: 'Hoop Hustle',
     tagline: 'One hoop, 75 seconds, everybody shooting.',
     description:
-      'A shootout at one shared hoop on a toy-sized court. Every toy shoots from its own spot on the taped arc: near spots score 1, middle 2 and far 3. Hold to charge, let go to throw, and watch the arc turn gold when it will drop. Sink one and you hop to a new spot. At half time the hoop starts sliding on its wind-up track, and in the last 15 seconds your next ball is gold and worth double. Most points wins.',
+      'A shootout at one shared hoop on a toy-sized court. Every toy shoots from its own spot on the taped arc: near spots score 1, middle 2 and far 3. Hold to charge (the meter winds up and back down, so time it), let go to throw, and watch the arc turn gold when it will drop. Sink one and you hop to a new spot. At half time the hoop starts sliding on its wind-up track, and in the last 15 seconds your next ball is gold and worth double. Most points wins.',
     category: 'reflex',
     accent: PALETTE.ballOrange,
     players: { min: 2, max: 8 },
@@ -197,14 +197,15 @@ export const MINIGAMES: MinigameDefinition[] = [
     recordUnit: 'points',
     controls: [
       { keys: 'A / D or mouse', action: 'Aim around your spot (it bends onto the hoop when you face it)' },
-      { keys: 'Hold Space / E / click', action: 'Charge the throw; let go to shoot. Gold arc: it goes in' },
+      { keys: 'Hold Space / E / click', action: 'Charge the throw (the meter winds up and back); let go to shoot. Gold arc: it goes in' },
+      { keys: 'X / right click', action: 'Cancel the throw (no shot)' },
     ],
     touch: {
       movement: 'joystick',
       look: 'none',
       buttons: [{ id: 'slot1', label: 'Throw', colour: PALETTE.ballOrange, hold: true }],
       orientation: 'any',
-      notes: 'The floating joystick (lower left) aims around your spot. Hold the big Throw button (right thumb) to charge and let go to shoot: let go while the meter is in its gold zone and the arc turns gold. The button works while your other thumb holds the stick.',
+      notes: 'The floating joystick (lower left) aims around your spot. Hold the big Throw button (right thumb) to charge (the meter winds up and back down) and let go to shoot: let go while the meter is in its gold zone and the arc turns gold. Slide your thumb off the button to cancel the throw. The button works while your other thumb holds the stick.',
     },
     status: 'playable',
     load: () => import('./hoophustle').then((m) => m.default),
@@ -474,7 +475,7 @@ export const MINIGAMES: MinigameDefinition[] = [
     title: 'Hoop Clash',
     tagline: 'Red against Blue on a toy court. Two halves, real baskets.',
     description:
-      'A proper game of toy basketball. Two teams in jerseys, Red against Blue, two-a-side or four-a-side (bots fill any gaps). A jump ball starts it. Dribble up, pass, and charge your shot until its arc glows gold: 2 points inside the arc, 3 beyond. Snatch passes and shots out of the air or swipe the ball off a dribbler. A 14-second shot clock, two halves with a switch of ends, and if it is tied, overtime: next basket wins.',
+      'A proper game of toy basketball. Two teams in jerseys, Red against Blue, two-a-side or four-a-side (bots fill any gaps). A jump ball starts it. Dribble up, pass, and time your shot on the back-and-forth meter until its arc glows gold: 2 points inside the arc, 3 beyond. Snatch passes and shots out of the air or swipe the ball off a dribbler. A 14-second shot clock, two halves with a switch of ends, and if it is tied, overtime: next basket wins.',
     category: 'pvp',
     accent: PALETTE.ballOrange,
     players: { min: 2, max: 8 },
@@ -482,16 +483,18 @@ export const MINIGAMES: MinigameDefinition[] = [
     durationSec: [270, 360],
     inputs: ['keyboard', 'mouse', 'touch'],
     bots: 'available',
-    // A party trial played from its gate, practice and an online one-trial lobby, but kept out of
-    // tournaments: it is a team game and tournaments rank every toy for itself. Set `tournament`
-    // to true here and in facts.ts to put it in the rotation.
+    // A team trial (owner decision, 21 Nov 2026: its own "Team games" section): played from its
+    // gate, practice and an online one-trial lobby, never in a tournament, which ranks every toy for
+    // itself. The group alone keeps it out (tournament.ts poolForFormat); `tournament: false` says the same.
+    group: 'team',
     eligibility: { tournament: false, ranked: false, casual: true },
     scoring: 'score',
     tieBreak: 'The winning team shares 1st place, the losing team the places after; within a team, more points first. A tie after overtime: everyone shares 1st.',
     recordUnit: 'points',
     controls: [
       { keys: 'W A S D', action: 'Move (Shift to sprint)' },
-      { keys: 'Hold E / Space / click', action: 'Charge, let go to shoot (gold arc = in). Without the ball: steal, snatch, pick up' },
+      { keys: 'Hold E / Space / click', action: 'Charge (the meter winds up and back), let go to shoot (gold arc = in). Without the ball: steal, snatch, pick up' },
+      { keys: 'X', action: 'Cancel a shot you are charging' },
       { keys: 'Q / right click', action: 'Pass to the teammate you face. Without the ball: call for it' },
     ],
     touch: {
@@ -502,7 +505,7 @@ export const MINIGAMES: MinigameDefinition[] = [
         { id: 'pass', label: 'Pass', colour: PALETTE.toyBlue },
       ],
       orientation: 'any',
-      notes: 'The floating joystick (left thumb, lower left) moves; push it all the way to sprint. On the right, hold Shoot to charge and let go to shoot; without the ball it becomes Steal or Grab. Pass throws to the teammate you face, or calls for the ball. Both buttons work while the other thumb holds the stick.',
+      notes: 'The floating joystick (left thumb, lower left) moves; push it all the way to sprint. On the right, hold Shoot to charge (the meter winds up and back down) and let go to shoot, or slide your thumb off it to cancel; without the ball it becomes Steal or Grab. Pass throws to the teammate you face, or calls for the ball. Both buttons work while the other thumb holds the stick.',
     },
     status: 'playable',
     load: () => import('./hoopclash').then((m) => m.default),

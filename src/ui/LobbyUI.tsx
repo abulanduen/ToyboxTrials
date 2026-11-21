@@ -29,7 +29,7 @@ import { DEFAULT_LOBBY_SETTINGS, LOBBY_MAX_CAP, LOBBY_MIN_CAP, type LobbyFormat,
 import { MINIGAMES, gameById } from '../minigames/registry';
 import { isOnlineGame } from '../minigames/facts';
 import { FORMATS, groupOf, isStrategy } from '../minigames/tournament';
-import { GROUP_INFO, GROUP_ORDER, LENGTH_LABEL, byLength, durationChip, durationLabel, groupDurationLabel, inGroup, lengthClassOf } from '../minigames/length';
+import { GROUPS_CLOSED, GROUP_INFO, GROUP_ORDER, LENGTH_LABEL, byLength, durationChip, durationLabel, groupDurationLabel, inGroup, lengthClassOf } from '../minigames/length';
 import { getMatchState, pauseMatch, useMatch } from '../minigames/session';
 import { pointsForPlace, rankStandings } from '../minigames/scoring';
 import type { BotDifficulty, MinigameDefinition, MinigameId, TrialGroup } from '../minigames/types';
@@ -80,7 +80,7 @@ function Thumb({ def }: { def: MinigameDefinition }) {
 
 /**
  * Trials as picture cards: thumbnail (or the trial's accent colour), title, length chip, players.
- * In two collapsible sections, party games and strategy games (each game's `group`), closed at
+ * In three collapsible sections, party, strategy and team games (each game's `group`), closed at
  * first so a long list never fills the sheet; a picked trial shows compactly above them. Ordered
  * short to long by default; the player can re-sort by name or type. Two columns in portrait, more
  * in landscape, no sideways scrolling.
@@ -103,7 +103,7 @@ export function GameCardGrid({
   readOnly?: boolean;
 }) {
   const [sort, setSort] = useState<CardSort>('length');
-  const [open, setOpen] = useState<Record<TrialGroup, boolean>>({ party: false, strategy: false });
+  const [open, setOpen] = useState<Record<TrialGroup, boolean>>({ ...GROUPS_CLOSED });
   const games = useMemo(() => sortGames(MINIGAMES.filter((g) => g.status === 'playable'), sort), [sort]);
   const picked = selected ? games.find((g) => g.id === selected) : undefined;
   const anyOpen = GROUP_ORDER.some((k) => open[k]);
@@ -124,7 +124,7 @@ export function GameCardGrid({
           sfx.click();
           onPick(g.id);
           // Picked: fold the list away again so the choice shows compactly.
-          if (selected !== undefined) setOpen({ party: false, strategy: false });
+          if (selected !== undefined) setOpen({ ...GROUPS_CLOSED });
         }}
       >
         <Thumb def={g} />

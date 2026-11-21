@@ -17,6 +17,7 @@ import { inputBlocked, useGame, useShownLoadout } from '../game/store';
 import { sfx } from '../game/audio';
 import { events } from '../game/events';
 import { INTERACTABLES, interact, interactablePos } from '../game/interactables';
+import { dropCharge } from '../hubplay/runtime';
 import { cameraBlockers, player, SPAWN } from '../game/player';
 import { paintJobFor } from '../game/cosmetics';
 import { blobShadowTexture } from '../scene/textures';
@@ -487,6 +488,8 @@ export function PlayerController() {
         g.setPrompt(best ? { id: best.id, verb: best.verb, label: best.label } : null);
         if (best) sfx.promptIn();
       }
+      // A held throw dropped with Cancel (X, right click, sliding off the touch button): no throw.
+      if (wasPressed('cancel') || isDown('cancel')) dropCharge();
       if (best && wasPressed('interact')) {
         a.interactT = 0;
         interact(best.id, { x: Math.sin(s.yaw), z: Math.cos(s.yaw) });

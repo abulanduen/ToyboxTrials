@@ -105,7 +105,10 @@ the browser runs the very same code with your toy as the only body, so single-pl
   if it falls out of step with the layout, `UPDATE_HUB_SOLIDS=1 npx vitest run
   tests/unit/hub-solids.test.ts` regenerates it) and off toys (where the server has them), stays on
   walkable ground, and rolls over the domino bridge (its mouths gently gather a marble rolling at
-  them, like a shallow gutter). The ball is 3D: thrown at 60° with a speed from the charged power,
+  them, like a shallow gutter). The ball is 3D: thrown at 60° with a speed from the charged power
+  (the client's shared shot meter, `src/minigames/shared/shotMeter.ts`, which winds up and back
+  down while Interact is held; X, right click or sliding off the touch button cancels, all in the
+  browser: the server only ever sees the `p` of a throw, so the meter needed no protocol change),
   under gravity, bouncing on the table, props, the backboard and the rim; it scores when it drops
   through the rim. Left alone 30 s (or stuck on top of something) it goes back to its spot.
 - **Kicks and pushes** (`kick {dx, dz, p}`): Interact kicks at power 1; walking into the marble
@@ -312,7 +315,7 @@ online"). The other choice in both places is the existing **practice with bots**
   locked the lobby or it is at its cap.
 - **Host controls** (`server/lobby.ts` checks every one: only the host's are accepted): kick a
   player (they can't rejoin that lobby), player cap 2–8, lock/unlock, bot fill on/off, bot skill,
-  and the mode: **one trial** (picked from two folded sections, Party games and Strategy games,
+  and the mode: **one trial** (picked from three folded sections, Party games, Strategy games and Team games,
   with the pick shown compactly) or a **tournament** (Blitz 3, Normal 5, Treasure 8 trials, as
   locally: Normal and Treasure end with a strategy finale), then **Start**. When the host leaves, the
   longest-present member becomes host; when the last member leaves, the lobby closes.
@@ -394,10 +397,13 @@ online"). The other choice in both places is the existing **practice with bots**
   practice, it skips the 3 s countdown and opens on its draft (`skipStartCountdown`, mirrored in
   `src/minigames/facts.ts`).
 - **Hoop Clash** (team basketball) runs through the same path, in one-trial lobbies only (it is
-  not eligible for tournaments). Its input is the stick and the held action button, sent every
+  the Team games section's trial, `group: 'team'`, and `poolForFormat` keeps team trials out of
+  every tournament). Its input is the stick and the held action button, sent every
   frame (`{ type: 'in', ax, ay, run, act }`) and latched by the rules, which see the button's
-  presses and releases in order (so a charge lasts as long as the button was held), plus
-  `{ type: 'pass', to? }`. Humans are split evenly between Red and Blue; bots, then AI "filler"
+  presses and releases in order (so a charge lasts as long as the button was held; the shared shot
+  meter winds up and back down over it), plus `{ type: 'pass', to? }` and `{ type: 'cancel' }`
+  (drop the charge unshot; added 21 Nov 2026 in the game's own validator, no protocol bump: no
+  wire message changed shape, but an older server drops the cancel, so redeploy the server with the client). Humans are split evenly between Red and Blue; bots, then AI "filler"
   toys the rules core drives itself, make both teams full; a player who forfeits is handed to the
   same AI so the teams stay even (their seat still forfeits). Toys and the ball are smoothed in the
   Scene between snapshots. Its own Hub-ball core is `src/minigames/shared/courtBall.ts`.

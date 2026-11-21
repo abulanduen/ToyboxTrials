@@ -109,6 +109,9 @@ function Controls() {
         <KeyCap k="E" /> interact
       </div>
       <div className="controls__row">
+        <KeyCap k="X" /> cancel a basketball throw
+      </div>
+      <div className="controls__row">
         <span className="controls__mouse" /> click &amp; move mouse to look
       </div>
       <div className="controls__row">

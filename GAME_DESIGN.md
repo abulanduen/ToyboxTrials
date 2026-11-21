@@ -98,9 +98,10 @@ Treasure rank.
 11. Return to the lobby.
 
 **Tournament selection** (owner decision, 20 Nov 2026; implemented for local and online tournaments)
-- Trials come in two groups, set on each registry entry (`group`, absent = party): **party games**
-  (the quick trials) and **strategy games** (Toy Squad, Toybox Siege, Toy Tower Tumble: long and much
-  more complex). The group never comes from a game's duration.
+- Trials come in three groups, set on each registry entry (`group`, absent = party): **party games**
+  (the quick trials), **strategy games** (Toy Squad, Toybox Siege, Toy Tower Tumble: long and much
+  more complex) and **team games** (Hoop Clash; owner decision, 21 Nov 2026: side against side, so
+  never in a tournament, which ranks every toy for itself). The group never comes from a game's duration.
 - **Blitz** (3): party games only.
 - **Normal** (5) and **Treasure** (8): party games for every round but the last, then exactly one
   strategy game, chosen from the seed, as the **finale**. Strategy games never appear earlier.

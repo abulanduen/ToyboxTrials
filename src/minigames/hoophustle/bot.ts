@@ -8,6 +8,7 @@
  */
 import type { BotDifficulty, BotPolicy } from '../types';
 import { STEP_MS } from './physics';
+import { holdForPower } from '../shared/shotMeter';
 import { canShoot, hoopXAt, perfectPowerAt, type HoopInput, type HoopState } from './rules';
 
 /** Spread of a bot's power error (standard deviation) and its pause before a shot (ms). */
@@ -54,7 +55,7 @@ export function createHoopBot(): BotPolicy<HoopState, HoopInput> {
         for (let k = 0; k < 40; k++) {
           const at = Math.ceil((s.t + wait + k * 100) / STEP_MS) * STEP_MS;
           const pp = perfectPowerAt(s.config, spot, at);
-          if (pp !== null && at - pp * s.config.chargeMs >= s.t) {
+          if (pp !== null && at - holdForPower(pp, s.config.chargeMs) >= s.t) {
             releaseAt = at;
             perfect = pp;
             break;
@@ -65,7 +66,8 @@ export function createHoopBot(): BotPolicy<HoopState, HoopInput> {
           return [];
         }
         const power = Math.max(0, Math.min(1, perfect + gauss(rng) * skill.sd));
-        plan = { shot: p.shots, chargeAt: releaseAt - power * s.config.chargeMs, releaseAt, power, charging: false };
+        // Let go on the meter's first rise (it would wind back down if held on).
+        plan = { shot: p.shots, chargeAt: releaseAt - holdForPower(power, s.config.chargeMs), releaseAt, power, charging: false };
         plans.set(bot.id, plan);
       }
       const out: HoopInput[] = [];

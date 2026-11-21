@@ -1,0 +1,44 @@
+/* The shared shot meter's needle (src/minigames/shared/shotMeterView.ts): an upright paper tab at the
+   current power, with a chevron on the side it is heading. The meter winds up and back like a toy
+   key, so the chevron flips at each end, and the fill fades a little on the way back down. */
+.shot-needle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+.shot-needle::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -2.5px;
+  width: 5px;
+  border-radius: 2px;
+  background: var(--paper, #fff9ee);
+  box-shadow: 0 0 0 1.5px var(--ink-deep, #2b2433);
+}
+.shot-needle::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 5px;
+  margin-top: -5px;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 7px solid var(--ink-deep, #2b2433);
+}
+.is-falling .shot-needle::after {
+  left: -12px;
+  border-left: 0;
+  border-right: 7px solid var(--ink-deep, #2b2433);
+}
+.shot-fill {
+  transition: opacity 0.12s;
+}
+.is-falling .shot-fill {
+  opacity: 0.62;
+}

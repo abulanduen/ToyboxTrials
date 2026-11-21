@@ -2,8 +2,9 @@
  * Hoop Hustle: a 75-second shootout at one shared hoop. Deterministic, fixed 60 Hz steps, seeded;
  * no DOM, three.js or wall clock, so the online server runs it unchanged (server/games.ts).
  *
- * Every toy shoots from its own spot on a taped arc (1, 2 or 3 points by distance). Hold to charge,
- * let go to throw: the Hub basketball's physics (physics.ts), its aim assist (a facing roughly at
+ * Every toy shoots from its own spot on a taped arc (1, 2 or 3 points by distance). Hold to charge
+ * (the shared shot meter winds up and back down while held, src/minigames/shared/shotMeter.ts; a
+ * `cancel` drops the charge without a throw), let go to throw: the Hub basketball's physics (physics.ts), its aim assist (a facing roughly at
  * the hoop bends onto it), and a power assist for the trial: letting go within the gold zone of the
  * charge meter (ASSIST_BAND around the perfect power) throws the perfect power. After a make the toy
  * hops to a new free spot (seeded). At half time the hoop starts sliding on a wind-up track (with a
@@ -13,13 +14,14 @@
 import type { Contestant, MatchEvent, RulesCore } from '../types';
 import { rankByKey } from '../scoring';
 import { seededRng, shuffle, subSeed } from '../rng';
+import { shotPower, SHOT_SWEEP_MS } from '../shared/shotMeter';
 import { ASSIST_ANGLE, BALL_R, STEP_MS, angleDelta, launch, perfectPower, stepBall, yawToHoop, type Ball, type BallHit } from './physics';
 
 export interface HoopConfig {
   durationMs: number;
   /** After the buzzer and the last ball: how long the court stays up before results. */
   endingMs: number;
-  /** Charge time to full power (the Hub's 1100 ms). */
+  /** One sweep of the shot meter, empty to full or back (the Hub's 1100 ms): held longer, it winds back down. */
   chargeMs: number;
   /** A new ball after a miss (ms after the shot is decided). */
   reloadMs: number;
@@ -49,7 +51,7 @@ export interface HoopConfig {
 export const DEFAULT_CONFIG: HoopConfig = {
   durationMs: 75000,
   endingMs: 1500,
-  chargeMs: 1100,
+  chargeMs: SHOT_SWEEP_MS,
   reloadMs: 350,
   moveMs: 700,
   slideAt: 37500,
@@ -70,7 +72,7 @@ export type HoopInput =
   | { type: 'aim'; yaw: number }
   | { type: 'charge' }
   | { type: 'cancel' }
-  /** `power` 0..1 (else the rules' own charge timer); `yaw` (else the last aim); `at`: the match time it was let go. */
+  /** `power` 0..1 (else the rules' own back-and-forth meter); `yaw` (else the last aim); `at`: the match time it was let go. */
   | { type: 'throw'; power?: number; yaw?: number; at?: number };
 
 export interface Spot {
@@ -242,7 +244,7 @@ function throwBall(s: HoopState, p: Shooter, input: Extract<HoopInput, { type: '
     const back = Math.max(0, Math.min(c.maxLagMs, s.t - input.at));
     at = s.t - Math.round(back / STEP_MS) * STEP_MS;
   }
-  const power = typeof input.power === 'number' && Number.isFinite(input.power) ? clamp01(input.power) : p.charging ? clamp01((s.t - p.chargeAt) / c.chargeMs) : 0;
+  const power = typeof input.power === 'number' && Number.isFinite(input.power) ? clamp01(input.power) : p.charging ? shotPower(s.t - p.chargeAt, c.chargeMs) : 0;
   const yaw = typeof input.yaw === 'number' && Number.isFinite(input.yaw) ? input.yaw : p.yaw;
   const spot = s.spots[p.spot];
   const shot = assistedThrow(s, spot, yaw, power, at);
@@ -347,6 +349,7 @@ function applyInputs(s: HoopState, p: Shooter, inputs: HoopInput[]) {
         emit(s, { type: 'hh-charge', id: p.id });
       }
     } else if (input.type === 'cancel') {
+      if (p.charging) emit(s, { type: 'hh-cancel', id: p.id });
       p.charging = false;
     } else if (input.type === 'throw') {
       if (canShoot(s, p)) throwBall(s, p, input);

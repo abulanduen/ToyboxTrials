@@ -7,8 +7,12 @@
  * The charge is timed on the match clock (the rules' `t`, smoothed online), so a paused or
  * sped-up match charges with it, and the throw carries the power the meter showed and the
  * moment it was let go: the rules honour both, so the gold arc you saw is the throw you get.
+ * The meter winds up and back down while held (src/minigames/shared/shotMeter.ts). The `cancel`
+ * action (X, the right mouse button, or sliding off the Throw button) drops the charge without a
+ * throw; the throw button must then come up before it can charge again.
  */
 import { getMoveAxis, isDown } from '../../game/input';
+import { holdForPower, shotPower, shotRising } from '../shared/shotMeter';
 import { canShoot, type HoopInput, type HoopState, type Shooter } from './rules';
 
 /** Turning speed with A/D or the arrow keys (rad/s). */
@@ -24,6 +28,8 @@ const local = {
   chargeT0: null as number | null,
   /** Tell the rules to drop a charge (pause, focus lost). */
   cancel: false,
+  /** The player cancelled: no new charge until the throw button comes up. */
+  cancelled: false,
   /** Where the mouse points on the court (yaw from the toy), set by the Scene. */
   mouseYaw: null as number | null,
   /** The camera's horizontal facing (yaw), set by the Scene: the joystick aims relative to it. */
@@ -37,6 +43,7 @@ export function resetHoopLocal() {
   local.sentYaw = NaN;
   local.chargeT0 = null;
   local.cancel = false;
+  local.cancelled = false;
   local.mouseYaw = null;
   local.lastFrame = 0;
 }
@@ -57,9 +64,13 @@ export const setHoopViewYaw = (yaw: number) => {
 /** The aim the local toy shows (before the assist), or null before the first frame. */
 export const localAim = () => local.yaw;
 
-/** Charge 0..1 on the match clock, or null when not charging. */
+/** Power 0..1 on the back-and-forth meter (match clock), or null when not charging. */
 export function localCharge(s: HoopState): number | null {
-  return local.chargeT0 === null ? null : Math.max(0, Math.min(1, (s.t - local.chargeT0) / s.config.chargeMs));
+  return local.chargeT0 === null ? null : shotPower(s.t - local.chargeT0, s.config.chargeMs);
+}
+/** The meter is winding up (true) or back down (false). */
+export function localChargeRising(s: HoopState): boolean {
+  return local.chargeT0 === null ? true : shotRising(s.t - local.chargeT0, s.config.chargeMs);
 }
 
 /** This frame's inputs for the local toy. */
@@ -107,7 +118,16 @@ export function readHoopInput(s: HoopState | null, me: Shooter | undefined, pres
   const held = isDown('slot1');
   const tapped = presses.includes('slot1');
   const ready = canShoot(s, me);
-  if (local.chargeT0 !== null && !ready) {
+  const cancel = presses.includes('cancel') || isDown('cancel');
+  if (local.cancelled && !held && !tapped) local.cancelled = false;
+  if (local.chargeT0 !== null && cancel) {
+    // Cancelled: the charge drops, no throw; let go of the button before charging again.
+    local.chargeT0 = null;
+    local.cancelled = true;
+    out.push({ type: 'cancel' });
+  } else if (local.cancelled) {
+    // (still holding the button after a cancel)
+  } else if (local.chargeT0 !== null && !ready) {
     // The buzzer went (or the ball went away): drop the charge.
     local.chargeT0 = null;
     out.push({ type: 'cancel' });
@@ -124,7 +144,7 @@ export function readHoopInput(s: HoopState | null, me: Shooter | undefined, pres
  * throw button had been down that long. The caller holds `slot1` down too.
  */
 export function stageHoopCharge(s: HoopState, power: number | null) {
-  local.chargeT0 = power === null ? null : s.t - power * s.config.chargeMs;
+  local.chargeT0 = power === null ? null : s.t - holdForPower(power, s.config.chargeMs);
 }
 
 function throwNow(s: HoopState): HoopInput {

@@ -8,7 +8,7 @@
 import { describe, expect, it } from 'vitest';
 import { MINIGAMES } from '../../src/minigames/registry';
 import { GAME_FACTS, onlineGames } from '../../src/minigames/facts';
-import { FORMATS, FORMAT_IDS, groupOf, isStrategy, poolForFormat, selectGames, selectTournament, type TournamentFormat } from '../../src/minigames/tournament';
+import { FORMATS, FORMAT_IDS, groupOf, isStrategy, isTeamGame, poolForFormat, selectGames, selectTournament, type TournamentFormat } from '../../src/minigames/tournament';
 import { MatchFlow, type FlowMember } from '../../server/lobbyMatch';
 import { SERVER_GAMES } from '../../server/games';
 import { DEFAULT_LOBBY_SETTINGS, type LobbySettings } from '../../src/net/protocol';
@@ -16,15 +16,17 @@ import { DEFAULT_LOOK } from '../../server/sanitize';
 import type { MinigameId } from '../../src/minigames/types';
 
 const STRATEGY: MinigameId[] = ['toy-squad', 'toybox-siege', 'toy-tower-tumble'];
+const TEAM: MinigameId[] = ['hoop-clash'];
 const SEEDS = Array.from({ length: 300 }, (_, i) => i * 7919 + 13);
 /** The client's games and the server's: both must follow the same rules. */
 const CATALOGUES = { registry: MINIGAMES, server: onlineGames().filter((g) => SERVER_GAMES.has(g.id)) };
 const groupById = (id: MinigameId) => groupOf(MINIGAMES.find((g) => g.id === id)!);
 
 describe('trial groups: one source of truth', () => {
-  it('exactly the three long, complex games are strategy trials; everything else is a party trial', () => {
+  it('exactly the three long, complex games are strategy trials, Hoop Clash the team trial; everything else is a party trial', () => {
     expect(MINIGAMES.filter(isStrategy).map((g) => g.id).sort()).toEqual([...STRATEGY].sort());
-    for (const g of MINIGAMES) expect(groupOf(g), g.id).toBe(STRATEGY.includes(g.id) ? 'strategy' : 'party');
+    expect(MINIGAMES.filter(isTeamGame).map((g) => g.id)).toEqual(TEAM);
+    for (const g of MINIGAMES) expect(groupOf(g), g.id).toBe(STRATEGY.includes(g.id) ? 'strategy' : TEAM.includes(g.id) ? 'team' : 'party');
   });
 
   it("the server's facts carry the same groups", () => {
@@ -83,6 +85,45 @@ describe.each(Object.entries(CATALOGUES))('selectTournament (%s)', (_name, games
       expect(SEEDS.slice(0, 40).map((s) => selectTournament(s, format, pool).join())).toEqual(runs);
       expect(new Set(runs).size).toBeGreaterThan(10);
     }
+  });
+});
+
+describe('team trials are never tournament rounds (owner decision, 21 Nov 2026)', () => {
+  // Even marked tournament-eligible, in every format and field size, the group alone keeps them out.
+  const eligible = <G extends { eligibility: object }>(games: readonly G[]) => games.map((g) => ({ ...g, eligibility: { ...g.eligibility, tournament: true } }));
+  it.each(Object.entries(CATALOGUES))('poolForFormat leaves them out (%s)', (_name, games) => {
+    for (const format of FORMAT_IDS) {
+      for (let field = 1; field <= 8; field++) {
+        for (const pool of [poolForFormat(format, games, field), poolForFormat(format, eligible(games), field)]) {
+          expect(pool.some(isTeamGame), `${format} ${field}`).toBe(false);
+          for (const id of TEAM) expect(pool.map((g) => g.id)).not.toContain(id);
+        }
+      }
+    }
+  });
+  it('selectTournament never deals one, even from a pool that holds one', () => {
+    const withTeam = eligible(MINIGAMES).filter((g) => g.status === 'playable');
+    expect(withTeam.some(isTeamGame)).toBe(true);
+    for (const seed of SEEDS.slice(0, 100)) {
+      for (const format of FORMAT_IDS) {
+        const picked = selectTournament(seed, format, withTeam);
+        expect(picked).toHaveLength(FORMATS[format].games);
+        expect(picked.some((id) => TEAM.includes(id))).toBe(false);
+      }
+    }
+    expect(selectTournament(3, 'blitz', withTeam.filter(isTeamGame))).toEqual([]);
+  });
+  it('the server agrees: online lobby tournaments never deal Hoop Clash', () => {
+    const member = (id: string): FlowMember => ({ id, name: id, look: DEFAULT_LOOK, account: null, connected: true, ready: false, watch: null });
+    for (let seed = 1; seed <= 40; seed++) {
+      for (const format of FORMAT_IDS) {
+        const games = new MatchFlow({ ...DEFAULT_LOBBY_SETTINGS, mode: 'tournament', format, cap: 4, botFill: true }, [member('p1'), member('p2')], seed, 0, 1).tournament!.games;
+        expect(games.some((id) => TEAM.includes(id))).toBe(false);
+      }
+    }
+    // ...while a one-trial lobby still plays it.
+    expect(GAME_FACTS['hoop-clash']?.group).toBe('team');
+    expect(SERVER_GAMES.has('hoop-clash')).toBe(true);
   });
 });
 

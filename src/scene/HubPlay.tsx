@@ -14,11 +14,12 @@ import { PALETTE } from '../game/palette';
 import { setDynamic } from '../game/collision';
 import { livePositions } from '../game/interactables';
 import { player } from '../game/player';
-import { getMoveAxis, isDown, stickRunning } from '../game/input';
+import { getMoveAxis, isDown, stickRunning, wasPressed } from '../game/input';
 import { inputBlocked, useGame } from '../game/store';
 import { BALL, HOOP, MARBLE, NET, NETS, PITCH_CENTRE, rollFloorAt, type Net } from '../game/hubPlay';
 import { BODY_R, PUSH_POWER, predictThrow, type PlayBody } from '../game/hubPlaySim';
-import { aimYaw, cancelCharge, chargePower, fxClock, fxQueue, iHold, pushMarble, releaseCharge, selfId, stepHubPlayView, view } from '../hubplay/runtime';
+import { paintShotMeter } from '../minigames/shared/shotMeterView';
+import { aimYaw, cancelCharge, chargePower, chargeRising, dropCharge, fxClock, fxQueue, iHold, pushMarble, releaseCharge, selfId, stepHubPlayView, view } from '../hubplay/runtime';
 import { meter } from '../hubplay/store';
 import { Kit } from './kit';
 
@@ -234,8 +235,10 @@ function ThrowArc() {
   const white = useMemo(() => new THREE.Color(PALETTE.white), []);
   const gold = useMemo(() => new THREE.Color(PALETTE.honey), []);
   useFrame(() => {
-    const p = chargePower();
     const g = useGame.getState();
+    // Cancel (X, right click, or sliding off the touch button) drops the throw before any let-go is seen.
+    if (chargePower() !== null && (wasPressed('cancel') || isDown('cancel'))) dropCharge();
+    const p = chargePower();
     if (p !== null && (!isDown('interact') || inputBlocked(g))) {
       if (inputBlocked(g)) cancelCharge();
       else releaseCharge();
@@ -246,7 +249,7 @@ function ThrowArc() {
       inst.current.count = 0;
       return;
     }
-    if (meter.el) meter.el.style.transform = `scaleX(${c.toFixed(3)})`;
+    paintShotMeter({ wrap: meter.wrap, fill: meter.el, needle: meter.needle }, c, chargeRising());
     const yaw = aimYaw();
     const body: PlayBody = { id: selfId(), x: player.pos.x, y: player.pos.y, z: player.pos.z, yaw };
     const r = predictThrow(body, yaw, c, pts, ARC_POINTS, 3);

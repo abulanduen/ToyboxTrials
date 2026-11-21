@@ -1,6 +1,6 @@
 /**
- * The facts about each trial that the online game server needs: category, group (party or
- * strategy), field size, tournament eligibility and the formats a trial may appear in. Pure data (no React, no lazy imports), so the
+ * The facts about each trial that the online game server needs: category, group (party,
+ * strategy or team), field size, tournament eligibility and the formats a trial may appear in. Pure data (no React, no lazy imports), so the
  * server can import it; the client's registry.ts holds the full catalogue, and
  * tests/unit/lobby-match.test.ts checks the two agree.
  *
@@ -14,7 +14,7 @@ import type { MinigameCategory, TrialGroup } from './types';
 export interface GameFacts {
   id: MinigameId;
   category: MinigameCategory;
-  /** Mirrors the registry's `group` (absent = party): strategy trials are tournament finales only. */
+  /** Mirrors the registry's `group` (absent = party): strategy trials are tournament finales only, team trials never in tournaments. */
   group?: TrialGroup;
   players: { min: number; max: number };
   /** Typical round length in seconds [min, max]. */
@@ -63,8 +63,8 @@ export const GAME_FACTS: Partial<Record<MinigameId, GameFacts>> = {
   'toy-tower-tumble': { ...f('toy-tower-tumble', 'strategy', 1, [300, 600], FINALE), group: 'strategy' },
   'hoop-hustle': f('hoop-hustle', 'reflex', 2, [75, 80]),
   'toybox-siege': { ...f('toybox-siege', 'survival', 1, [300, 390], FINALE), group: 'strategy', skipStartCountdown: true },
-  // A team game: one-trial lobbies only, never a tournament round (registry.ts says why).
-  'hoop-clash': f('hoop-clash', 'pvp', 2, [270, 360], { tournament: false }),
+  // A team game: one-trial lobbies only, never a tournament round (the group keeps it out; registry.ts says why).
+  'hoop-clash': { ...f('hoop-clash', 'pvp', 2, [270, 360], { tournament: false }), group: 'team' },
 };
 
 /** Every trial the online server can run. */

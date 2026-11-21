@@ -11,7 +11,7 @@ import { SiegeHud } from './Hud';
 const BINDINGS: Record<Action, string[]> = {
   forward: ['KeyW', 'ArrowUp'], back: ['KeyS', 'ArrowDown'], left: ['KeyA', 'ArrowLeft'], right: ['KeyD', 'ArrowRight'],
   slot1: ['Space'], slot2: ['Digit1', 'Numpad1'], slot3: ['Digit2', 'Numpad2'], slot4: ['Digit3', 'Numpad3'], run: ['Digit4', 'Numpad4'],
-  interact: ['KeyQ'], jump: ['KeyE'], pause: ['Escape', 'KeyP'],
+  interact: ['KeyQ'], jump: ['KeyE'], pause: ['Escape', 'KeyP'], cancel: [],
 };
 const CARD_KEYS: Partial<Record<Action, number>> = { slot2: 0, slot3: 1, slot4: 2, run: 3 };
 

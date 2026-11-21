@@ -14,6 +14,7 @@ import {
   attackHoop,
   hoopRules,
   isDribbling,
+  shotPreview,
   solveShotFor,
   type HoopConfig,
   type HoopInput,
@@ -479,6 +480,65 @@ describe('bots and determinism', () => {
   });
 });
 
+describe('the shot meter winds back and forth, and a shot can be cancelled', () => {
+  it('held past full, the power winds back down; letting go shoots at the power the meter shows', () => {
+    const s = setup();
+    const at = spot(s, 0, 14);
+    giveBall(s, 'you', at.x, at.z);
+    run(s, STEP_MS, { you: [press] });
+    const seen: number[] = [];
+    for (let i = 0; i < Math.round((CHARGE_MS * 1.5) / STEP_MS) - 1; i++) {
+      run(s, STEP_MS);
+      seen.push(shotPreview(s, 'you')!.power);
+    }
+    // Up to full, then back down to about half (never parked at full).
+    expect(Math.max(...seen)).toBeGreaterThan(0.98);
+    const now = seen[seen.length - 1];
+    expect(now).toBeGreaterThan(0.45);
+    expect(now).toBeLessThan(0.55);
+    expect(seen[seen.length - 1]).toBeLessThan(seen[seen.length - 2]);
+    const ev = run(s, STEP_MS, { you: [still] });
+    const shot = ev.find((e) => e.type === 'shot');
+    expect(shot).toBeDefined();
+    expect(Math.abs((shot!.power as number) - now)).toBeLessThan(0.03);
+  });
+
+  it('cancel drops the charge: letting go afterwards shoots nothing, and the toy can move and shoot again', () => {
+    const s = setup();
+    const at = spot(s, 0, 14);
+    const me = giveBall(s, 'you', at.x, at.z);
+    const ev = run(s, 500, { you: [press] });
+    expect(me.charge).toBeGreaterThan(0);
+    run(s, STEP_MS, { you: [{ type: 'cancel' }] }, ev);
+    expect(me.charge).toBe(-1);
+    expect(ev.filter((e) => e.type === 'uncharge')).toEqual([{ type: 'uncharge', by: 'you' }]);
+    // Still holding the button: no new charge; then letting go: no shot.
+    run(s, 300, {}, ev);
+    expect(me.charge).toBe(-1);
+    run(s, 300, { you: [still] }, ev);
+    expect(ev.some((e) => e.type === 'shot')).toBe(false);
+    expect(s.ball.holder).toBe('you');
+    expect(me.tries).toBe(0);
+    // A cancel with nothing charging changes nothing.
+    run(s, STEP_MS, { you: [{ type: 'cancel' }] }, ev);
+    expect(ev.filter((e) => e.type === 'uncharge')).toHaveLength(1);
+    // A fresh press charges again, and shoots on release.
+    shoot(s, 'you', 0.6, ev);
+    expect(ev.filter((e) => e.type === 'shot')).toHaveLength(1);
+    expect(me.tries).toBe(1);
+  });
+
+  it('a cancel and a let-go in the same batch: the cancel comes first, so no shot', () => {
+    const s = setup();
+    const at = spot(s, 0, 14);
+    giveBall(s, 'you', at.x, at.z);
+    const ev = run(s, 400, { you: [press] });
+    run(s, 400, { you: [{ type: 'cancel' }, still] }, ev);
+    expect(ev.some((e) => e.type === 'shot')).toBe(false);
+    expect(s.ball.holder).toBe('you');
+  });
+});
+
 describe('online', () => {
   it('validates the stick, the held button and passes; hides the seed and the AI stream', () => {
     const g = serverGame('hoop-clash');
@@ -489,6 +549,7 @@ describe('online', () => {
     expect(g.validate({ type: 'pass', to: 'p2' })).toEqual({ type: 'pass', to: 'p2' });
     expect(g.validate({ type: 'pass', to: 7 })).toBeNull();
     expect(g.validate({ type: 'shoot' })).toBeNull();
+    expect(g.validate({ type: 'cancel', extra: 1 })).toEqual({ type: 'cancel' });
     const v = JSON.parse(JSON.stringify(setup())) as Record<string, unknown>;
     g.publicView!(v);
     expect(v.seed).toBe(0);

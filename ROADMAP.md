@@ -163,6 +163,10 @@ Owner decision (20 Nov 2026): Normal and Treasure tournaments end with one strat
 Squad, Toybox Siege or Toy Tower Tumble, seeded) after party trials; Blitz stays party-only. The
 pickers fold into Party games and Strategy games sections, and online lobby trials open on the same
 intro card (How to play, then Ready) as practice and local tournaments.
+Owner requests (21 Nov 2026): a third picker section, Team games (Hoop Clash, never in a tournament:
+the group keeps it out); and every basketball shot meter (Hub ball, Hoop Hustle, Hoop Clash) winds
+back and forth while held, with a cancel (X, right click outside Hoop Clash, or sliding off the touch
+button), from one shared helper (`src/minigames/shared/shotMeter.ts`).
 
 ## Current milestone and priorities
 
