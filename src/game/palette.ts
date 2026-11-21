@@ -95,6 +95,9 @@ export const ROOM = {
   dog: '#8A5E40',
   dogLight: '#D8BC9A',
   dogDark: '#2E2522',
+  /** The dog's love hearts when petted, and its tongue (the lick). */
+  dogHeart: '#E8506A',
+  dogTongue: '#E58A93',
   bookSpines: ['#C46A5D', '#5E86A3', '#7E9C78', '#D9B26A', '#574D69', '#D8CBB5', '#A0705A', '#8C9AAE'],
   // Baked light colours (linear multipliers are applied in src/scene/room/bake.ts)
   sunWarm: '#FFD9A0',

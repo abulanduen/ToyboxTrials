@@ -14,6 +14,8 @@ import { openPractice } from '../minigames/session';
 import { BALL, MARBLE } from './hubPlay';
 import { ballFree, ballInAir, canSnatch, canSteal, grab, iHold, kick, startCharge } from '../hubplay/runtime';
 import { JACK_SPOT } from './whoAmI';
+import { dogVisit, petDog } from './dogVisit';
+import { DOG_PERCH } from '../scene/room/roomLayout';
 import { useNet } from '../net/store';
 import { requestCard, wearingCard } from '../net/chat';
 import { CHAT_NOTE_TEXT } from '../net/protocol';
@@ -60,6 +62,8 @@ export const INTERACTABLES: Interactable[] = [
   { id: 'ball-steal', x: BALL.spot.x, z: BALL.spot.z, radius: 3.5, verb: 'Steal', label: 'the basketball', disabled: () => !canSteal() },
   // (while you hold it: its live spot sits 2.9 cm ahead of you, so a nearer prompt such as a gate wins)
   { id: 'ball-throw', x: BALL.spot.x, z: BALL.spot.z, radius: 3, verb: 'Hold to throw', label: 'the basketball', disabled: () => !iHold() },
+  // the dog, when it stands up at the spawn table's front edge (every loop of its stroll)
+  { id: 'dog', x: DOG_PERCH.pet.x, z: DOG_PERCH.pet.z, radius: 6, verb: 'Pet', label: 'the dog', disabled: () => !dogVisit.perched },
   { id: 'jack', x: JACK_SPOT.x, z: JACK_SPOT.z, radius: JACK_SPOT.radius, verb: 'Open', label: 'a suspicious box', secret: true },
   { id: 'key', x: TOWER.block.x, z: TOWER.block.z, radius: 2.4, verb: 'Grab', label: 'the golden key', secret: true, minY: TOWER.block.top - 0.5, disabled: () => !keyAvailable() },
 ];
@@ -148,6 +152,16 @@ export function interact(id: string, facing: { x: number; z: number }) {
     case 'ball-throw':
       startCharge();
       break;
+    case 'dog': {
+      const r = petDog(performance.now() / 1000);
+      if (!r) return;
+      events.emit('dog:pet', { lick: r === 'lick' });
+      if (r === 'lick') {
+        sfx.dogLick();
+        g.pushTicket({ title: 'Slobbery lick!', body: 'Ten pets and the dog licked you. It loves you.', tone: 'reward' });
+      } else sfx.dogPet();
+      break;
+    }
     case 'jack':
       if (useNet.getState().status === 'online') {
         // Online: Who Am I? The jack slaps a card (dealt by the server) on your face; no ambush.

@@ -68,7 +68,7 @@ export const FLOOR_OBSTACLES: FloorRect[] = [
 ];
 
 /** What the dog does when it reaches a spot. */
-export type DogAction = 'walk' | 'sniff' | 'sit' | 'lie' | 'sleep';
+export type DogAction = 'walk' | 'sniff' | 'sit' | 'lie' | 'sleep' | 'perch';
 export interface DogSpot {
   id: string;
   x: number;
@@ -88,15 +88,25 @@ export const DOG_SPOTS: Record<string, DogSpot> = {
   eastLane: { id: 'eastLane', x: 132, z: 105, action: 'walk', hold: 0 },
   byTheBed: { id: 'byTheBed', x: 150, z: -55, action: 'sit', hold: 6 },
   rugMid: { id: 'rugMid', x: 40, z: 150, action: 'walk', hold: 0 },
+  // up on its hind legs at the spawn table's front edge, looking over at the toys (toys can pet it)
+  perch: { id: 'perch', x: -20, z: TABLE.maxZ + 4, action: 'perch', hold: 10 },
 };
+
+/**
+ * The perch: the dog stands up at the spawn table's front edge with its front paws on the table and
+ * its head over it. `pet` is where a toy stands to pet it (on walkable ground, just inside the
+ * table's front edge). A perch lasts `hold` seconds, or until 10 s after the last pet.
+ */
+export const DOG_PERCH = { x: DOG_SPOTS.perch.x, z: DOG_SPOTS.perch.z, heading: Math.PI, pet: { x: DOG_SPOTS.perch.x, z: 33 } };
 
 /**
  * DOG_PATH: the dog's loop, as an ordered list of spot ids (a polyline over the floor that may
  * revisit spots). From its bed, up the west side to sniff at the bookshelf, back and across the
  * rug to lie in the sun patch in front of the spawn table, past the toy chest, up the east side to
- * sit by the bed, and home across the rug. Every leg keeps DOG_CLEARANCE from all furniture.
+ * sit by the bed, and home across the rug. Every leg keeps DOG_CLEARANCE from all furniture, except
+ * the last steps up to the perch, where it stands against the spawn table on purpose.
  */
-export const DOG_PATH: string[] = ['bed', 'westLane', 'bookshelf', 'westLane', 'rugSun', 'toyChest', 'eastLane', 'byTheBed', 'eastLane', 'rugMid', 'bed'];
+export const DOG_PATH: string[] = ['bed', 'westLane', 'bookshelf', 'westLane', 'rugSun', 'perch', 'toyChest', 'eastLane', 'byTheBed', 'eastLane', 'rugMid', 'bed'];
 /** Half of the corridor the dog needs (a ~50 cm tall pit bull needs 60–80 cm of floor to pass). */
 export const DOG_CLEARANCE = 30;
 /** Walking speed of the stand-in (cm/s): a slow amble. */
@@ -112,6 +122,17 @@ export function distToRect(x: number, z: number, r: FloorRect) {
   return Math.hypot(dx, dz);
 }
 
+/** Seconds into the loop at which the dog arrives at spot `id` (its first visit), or null. */
+export function dogArrivalTime(id: string): number | null {
+  const route = dogRoute();
+  let t = 0;
+  for (let i = 0; i < route.length - 1; i++) {
+    if (route[i].id === id) return t;
+    t += route[i].hold + Math.hypot(route[i + 1].x - route[i].x, route[i + 1].z - route[i].z) / DOG_SPEED;
+  }
+  return null;
+}
+
 /**
  * Where the stand-in dog is `t` seconds into its loop: position, heading and what it is doing.
  * Pure (deterministic in t), so the scene and the tests agree.
@@ -124,17 +145,21 @@ export function dogPose(t: number) {
   let k = ((t % total) + total) % total;
   for (const l of legs) {
     const heading = Math.atan2(l.b.x - l.a.x, l.b.z - l.a.z);
-    if (k < l.a.hold) return { x: l.a.x, z: l.a.z, heading, action: l.a.action, moving: false, loop: total };
+    if (k < l.a.hold) {
+      // a perch faces the table (whatever way the next leg goes)
+      const h = l.a.action === 'perch' ? DOG_PERCH.heading : heading;
+      return { x: l.a.x, z: l.a.z, heading: h, action: l.a.action, moving: false, loop: total, holdLeft: l.a.hold - k };
+    }
     k -= l.a.hold;
     const walk = l.len / DOG_SPEED;
     if (k < walk) {
       const f = k / walk;
-      return { x: l.a.x + (l.b.x - l.a.x) * f, z: l.a.z + (l.b.z - l.a.z) * f, heading, action: 'walk' as DogAction, moving: true, loop: total };
+      return { x: l.a.x + (l.b.x - l.a.x) * f, z: l.a.z + (l.b.z - l.a.z) * f, heading, action: 'walk' as DogAction, moving: true, loop: total, holdLeft: 0 };
     }
     k -= walk;
   }
   const last = route[route.length - 1];
-  return { x: last.x, z: last.z, heading: 0, action: last.action, moving: false, loop: total };
+  return { x: last.x, z: last.z, heading: 0, action: last.action, moving: false, loop: total, holdLeft: 0 };
 }
 
 /**

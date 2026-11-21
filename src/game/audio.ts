@@ -615,6 +615,19 @@ export const sfx = {
   // ---- Who Am I? (the suspicious box, online Hub) ----
 
   /** A paper card slapped onto the face: a soft papery thwack and a little tape squeak. */
+  /** Petting the dog: a happy little whine and a tail thump on the floor. */
+  dogPet() {
+    const t = now();
+    tone(jitter(620, 0.06), t, 0.07, 0.16, 'sine', 0.02, 980);
+    tone(jitter(760, 0.06), t + 0.13, 0.05, 0.14, 'sine', 0.02, 1100);
+    noise(t + 0.05, 0.08, 0.06, 260, 0.7, 'lowpass');
+  },
+  /** The big lick: a wet slurp (filtered noise sweeping up), then a happy yip. */
+  dogLick() {
+    const t = now();
+    for (let i = 0; i < 3; i++) noise(t + i * 0.07, 0.12 - i * 0.02, 0.09, 700 + i * 600, 1.6);
+    tone(880, t + 0.28, 0.08, 0.12, 'triangle', 0.005, 1400);
+  },
   cardSlap() {
     const t = now();
     noise(t, 0.22, 0.06, 900, 0.8, 'lowpass');

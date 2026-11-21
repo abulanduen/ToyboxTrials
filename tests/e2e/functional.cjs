@@ -181,7 +181,7 @@ const check = (name, ok, detail = '') => { results.push(`${ok ? 'PASS' : 'FAIL'}
   await page.keyboard.up('KeyW');
   const lo = Math.min(...ys), hi = Math.max(...ys);
   check('walking with the ball dribbles it: it bounces between the floor and the hand', lo < 1.5 && hi > 1.8 && (await hp()).holding, `ball y ${lo.toFixed(2)} … ${hi.toFixed(2)}`);
-  await page.waitForTimeout(800);
+  await waitHp(() => window.__toybox.hubplay.state().ball.y > 2, null, 30000);
   const still = (await hp()).ball.y;
   check('…and standing still holds it up again', still > 2, `y ${still.toFixed(2)}`);
   await T(() => window.__toybox.teleport(60, -122, Math.PI / 2));
@@ -220,6 +220,33 @@ const check = (name, ok, detail = '') => { results.push(`${ok ? 'PASS' : 'FAIL'}
   check('…and the HUD shows Coral 1 – 0 Blue', ((await page.textContent('[data-testid=hubplay-goals]').catch(() => '')) || '').replace(/\s/g, '') === '1–0');
   await waitHp(() => { const m = window.__toybox.hubplay.state().marble; return !m.inNet && Math.abs(m.x - 26) < 0.5; }, null, 120000);
   check('after the goal the marble goes back to the centre spot', Math.abs((await hp()).marble.x - 26) < 0.5);
+
+  // The dog stands up at the spawn table now and then: Pet it (a heart each time); the tenth pet is a lick.
+  await T(() => window.__toybox.dog.patience(120)); // software GL: pets come slowly here
+  await T(() => window.__toybox.dog.perch(0.2));
+  await T(() => window.__toybox.teleport(-20, 30, 0));
+  await page.waitForFunction(() => window.__toybox.dog.visit().perched, null, { timeout: 120000, polling: 200 }).catch(() => null);
+  await page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Pet'), null, { timeout: 120000 }).catch(() => null);
+  check('when the dog stands up at the table the prompt says Pet (the dog)', await promptHas('Pet', 'the dog'));
+  const dogVisit = () => T(() => window.__toybox.dog.visit());
+  for (let i = 0; i < 9; i++) {
+    const before = (await dogVisit()).pets;
+    await page.keyboard.press('KeyE');
+    await page.waitForFunction((n) => window.__toybox.dog.visit().pets > n, before, { timeout: 60000, polling: 100 }).catch(() => null);
+  }
+  const nine = await dogVisit();
+  await page.screenshot({ path: `${OUT}/16b-dog-petted.png` });
+  check('each pet counts and pops a heart', nine.pets === 9 && nine.hearts > 0, JSON.stringify(nine));
+  await page.keyboard.press('KeyE');
+  await page.waitForFunction(() => window.__toybox.dog.visit().lickAt > 0, null, { timeout: 60000, polling: 100 }).catch(() => null);
+  const licked = await page.waitForFunction(() => [...document.querySelectorAll('.ticket')].some((t) => t.textContent.includes('Slobbery lick!')), null, { timeout: 30000 }).then(() => true).catch(() => false);
+  check('the tenth pet: the dog licks you (Slobbery lick! ticket), and the count starts again', (await dogVisit()).lickAt > 0 && (await dogVisit()).pets === 0 && licked);
+  // nobody pets it for 10 s: it goes back to its stroll, and the prompt goes
+  await T(() => window.__toybox.dog.patience(10));
+  await page.waitForFunction(() => !window.__toybox.dog.visit().perched, null, { timeout: 120000, polling: 250 }).catch(() => null);
+  await page.waitForFunction(() => !document.querySelector('.prompt')?.textContent.includes('Pet'), null, { timeout: 60000 }).catch(() => null);
+  const gone = await T(() => ({ perched: window.__toybox.dog.visit().perched, action: window.__toybox.dog.pose().action, prompt: document.querySelector('.prompt')?.textContent ?? '' }));
+  check('10 s after the last pet the dog strolls off; no more Pet prompt', !gone.perched && gone.action === 'walk' && !gone.prompt.includes('Pet'), JSON.stringify(gone));
 
   // Hold Alt: a free cursor for the HUD (no pause), with its hint; let go and it's gone.
   await page.keyboard.down('Alt');
