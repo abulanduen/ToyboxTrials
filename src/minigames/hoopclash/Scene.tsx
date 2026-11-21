@@ -12,7 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { PALETTE, PAINT_JOBS } from '../../game/palette';
-import { playHubCue, unlockAudio } from '../../game/audio';
+import { playHoopCue, playHubCue, unlockAudio } from '../../game/audio';
 import { exposeDebug } from '../../game/debug';
 import { useGame } from '../../game/store';
 import { player } from '../../game/player';
@@ -482,6 +482,9 @@ function useSounds(localId: string) {
         switch (e.type) {
           case 'shot':
             playHubCue('throw', e.by === localId ? 0.9 : 0.6);
+            break;
+          case 'uncharge':
+            if (e.by === localId) playHoopCue('uncharge', 0.7);
             break;
           case 'pass':
             playHubCue('throw', 0.45);

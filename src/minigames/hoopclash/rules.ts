@@ -4,7 +4,9 @@
  * Pure and deterministic (no DOM, no three.js, no wall clock, randomness only from the seed), so
  * the online server runs it unchanged. The ball is the Hub basketball (src/minigames/shared/
  * courtBall.ts, built on src/game/hubPlaySim.ts): the same 60° throw, charge power, rim, backboard
- * and floor bounces, and the same pick-up, mid-air snatch and dribble-steal reaches and guard.
+ * and floor bounces, and the same pick-up, mid-air snatch and dribble-steal reaches and guard. The
+ * shot meter is the shared one (src/minigames/shared/shotMeter.ts): held, it winds up and back
+ * down; letting go shoots at the power it shows, and a `cancel` input drops the charge unshot.
  *
  * Toys a match needs beyond its contestants (to make two even teams) are "fillers": the rules core
  * itself drives them with the same AI the bot policy uses (ai.ts), so they play on every device and
@@ -23,6 +25,7 @@ import { PAINT_JOBS } from '../../game/palette';
 import type { HatId, KeySkinId } from '../../game/cosmetics';
 import { DRIBBLE_SPEED, STEAL_GUARD, STEAL_REACH, inSnatchReach, type PlayBody } from '../../game/hubPlaySim';
 import { TOY_TUNING, stepMover, type MoveTuning, type Mover } from '../shared/movement';
+import { SHOT_SWEEP_MS, shotPower } from '../shared/shotMeter';
 import {
   BALL_R,
   courtBallAirborne,
@@ -44,8 +47,8 @@ import { aiDecide, createAiMemory, type AiMemory } from './ai';
 export const STEP_MS = 1000 / 60;
 
 // ---------------------------------------------------------------- tuning
-/** Charge time to full power (ms): the Hub's. */
-export const CHARGE_MS = 1100;
+/** One sweep of the shot meter, empty to full or back (ms): the Hub's. Held longer, it winds back down. */
+export const CHARGE_MS = SHOT_SWEEP_MS;
 /** The aim bends onto the attacking rim when it is this close (cm) and within this angle of your facing: the Hub's. */
 export const ASSIST_RANGE = 40;
 export const ASSIST_ANGLE = 0.75;
@@ -105,7 +108,9 @@ export interface HoopInputState {
 export type HoopInput =
   | ({ type: 'in' } & HoopInputState)
   /** Pass (to the teammate nearest your facing, or `to`); without the ball, call for it. */
-  | { type: 'pass'; to?: string };
+  | { type: 'pass'; to?: string }
+  /** Drop a shot being charged without shooting (the action button must come up before the next press). */
+  | { type: 'cancel' };
 
 export interface HoopPlayer extends Mover {
   id: string;
@@ -121,7 +126,7 @@ export interface HoopPlayer extends Mover {
   look: { paint: number; hat: HatId; keySkin: KeySkinId } | null;
   forfeit: boolean;
   in: HoopInputState;
-  /** Ms of charge while the action is held with the ball, or −1. */
+  /** Ms the action has been held with the ball (a shot charging: the meter winds back and forth), or −1. */
   charge: number;
   /** Ms left reaching, and until the next swipe may start. */
   swipeT: number;
@@ -456,6 +461,13 @@ function applyInput(s: HoopState, p: HoopPlayer, i: HoopInput) {
     }
     return;
   }
+  if (i.type === 'cancel') {
+    if (p.charge >= 0) {
+      p.charge = -1;
+      emit(s, { type: 'uncharge', by: p.id });
+    }
+    return;
+  }
   if (i.type !== 'in') return;
   const fin = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(-1, Math.min(1, v)) : 0);
   let ax = fin(i.ax);
@@ -489,7 +501,7 @@ function press(s: HoopState, p: HoopPlayer) {
 
 /** The action button came up while charging: shoot. */
 function release(s: HoopState, p: HoopPlayer) {
-  const power = Math.min(1, p.charge / CHARGE_MS);
+  const power = shotPower(p.charge, CHARGE_MS);
   p.charge = -1;
   if (s.ball.holder !== p.id || s.phase !== 'live') return;
   const hoop = attackHoop(s, p.team);
@@ -958,7 +970,7 @@ function clocks(s: HoopState, dtMs: number) {
 export function shotPreview(s: HoopState, id: string): { body: PlayBody; yaw: number; power: number } | null {
   const p = playerById(s, id);
   if (!p || p.charge < 0 || s.ball.holder !== p.id) return null;
-  return { body: bodyOf(p), yaw: aimYaw(s, p), power: Math.min(1, p.charge / CHARGE_MS) };
+  return { body: bodyOf(p), yaw: aimYaw(s, p), power: shotPower(p.charge, CHARGE_MS) };
 }
 
 /** The power that sinks a shot from where `p` stands, facing its attacking rim (null: none goes in). */

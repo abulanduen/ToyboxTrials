@@ -44,10 +44,12 @@ describe('length classes', () => {
 });
 
 describe('trial groups for the pickers', () => {
-  it('splits the catalogue into party and strategy sections, each game in exactly one', () => {
+  it('splits the catalogue into party, strategy and team sections, each game in exactly one', () => {
+    expect(GROUP_ORDER).toEqual(['party', 'strategy', 'team']);
     const sections = GROUP_ORDER.map((g) => inGroup(MINIGAMES, g).map((x) => x.id));
     expect(sections.flat().sort()).toEqual(MINIGAMES.map((g) => g.id).sort());
     expect(sections[1].sort()).toEqual(['toy-squad', 'toy-tower-tumble', 'toybox-siege']);
+    expect(sections[2]).toEqual(['hoop-clash']);
   });
   it('labels a section with the span of its lengths', () => {
     expect(groupDurationLabel([d(20, 75), d(60, 240)])).toBe('about 1–4 min each');

@@ -837,6 +837,10 @@ textarea,
   transform: translateY(5px);
   box-shadow: 0 1px 0 var(--ink-deep);
 }
+/* the finger slid off Interact while throwing: the throw is cancelled */
+.touch-btn.is-cancelled {
+  filter: saturate(0.4) brightness(0.92);
+}
 .touch-btn--jump {
   width: 88px;
   height: 88px;
@@ -4089,7 +4093,7 @@ textarea,
   opacity: 0.75;
 }
 
-/* The pickers' sections: party games and strategy games, each folded away until opened. */
+/* The pickers' sections: party, strategy and team games, each folded away until opened. */
 .game-group {
   display: grid;
   gap: 8px;
@@ -4113,6 +4117,9 @@ textarea,
 }
 .game-group--strategy .game-group__head {
   background: color-mix(in srgb, var(--sage) 22%, var(--paper));
+}
+.game-group--team .game-group__head {
+  background: color-mix(in srgb, var(--blue) 20%, var(--paper));
 }
 .game-group__head:active {
   transform: translateY(3px);
@@ -4893,6 +4900,7 @@ textarea,
   pointer-events: none;
 }
 .hubplay-meter__bar {
+  position: relative;
   width: 160px;
   height: 14px;
   border-radius: 999px;
@@ -4907,6 +4915,12 @@ textarea,
   transform: scaleX(0);
   background: linear-gradient(90deg, var(--sage), var(--honey) 60%, var(--coral));
 }
+/* the throw is cancellable: a quiet reminder of how (X, right click, or slide off the touch button) */
+.hubplay-meter__cancel {
+  font: 700 0.7rem var(--font-body);
+  color: var(--ink);
+  white-space: nowrap;
+}
 @media (max-width: 700px), (max-height: 500px) {
   .hubplay-score {
     font-size: 0.8rem;
@@ -4915,6 +4929,19 @@ textarea,
   }
   .hubplay-meter__bar {
     width: 120px;
+  }
+  /* phones: the cancel reminder goes on its own line under the bar, so the meter stays narrow
+     (clear of the Emote and Interact buttons) */
+  .hubplay-meter {
+    flex-wrap: wrap;
+    justify-content: center;
+    row-gap: 2px;
+    width: max-content;
+    max-width: 200px;
+  }
+  .hubplay-meter__cancel {
+    flex-basis: 100%;
+    text-align: center;
   }
 }
 /* phones in landscape: the top centre is free (the HUD sign is top left, the gear top right) */

@@ -1,6 +1,7 @@
 /* Hoop Clash: desktop (keys + mouse) and phones in portrait and landscape (the joystick, a held
-   Shoot button and Pass, with two thumbs). Entry from practice, the jump ball, moving, a charged
-   shot released on the gold arc that scores, a pass, the touch button's Steal/Grab label, pause,
+   Shoot button and Pass, with two thumbs). Entry from practice (its own Team games section), the
+   jump ball, moving, the shot meter winding back down while held and a cancelled shot (X / sliding
+   off Shoot) that throws nothing, a charged shot released on the gold arc that scores, a pass, the touch button's Steal/Grab label, pause,
    the end of the game with the team results, and back to the Playroom; no console errors.
      BASE_URL=http://localhost:4173/ node tests/e2e/hoopclash.cjs        ONLY=desktop|portrait|landscape
    Screenshots: tests/e2e/output/hoopclash-<layout>-*.png */
@@ -38,7 +39,15 @@ async function touch(page) {
     async press(testId) {
       const [bx, by] = await centre(testId);
       await send('touchStart', [...(stick ? [stick] : []), [bx, by, 2]]);
-      return { up: () => send('touchEnd', [[bx, by, 2]]) };
+      let at = [bx, by];
+      return {
+        up: () => send('touchEnd', [[...at, 2]]),
+        /** Slide the finger by (dx, dy) px, still down. */
+        move: async (dx, dy) => {
+          at = [bx + dx, by + dy];
+          await send('touchMove', [...(stick ? [stick] : []), [...at, 2]]);
+        },
+      };
     },
     async tap(testId) {
       const p = await this.press(testId);
@@ -73,12 +82,22 @@ async function touch(page) {
 
       await page.goto(`${BASE}?debug#play`);
       await page.waitForSelector('.loading', { state: 'detached' });
-      // Practice from the Pavilion's party shelf, as a player would.
+      // Practice from the Pavilion's Team games shelf (its own section: never a tournament trial), as a player would.
       await page.evaluate(() => window.__toybox.hub.goTo('pavilion'));
       await page.waitForSelector('.prompt');
       if (mobile) await page.locator('.prompt').tap();
       else await page.keyboard.press('KeyE');
+      await page.getByTestId('practice-group-team').waitFor();
+      const heads = await page.$$eval('.game-group__head strong', (els) => els.map((e) => e.textContent.replace(/\s+/g, ' ').trim()));
+      assert.deepEqual(heads.map((h) => h.replace(/ ·.*/, '')), ['Party games', 'Strategy games', 'Team games'], `three sections: ${heads}`);
+      await tap('practice-group-team');
+      assert.deepEqual(await page.$$eval('.game-group--team .game-card', (els) => els.map((e) => e.dataset.testid)), ['practice-hoop-clash'], 'Team games holds Hoop Clash');
       await tap('practice-group-party');
+      assert.equal(await page.locator('.game-group--party [data-testid=practice-hoop-clash]').count(), 0, 'Hoop Clash is not a party game any more');
+      assert.ok((await page.locator('.game-group--party .game-card').count()) > 5, 'the party section still lists the party games');
+      await tap('practice-group-party');
+      await page.getByTestId('practice-hoop-clash').scrollIntoViewIfNeeded();
+      await shot('team-group');
       await tap('practice-hoop-clash');
       await page.getByTestId('match-start').waitFor({ state: 'visible' });
       await shot('intro');
@@ -127,7 +146,7 @@ async function touch(page) {
       // A shot: you have the ball 12 cm out in front of your hoop, the others far away. Charge with
       // the real control, slowed down, and let go when the arc turns gold.
       await timeScale(0);
-      await page.evaluate(() => {
+      const placeShot = () => page.evaluate(() => {
         const s = window.__toybox.match.state();
         const me = s.players.find((p) => p.id === 'you');
         const att = (me.team === 0) !== s.swapped ? 1 : 0;
@@ -148,6 +167,39 @@ async function touch(page) {
         s.shot = null;
         s.pass = null;
       });
+      await placeShot();
+
+      // First, held on: the meter winds up to full and back down (the shared shot meter), then a
+      // cancel (X; on a phone, sliding the thumb off Shoot) drops it, and letting go shoots nothing.
+      const meterNow = () => page.evaluate(() => { const m = document.querySelector('[data-testid=hc-meter]'); return { power: parseFloat(m?.dataset.power ?? 'NaN'), dir: m?.dataset.dir ?? '', falling: !!m?.classList.contains('is-falling') }; });
+      await timeScale(0.5);
+      let hold;
+      if (mobile) hold = await t.press('hc-shoot');
+      else await page.keyboard.down('Space');
+      await page.waitForFunction(() => window.__toybox.match.state().players.find((p) => p.id === 'you').charge >= 0);
+      await page.waitForFunction(() => parseFloat(document.querySelector('[data-testid=hc-meter]')?.dataset.power ?? '0') > 0.75);
+      await page.waitForFunction(() => { const m = document.querySelector('[data-testid=hc-meter]'); return m?.dataset.dir === 'down' && parseFloat(m.dataset.power) < 0.9; });
+      await timeScale(0);
+      const winding = await meterNow();
+      const heldMs = (await st()).players.find((p) => p.id === 'you').charge;
+      assert.ok(winding.falling && winding.power < 0.9 && heldMs > 1100, `${layout}: held past full, the meter winds back down (${JSON.stringify(winding)}, held ${heldMs} ms)`);
+      await shot('meter-winding');
+      await timeScale(0.5);
+      if (mobile) await hold.move(-150, -70);
+      else await page.keyboard.press('KeyX');
+      await page.waitForFunction(() => window.__toybox.match.state().players.find((p) => p.id === 'you').charge === -1);
+      await page.getByTestId('hc-meter').waitFor({ state: 'hidden' });
+      if (mobile) assert.match((await page.getByTestId('hc-shoot').getAttribute('class')) ?? '', /is-cancelled/, 'the Shoot button shows the cancel');
+      if (mobile) await hold.up();
+      else await page.keyboard.up('Space');
+      await page.waitForFunction((t0) => window.__toybox.match.state().t > t0 + 400, (await st()).t);
+      s = await st();
+      assert.equal(s.ball.holder, 'you', `${layout}: a cancelled shot keeps the ball (${s.ball.holder})`);
+      assert.equal(s.players.find((p) => p.id === 'you').tries, 0, 'no shot taken');
+      assert.equal(s.shot, null);
+      await timeScale(0);
+      await placeShot();
+
       const before = (await st()).score[0];
       assert.ok((await page.evaluate(() => window.__toybox.hoop.perfect())) !== null, 'a shot from 12 cm can go in');
       await timeScale(0.12);
@@ -227,7 +279,7 @@ async function touch(page) {
       await tap('results-leave');
       await page.waitForSelector('.hud-sign');
       assert.deepEqual(errors, []);
-      console.log(`PASS Hoop Clash ${layout}: practice entry, 2 v 2 with you on Red, scoreboard, jump ball, ${mobile ? 'joystick, held Shoot button with a second thumb, Pass button' : 'keys, held Space, Q pass'}, gold-arc shot scores 2, pass, pause, final buzzer, team results, back to the Playroom; no console/page errors`);
+      console.log(`PASS Hoop Clash ${layout}: practice entry, 2 v 2 with you on Red, scoreboard, jump ball, ${mobile ? 'joystick, held Shoot button with a second thumb, Pass button' : 'keys, held Space, Q pass'}, Team games section, meter winds back down, cancel (${mobile ? 'slide off Shoot' : 'X'}) shoots nothing, gold-arc shot scores 2, pass, pause, final buzzer, team results, back to the Playroom; no console/page errors`);
       await page.close();
     }
   } finally {

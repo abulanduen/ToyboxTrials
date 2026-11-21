@@ -18,6 +18,7 @@ export const MOVE_BINDINGS: Record<Action, string[]> = {
   interact: [],
   run: [],
   pause: ['Escape', 'KeyP'],
+  cancel: [],
   slot1: [],
   slot2: [],
   slot3: [],

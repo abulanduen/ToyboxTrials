@@ -393,8 +393,9 @@ const GAMES: ServerGame[] = [
     rules: hoopClashRules as RulesCoreAny,
     createBot: createHoopClashBot as () => BotPolicy,
     // The stick and the held action button, sampled every frame (the rules latch the newest and
-    // see the button's presses and releases in order), and passes.
+    // see the button's presses and releases in order), passes, and cancelling a shot being charged.
     validate(i) {
+      if (i.type === 'cancel') return { type: 'cancel' };
       if (i.type === 'in') return num(i.ax, 1.5) && num(i.ay, 1.5) && typeof i.run === 'boolean' && typeof i.act === 'boolean' ? { type: 'in', ax: i.ax, ay: i.ay, run: i.run, act: i.act } : null;
       if (i.type === 'pass') return i.to === undefined ? { type: 'pass' } : typeof i.to === 'string' && i.to.length <= 64 ? { type: 'pass', to: i.to } : null;
       return null;

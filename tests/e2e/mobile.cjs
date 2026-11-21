@@ -189,6 +189,18 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
   await page.waitForFunction(() => window.__toybox.hubplay.state().holding, null, { timeout: 120000, polling: 200 }).catch(() => null);
   await btnText('Hold');
   check('touch: Pick up takes the ball; the button now reads Hold (to throw)', (await hp()).holding && ((await page.textContent('.touch-btn--interact').catch(() => '')) || '').includes('Hold'));
+  // Sliding the thumb off the held button cancels the throw; lifting it then throws nothing.
+  const cb = await pressBtn(45);
+  await page.waitForFunction(() => window.__toybox.hubplay.state().charge !== null, null, { timeout: 120000, polling: 100 }).catch(() => null);
+  const charged = (await hp()).charge !== null;
+  await touch('touchMove', [[cb.x + cb.width / 2 - 150, cb.y + cb.height / 2 - 70, 45]]);
+  await page.waitForFunction(() => window.__toybox.hubplay.state().charge === null, null, { timeout: 120000, polling: 100 }).catch(() => null);
+  const offClass = (await page.getAttribute('.touch-btn--interact', 'class').catch(() => '')) || '';
+  const slid = await hp();
+  await touch('touchEnd', []);
+  await page.waitForTimeout(1500);
+  const after = await hp();
+  check('touch: sliding the thumb off the held button cancels the throw; lifting it throws nothing', charged && slid.charge === null && offClass.includes('is-cancelled') && after.holding && after.charge === null, `charged ${charged}, class "${offClass}", holding ${after.holding}`);
   await pressBtn(42);
   await page.waitForFunction(() => (window.__toybox.hubplay.state().charge ?? 0) > 0.3, null, { timeout: 120000, polling: 100 }).catch(() => null);
   await page.waitForFunction(() => document.querySelector('[data-testid=hubplay-meter]')?.style.display !== 'none', null, { timeout: 120000, polling: 100 }).catch(() => null);
@@ -197,7 +209,7 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
   await page.screenshot({ path: `${OUT}/mobile-10-hubplay-charge-landscape.png` });
   await touch('touchEnd', []);
   await page.waitForFunction(() => !window.__toybox.hubplay.state().holding, null, { timeout: 120000, polling: 100 }).catch(() => null);
-  check('touch: holding the button charges (meter on screen), letting go throws', ch.charge > 0.3 && !!meterBox && meterBox.y > 0 && meterBox.y + meterBox.height < 412 && !(await hp()).holding, `charge ${ch.charge?.toFixed(2)} meter ${JSON.stringify(meterBox)}`);
+  check('touch: holding the button charges (meter on screen), letting go throws', ch.charge !== null && !!meterBox && meterBox.y > 0 && meterBox.y + meterBox.height < 412 && !(await hp()).holding, `charge ${ch.charge?.toFixed(2)} meter ${JSON.stringify(meterBox)}`);
 
   // The dog stands up at the spawn table: the Interact button reads Pet, and a tap pets it (a heart).
   await page.evaluate(() => window.__toybox.dog.patience(120)); // software GL: slow frames

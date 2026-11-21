@@ -227,7 +227,7 @@ export function playHubCue(cue: HubCue, volume = 1) {
  * Hoop Hustle's own cues (the ball itself uses the Hub's: swish, rim, board, bounce, throw). A toy
  * scoreboard buzzer, the gold-ball chime and the hoop's wind-up track ratcheting before it slides.
  */
-export type HoopCue = 'buzzer' | 'gold' | 'windup' | 'charge';
+export type HoopCue = 'buzzer' | 'gold' | 'windup' | 'charge' | 'uncharge';
 export function playHoopCue(cue: HoopCue, volume = 1) {
   if (!live()) return;
   const t = now(), k = Math.max(0, Math.min(1, volume));
@@ -241,6 +241,8 @@ export function playHoopCue(cue: HoopCue, volume = 1) {
       tone(660, t + .95, .08*k, .3, 'sine', .004, 990); break;
     case 'charge': // the throw button goes down: a soft spring creak
       tone(300, t, .04*k, .12, 'triangle', .01, 420); break;
+    case 'uncharge': // a held shot is cancelled: the spring lets go, creaking back down
+      tone(420, t, .04*k, .14, 'triangle', .01, 240); noise(t + .02, .03*k, .05, 1200, .6, 'lowpass'); break;
   }
 }
 

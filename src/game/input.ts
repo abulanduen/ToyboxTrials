@@ -43,6 +43,14 @@ const isVoiceAction = (a: InputAction): a is VoiceAction => a in VOICE_KEYS;
  */
 const voicePresses: Record<VoiceAction, number> = { talk: 0 };
 
+/**
+ * The right mouse button, as a binding code like a key's (`MouseRight`): bindings may list it, and
+ * it is held / pressed like a key. Only the right button: the left one is each scene's own (look,
+ * aim, shoot), and the right one is otherwise only the Hub's (unused) and Hoop Clash's pass, which
+ * its own bindings leave out.
+ */
+export const MOUSE_RIGHT = 'MouseRight';
+
 export const HUB_BINDINGS: Record<Action, string[]> = {
   forward: ['KeyW', 'ArrowUp'],
   back: ['KeyS', 'ArrowDown'],
@@ -52,6 +60,9 @@ export const HUB_BINDINGS: Record<Action, string[]> = {
   interact: ['KeyE', 'Enter'],
   run: ['ShiftLeft', 'ShiftRight'],
   pause: ['Escape', 'KeyP'],
+  // Drop a held basketball shot without shooting (src/minigames/shared/shotMeter.ts). X is free in
+  // the Hub and in every game that spreads these bindings; those games ignore the action.
+  cancel: ['KeyX', MOUSE_RIGHT],
   slot1: [],
   slot2: [],
   slot3: [],
@@ -68,6 +79,7 @@ export const SLOT_BINDINGS: Record<Action, string[]> = {
   interact: [],
   run: [],
   pause: ['Escape', 'KeyP'],
+  cancel: [],
   slot1: ['KeyA', 'Digit1', 'ArrowLeft'],
   slot2: ['KeyS', 'Digit2', 'ArrowDown'],
   slot3: ['KeyJ', 'Digit3', 'ArrowUp'],
@@ -139,6 +151,19 @@ function onKeyDown(e: KeyboardEvent) {
 function onKeyUp(e: KeyboardEvent) {
   down.delete(e.code);
 }
+// The right mouse button, held and pressed like a key (mouse events fire for every button, even one
+// pressed while another is already down, which pointer events report only as a move).
+function onMouseDown(e: MouseEvent) {
+  if (e.button !== 2 || isTypingTarget(e.target)) return;
+  if (!down.has(MOUSE_RIGHT)) {
+    pressedThisFrame.add(MOUSE_RIGHT);
+    logKeyPress(MOUSE_RIGHT, e.timeStamp);
+  }
+  down.add(MOUSE_RIGHT);
+}
+function onMouseUp(e: MouseEvent) {
+  if (e.button === 2) down.delete(MOUSE_RIGHT);
+}
 function onBlur() {
   down.clear();
   virtualDown.clear();
@@ -151,6 +176,8 @@ export function installInput() {
   installed = true;
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('keyup', onKeyUp);
+  window.addEventListener('mousedown', onMouseDown);
+  window.addEventListener('mouseup', onMouseUp);
   window.addEventListener('blur', onBlur);
 }
 

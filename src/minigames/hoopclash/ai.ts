@@ -15,6 +15,7 @@ import { STEAL_GUARD, inSnatchReach } from '../../game/hubPlaySim';
 import { courtBallAirborne, solveCourtShot, type CourtHoop } from '../shared/courtBall';
 import { COURT, HOOPS, inCourt, offAxis } from './court';
 import type { HoopInput, HoopPlayer, HoopState } from './rules';
+import { holdForPower } from '../shared/shotMeter';
 import { CHARGE_MS, attackHoop, bestOpenMate, bodyOf, defendHoop, isDribbling, laneClearance, playerById } from './rules';
 
 export interface AiMemory {
@@ -70,7 +71,8 @@ export function aiDecide(s: HoopState, p: HoopPlayer, diff: BotDifficulty, rnd: 
     const l = Math.hypot(dx, dz) || 1;
     const sol = solveCourtShot(l, offAxis(att, p));
     const power = Math.max(0, Math.min(1, (sol?.power ?? 0.95) + (Number.isFinite(mem.err) ? mem.err : 0)));
-    return [{ type: 'in', ax: dx / l, ay: -dz / l, run: false, act: p.charge < power * CHARGE_MS - 8 }];
+    // Let go on the meter's first rise (held on, it would wind back down).
+    return [{ type: 'in', ax: dx / l, ay: -dz / l, run: false, act: p.charge < holdForPower(power, CHARGE_MS) - 8 }];
   }
   mem.err = NaN;
 

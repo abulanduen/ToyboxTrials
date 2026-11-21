@@ -21,7 +21,13 @@ loop, west of the avenue, facing it (Toybox Siege's mirror). Owner-approved desi
   (0.7 s) to a new free spot: a ring chosen evenly among rings with room, then a spot on it, from
   `subSeed(seed, "<id>:spot:<makes>")`. A spot is reserved the moment the hop starts, so no two toys
   ever share one.
-- **Throwing:** hold to charge (0 → full in 1.1 s, the Hub's charge), let go to throw. One ball per
+- **Throwing:** hold to charge, let go to throw. The meter is the shared shot meter
+  (`src/minigames/shared/shotMeter.ts`, also the Hub's and Hoop Clash's): it winds up from empty to
+  full in 1.1 s, then back down to empty in the next 1.1 s, and so on while held (owner request,
+  21 Nov 2026: "wind back and forth", so timing the release matters and holding on never parks it
+  at full). Letting go throws at the power the meter shows. **Cancel** (X, the right mouse button, or
+  sliding the thumb off the Throw button) drops the charge without a throw (`cancel` input,
+  `hh-cancel` event); the button must come up before it charges again. One ball per
   toy: the next arrives 0.35 s after a miss is decided, or when a hop lands. A shot is decided when it
   drops through the rim (make) or first touches the court (miss; "short" or "long" for the HUD).
 - **Aim assist (the Hub's):** a facing within 0.75 rad of the hoop bends onto it.
@@ -45,16 +51,20 @@ loop, west of the avenue, facing it (Toybox Siege's mirror). Owner-approved desi
   points.
 - **Bots:** wait 0.8–1.5 s (easy), 0.5–1.0 s (normal) or 0.32–0.65 s (hard) with a ball in hand, pick
   a release time when the (sliding) hoop has a perfect power, charge for as long as their intended
-  power needs and let go. Intended power = perfect + a seeded error (sd 0.09 / 0.062 / 0.04), so they
+  power needs on the meter's first rise (`holdForPower`), and let go. Intended power = perfect + a seeded error (sd 0.09 / 0.062 / 0.04), so they
   miss short or long. Measured in an 8-bot match (seed 99): about 40 % / 52 % / 68 % of shots made.
 
 ## Controls
 
 - Desktop: A / D or the arrow keys turn the aim; the mouse aims too (point on the court). Hold Space,
-  E or the left mouse button to charge; let go to throw.
+  E or the left mouse button to charge (the meter winds up and back); let go to throw. X or the right
+  mouse button cancels.
 - Touch: the floating joystick (lower left) aims, relative to the camera (up is towards the hoop). The
-  big Throw button (lower right) is held to charge and let go to throw; it acts on pointer-down, so it
-  works while the other thumb holds the stick.
+  big Throw button (lower right) is held to charge and let go to throw; sliding the thumb off it
+  cancels (the shared hold-to-shoot button, `src/minigames/shared/holdToShoot.ts`). It acts on
+  pointer-down, so it works while the other thumb holds the stick.
+- The meter's needle carries a chevron pointing the way it is winding, and the fill fades on the way
+  back down (`shotMeterView.ts`, `shotMeter.css`).
 
 ## Online
 

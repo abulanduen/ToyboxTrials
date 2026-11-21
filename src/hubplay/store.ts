@@ -29,6 +29,7 @@ export const useHubPlay = create<HubPlayUi>()((set) => ({
 
 /**
  * The throw meter's fill element, written by the frame loop (style only, no React state): the
- * HUD registers it, the scene sets its width while you charge a throw.
+ * HUD registers it, the scene sets its width (and the needle's place and direction: the meter winds
+ * back and forth, src/minigames/shared/shotMeter.ts) while you charge a throw.
  */
-export const meter = { el: null as HTMLElement | null, wrap: null as HTMLElement | null };
+export const meter = { el: null as HTMLElement | null, wrap: null as HTMLElement | null, needle: null as HTMLElement | null };

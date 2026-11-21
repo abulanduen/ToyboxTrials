@@ -132,6 +132,30 @@ const check = (name, ok, detail = '') => { results.push(`${ok ? 'PASS' : 'FAIL'}
   await waitHp(() => window.__toybox.hubplay.state().holding);
   await page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Hold to throw'), null, { timeout: 60000 }).catch(() => null);
   check('E picks the ball up; the prompt becomes Hold to throw', (await hp()).holding && (await promptHas('Hold to throw')));
+  // The throw meter winds up and back down while E is held (the power is read on the page's own
+  // clock, so slow software-GL frames don't matter; the needle is painted by frames, so only its
+  // turn-round is checked), and X cancels the throw.
+  await page.keyboard.down('KeyE');
+  await waitHp(() => window.__toybox.hubplay.state().charge !== null, null, 60000);
+  const wind = [];
+  for (let i = 0; i < 60; i++) {
+    wind.push(await T(() => { const s = window.__toybox.hubplay.state(); return { c: s.charge, up: s.rising, dir: document.querySelector('[data-testid=hubplay-meter]')?.dataset.dir ?? '' }; }));
+    const peak = wind.findIndex((w) => w.c !== null && w.c > 0.85);
+    if (peak >= 0 && wind.slice(peak).some((w) => w.c !== null && !w.up && w.c < 0.7) && wind.some((w) => w.dir === 'down')) break;
+    await page.waitForTimeout(120);
+  }
+  const peakAt = wind.findIndex((w) => w.c !== null && w.c > 0.85);
+  const fellBack = peakAt >= 0 && wind.slice(peakAt).some((w) => w.c !== null && !w.up && w.c < 0.7);
+  check('held, the throw meter winds up to full and back down (not parked at full); its needle shows the way', fellBack && wind.every((w) => w.c === null || (w.c >= 0 && w.c <= 1)) && wind.some((w) => w.dir === 'down'), wind.map((w) => `${w.c === null ? '-' : w.c.toFixed(2)}${w.up ? '↑' : '↓'}${w.dir}`).join(' '));
+  await page.screenshot({ path: `${OUT}/14a-hubplay-meter-winding.png` });
+  await page.keyboard.press('KeyX');
+  await waitHp(() => window.__toybox.hubplay.state().charge === null, null, 30000);
+  await waitHp(() => document.querySelector('[data-testid=hubplay-meter]')?.style.display === 'none', null, 60000);
+  const cancelled = await hp();
+  await page.keyboard.up('KeyE');
+  await page.waitForTimeout(1500);
+  const kept = await hp();
+  check('X cancels the throw: the meter goes, letting go of E throws nothing, the ball stays in hand', cancelled.charge === null && cancelled.holding && kept.holding && kept.charge === null && (await page.isHidden('[data-testid=hubplay-meter]')), `charge ${cancelled.charge}, holding ${kept.holding}`);
   await page.keyboard.down('KeyE');
   await waitHp(() => (window.__toybox.hubplay.state().charge ?? 0) > 0.3, null, 60000);
   await waitHp(() => document.querySelector('[data-testid=hubplay-meter]')?.style.display !== 'none', null, 120000);
@@ -142,7 +166,7 @@ const check = (name, ok, detail = '') => { results.push(`${ok ? 'PASS' : 'FAIL'}
   await page.keyboard.up('KeyE');
   await waitHp(() => { const s = window.__toybox.hubplay.state(); return !s.holding && !s.ball.held; });
   const thrown = await hp();
-  check('holding E charges (meter and arc preview showing); letting go throws', charging.charge > 0.3 && meterShown && arcDots > 3 && !thrown.holding && !thrown.ball.held, `charge ${charging.charge?.toFixed(2)}, meter ${meterShown}, arc ${arcDots} dots`);
+  check('holding E again charges (meter and arc preview showing); letting go throws', charging.charge !== null && meterShown && arcDots > 3 && !thrown.holding && !thrown.ball.held, `charge ${charging.charge?.toFixed(2)}, meter ${meterShown}, arc ${arcDots} dots`);
   // software GL runs a few frames a second here, so the flight takes a while: wait until it rests
   await waitHp(() => window.__toybox.hubplay.state().ballRest, null, 400000);
   // a basket: pick it up where it landed, then throw from in front of the hoop with the solved power

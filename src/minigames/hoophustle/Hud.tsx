@@ -3,20 +3,22 @@
  * meter (with its gold zone: let go there and the throw is perfect), "+2!" popups, and banners
  * for the sliding hoop and the gold balls. On touch screens: the floating joystick (aim) on the
  * left and a big hold-to-throw button on the right; the button fires on pointer-down, so it works
- * while the other thumb holds the stick.
+ * while the other thumb holds the stick, and sliding off it cancels the throw (the shared
+ * hold-to-shoot button). The meter winds up and back down while held (shared shot meter).
  *
  * Re-rendered by a 10 Hz timer; the charge meter is written straight to the DOM every frame.
  */
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { pressVirtual, releaseVirtual } from '../../game/input';
-import { unlockAudio } from '../../game/audio';
+import { useEffect, useRef, useState } from 'react';
+import { releaseVirtual } from '../../game/input';
 import { useGame } from '../../game/store';
+import { useHoldToShoot } from '../shared/holdToShoot';
+import { paintShotMeter } from '../shared/shotMeterView';
 import { MoveTouch } from '../shared/MoveTouch';
 import { useMatch } from '../session';
 import type { MinigameSceneProps } from '../types';
 import { VALUE_COLOURS } from './Scene';
 import { assistBand, assistedThrow, canShoot, type HoopState } from './rules';
-import { cancelHoopCharge, localAim, localCharge } from './local';
+import { cancelHoopCharge, localAim, localCharge, localChargeRising } from './local';
 import './hoophustle.css';
 
 const VALUE_NAME = ['', '1-point spot', '2-point spot', '3-point spot'];
@@ -36,47 +38,23 @@ function bannerFor(s: HoopState): { text: string; sub: string; tone: 'warn' | 's
   return null;
 }
 
-/** The hold-to-throw button: presses `slot1` while a finger (or the mouse) holds it. */
+/** The hold-to-throw button: presses `slot1` while a finger (or the mouse) holds it; slide off to cancel. */
 function ThrowButton({ gold, ready }: { gold: boolean; ready: boolean }) {
-  const held = useRef<number | null>(null);
-  const [down, setDown] = useState(false);
-  useEffect(() => () => releaseVirtual('slot1'), []);
-  const release = (e?: ReactPointerEvent<HTMLButtonElement>) => {
-    if (e && held.current !== e.pointerId) return;
-    held.current = null;
-    setDown(false);
-    releaseVirtual('slot1');
-  };
+  const { props, down, cancelled } = useHoldToShoot('slot1');
   return (
     <button
       type="button"
-      className={`hh-throw${down ? ' is-down' : ''}${gold ? ' is-gold' : ''}${ready ? '' : ' is-waiting'}`}
+      className={`hh-throw${down ? ' is-down' : ''}${cancelled ? ' is-cancelled' : ''}${gold ? ' is-gold' : ''}${ready ? '' : ' is-waiting'}`}
       data-testid="hh-throw"
-      aria-label="Throw: hold to charge, let go to shoot"
-      onPointerDown={(e) => {
-        if (e.button !== 0) return;
-        e.preventDefault();
-        unlockAudio();
-        try {
-          e.currentTarget.setPointerCapture(e.pointerId);
-        } catch {
-          // (a pointer that is not active, e.g. a synthetic event: the button still holds until pointer-up)
-        }
-        held.current = e.pointerId;
-        setDown(true);
-        pressVirtual('slot1');
-      }}
-      onPointerUp={release}
-      onPointerCancel={release}
-      onLostPointerCapture={release}
-      onContextMenu={(e) => e.preventDefault()}
+      aria-label="Throw: hold to charge, let go to shoot, slide off to cancel"
+      {...props}
     >
       <svg viewBox="0 0 40 40" width="38" height="38" aria-hidden>
         <circle cx="20" cy="20" r="15" fill={gold ? '#EFAE45' : '#E8893F'} stroke="#2B2433" strokeWidth="2.5" />
         <path d="M5 20h30M20 5v30M9 9c6 5 6 17 0 22M31 9c-6 5-6 17 0 22" fill="none" stroke="#2B2433" strokeWidth="1.8" />
       </svg>
-      <span>Throw</span>
-      <small>hold · let go</small>
+      <span>{cancelled ? 'Cancelled' : 'Throw'}</span>
+      <small>{cancelled ? 'let go' : 'hold · let go'}</small>
     </button>
   );
 }
@@ -89,6 +67,7 @@ export function HoopHud({ getState: rawGet, contestants }: MinigameSceneProps<Ho
   const touch = useGame((s) => s.touchUI);
   const [, refresh] = useState(0);
   const fill = useRef<HTMLDivElement>(null);
+  const needle = useRef<HTMLElement>(null);
   const zone = useRef<HTMLDivElement>(null);
   const meter = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -101,7 +80,7 @@ export function HoopHud({ getState: rawGet, contestants }: MinigameSceneProps<Ho
       const me = s?.kind === 'hoop-hustle' ? s.players.find((p) => p.id === useMatch.getState().localId) : undefined;
       if (!s || s.kind !== 'hoop-hustle' || !me || !meter.current || !fill.current || !zone.current) return;
       const charge = localCharge(s);
-      fill.current.style.transform = `scaleX(${(charge ?? 0).toFixed(3)})`;
+      paintShotMeter({ wrap: meter.current, fill: fill.current, needle: needle.current }, charge, localChargeRising(s));
       const sp = s.spots[me.spot];
       const shot = canShoot(s, me) ? assistedThrow(s, sp, localAim() ?? me.yaw, charge ?? 0, s.t) : null;
       const band = assistBand(s.config, sp);
@@ -202,9 +181,12 @@ export function HoopHud({ getState: rawGet, contestants }: MinigameSceneProps<Ho
         <div className={`hh-meter${touch ? ' hh-meter--touch' : ''}`} ref={meter} data-testid="hh-meter" aria-hidden>
           <div className="hh-meter__bar">
             <div className="hh-meter__zone" ref={zone} />
-            <div className="hh-meter__fill" ref={fill} />
+            <div className="hh-meter__fill shot-fill" ref={fill} />
+            <i className="shot-needle" ref={needle} />
           </div>
-          <span className="hh-meter__label">{me.holding ? 'Let go in the gold zone' : me.move ? 'Hopping…' : 'Next ball…'}</span>
+          <span className="hh-meter__label">
+            {me.holding ? (touch ? 'Let go in the gold zone · slide off to cancel' : 'Let go in the gold zone · X or right click: cancel') : me.move ? 'Hopping…' : 'Next ball…'}
+          </span>
         </div>
       )}
 
@@ -218,7 +200,7 @@ export function HoopHud({ getState: rawGet, contestants }: MinigameSceneProps<Ho
           </div>
         </>
       )}
-      {active && !touch && <div className="hh-hint">A / D or mouse: aim · hold Space, E or click: charge · let go: throw</div>}
+      {active && !touch && <div className="hh-hint">A / D or mouse: aim · hold Space, E or click: wind up · let go: throw · X or right click: cancel</div>}
     </div>
   );
 }

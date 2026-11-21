@@ -1,15 +1,16 @@
 /**
  * Hoop Clash HUD: the scoreboard (Red – Blue, the game clock, the half, the shot clock), your team,
  * who has the ball, announcements (jump ball, baskets, violations, halftime, overtime), your shot's
- * charge meter, and on touch screens the joystick plus a hold-to-shoot button (Steal / Grab when
- * you don't have the ball) and a Pass button that work with two thumbs. The results card adds the
- * team totals and every toy's points.
+ * charge meter (the shared shot meter: it winds up and back down while held), and on touch screens
+ * the joystick plus a hold-to-shoot button (Steal / Grab when you don't have the ball; slide off it
+ * to cancel a shot) and a Pass button that work with two thumbs. The results card adds the team
+ * totals and every toy's points.
  *
  * The HUD re-renders a few times a second on a timer; the charge meter is moved in a rAF loop
  * through a ref. Nothing here changes per frame through React state.
  */
 import { useEffect, useRef, useState } from 'react';
-import { pressVirtual, releaseVirtual, tapVirtual } from '../../game/input';
+import { releaseVirtual, tapVirtual } from '../../game/input';
 import { unlockAudio } from '../../game/audio';
 import { useGame } from '../../game/store';
 import { gameById } from '../registry';
@@ -17,8 +18,11 @@ import { matchBus, useMatch } from '../session';
 import type { MinigameSceneProps } from '../types';
 import { MoveTouch } from '../shared/MoveTouch';
 import { tapButton } from '../shared/tapButton';
+import { useHoldToShoot } from '../shared/holdToShoot';
+import { shotRising } from '../shared/shotMeter';
+import { paintShotMeter } from '../shared/shotMeterView';
 import { TEAMS } from './court';
-import { CHARGE_MS, type HoopState } from './rules';
+import { CHARGE_MS, shotPreview, type HoopState } from './rules';
 import { arcState, TEAM_COLOURS } from './Scene';
 import './hoopclash.css';
 
@@ -47,7 +51,8 @@ export function HoopHud({ getState: rawState, localId, contestants }: MinigameSc
   const [banner, setBanner] = useState<Banner | null>(null);
   const meter = useRef<HTMLDivElement>(null);
   const fill = useRef<HTMLDivElement>(null);
-  const [shootDown, setShootDown] = useState(false);
+  const needle = useRef<HTMLElement>(null);
+  const shoot = useHoldToShoot('interact');
   const title = gameById('hoop-clash').title;
 
   useEffect(() => {
@@ -60,7 +65,7 @@ export function HoopHud({ getState: rawState, localId, contestants }: MinigameSc
   useEffect(() => {
     if (paused) {
       releaseVirtual('interact');
-      setShootDown(false);
+      releaseVirtual('cancel');
     }
   }, [paused]);
 
@@ -71,11 +76,11 @@ export function HoopHud({ getState: rawState, localId, contestants }: MinigameSc
       raf = requestAnimationFrame(loop);
       const s = getState();
       const me = s?.players.find((p) => p.id === localId);
-      const on = !!me && me.charge >= 0 && s!.ball.holder === me.id;
-      if (meter.current) meter.current.style.display = on ? '' : 'none';
-      if (on && fill.current) {
-        fill.current.style.transform = `scaleX(${Math.min(1, me!.charge / CHARGE_MS).toFixed(3)})`;
-        meter.current!.classList.toggle('is-gold', arcState.gold);
+      const shot = s && me ? shotPreview(s, me.id) : null;
+      if (meter.current) meter.current.style.display = shot ? '' : 'none';
+      if (shot && meter.current) {
+        paintShotMeter({ wrap: meter.current, fill: fill.current, needle: needle.current }, shot.power, shotRising(me!.charge, CHARGE_MS));
+        meter.current.classList.toggle('is-gold', arcState.gold);
       }
     };
     raf = requestAnimationFrame(loop);
@@ -153,25 +158,6 @@ export function HoopHud({ getState: rawState, localId, contestants }: MinigameSc
   else ballLine = { text: s.shot ? 'Shot up!' : 'Loose ball' };
 
   const verb = inbounding ? 'Pass in' : iHold ? 'Shoot' : holder && me && holder.team !== me.team ? 'Steal' : 'Grab';
-  const shootHandlers = {
-    onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => {
-      if (e.button !== 0) return;
-      e.preventDefault();
-      unlockAudio();
-      e.currentTarget.setPointerCapture(e.pointerId);
-      setShootDown(true);
-      pressVirtual('interact');
-    },
-    onPointerUp: () => {
-      setShootDown(false);
-      releaseVirtual('interact');
-    },
-    onPointerCancel: () => {
-      setShootDown(false);
-      releaseVirtual('interact');
-    },
-    onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
-  };
 
   return (
     <div className="hc-hud" data-testid="hc-hud">
@@ -213,8 +199,9 @@ export function HoopHud({ getState: rawState, localId, contestants }: MinigameSc
       )}
       {inbounding && <div className="hc-tip" data-testid="hc-inbound-tip">Your inbound: face a teammate and pass {touch ? '(Pass)' : '(Q, E or right click)'}</div>}
       <div className="hc-meter" ref={meter} style={{ display: 'none' }} data-testid="hc-meter" aria-hidden>
-        <div ref={fill} />
-        <span>{touch ? 'Let go to shoot' : 'Let go to shoot · gold arc goes in'}</span>
+        <div ref={fill} className="shot-fill" />
+        <i className="shot-needle" ref={needle} />
+        <span>{touch ? 'Let go to shoot · slide off to cancel' : 'Let go to shoot · gold arc goes in · X: cancel'}</span>
       </div>
       {touch && live && me && (
         <>
@@ -228,13 +215,18 @@ export function HoopHud({ getState: rawState, localId, contestants }: MinigameSc
             })}>
               <span>{iHold || inbounding ? 'Pass' : 'Call'}</span>
             </button>
-            <button className={`hc-btn hc-btn--shoot${shootDown ? ' is-down' : ''}`} data-testid="hc-shoot" aria-label={verb} {...shootHandlers}>
-              <span>{verb}</span>
+            <button
+              className={`hc-btn hc-btn--shoot${shoot.down ? ' is-down' : ''}${shoot.cancelled ? ' is-cancelled' : ''}`}
+              data-testid="hc-shoot"
+              aria-label={verb}
+              {...shoot.props}
+            >
+              <span>{shoot.cancelled ? 'Cancelled' : verb}</span>
             </button>
           </div>
         </>
       )}
-      {!touch && <div className="hc-hint">{title}: W A S D move · Shift sprint · hold E, Space or click to shoot · Q or right click to pass</div>}
+      {!touch && <div className="hc-hint">{title}: W A S D move · Shift sprint · hold E, Space or click to shoot · X cancels · Q or right click to pass</div>}
     </div>
   );
 }

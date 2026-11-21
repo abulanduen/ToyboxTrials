@@ -14,6 +14,7 @@ import { unlockAudio } from '../game/audio';
 import { useGame } from '../game/store';
 import { GearIcon } from './icons';
 import { TouchEmotes } from './OnlineUI';
+import { useHoldToShoot } from '../minigames/shared/holdToShoot';
 
 const STICK_RADIUS = 52; // px the knob can travel
 
@@ -124,6 +125,20 @@ function HoldButton({ action, className, label, children }: { action: Action; cl
   );
 }
 
+/**
+ * Interact: held like the other buttons (holding it with the basketball winds the throw meter back
+ * and forth; letting go throws), and sliding the finger off it cancels a throw (the shared
+ * hold-to-shoot button, src/minigames/shared/holdToShoot.ts).
+ */
+function InteractButton({ label, children }: { label: string; children: React.ReactNode }) {
+  const { props, down, cancelled } = useHoldToShoot('interact');
+  return (
+    <button className={`touch-btn touch-btn--interact${down ? ' is-down' : ''}${cancelled ? ' is-cancelled' : ''}`} aria-label={label} {...props}>
+      {children}
+    </button>
+  );
+}
+
 export function TouchControls() {
   const prompt = useGame((s) => s.prompt);
   const togglePause = useGame((s) => s.togglePause);
@@ -132,10 +147,10 @@ export function TouchControls() {
       <Joystick />
       <div className="touch-buttons">
         {prompt && (
-          <HoldButton action="interact" className="touch-btn touch-btn--interact" label={`${prompt.verb} ${prompt.label}`}>
+          <InteractButton label={`${prompt.verb} ${prompt.label}`}>
             {/* "Repaint at" → "Repaint": the full phrase is on the prompt pill */}
             <span className="touch-btn__verb">{prompt.verb.split(' ')[0]}</span>
-          </HoldButton>
+          </InteractButton>
         )}
         <HoldButton action="jump" className="touch-btn touch-btn--jump" label="Jump">
           <span>Jump</span>

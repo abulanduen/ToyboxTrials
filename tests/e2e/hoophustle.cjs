@@ -200,6 +200,59 @@ const boxesOverlap = (a, b) => a && b && a.x < b.x + b.width && b.x < a.x + a.wi
       assert.equal((await me()).shots, shots, 'the charge was dropped, not thrown');
       assert.equal((await me()).charging, false);
 
+      // ----- held, the meter winds up to full and back down (the shared shot meter); cancel drops it
+      await quietBots();
+      await page.waitForFunction(() => { const p = window.__toybox.match.state().players.find((q) => q.id === 'you'); return p.holding && !p.move; });
+      const meterNow = () => page.evaluate(() => { const m = document.querySelector('[data-testid=hh-meter]'); return { power: parseFloat(m?.dataset.power ?? 'NaN'), dir: m?.dataset.dir ?? '', charging: !!m?.classList.contains('is-charging'), falling: !!m?.classList.contains('is-falling') }; });
+      let touchFinger = null;
+      let throwBox = null;
+      const pressThrow = async () => {
+        if (!mobile) return page.keyboard.down('Space');
+        touchFinger = await page.context().newCDPSession(page);
+        throwBox = await page.getByTestId('hh-throw').boundingBox();
+        await touchFinger.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: throwBox.x + throwBox.width / 2, y: throwBox.y + throwBox.height / 2, id: 6 }] });
+      };
+      const releaseThrow = async () => {
+        if (!mobile) return page.keyboard.up('Space');
+        await touchFinger.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        await touchFinger.detach();
+      };
+      const shots1 = (await me()).shots;
+      await pressThrow();
+      await page.waitForFunction(() => document.querySelector('[data-testid=hh-meter]')?.dataset.dir === 'up');
+      // Up past three quarters, then (held on) back down: the needle turns round.
+      await page.waitForFunction(() => parseFloat(document.querySelector('[data-testid=hh-meter]')?.dataset.power ?? '0') > 0.75);
+      await page.waitForFunction(() => { const m = document.querySelector('[data-testid=hh-meter]'); return m?.dataset.dir === 'down' && parseFloat(m.dataset.power) < 0.9; });
+      await page.evaluate(() => window.__toybox.match.timeScale(0));
+      const down = await meterNow();
+      assert.ok(down.charging && down.falling && down.power < 0.9 && down.power > 0, `${layout}: the meter winds back down while held (${JSON.stringify(down)})`);
+      assert.equal((await me()).charging, true, 'still charging on the way down');
+      await shot('meter-winding');
+      await page.evaluate(() => window.__toybox.match.timeScale(1));
+      // Cancel: X on a keyboard, sliding the thumb off the Throw button on a phone.
+      if (mobile) await touchFinger.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: throwBox.x - 150, y: throwBox.y - 60, id: 6 }] });
+      else await page.keyboard.press('KeyX');
+      await page.waitForFunction(() => !document.querySelector('.hh-meter.is-charging'));
+      await page.waitForFunction(() => !window.__toybox.match.state().players.find((p) => p.id === 'you').charging);
+      if (mobile) assert.match((await page.getByTestId('hh-throw').getAttribute('class')) ?? '', /is-cancelled/, 'the Throw button shows the cancel');
+      await releaseThrow();
+      await page.waitForFunction((t0) => window.__toybox.match.state().t > t0 + 500, (await state()).t);
+      assert.equal((await me()).shots, shots1, `${layout}: a cancelled charge throws nothing, even when let go`);
+      assert.equal((await me()).holding, true, 'the ball stays in hand');
+      if (!mobile) {
+        // The right mouse button cancels too (Space still held: it must come up before a new charge).
+        await page.keyboard.down('Space');
+        await page.waitForFunction(() => !!document.querySelector('.hh-meter.is-charging'));
+        await page.mouse.down({ button: 'right' });
+        await page.mouse.up({ button: 'right' });
+        await page.waitForFunction(() => !document.querySelector('.hh-meter.is-charging'));
+        await page.waitForTimeout(400);
+        assert.equal((await me()).charging, false, 'right click cancels; holding Space on does not start a new charge');
+        await page.keyboard.up('Space');
+        await page.waitForFunction((t0) => window.__toybox.match.state().t > t0 + 500, (await state()).t);
+        assert.equal((await me()).shots, shots1, 'a right-click cancel throws nothing');
+      }
+
       // ----- the twists: the hoop winds up and slides, then the gold ball
       await jumpTo(37500 - 1500);
       await page.waitForFunction(() => document.querySelector('[data-testid=hh-banner]')?.dataset.tone === 'warn');
@@ -230,7 +283,7 @@ const boxesOverlap = (a, b) => a && b && a.x < b.x + b.width && b.x < a.x + a.wi
       await page.locator('.pause__actions .toy-btn').nth(1).click();
       await page.waitForSelector('.hud-sign');
       assert.deepEqual(errors, []);
-      console.log(`PASS Hoop Hustle ${layout}: entry, HUD layout${mobile ? ' (joystick + Throw button, no overlaps)' : ''}, aim (${mobile ? 'joystick' : 'A/D and mouse'}), two gold-zone baskets${mobile ? ' with the stick held' : ''}, hop to a new spot, pause drops a charge, slide warning and slide, gold ball, results, record, restart, hub return; no console/page errors`);
+      console.log(`PASS Hoop Hustle ${layout}: entry, HUD layout${mobile ? ' (joystick + Throw button, no overlaps)' : ''}, aim (${mobile ? 'joystick' : 'A/D and mouse'}), two gold-zone baskets${mobile ? ' with the stick held' : ''}, hop to a new spot, pause drops a charge, the meter winds back down while held, cancel (${mobile ? 'slide off Throw' : 'X and right click'}) throws nothing, slide warning and slide, gold ball, results, record, restart, hub return; no console/page errors`);
       await page.close();
     }
   } finally {

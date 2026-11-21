@@ -50,6 +50,8 @@ export function selectGames(seed: number, count: number, pool: { id: MinigameId;
 /** Absent `group` means a party trial. */
 export const groupOf = (g: { group?: TrialGroup }): TrialGroup => g.group ?? 'party';
 export const isStrategy = (g: { group?: TrialGroup }) => groupOf(g) === 'strategy';
+/** Team trials (side against side) are never tournament rounds, whatever their eligibility says. */
+export const isTeamGame = (g: { group?: TrialGroup }) => groupOf(g) === 'team';
 
 /**
  * A tournament's trials, deterministically from `seed` (local and online tournaments both use this):
@@ -59,10 +61,11 @@ export const isStrategy = (g: { group?: TrialGroup }) => groupOf(g) === 'strateg
  * The pool is already filtered for the format and field (`poolForFormat`). Group membership
  * comes from each game's `group`, never its duration, so retuned lengths don't move a game.
  * Degenerate pools (no strategy trial for this field, or no party trial) fall back to what there is.
+ * Team trials never take part, even in a pool that holds them.
  */
 export function selectTournament(seed: number, format: TournamentFormat, pool: readonly { id: MinigameId; category: MinigameCategory; group?: TrialGroup }[]): MinigameId[] {
   const count = FORMATS[format].games;
-  const party = pool.filter((g) => !isStrategy(g));
+  const party = pool.filter((g) => groupOf(g) === 'party');
   const strategy = pool.filter(isStrategy);
   if (!FORMATS[format].finale || !strategy.length) return selectGames(seed, count, party);
   if (!party.length) return selectGames(seed, count, strategy);
@@ -88,14 +91,16 @@ export interface PoolEntry {
 /**
  * The games a tournament of `format` may draw from, for a field of `field` toys (when given).
  * A game with `eligibility.formats` only appears in those formats (the strategy trials: Normal
- * and Treasure, never Blitz — owner decisions, 19 and 20 Nov 2026). Used by local and online
- * tournaments; `selectTournament` then keeps strategy trials to the finale.
+ * and Treasure, never Blitz — owner decisions, 19 and 20 Nov 2026). Team trials are never in the
+ * pool (owner decision, 21 Nov 2026). Used by local and online tournaments; `selectTournament`
+ * then keeps strategy trials to the finale.
  */
 export function poolForFormat<G extends PoolEntry>(format: TournamentFormat, games: readonly G[], field?: number): G[] {
   return games.filter(
     (g) =>
       (g.status ?? 'playable') === 'playable' &&
       g.eligibility.tournament &&
+      !isTeamGame(g) &&
       (!g.eligibility.formats || g.eligibility.formats.includes(format)) &&
       (field === undefined || (field >= g.players.min && field <= g.players.max)),
   );

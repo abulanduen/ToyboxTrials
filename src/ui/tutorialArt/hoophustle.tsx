@@ -89,11 +89,11 @@ function Throw({ touch }: { touch?: boolean }) {
       {dots.map((d, i) => (
         <circle key={i} cx={d.x} cy={d.y} r={i === dots.length - 1 ? 4 : 3} fill={PALETTE.honey} {...thin} className="ta-glow" style={vars({ d: `${i * 0.05}s`, t: '1.6s' })} />
       ))}
-      {/* the charge meter, with its gold zone */}
+      {/* the charge meter, with its gold zone: it winds up and back down while held (still: in the gold zone) */}
       <g transform="translate(96 120)">
         <rect width={84} height={12} rx={6} fill={PALETTE.cream} {...line} />
         <rect x={44} width={14} height={12} fill={PALETTE.honey} stroke={PALETTE.brass} strokeWidth={1.4} />
-        <g className="ta-charge" style={vars({ ox: '0%', oy: '50%', t: '1.6s' })}>
+        <g className="ta-wind" style={vars({ ox: '0%', oy: '50%', t: '1.1s', k: '1.68' })}>
           <rect width={50} height={12} rx={6} fill={PALETTE.coral} opacity={0.7} />
         </g>
         <rect width={84} height={12} rx={6} fill="none" {...line} />

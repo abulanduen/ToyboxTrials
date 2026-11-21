@@ -28,8 +28,11 @@ export type MinigameCategory = 'memory' | 'survival' | 'observation' | 'reflex' 
  * 20 Nov 2026): `party` trials are the quick ones every format draws from; `strategy` trials are
  * the long, much more complex games (Toy Squad, Toybox Siege, Toy Tower Tumble) that only ever
  * close a Normal or Treasure tournament, as its finale. See tournament.ts `selectTournament`.
+ * `team` trials (owner decision, 21 Nov 2026: Hoop Clash) are played side against side, so they
+ * are never in a tournament, whose results rank every toy for itself: gate, practice and one-trial
+ * lobbies only (tournament.ts `poolForFormat` leaves the group out).
  */
-export type TrialGroup = 'party' | 'strategy';
+export type TrialGroup = 'party' | 'strategy' | 'team';
 
 export type BotDifficulty = 'easy' | 'normal' | 'hard';
 
@@ -136,7 +139,7 @@ export interface MinigameDefinition {
   tagline: string;
   description: string;
   category: MinigameCategory;
-  /** Party (default) or strategy: the pickers' sections and the tournament finale (see TrialGroup). */
+  /** Party (default), strategy or team: the pickers' sections, the tournament finale, and team games kept out of tournaments (see TrialGroup). */
   group?: TrialGroup;
   accent: string;
   players: { min: number; max: number };

@@ -20,6 +20,7 @@ const BINDINGS: Record<Action, string[]> = {
   interact: ['Enter', 'KeyE'],
   run: [],
   pause: ['Escape', 'KeyP'],
+  cancel: [],
   slot1: [],
   slot2: [],
   slot3: [],

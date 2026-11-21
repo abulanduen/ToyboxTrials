@@ -12,6 +12,8 @@ export type Action =
   | 'interact'
   | 'run'
   | 'pause'
+  /** Drop a held basketball shot without shooting (X, the right mouse button, or sliding off the touch button). */
+  | 'cancel'
   /** Four generic minigame slots (Copycat instruments, rhythm lanes, answer buttons…). */
   | 'slot1'
   | 'slot2'

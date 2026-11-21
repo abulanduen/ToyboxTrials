@@ -52,14 +52,17 @@ export function byLength<T extends { durationSec: readonly [number, number] }>(g
 
 // ------------------------------------------------------------------ trial groups, for the pickers
 /*
- * The pickers' two sections (practice list, host's trial picker). Membership is each game's own
+ * The pickers' three sections (practice list, host's trial picker). Membership is each game's own
  * `group` field (absent = party; see types.ts TrialGroup), so no UI keeps a list of its own.
  */
-export const GROUP_ORDER: readonly TrialGroup[] = ['party', 'strategy'];
+export const GROUP_ORDER: readonly TrialGroup[] = ['party', 'strategy', 'team'];
 export const GROUP_INFO: Record<TrialGroup, { label: string; blurb: string }> = {
   party: { label: 'Party games', blurb: 'Quick trials, in every tournament' },
   strategy: { label: 'Strategy games', blurb: 'Long and deeper: the Normal and Treasure finale' },
+  team: { label: 'Team games', blurb: 'Side against side, on their own: never in a tournament' },
 };
+/** Every section closed (the pickers start folded). */
+export const GROUPS_CLOSED: Readonly<Record<TrialGroup, boolean>> = { party: false, strategy: false, team: false };
 
 /** The games of one group, in the given order. */
 export function inGroup<T extends { group?: TrialGroup }>(games: readonly T[], group: TrialGroup): T[] {
