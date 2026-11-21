@@ -202,7 +202,7 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
   // The dog stands up at the spawn table: the Interact button reads Pet, and a tap pets it (a heart).
   await page.evaluate(() => window.__toybox.dog.patience(120)); // software GL: slow frames
   await page.evaluate(() => window.__toybox.dog.perch(0.2));
-  await page.evaluate(() => window.__toybox.teleport(-20, 30, 0));
+  await page.evaluate(() => window.__toybox.teleport(-30, 30, 0));
   await page.waitForFunction(() => window.__toybox.dog.visit().perched, null, { timeout: 120000, polling: 200 }).catch(() => null);
   await btnText('Pet');
   await pressBtn(43, 200);

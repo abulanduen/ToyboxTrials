@@ -224,7 +224,7 @@ const check = (name, ok, detail = '') => { results.push(`${ok ? 'PASS' : 'FAIL'}
   // The dog stands up at the spawn table now and then: Pet it (a heart each time); the tenth pet is a lick.
   await T(() => window.__toybox.dog.patience(120)); // software GL: pets come slowly here
   await T(() => window.__toybox.dog.perch(0.2));
-  await T(() => window.__toybox.teleport(-20, 30, 0));
+  await T(() => window.__toybox.teleport(-30, 30, 0));
   await page.waitForFunction(() => window.__toybox.dog.visit().perched, null, { timeout: 120000, polling: 200 }).catch(() => null);
   await page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Pet'), null, { timeout: 120000 }).catch(() => null);
   check('when the dog stands up at the table the prompt says Pet (the dog)', await promptHas('Pet', 'the dog'));
