@@ -213,14 +213,14 @@ fs.mkdirSync(OUT, { recursive: true });
             if (i === 1) {
               step({ [p.id]: [{ type: 'class', cls: 'ranger' }], [others[2].id]: [{ type: 'class', cls: 'ranger' }] });
               for (const q of s.players) { q.invuln = 1e12; q.xpNext = 1e9; }
-              kit(p, [['popgun', 4], ['chime', 2]], [['gears', 1]]);
+              kit(p, [['popgun', 4], ['spark', 2]], [['gears', 1]]);
               for (let n = 0; n < 500; n++) step({}, 16); // 8 s: the first dust bunnies arrive and fall
               p.xp = 0; p.xpNext = 3;
               const g = p.board.gems.find(x => !x.on);
               Object.assign(g, { on: true, kind: 0, v: 3, x: p.x, z: p.z, pull: true });
               step({}, 16);
               // A card that shows every kind of label: a level change that unlocks the secret upgrade
-              // (the Pop-Gun's partner is owned), a new passive that pairs with the Chime Burst, a new weapon.
+              // (the Pop-Gun's partner is owned), a new passive that pairs with Chain Lightning, a new weapon.
               p.choice.options = [{ kind: 'weapon', id: 'popgun', level: 5 }, { kind: 'passive', id: 'magnifier', level: 1 }, { kind: 'weapon', id: 'marbles', level: 1 }];
             }
             if (i === 2) {
@@ -228,7 +228,7 @@ fs.mkdirSync(OUT, { recursive: true });
               cards(p);
               p.xpNext = 1e9;
               // A middling kit, so the swarm is not wiped out before the photo.
-              kit(p, [['popgun', 3], ['chime', 2], ['yoyo', 2], ['marbles', 2]], [['gears', 1], ['magnifier', 1]]);
+              kit(p, [['popgun', 3], ['spark', 2], ['yoyo', 2], ['marbles', 2]], [['gears', 1], ['magnifier', 1]]);
               s.runT = 38000;
               for (let n = 0; n < 1450; n++) { step({}, 16); cards(p); } // the swarm builds; the Rag Bear arrives at 1:00
               const bear = p.board.bigs.find(b => b.on);
@@ -238,7 +238,7 @@ fs.mkdirSync(OUT, { recursive: true });
             if (i === 3) {
               // Every toy pulled out at 5:00, a moment of prep, then the arena with every build and a summoned Baron.
               kit(others[0], [['sweep', 5, true], ['yoyo', 4]], [['plating', 3]]);
-              kit(others[1], [['chime', 5, true], ['marbles', 4]], [['magnifier', 3]]);
+              kit(others[1], [['spark', 5, true], ['marbles', 4]], [['magnifier', 3]]);
               kit(others[2], [['popgun', 5], ['planes', 4]], [['gears', 2]]);
               p.horn = { level: 2, readyAt: 0 };
               s.players.forEach((q, k) => { q.level = 24 + 2 * k; });

@@ -92,7 +92,7 @@ function siegeKeep(v: Obj, viewer: string | null): Set<unknown> {
   return keep;
 }
 /** Pooled entity lists on a Siege board (each slot has `on`; the client never reads a dead slot's other fields). */
-const SIEGE_POOLS = ['mobs', 'projs', 'shots', 'gems', 'chests', 'blasts', 'fires', 'bigs'] as const;
+const SIEGE_POOLS = ['mobs', 'projs', 'shots', 'gems', 'chests', 'blasts', 'bigs'] as const;
 const DEAD_SLOT: Obj = Object.freeze({ on: false }) as Obj;
 /** A board as sent whole: every dead pool slot is just `{ on: false }` (no stale fields to copy, diff and send). */
 const siegeLive = (b: Obj): Obj => {
@@ -101,7 +101,7 @@ const siegeLive = (b: Obj): Obj => {
   return out;
 };
 /** A board cut to what other players need: no pooled entities, only its live elites (the HUD's send-limit check). */
-const siegeStub = (b: Obj): Obj => ({ ...b, mobs: [], projs: [], shots: [], gems: [], chests: [], blasts: [], fires: [], bigs: (b.bigs as Obj[]).filter((g) => g.on) });
+const siegeStub = (b: Obj): Obj => ({ ...b, mobs: [], projs: [], shots: [], gems: [], chests: [], blasts: [], bigs: (b.bigs as Obj[]).filter((g) => g.on) });
 
 /** Movement games (Red Light, Wind-Up Dash): the shared MoveInput. */
 function moveInput(i: Obj) {

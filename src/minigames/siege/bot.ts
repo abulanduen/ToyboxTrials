@@ -7,7 +7,7 @@
  */
 import type { BotPolicy } from '../types';
 import {
-  ARENA_HALF, CLASS_IDS, FINALE, WEAPONS, len, passiveLevel, reviveCost, standings,
+  ARENA_HALF, AURA, CLASS_IDS, FINALE, WEAPONS, len, passiveLevel, reviveCost, standings,
   type Option, type SiegeInput, type SiegePlayer, type SiegeState,
 } from './rules';
 
@@ -170,9 +170,9 @@ function arenaSteer(s: SiegeState, p: SiegePlayer, skill: 'easy' | 'normal' | 'h
   let t: SiegePlayer | null = null, best = Infinity;
   for (const q of s.players) if (q !== p && q.status === 'arena') { const d = (q.x - p.x) ** 2 + (q.z - p.z) ** 2; if (d < best) { best = d; t = q; } }
   let vx = 0, vz = 0;
+  const top = p.weapons.reduce((a, w) => (w.evolved ? w.level + 2 : w.level) > (a.evolved ? a.level + 2 : a.level) ? w : a, p.weapons[0]);
+  const close = !!top && (top.id === 'sweep' || top.id === 'yoyo');
   if (t) {
-    const top = p.weapons.reduce((a, w) => (w.evolved ? w.level + 2 : w.level) > (a.evolved ? a.level + 2 : a.level) ? w : a, p.weapons[0]);
-    const close = top && (top.id === 'sweep' || top.id === 'yoyo');
     const want = close ? 4 : skill === 'easy' ? 8 : 11;
     const dx = t.x - p.x, dz = t.z - p.z, d = len(dx, dz) || 1;
     const push = Math.max(-1, Math.min(1, (d - want) / 4));
@@ -188,11 +188,10 @@ function arenaSteer(s: SiegeState, p: SiegePlayer, skill: 'easy' | 'normal' | 'h
       if (g.mode === 1 && skill !== 'easy') { const sd = g.aimX * dz - g.aimZ * dx > 0 ? 1 : -1; vx += -g.aimZ * sd * 3; vz += g.aimX * sd * 3; }
       if (d < 9) { const k = (9 - d) / 9; vx += (dx / d) * 2.5 * k; vz += (dz / d) * 2.5 * k; }
     }
-    // Rival flame pools (Firebell Meteors) burn: step out of them.
-    const me = s.players.indexOf(p);
-    if (skill !== 'easy') for (const f of a.fires) {
-      if (!f.on || f.own === me) continue;
-      const dx = p.x - f.x, dz = p.z - f.z, d = len(dx, dz) || 1, edge = f.r + 2;
+    // A rival's Yo-Yo Cyclone whirlwind hurts: stay out of it (unless this toy fights up close itself).
+    if (skill !== 'easy' && !close) for (const q of s.players) {
+      if (q === p || q.status !== 'arena' || !q.weapons.some((w) => w.id === 'yoyo' && w.evolved)) continue;
+      const dx = p.x - q.x, dz = p.z - q.z, d = len(dx, dz) || 1, edge = AURA.radius * q.stat.area + 2;
       if (d < edge) { const k = (edge - d) / edge; vx += (dx / d) * 2.5 * k; vz += (dz / d) * 2.5 * k; }
     }
     if (skill !== 'easy') for (const sh of a.shots) {

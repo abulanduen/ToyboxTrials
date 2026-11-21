@@ -20,7 +20,7 @@ import { matchBus, useMatch } from '../session';
 import type { MinigameSceneProps } from '../types';
 import { fxShapeGeometry } from '../toysquad/Fx';
 import { TOY_MATERIAL, UNLIT_VERTEX_MATERIAL, bakeParts, toyGeometry } from '../toysquad/toys';
-import { ARENA_HALF, BIGS, FINALE, boardCounts, viewedBoard, viewedPlayer, weaponStats, yoyoAt, type Board, type SiegePlayer, type SiegeState } from './rules';
+import { ARENA_HALF, AURA, BIGS, FINALE, boardCounts, viewedBoard, viewedPlayer, weaponStats, yoyoAt, type Board, type SiegePlayer, type SiegeState } from './rules';
 import { BIG_MODEL, CHEST_PARTS, CLASS_PARTS, MOB_PARTS, SNACK_PARTS } from './models';
 import { ARENA, CLASS_COLOUR, FX, HURT_TINT, RING, SHOT_COLOUR, WEAPON_COLOUR, gemColour } from './look';
 import { CueLimiter, WEAPON_GAIN, eventCue, type SiegeCue } from './sounds';
@@ -87,9 +87,36 @@ const BEAM_GEOMETRY = new THREE.PlaneGeometry(1, 1).rotateX(-H).translate(0, 0, 
 const glow = (opacity: number) => new THREE.MeshBasicMaterial({ color: PALETTE.white, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide, toneMapped: false, blending: THREE.AdditiveBlending });
 const BEAM_GLOW = glow(0.55);
 const BEAM_CORE = glow(0.95);
-/** Flame pools: a soft burning disc and a brighter rim. */
-const FIRE_SOFT = fade(0.68);
-const FIRE_RIM = fade(0.75);
+/**
+ * A jagged lightning ribbon `width` wide along a fixed zig-zag (original, code-built). Flat (`vertical` false): on the
+ * floor plane from the origin along +z, 1 long (Chain Lightning leaps, scaled per leap). Vertical: two crossed
+ * ribbons from the origin up +y, 1 tall (Thunderhead's sky bolts), so it reads from any side.
+ */
+const ZAG = [0, 0.32, -0.22, 0.4, -0.3, 0.18, -0.36, 0.26, 0];
+function jagged(width: number, vertical: boolean): THREE.BufferGeometry {
+  const pos: number[] = [], idx: number[] = [], n = ZAG.length - 1, planes = vertical ? 2 : 1;
+  for (let pl = 0; pl < planes; pl++) {
+    const base = pos.length / 3;
+    for (let i = 0; i <= n; i++) {
+      const t = i / n, c = ZAG[i];
+      for (const side of [-0.5, 0.5]) {
+        const a = c + side * width;
+        if (!vertical) pos.push(a, 0, t);
+        else if (pl === 0) pos.push(a, t, 0);
+        else pos.push(0, t, a);
+      }
+      if (i < n) { const k = base + i * 2; idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx);
+  return g;
+}
+const BOLT_GLOW_GEOMETRY = jagged(0.9, false), BOLT_CORE_GEOMETRY = jagged(0.26, false);
+const SKY_GLOW_GEOMETRY = jagged(1.1, true), SKY_CORE_GEOMETRY = jagged(0.32, true);
+/** Yo-Yo Cyclone: a soft whirlwind disc. */
+const AURA_SOFT = fade(0.2);
 
 interface Particle { on: boolean; x: number; y: number; z: number; vx: number; vy: number; vz: number; age: number; life: number; size: number; shape: number; colour: THREE.Color; spin: number }
 
@@ -111,15 +138,18 @@ class SiegeView {
   private readonly shots: THREE.InstancedMesh;
   private readonly yoyos: THREE.InstancedMesh;
   private readonly marbles: THREE.InstancedMesh;
-  /** Prism Ray beams (a wide glow and a hot core), flame pools (disc, rim, flame tongues), Boiler Heart rivets. */
+  /** Prism Ray beams (a wide glow and a hot core), Chain Lightning leaps and sky bolts (glow and core), Boiler Heart rivets. */
   private readonly beamGlow: THREE.InstancedMesh;
   private readonly beamCore: THREE.InstancedMesh;
-  private readonly fireDiscs: THREE.InstancedMesh;
-  private readonly fireRims: THREE.InstancedMesh;
-  private readonly flames: THREE.InstancedMesh;
+  private readonly boltGlow: THREE.InstancedMesh;
+  private readonly boltCore: THREE.InstancedMesh;
+  private readonly skyGlow: THREE.InstancedMesh;
+  private readonly skyCore: THREE.InstancedMesh;
   private readonly rivets: THREE.InstancedMesh;
-  private readonly flamesPerPool: number;
-  private readonly mix = new THREE.Color();
+  /** Yo-Yo Cyclone whirlwinds: a soft disc, a rim and two sweeping arcs per toy that has one. */
+  private readonly auraDiscs: THREE.InstancedMesh;
+  private readonly auraRims: THREE.InstancedMesh;
+  private readonly auraArcs: THREE.InstancedMesh;
   private readonly rings: THREE.InstancedMesh;
   private readonly arcs: THREE.InstancedMesh;
   private readonly discs: THREE.InstancedMesh;
@@ -150,7 +180,7 @@ class SiegeView {
   private kills = 0;
   private readonly counts = [0, 0, 0, 0];
 
-  constructor(caps: { mobs: number; projs: number; shots: number; gems: number; blasts: number; chests: number; bigs: number; fires: number }, private readonly low: boolean) {
+  constructor(caps: { mobs: number; projs: number; shots: number; gems: number; blasts: number; chests: number; bigs: number }, private readonly low: boolean) {
     mobGeometry ??= MOB_PARTS.map((parts) => bakeParts(parts));
     chestGeometry ??= bakeParts(CHEST_PARTS);
     snackGeometry ??= bakeParts(SNACK_PARTS);
@@ -164,10 +194,13 @@ class SiegeView {
     this.marbles = instanced(fxShapeGeometry('orb'), UNLIT_VERTEX_MATERIAL, caps.blasts, 'siege-marbles');
     this.beamGlow = instanced(BEAM_GEOMETRY, BEAM_GLOW, caps.blasts, 'siege-beam-glow');
     this.beamCore = instanced(BEAM_GEOMETRY, BEAM_CORE, caps.blasts, 'siege-beam-core');
-    this.fireDiscs = instanced(DISC_GEOMETRY, FIRE_SOFT, caps.fires, 'siege-fire-discs');
-    this.fireRims = instanced(RING_GEOMETRY, FIRE_RIM, caps.fires, 'siege-fire-rims');
-    this.flamesPerPool = low ? 2 : 3;
-    this.flames = instanced(fxShapeGeometry('flame'), UNLIT_VERTEX_MATERIAL, caps.fires * this.flamesPerPool, 'siege-flames');
+    this.boltGlow = instanced(BOLT_GLOW_GEOMETRY, BEAM_GLOW, caps.blasts, 'siege-bolt-glow');
+    this.boltCore = instanced(BOLT_CORE_GEOMETRY, BEAM_CORE, caps.blasts, 'siege-bolt-core');
+    this.skyGlow = instanced(SKY_GLOW_GEOMETRY, BEAM_GLOW, caps.blasts, 'siege-sky-glow');
+    this.skyCore = instanced(SKY_CORE_GEOMETRY, BEAM_CORE, caps.blasts, 'siege-sky-core');
+    this.auraDiscs = instanced(DISC_GEOMETRY, AURA_SOFT, 8, 'siege-aura-discs');
+    this.auraRims = instanced(RING_GEOMETRY, FX_FLAT, 8, 'siege-aura-rims');
+    this.auraArcs = instanced(ARC_GEOMETRY, FX_FLAT, 16, 'siege-aura-arcs');
     this.rivets = instanced(fxShapeGeometry('orb'), UNLIT_VERTEX_MATERIAL, caps.projs, 'siege-rivets');
     this.rings = instanced(RING_GEOMETRY, FX_FLAT, caps.blasts + caps.bigs, 'siege-rings');
     this.arcs = instanced(ARC_GEOMETRY, FX_FLAT, caps.blasts, 'siege-arcs');
@@ -178,7 +211,7 @@ class SiegeView {
     this.chips = instanced(fxShapeGeometry('chip'), UNLIT_VERTEX_MATERIAL, pool, 'siege-chips');
     this.stars = instanced(fxShapeGeometry('star'), UNLIT_VERTEX_MATERIAL, pool, 'siege-stars');
     for (const m of [...this.mobs, this.gems, this.snacks, this.corks, this.planes, this.shots, this.yoyos, this.marbles, this.rings, this.arcs, this.discs, this.chests, this.chips, this.stars,
-      this.beamGlow, this.beamCore, this.fireDiscs, this.fireRims, this.flames, this.rivets]) this.group.add(m);
+      this.beamGlow, this.beamCore, this.boltGlow, this.boltCore, this.skyGlow, this.skyCore, this.rivets, this.auraDiscs, this.auraRims, this.auraArcs]) this.group.add(m);
     this.prevSerial = new Int32Array(caps.mobs); this.prevX = new Float32Array(caps.mobs); this.prevZ = new Float32Array(caps.mobs);
     this.prevBlast = new Int8Array(caps.blasts); this.prevProj = new Int8Array(caps.projs); this.prevBig = new Int32Array(caps.bigs); this.prevBigX = new Float32Array(caps.bigs); this.prevBigZ = new Float32Array(caps.bigs);
     this.heroShadow.scale.setScalar(1.3); this.heroShadow.position.y = 0.09;
@@ -374,21 +407,41 @@ class SiegeView {
     this.finish(this.corks, nk); this.finish(this.planes, np); this.finish(this.shots, nb); this.finish(this.yoyos, ny); this.finish(this.rivets, nv);
 
     // ---------------- area hits
-    let nr = 0, na = 0, nd = 0, nm = 0, nl = 0;
+    let nr = 0, na = 0, nd = 0, nm = 0, nl = 0, nz = 0, nsky = 0;
     for (let i = 0; i < b.blasts.length; i++) {
       const k = b.blasts[i];
       if (!k.on) { this.prevBlast[i] = 0; continue; }
       const fresh = this.prevBlast[i] === 0;
-      if (fresh) this.sounds.push(k.kind === 0 ? 'sweep' : k.kind === 1 ? 'chime' : k.kind === 2 ? 'marble' : k.kind === 4 ? 'laser' : 'revive');
+      if (fresh) this.sounds.push(k.kind === 0 ? 'sweep' : k.kind === 2 ? 'marble' : k.kind === 4 ? 'laser' : k.kind === 5 ? 'zap' : k.kind === 6 ? 'thunder' : 'revive');
       const landed = k.done && this.prevBlast[i] < 2;
       this.prevBlast[i] = k.done ? 2 : 1;
       const t = Math.min(1, k.age / k.life);
-      if (k.kind === 4) { // Prism Ray: a glowing beam that narrows as it fades
+      if (k.kind === 4) { // Prism Ray: a glowing beam from one foe to the next, narrowing as it fades
         const wide = k.w * 2 * (1 - 0.7 * t), y = 1.25;
         obj.position.set(k.x, y, k.z); obj.rotation.set(0, k.ang, 0);
         obj.scale.set(wide * 2.4, 1, k.r); this.put(this.beamGlow, nl, tint(FX.laser));
         obj.scale.set(wide * 0.7, 1, k.r); obj.position.y = y + 0.02; this.put(this.beamCore, nl++, WHITE);
-        if (landed && !this.low) this.burst(k.x + Math.sin(k.ang) * k.r * 0.5, 1.2, k.z + Math.cos(k.ang) * k.r * 0.5, 3, FX.laser, 1, 6, 0.24);
+        if (landed && !this.low) this.burst(k.x + Math.sin(k.ang) * k.r, 1.2, k.z + Math.cos(k.ang) * k.r, 2, FX.laser, 1, 6, 0.22);
+        continue;
+      }
+      if (k.kind === 5) { // Chain Lightning: a jagged bolt from one foe to the next, thinning as it fades
+        const wide = 1 - 0.75 * t, flip = i & 1 ? -1 : 1, y = 1.3 + (i % 3) * 0.01;
+        obj.position.set(k.x, y, k.z); obj.rotation.set(0, k.ang, 0);
+        obj.scale.set(wide * flip, 1, k.r); this.put(this.boltGlow, nz, tint(FX.bolt));
+        obj.position.y = y + 0.02; this.put(this.boltCore, nz++, WHITE);
+        if (landed && !this.low) this.burst(k.x + Math.sin(k.ang) * k.r, 1.3, k.z + Math.cos(k.ang) * k.r, 2, FX.bolt, 1, 6, 0.2);
+        continue;
+      }
+      if (k.kind === 6) { // Thunderhead: a bolt down from the sky for the first moments, then a flash and a ring on the floor
+        if (t < 0.45) {
+          const wide = 0.9 * (1 - t), flip = i & 1 ? -1 : 1;
+          obj.position.set(k.x, 0, k.z); obj.rotation.set(0, (i * 0.9) % Math.PI, 0);
+          obj.scale.set(wide * flip, 15, wide); this.put(this.skyGlow, nsky, tint(FX.bolt)); this.put(this.skyCore, nsky++, WHITE);
+        }
+        if (landed && !this.low) this.burst(k.x, 0.6, k.z, 6, FX.boltFlash, 1, 9, 0.3);
+        obj.position.set(k.x, 0.14, k.z); obj.rotation.set(0, 0, 0); obj.scale.setScalar(k.r * (0.5 + 0.5 * easeOut(t)) * (1 - 0.3 * t));
+        this.put(this.discs, nd++, tint(FX.boltFlash));
+        obj.scale.setScalar(k.r * (0.6 + 0.5 * easeOut(t))); this.put(this.rings, nr++, tint(FX.bolt));
         continue;
       }
       if (k.kind === 0) { // bayonet sweep
@@ -396,47 +449,40 @@ class SiegeView {
         else { obj.position.set(k.x, 0.35, k.z); obj.rotation.set(0, k.ang + (t - 0.5) * 0.5, 0); obj.scale.setScalar(k.r * (0.7 + 0.3 * easeOut(t))); this.put(this.arcs, na++, tint(FX.sweep)); }
         continue;
       }
-      if (!k.done) { // fuse: a target ring, and the falling marble or chime meteor itself
-        const hot = k.burn > 0;
-        obj.position.set(k.x, 0.12, k.z); obj.rotation.set(0, 0, 0); obj.scale.setScalar(k.r * 0.9); this.put(this.rings, nr++, tint(k.kind === 2 ? FX.marble : hot ? FX.flame : FX.chime));
-        if (k.kind === 2 || k.kind === 1) {
-          const f = 1 - k.age / Math.max(1, k.delay), m = k.kind === 1;
-          // Meteors come in at a slant, from up and behind (the camera's side), so a phone sees them fall.
-          obj.position.set(k.x + (m ? f * 4 : 0), 0.8 + 14 * f * f, k.z + (m ? f * 6 : 0)); obj.scale.setScalar(m ? 1.6 : 1.3);
-          this.put(this.marbles, nm++, tint(k.kind === 2 ? FX.marble : hot ? FX.flameCore : FX.chimeCore));
+      if (!k.done) { // a marble's fuse: a target ring, and the falling marble itself
+        obj.position.set(k.x, 0.12, k.z); obj.rotation.set(0, 0, 0); obj.scale.setScalar(k.r * 0.9); this.put(this.rings, nr++, tint(FX.marble));
+        if (k.kind === 2) {
+          const f = 1 - k.age / Math.max(1, k.delay);
+          obj.position.set(k.x, 0.8 + 14 * f * f, k.z); obj.scale.setScalar(1.3);
+          this.put(this.marbles, nm++, tint(FX.marble));
         }
         continue;
       }
-      if (landed && !this.low) this.burst(k.x, 0.6, k.z, k.kind === 3 ? 10 : 4, k.kind === 1 ? FX.chimeCore : k.kind === 3 ? FX.revive : FX.marble, k.kind === 1 || k.kind === 3 ? 1 : 0, 8, 0.3);
+      if (landed && !this.low) this.burst(k.x, 0.6, k.z, k.kind === 3 ? 10 : 4, k.kind === 3 ? FX.revive : FX.marble, k.kind === 3 ? 1 : 0, 8, 0.3);
       const u = (k.age - k.delay) / Math.max(1, k.life - k.delay);
       obj.position.set(k.x, 0.14, k.z); obj.rotation.set(0, 0, 0); obj.scale.setScalar(k.r * (0.35 + 0.65 * easeOut(Math.min(1, u))));
-      this.put(this.discs, nd++, tint(k.kind === 1 ? (k.burn > 0 ? FX.flame : FX.chime) : k.kind === 3 ? FX.revive : FX.marble));
-      this.put(this.rings, nr++, tint(k.kind === 1 ? FX.chimeCore : FX.revive));
+      this.put(this.discs, nd++, tint(k.kind === 3 ? FX.revive : FX.marble));
+      this.put(this.rings, nr++, tint(FX.revive));
     }
     this.finish(this.rings, nr); this.finish(this.arcs, na); this.finish(this.discs, nd); this.finish(this.marbles, nm);
-    this.finish(this.beamGlow, nl); this.finish(this.beamCore, nl);
+    this.finish(this.beamGlow, nl); this.finish(this.beamCore, nl); this.finish(this.boltGlow, nz); this.finish(this.boltCore, nz);
+    this.finish(this.skyGlow, nsky); this.finish(this.skyCore, nsky);
 
-    // ---------------- flame pools: a flickering disc, a bright rim and a few flame tongues each
-    let nf = 0, nt = 0;
-    const per = this.flamesPerPool;
-    for (let i = 0; i < b.fires.length; i++) {
-      const f = b.fires[i];
-      if (!f.on) continue;
-      const grow = Math.min(1, f.age / 180), fadeOut = Math.min(1, (f.life - f.age) / 450), k = grow * fadeOut;
-      const flick = 0.5 + 0.5 * Math.sin(sec * 13 + i * 1.7);
-      this.mix.copy(tint(FX.flame)).lerp(tint(FX.flameCore), flick * 0.35);
-      obj.position.set(f.x, 0.13 + i * 0.001, f.z); obj.rotation.set(0, 0, 0); obj.scale.setScalar(f.r * k);
-      this.put(this.fireDiscs, nf, this.mix);
-      obj.position.y = 0.15; obj.scale.setScalar(f.r * k * (0.97 + 0.05 * flick)); this.put(this.fireRims, nf++, tint(FX.flameCore));
-      for (let j = 0; j < per; j++) {
-        // Flame tongues about a centimetre and a half across and up to three tall, licking up and down.
-        const a = j * ((Math.PI * 2) / per) + f.age * 0.0012 + i, d = f.r * 0.5 * (j === 0 ? 0.25 : 1);
-        const h = (0.75 + 0.35 * Math.sin(sec * 9 + i * 2.3 + j * 1.9)) * k;
-        obj.position.set(f.x + Math.cos(a) * d, 0.9 * h, f.z + Math.sin(a) * d); obj.rotation.set(0, a, 0); obj.scale.set(1.9 * k, 3.1 * h, 1.9 * k);
-        this.put(this.flames, nt++, tint(j % 2 ? FX.flameCore : FX.flame));
-      }
+    // ---------------- Yo-Yo Cyclone whirlwinds: a soft disc, a rim and two arcs sweeping round
+    let nw = 0;
+    for (let j = 0; j < s.players.length && nw < 8; j++) {
+      const q = s.players[j];
+      if (inArena ? q.status !== 'arena' : q !== viewed || q.status !== 'alive') continue;
+      let has = false;
+      for (let wi = 0; wi < q.weapons.length; wi++) if (q.weapons[wi].id === 'yoyo' && q.weapons[wi].evolved) has = true;
+      if (!has) continue;
+      const r = AURA.radius * q.stat.area, spin = sec * 5 + j, breathe = 0.97 + 0.03 * Math.sin(sec * 6 + j);
+      obj.position.set(q.x, 0.13, q.z); obj.rotation.set(0, 0, 0); obj.scale.setScalar(r * breathe); this.put(this.auraDiscs, nw, tint(FX.aura));
+      obj.position.y = 0.16; this.put(this.auraRims, nw, tint(FX.auraRim));
+      for (let a = 0; a < 2; a++) { obj.position.y = 0.18; obj.rotation.set(0, spin + a * Math.PI, 0); obj.scale.setScalar(r * 0.8); this.put(this.auraArcs, nw * 2 + a, tint(FX.aura)); }
+      nw++;
     }
-    this.finish(this.fireDiscs, nf); this.finish(this.fireRims, nf); this.finish(this.flames, nt);
+    this.finish(this.auraDiscs, nw); this.finish(this.auraRims, nw); this.finish(this.auraArcs, nw * 2);
 
     // ---------------- ghosts watching this board (you can see the other ghosts)
     let gi = 0;
@@ -549,7 +595,8 @@ function Ring() {
 }
 
 const PLAY: Record<SiegeCue, () => void> = {
-  kill: () => playToyCue('puff', 0.45), sweep: () => playToyCue('fan', WEAPON_GAIN.sweep), pop: () => playToyCue('button', WEAPON_GAIN.pop), chime: () => playToyCue('chime', WEAPON_GAIN.chime),
+  kill: () => playToyCue('puff', 0.45), sweep: () => playToyCue('fan', WEAPON_GAIN.sweep), pop: () => playToyCue('button', WEAPON_GAIN.pop),
+  zap: () => playToyCue('charge', WEAPON_GAIN.zap), thunder: () => playToyCue('storm', WEAPON_GAIN.thunder),
   marble: () => playToyCue('marble', WEAPON_GAIN.marble), plane: () => playToyCue('ribbon', WEAPON_GAIN.plane), hurt: () => playToyCue('hit', 0.8), level: () => sfx.promptIn(), card: () => sfx.click(),
   elite: () => playToyCue('warning'), boss: () => { playToyCue('warning'); sfx.windUp(12); }, chest: () => sfx.purchase(), evolve: () => sfx.musicBoxTune(),
   downed: () => playToyCue('out'), revive: () => sfx.windUp(9), ghost: () => sfx.eliminate(), victory: () => sfx.reward(), sent: () => playToyCue('storm'),
@@ -575,7 +622,7 @@ export function SiegeScene({ getState, localId }: MinigameSceneProps<SiegeState>
     const c = getState()?.config;
     // Sized for the busier of a board and the arena (twice the projectile pools, one summoned boss per toy).
     const players = getState()?.players.length ?? 8;
-    return new SiegeView({ mobs: c?.mobCap ?? 150, projs: 2 * (c?.projectileCap ?? 96), shots: 2 * (c?.shotCap ?? 64), gems: c?.gemCap ?? 160, blasts: 2 * (c?.blastCap ?? 40), chests: c?.chestCap ?? 4, bigs: Math.max(c?.bigCap ?? 4, players), fires: 2 * (c?.fireCap ?? 24) }, low);
+    return new SiegeView({ mobs: c?.mobCap ?? 150, projs: 2 * (c?.projectileCap ?? 96), shots: 2 * (c?.shotCap ?? 64), gems: c?.gemCap ?? 160, blasts: 2 * (c?.blastCap ?? 40), chests: c?.chestCap ?? 4, bigs: Math.max(c?.bigCap ?? 4, players) }, low);
   }, [getState, low]);
   const limiter = useMemo(() => new CueLimiter(), []);
   useEffect(() => () => view.dispose(), [view]);

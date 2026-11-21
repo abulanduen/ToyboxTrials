@@ -102,7 +102,7 @@ All numbers live in `FINALE` and `DEFAULT_CONFIG` (`prepMs`, `arenaMs`) in `conf
 | --- | --- | --- | --- | --- | --- |
 | Warrior | Tin Soldier (Toy Squad's soldier model) | Bayonet Sweep | 150 | 9.2 | 2 armour |
 | Ranger | Pop-Gun Ranger | Pop-Gun | 115 | 11.6 | ×1.35 pickup reach |
-| Mage | Clockwork Wizard | Chime Meteors | 105 | 10 | ×0.9 cooldowns, ×1.15 area |
+| Mage | Clockwork Wizard | Chain Lightning | 105 | 10 | ×0.9 cooldowns, ×1.15 area |
 
 ## Weapons (maximum level 5, maximum 4 weapons held)
 
@@ -111,9 +111,9 @@ Every weapon is open to every class. Only the starting weapon depends on class.
 | Weapon | Level 1 | Levels 2–5 | Evolution (level 5 + partner + chest) |
 | --- | --- | --- | --- |
 | Bayonet Sweep | 150° arc at the nearest enemy, reach 6, 14 damage, every 1.15 s | +6 damage · swings behind too · +25% reach · +8 damage and faster | **Whirling Brigade**: a full 360° sweep, reach 9.5, 44 damage. Partner: **Tin Plating** |
-| Pop-Gun | 1 cork at the nearest enemy, 10 damage, every 0.75 s | +1 cork, pierce 1 · homing 1.6 rad/s, +2 damage · +5 damage, pierce 2 · +1 cork, pierce 3, homing 2.6 rad/s, faster | **Prism Ray**: a laser beam 34 cm long every 0.4 s, 52 damage to **every** enemy in its line. Partner: **Fast Gears** |
-| Chime Meteors | 1 meteor (radius 4.5) on a random enemy within 20, 18 damage, every 1.6 s | +1 meteor · +1 meteor, bigger · +1 meteor, +6 damage · +1 meteor, faster (5 at level 5) | **Firebell Meteors**: 6 meteors, radius 6.5, 32 damage, each leaving a **pool of flame**. Partner: **Magnifying Glass** |
-| Yo-Yo Orbit | 1 yo-yo orbiting at radius 5.5, 8 damage per touch (0.45 s per enemy) | +1 yo-yo · +5 damage · +1 yo-yo and wider · +5 damage and faster | **Yo-Yo Cyclone**: 5 yo-yos, radius 8, 24 damage. Partner: **Tight Mainspring** |
+| Pop-Gun | 3 corks, one at each of the 3 nearest enemies; each hits one, then hops to the nearest it has not hit (1 hop); 8 damage, every 1 s | +1 cork · 2 hops, +2 damage · +1 cork, +2 damage · 3 hops, +2 damage, faster | **Prism Ray**: 6 instant laser beams, each striking one of the nearest enemies and chaining on 4 times (5 enemies a beam), 20 damage. Partner: **Fast Gears** |
+| Chain Lightning | Strikes the nearest enemy within 18, then leaps 3 times (6 cm × area) to the next nearest not yet struck, 18 damage, every 1 s | +2 bounces · +8 damage, faster · +2 bounces, leaps further · +8 damage, +2 bounces, faster (9 bounces) | **Thunderhead**: 12 bounces, 40 damage, and every 1.3 s **4 bolts from the sky** shock everything round where they land. Partner: **Magnifying Glass** |
+| Yo-Yo Orbit | 1 yo-yo orbiting at radius 5.5, 8 damage per touch (0.45 s per enemy) | +1 yo-yo · +5 damage · +1 yo-yo and wider · +5 damage and faster | **Yo-Yo Cyclone**: the level-5 yo-yos, plus a **whirlwind** (radius 7 × area) that hurts every enemy inside it, 12 damage every 0.3 s. Partner: **Tight Mainspring** |
 | Paper Planes | 1 plane out 14 cm along your heading and back, pierces everything, 10 damage | +1 plane · +6 damage · +1 plane · further and faster | **Origami Squadron**: 6 planes in every direction, 24 damage. Partner: **Magnet Button** |
 | Marble Rain | 3 marbles fall on enemies within 20 (radius 2.4), 18 damage, every 2.4 s | +2 marbles · +8 damage · +2 marbles · bigger and faster | **Marble Avalanche**: 14 marbles, 36 damage. Partner: **Sharp Crayon** |
 
@@ -136,54 +136,103 @@ secret upgrade too: at its top level (3) the next chest offers it (it has no par
 are its price). Weapons are offered first when both are ready. If no evolution is ready, the chest
 raises up to two owned items by one level. If everything is maxed, it gives full health and 50 points.
 
-## The ranged upgrades and new secret upgrades (owner request, 20 November 2026)
+## Ranger, Mage and Yo-Yo redesigns (owner request, 21 November 2026)
 
-The owner asked for the two ranged classes to be upgraded: piercing and a little homing for the
-Ranger, more meteors for the Mage, and secret upgrades as distinct as the Whirling Brigade (the
-sword), including one for the elite-sending skill. All numbers are in `config.ts` (`WEAPONS`,
-`FLAME`, `BOILER`, `HOMING_SEEK`) and are **provisional**.
+The owner redesigned the Ranger's Pop-Gun, replaced the Mage's meteors with chain lightning, and made
+the Yo-Yo's secret upgrade an aura. This replaces the 20 November ranged upgrades (piercing and gentle
+homing corks, a laser through a line, Chime Meteors and their Firebell flame pools). All numbers are in
+`config.ts` (`WEAPONS`, `RANGER`, `SKY`, `AURA`) and are **provisional**. The owner calls the Ranger's
+shots "arrows"; in the game they stay **corks** (the toy is a pop-gun), which is an open naming choice.
 
-- **Pop-Gun piercing:** a cork passes through 0 / 1 / 1 / 2 / 3 enemies at levels 1 to 5 (it was
-  0 / 0 / 1 / 1 / 1), each enemy once.
-- **Pop-Gun homing:** from level 3 a cork curves towards the nearest enemy **ahead of it** (within 90°
-  of its heading) within 12 cm that it has not hit yet, turning at most 1.6 rad/s (2.6 at level 5).
-  At 42 cm/s that is a turning circle of 26 cm (16 cm): it bends a near miss into a hit, it never
-  orbits. It keeps its target until that enemy falls or is hit, then picks the next.
-- **Prism Ray** (Pop-Gun + Fast Gears + a chest): the pop-gun becomes a toy ray gun. Every 0.4 s
-  a beam 34 cm long (past the edge of the view) and 0.9 cm either side (× area) fires at the nearest
-  enemy (else the way the toy faces) and hits **every** mob, elite and boss touching that line,
-  52 damage each, at once. It replaces the Cork Gatling (2 corks every 0.23 s, pierce 3).
-  Why these numbers: 130 damage per second to a single target (the Gatling's best case was 139 if
-  every cork landed), but through a whole lane of the swarm; it reaches further than the Whirling
-  Brigade (44 damage, 9.5 cm all round, every 0.85 s), which keeps the close-quarters crown.
-- **Chime Meteors:** the Chime Burst is now drawn as meteors falling in at a slant (they land 0.2 s
-  after they appear, as the burst did) and gains a meteor at every level: 1 / 2 / 3 / 4 / 5 (was
-  1 / 1 / 2 / 2 / 3) with the same 26 damage per meteor at levels 4–5 and 2 more at levels 1–3, so a
-  level-5 volley does about 67% more in all (5 × 26 against 3 × 26).
-- **Firebell Meteors** (Chime + Magnifying Glass + a chest): 6 meteors every 1.2 s, and each leaves
-  a **pool of flame** (radius 3.2 × area, so about 5.5 cm with a maxed Magnifying Glass on the Mage)
-  that burns every enemy in it for 9 × damage every 0.4 s for 3 s (about 63 damage over its life
-  to an enemy that stays in it; mobs walk through, elites and the boss linger). Up to 24 pools per
-  board (`fireCap`); a full pool replaces its oldest flame. Drawn as a flickering coral disc with a
-  honey rim and two or three flame tongues, all instanced.
-- **Boiler Heart** (Rally Horn at level 3 + a chest): the toy fires a **ring of 16 rivets all round
-  itself every 1.5 s**, like the Boiler Baron's bullet rings: 18 damage each (× damage), 22 cm/s for
-  1 s (about 22 cm), each passing through one enemy; every ring turns half a gap so the gaps sweep.
-  It takes **no weapon slot** (a fifth weapon) and the horn keeps its active skill (sending elites,
-  summoning the Baron in the arena). Why: the horn costs three level-up cards that could have been
-  weapon or passive levels; the reward is the strongest crowd-clearer for its cost, up to 576 damage
-  per ring if every rivet hits twice, though only one or two rivets reach a single enemy.
+- **Pop-Gun (Ranger):** every volley picks the **nearest enemies** within 30 cm and fires **one cork at
+  each** (3 at level 1). With fewer enemies than corks, the extra corks go to the nearest again (fanned
+  out a little so they read as separate corks); with none in reach they fan out the way the toy faces
+  and look for a foe as they fly. A cork flies straight at its target and strikes **only that one** (it
+  passes over other enemies on the way, so a volley really reaches the nearest few). After each hit it
+  **hops**: it turns to the **nearest enemy within 12 cm that it has not hit yet** and flies at that one,
+  once per hop. With no enemy left in hop range it flies on straight, strikes the first enemy it meets
+  (if its hops allow) and then looks again, until its 0.9 s run out. Levels add corks and hops (corks 3 / 4 / 4 / 5 / 5, hops 1 / 1 / 2 / 2 / 3, so a cork
+  hits up to 2 / 2 / 3 / 3 / 4 enemies) and a little damage (8 / 8 / 10 / 12 / 14 per hit, every 1.0 /
+  1.0 / 0.95 / 0.9 / 0.8 s). Fast Gears (its partner) makes corks fly and hop faster.
+- **Prism Ray** (Pop-Gun 5 + Fast Gears + a chest): **one more cork and one more hop** (6 and 4), and
+  the corks become **instant lasers**: each of the six beams strikes one of the nearest enemies (within
+  30 cm; extra beams go to the nearest again) and then **chains** to the nearest enemy within 12 cm it has
+  not struck, four times, all in the same instant (hitscan): up to 5 enemies a beam, 20 damage each,
+  every 0.75 s. Each hop is drawn as a short-lived coral beam (0.2 s) from one enemy to the next. Damage
+  never depends on the effect pool: a full pool only skips drawing a hop.
+- **Chain Lightning (Mage, replaces Chime Meteors):** a bolt strikes the **nearest enemy** within 18 cm
+  (20 from level 4), then **leaps** to the nearest enemy it has not struck within its leap reach (6 cm,
+  7 from level 4, × area: the Mage's ×1.15 and Magnifying Glass make it leap further), instantly.
+  Levels add **bounces** (3 / 5 / 5 / 7 / 9, so 4 to 10 enemies a cast), **cast speed** (1.0 / 1.0 /
+  0.9 / 0.9 / 0.75 s) and **damage** (18 / 18 / 26 / 26 / 34). Drawn as jagged lilac-and-white bolts
+  from foe to foe (0.22 s, instanced).
+- **Thunderhead** (Chain Lightning 5 + Magnifying Glass + a chest): the chain strikes 13 enemies (12
+  bounces), 40 damage, every 0.65 s, leaping 8 cm (× area); **and** every 1.3 s (× cooldowns) **4 bolts
+  fall from the sky**, each on a random enemy within 20 cm (so mostly where the swarm is thickest),
+  shocking everything within 4.5 cm (× area) for 50 (× damage). Drawn as a jagged bolt down from the sky
+  with a honey flash and a lilac ring where it lands.
+- **Yo-Yo Cyclone** (Yo-Yo 5 + Tight Mainspring + a chest): the **level-5 yo-yos keep spinning as
+  before**, and a **whirlwind** of radius 7 cm (× area) round the toy hurts every enemy inside it for
+  12 (× damage) every 0.3 s (× cooldowns, so its partner Tight Mainspring speeds it up). Drawn as a soft
+  toy-blue disc with a white rim and two sweeping arcs (instanced, one per toy).
+- **Unlock rules are unchanged:** level 5, the partner passive (Fast Gears, Magnifying Glass, Tight
+  Mainspring) and a chest. Card texts and blurbs say what each level adds.
 - **In the arena** all of these hit rival toys and their summoned Barons (never their owner) at the
-  usual arena multiplier (0.013): homing corks curve towards rival toys, the beam hits every rival in
-  its line, flame pools burn rivals standing in them (bots step out of them), rivet rings hit rivals.
-- **Bots** take a secret upgrade from a chest whenever one is offered (never skipping it to send an
-  elite), and once they hold the horn they value raising it (it now leads to the Boiler Heart).
-- **Balance check (headless bots, 40 matches × 8 bots, mixed skills; not people):** compared with
-  the previous rules, Rangers reach the arena more often (64% → 82%) and slay the boss more often
-  (23% → 34%), Mages slay the boss more often (69% → 86%), and the mean place of a Ranger rose from
-  5.41 to 5.19 (Warrior 4.14 → 3.90, Mage 3.97 → 4.48). Bots win the arena with a Ranger less often
-  than with a Warrior (7% against 24% of arena entries): the arena favours armour and melee, an open
-  question below. 1.1–1.5 Boiler Hearts per match; matches 318–360 s.
+  usual arena multiplier (0.013): corks and beams pick the nearest rivals, lightning leaps between
+  rivals, sky bolts fall on rivals, the whirlwind hurts rivals inside it (bots that do not fight up close
+  keep out of a rival's whirlwind).
+- **Bots** need no new rules: they rate an evolution 100 and partner passives of their weapons above
+  other passives, and keep their usual ranges (close for sweeps and yo-yos, 11 cm otherwise).
+
+**Measured, not guessed** (deterministic weapon simulation in a scratch harness: one toy holding one
+weapon, no passives, its own class's multipliers; *single* = a still Rag Bear 5 cm away, damage per
+second over 10 s; *crowd* = 60 still dummies scattered 2–20 cm round the toy, total damage per second;
+*swarm* = a live swarm at 2:00 health, 60 alive and walking in, kills per second over 20 s; the swarm
+figure is capped by how fast mobs reach short-range weapons):
+
+| Weapon | Level | Single target (dmg/s) | Crowd (dmg/s) | Swarm (kills/s) |
+| --- | --- | --- | --- | --- |
+| Knight: Bayonet Sweep (unchanged) | Lv 1 | 13 | 50 | 6.50 |
+| Knight: Bayonet Sweep (unchanged) | Lv 3 | 20 | 100 | 12.55 |
+| Knight: Bayonet Sweep (unchanged) | Lv 5 | 35 | 246 | 14.95 |
+| Knight: Bayonet Sweep (unchanged) | secret | 53 | 528 | 17.95 |
+| Ranger: Pop-Gun → Prism Ray | Lv 1 | 14 → **24** | 14 → **48** | 0.55 → **3.10** |
+| Ranger: Pop-Gun → Prism Ray | Lv 3 | 34 → **44** | 67 → **132** | 2.70 → **6.80** |
+| Ranger: Pop-Gun → Prism Ray | Lv 5 | 97 → **91** | 324 → **364** | 14.15 → **12.90** |
+| Ranger: Pop-Gun → Prism Ray | secret | 135 → **168** | 406 → **840** | 15.00 → **38.95** |
+| Mage: Chime Meteors / Firebell → Chain Lightning / Thunderhead | Lv 1 | 13 → **22** | 61 → **86** | 10.25 → **4.40** |
+| Mage: Chime Meteors / Firebell → Chain Lightning / Thunderhead | Lv 3 | 48 → **34** | 348 → **203** | 15.00 → **7.50** |
+| Mage: Chime Meteors / Firebell → Chain Lightning / Thunderhead | Lv 5 | 117 → **51** | 933 → **510** | 24.90 → **14.85** |
+| Mage: Chime Meteors / Firebell → Chain Lightning / Thunderhead | secret | 494 → **252** | 3100 → **2051** | 64.65 → **36.00** |
+| Yo-Yo Orbit → Yo-Yo Cyclone (on a Knight) | Lv 1 | 5 | 20 | 4.50 |
+| Yo-Yo Orbit → Yo-Yo Cyclone (on a Knight) | Lv 3 | 16 | 72 | 7.95 |
+| Yo-Yo Orbit → Yo-Yo Cyclone (on a Knight) | Lv 5 | 41 | 239 | 16.45 |
+| Yo-Yo Orbit → Yo-Yo Cyclone (on a Knight) | secret | 48 → **82** | 290 → **443** | 18.40 → **16.45** |
+| Marble Rain (on a Knight, unchanged) | Lv 1 | 22 | 63 | 8.50 |
+| Marble Rain (on a Knight, unchanged) | Lv 3 | 65 | 174 | 9.70 |
+| Marble Rain (on a Knight, unchanged) | Lv 5 | 144 | 468 | 12.85 |
+| Marble Rain (on a Knight, unchanged) | secret | 302 | 1228 | 23.75 |
+
+**Whole matches** (headless bots, 48 matches × 8 bots, classes and skills rotated so each class has
+the same share; not people):
+
+| Class | Boss kills | Reach the arena | Arena wins (of entries) | Mean place (1–8) | Evolved weapons by the end |
+| --- | --- | --- | --- | --- | --- |
+| Warrior | 50% → 48% | 77% → 81% | 19% → 19% | 4.05 → 3.92 | 1.90 → 1.88 |
+| Ranger | 32% → 52% | 79% → 91% | 8% → 10% | 5.22 → 4.84 | 1.91 → 2.22 |
+| Mage | 77% → 79% | 90% → 95% | 18% → 13% | 4.23 → 4.73 | 2.42 → 2.45 |
+
+So the Ranger is stronger early (three corks that always land, where one cork often missed) and its
+Prism Ray clears a swarm more than twice as fast as before, while its level-5 numbers stay close to the
+old ones. The Mage trades the meteors' huge area for a reliable chain: Chain Lightning does about half
+the old meteors' area damage at level 5, and Thunderhead about two thirds of Firebell's (both still the
+most crowd damage in the table), and much less against a single target. The Yo-Yo Cyclone now nearly doubles
+the level-5 yo-yos' damage (the old Cyclone added a sixth of it); its swarm kill rate does not move,
+because a short-range weapon only kills as fast as the swarm walks in. In whole
+matches no class dominates: the gap in mean place between the best and worst class narrowed from 1.17
+to 0.92. The Ranger gained the most; the Mage lost some ground, mostly in the arena (13% of its arena entries won, from 18%); the Warrior still places best. Both
+columns use the same seeds (100–147); an earlier sample of 24 matches put all three classes within 0.1
+places of each other, so treat differences of a few percent as noise.
 
 ## Level-up cards
 
@@ -207,8 +256,9 @@ badge (`evolutionHint` in `rules.ts`):
 - the treasure card's evolution itself.
 
 The kit strip under the clock uses the same icons, with level pips (gold when evolved), and shows
-the Rally Horn (three pips) once taken. The Prism Ray, Firebell Meteors and Boiler Heart have their
-own icons (a ray gun, a meteor over flames, a boiler throwing rivets); the other evolutions keep the star.
+the Rally Horn (three pips) once taken. The Prism Ray, Thunderhead, Yo-Yo Cyclone and Boiler Heart have
+their own icons (a ray gun, a storm cloud dropping a bolt, a yo-yo in a whirlwind, a boiler throwing
+rivets); the other evolutions keep the star. Chain Lightning's icon is a bolt leaping between three foes.
 
 Experience to the next level is `5 + 3(L−1) + ⌊0.3(L−1)²⌋`, giving 5, 8, 11 … 56 at level 10 and
 170 at level 20. In bot matches, toys reach about level 12 by 2:00, 20 by 4:00 and 25–32 by 5:00.
@@ -303,8 +353,7 @@ revive). The game counts as long (`durationSec` [300, 390], see the finale).
   | Player projectiles | 96 |
   | Enemy bullets | 64 |
   | Gems | 160 |
-  | Area hits (including laser beams) | 40 |
-  | Flame pools | 24 |
+  | Area hits (including beam and lightning hops, sky strikes) | 40 |
   | Chests | 4 |
   | Elites | 4 |
 
@@ -317,6 +366,15 @@ revive). The game counts as long (`durationSec` [300, 390], see the finale).
   optimise/deoptimise loop in the bots' steering). Time per step, old and new rules run back to back
   in the same harness and under the same (heavy) load: 0.84–0.98 ms before, 0.34–0.39 ms after,
   new weapons included (node; timings on a shared machine are rough, the allocation is not).
+  The 21 November redesign keeps this: target picking uses small scratch typed arrays outside the
+  state (the nearest few by insertion into a sorted list of at most 16, chain hits in a 32-slot list),
+  chains are hitscan (no projectile, a seeking cork checks contact with its one target only), and the
+  hop effects reuse the blast pool. Old and new rules run back to back in a scratch harness (eight
+  immortal bot boards at 3:20, each kept full at 150 mobs, bots included, no level-up cards; mixed
+  classes, all Rangers, all Mages, and every toy holding the three redesigned secret upgrades; three
+  rounds each) on a machine under heavy shared load: 0.20–0.40 ms per step before and 0.20–0.42 ms
+  after (medians 0.28 and 0.29, no difference within the noise); 1.4–3.1 KB allocated per step before
+  and 1.3–3.0 KB after (lower in every mix but all-Mage, where it is the same).
 - **Collisions:** a uniform spatial hash (4 cm cells) is rebuilt per board per step from scratch
   typed arrays held outside the state. Mob separation checks at most six neighbours in the mob's
   own cell.
@@ -381,12 +439,16 @@ wire size needs measuring.
   chests and several level-ups needs people to try it. Early boss slayers wait for the arena (up to
   about 40 s); a shorter shared deadline is an alternative if the wait feels long.
 - **The arena and the ranged classes:** in bot arenas, armour (4% per point, up to 40%) and melee
-  builds win most often; the Ranger's new numbers help it reach the arena but not win it. A per-weapon
-  arena multiplier, or a lower armour cap, is the obvious lever if people find the same.
-- **Secret upgrades for the other three weapons** (Whirling Brigade, Yo-Yo Cyclone, Origami Squadron,
-  Marble Avalanche) are unchanged bigger versions; the owner singled out the sword as the bar, and the
-  three new ones (beam, flame pools, rivet ring) each change how the weapon plays.
+  builds win most often; after the 21 November redesign the Ranger reaches the arena and slays the boss
+  more often but still wins the arena least (see the table above). A per-weapon arena multiplier, or a
+  lower armour cap, is the obvious lever if people find the same. In a duel every cork, beam and the
+  lightning go to the one rival (extra corks go to the nearest), which is the Ranger's best case there.
+- **Secret upgrades for the other three weapons** (Whirling Brigade, Origami Squadron, Marble
+  Avalanche) are unchanged bigger versions; the owner singled out the sword as the bar. The Prism Ray,
+  Thunderhead, Yo-Yo Cyclone and Boiler Heart each change how the weapon plays.
+- **Naming:** the owner's "arrows" are corks in the game (the Ranger's toy is a pop-gun). If arrows
+  are wanted, it is a text and model change only (`config.ts`, `models.ts`, the cork shape in `Scene.tsx`).
 - **Unverified:** balance and feel with real players, especially how strong the Ranger is, boss
   kill rates, revive costs and the arena. Bot matches suggest 0 to 5 boss kills per 8-toy match
-  and 2 to 8 toys in the arena. Touch feel, audio mix (including the softer chime cue, the beam's zap and the rivet ring)
+  and 2 to 8 toys in the arena. Touch feel, audio mix (the lightning crackle and sky-bolt rumble reuse the soft `charge` and `storm` toy cues; the beam's zap and the rivet ring)
   and real-device frame rates have not been measured.

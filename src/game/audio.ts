@@ -140,7 +140,7 @@ export function playToyCue(cue: ToyCue, volume = 1) {
     case 'out': tone(350,t,.09*k,.23,'sine',.012,130); noise(t+.08,.035*k,.065,700,.5,'lowpass'); break;
     case 'warning': tone(660,t,.09*k,.14,'sine',.01); tone(440,t+.17,.07*k,.14,'sine',.01); break;
     case 'count': tone(400,t,.06*k,.055,'sine',.008,300); break;
-    // A soft, short muted chime for rapid auto-fire (Toybox Siege's Chime Burst): a rounded low tine
+    // A soft, short muted chime for rapid auto-fire: a rounded low tine
     // that dies in a tenth of a second, a faint fifth above, no long bell ring or bright partials.
     case 'chime': tone(jitter(698,.02),t,.042*k,.1,'sine',.006,660); tone(1047,t+.012,.012*k,.06,'sine',.005); break;
   }
