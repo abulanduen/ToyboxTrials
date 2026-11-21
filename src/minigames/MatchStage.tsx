@@ -42,7 +42,7 @@ export function MatchStage() {
  * effect, enemy or flash appears mid-play (on Windows a compile can stall a frame for tens to
  * hundreds of ms: felt as stutter). three's compile covers hidden objects too, so pooled effects
  * are included. Once when the trial's scene mounts and again as play begins (some games mount
- * more of their set then). compileAsync uses parallel compiling where the browser offers it.
+ * more of their set then). The browser compiles them in parallel where it can.
  */
 function useWarmShaders(key: string | null, playing: boolean) {
   const { gl, scene, camera } = useThree();
@@ -57,7 +57,11 @@ function useWarmShaders(key: string | null, playing: boolean) {
       const rt = post ? new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType }) : null;
       try {
         if (rt) gl.setRenderTarget(rt);
-        void gl.compileAsync(scene, camera).catch(() => {});
+        // compile(), not compileAsync(): the async one polls each material on a timer until its
+        // program is ready, and throws from that timer (uncatchable) when a short match disposes a
+        // material first. We never wait on it; compile() starts the same (parallel where the
+        // browser offers KHR_parallel_shader_compile) compiles.
+        gl.compile(scene, camera);
       } catch {
         /* a context that can't precompile just compiles on first draw, as before */
       } finally {
