@@ -114,6 +114,16 @@ describe('Toy Tower Tumble rules', () => {
     expect(JSON.stringify(s2)).toBe(JSON.stringify(s1));
   });
 
+  it('starts with 90 gold: enough to level the builder first and still build two towers for round 1', () => {
+    expect(START_GOLD).toBe(90);
+    const s = tumbleRules.init(field(1), 1), me = p(s);
+    step(s, { you: [{ type: 'builder' }] });
+    expect(me.builder).toBe(2);
+    step(s, { you: [{ type: 'build' }, { type: 'build' }, { type: 'build' }] });
+    expect(me.towers.length).toBe(2); // the third build is unaffordable
+    expect(me.gold).toBe(START_GOLD - BUILDER[1].cost - 2 * BUILD_COST);
+  });
+
   it('builds a random tier-1 tower at builder level 1, for gold, only on a free felt square', () => {
     const s = tumbleRules.init(field(1), 1), me = p(s);
     expect(me.gold).toBe(START_GOLD); expect(me.lives).toBe(START_LIVES); expect(me.builder).toBe(1);

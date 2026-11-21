@@ -1,12 +1,12 @@
 /**
  * Looking at other boards (Toy Tower Tumble and Toy Squad): the floating popover placement, the
- * board summary, touch never merging on a tap, and the server sending every board's public picture
+ * board summary, the Merge / Swap popup (nothing merges without it), and the server sending every board's public picture
  * (towers, quests, builder; units, traits, passives) while still hiding the secrets.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { placePopover, type Box } from '../../src/minigames/shared/popover';
 import { boardSummary } from '../../src/minigames/towertumble/info';
-import { drainTumbleInput, inspectCell, resetTumbleUI, tapCell, useTumbleUI } from '../../src/minigames/towertumble/local';
+import { cancelMerge, chooseMerge, drainTumbleInput, dropTower, inspectCell, liveChoice, resetTumbleUI, tapCell, useTumbleUI } from '../../src/minigames/towertumble/local';
 import { tumbleRules, type TdPlayer, type TdState, type Tower } from '../../src/minigames/towertumble/rules';
 import { traitCounts } from '../../src/minigames/toysquad/spellcraft';
 import { GameRun } from '../../server/matchRunner';
@@ -67,27 +67,61 @@ describe('Toy Tower Tumble board summary', () => {
   });
 });
 
-describe('Toy Tower Tumble: a tap never merges on touch', () => {
+describe('Toy Tower Tumble: merging asks first (Merge / Swap popup)', () => {
   let s: TdState, me: TdPlayer, a: Tower, b: Tower;
   beforeEach(() => {
     resetTumbleUI(); drainTumbleInput();
     s = tumbleRules.init([who('you'), who('bot')], 3); me = s.players[0];
     a = put(s, me, 'tin-sentry', 0); b = put(s, me, 'spark-bot', 2); // same tier, different towers
   });
-  it('touch: tapping a same-tier partner selects it and keeps the first as its pair', () => {
-    tapCell(me, a.cell, true);
+  it('a tap on a same-tier partner opens the popup at the partner; nothing merges yet', () => {
+    tapCell(me, a.cell);
     expect(useTumbleUI.getState().selected).toBe(a.cell);
-    tapCell(me, b.cell, true);
+    tapCell(me, b.cell);
     expect(drainTumbleInput()).toEqual([]);
-    expect(useTumbleUI.getState()).toMatchObject({ selected: b.cell, pair: a.cell });
-    // Tapping the selected tower again clears it (and the pair).
-    tapCell(me, b.cell, true);
-    expect(useTumbleUI.getState()).toMatchObject({ selected: null, pair: null });
+    expect(useTumbleUI.getState()).toMatchObject({ selected: a.cell, confirm: { from: a.cell, to: b.cell } });
+    expect(liveChoice(me)).toEqual({ from: a.cell, to: b.cell });
   });
-  it('mouse and keyboard keep the quick merge', () => {
-    tapCell(me, a.cell, false);
-    tapCell(me, b.cell, false);
-    expect(drainTumbleInput()).toEqual([{ type: 'merge', from: a.cell, to: b.cell }]);
+  it('Merge lands the new tower on the target; Swap trades the squares', () => {
+    tapCell(me, a.cell); tapCell(me, b.cell);
+    expect(chooseMerge(me, 'merge')).toEqual({ type: 'merge', from: a.cell, to: b.cell });
+    expect(useTumbleUI.getState()).toMatchObject({ confirm: null, selected: b.cell });
+    expect(chooseMerge(me, 'merge')).toBe(null); // answered once
+    tapCell(me, b.cell); tapCell(me, a.cell); tapCell(me, b.cell); // clear, select a, partner b
+    const swap = chooseMerge(me, 'swap')!;
+    expect(swap).toEqual({ type: 'move', from: a.cell, to: b.cell });
+    // The rules' move swaps two occupied squares (the source tower ends on the target).
+    tumbleRules.step(s, { you: [swap] }, 16);
+    expect(me.towers.find((t) => t.id === a.id)!.cell).toBe(2);
+    expect(me.towers.find((t) => t.id === b.id)!.cell).toBe(0);
+  });
+  it('a drop on a same-tier tower asks; on another tier or an empty square it moves at once', () => {
+    dropTower(me, a.cell, b.cell);
+    expect(drainTumbleInput()).toEqual([]);
+    expect(useTumbleUI.getState().confirm).toEqual({ from: a.cell, to: b.cell });
+    cancelMerge();
+    expect(useTumbleUI.getState()).toMatchObject({ confirm: null, selected: null });
+    const c = put(s, me, 'cork-musketeer', 4); // tier 2: no merge
+    dropTower(me, a.cell, c.cell);
+    expect(drainTumbleInput()).toEqual([{ type: 'move', from: a.cell, to: c.cell }]);
+    expect(useTumbleUI.getState().confirm).toBe(null);
+    dropTower(me, a.cell, 6);
+    expect(drainTumbleInput()).toEqual([{ type: 'move', from: a.cell, to: 6 }]);
+    dropTower(me, a.cell, a.cell); dropTower(me, a.cell, null);
+    expect(drainTumbleInput()).toEqual([]);
+  });
+  it('a choice that no longer applies (a tower sold or merged away) is not live', () => {
+    tapCell(me, a.cell); tapCell(me, b.cell);
+    me.towers = me.towers.filter((t) => t !== b);
+    expect(liveChoice(me)).toBe(null);
+    expect(chooseMerge(me, 'merge')).toBe(null);
+    expect(useTumbleUI.getState().confirm).toBe(null);
+  });
+  it('the phone sheet size (compact or full) survives a match reset', () => {
+    useTumbleUI.setState({ sheetFull: true });
+    resetTumbleUI();
+    expect(useTumbleUI.getState().sheetFull).toBe(true);
+    useTumbleUI.setState({ sheetFull: false });
   });
   it('a board you only look at: a tap inspects a tower, or clears', () => {
     const bot = s.players[1], t = put(s, bot, 'felt-cub', 5);

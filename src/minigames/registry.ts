@@ -402,9 +402,9 @@ export const MINIGAMES: MinigameDefinition[] = [
     tieBreak: 'Waves survived, then lives left, then damage score',
     recordUnit: 'waves',
     controls: [
-      { keys: 'Click / drag', action: 'Select a square; drag a tower onto any same-tier tower to merge' },
+      { keys: 'Click / drag', action: 'Select a square; drag (or click) a tower onto a same-tier tower, then Merge or Swap' },
       { keys: 'B / U', action: 'Build a random tower / level the builder' },
-      { keys: 'Arrows + Enter', action: 'Move the square cursor and select or merge' },
+      { keys: 'Arrows + Enter', action: 'Move the square cursor and select; Enter on a same-tier partner asks Merge (M) or Swap (S)' },
       { keys: 'M / Q / N', action: 'Auto-merge a same-tier pair (no selection needed) / sell / next wave' },
     ],
     touch: {
@@ -420,7 +420,7 @@ export const MINIGAMES: MinigameDefinition[] = [
         { id: 'close', label: 'Close' },
       ],
       orientation: 'any',
-      notes: 'Tap a square to select it; a sheet floats beside it with Build here, Merge same tier, Sell and Close (all large buttons). Same-tier partners glow gold. On touch, tapping (or dragging onto) another tower only selects it and pairs it with the last one: only the Merge button merges. Tap a player on the rail to view their board read-only (quests, towers, builder, Board details).',
+      notes: 'Tap a square to select it; a compact sheet floats beside it with Build here or Sell, More (full details) and Close (all large buttons). Same-tier partners glow gold. Drag a tower onto one (or tap it after selecting a tower) and a small popup at that tower, where the merged tower would land, offers Merge or Swap; tap elsewhere or × to cancel. Nothing merges without it. Tap a player on the rail to view their board read-only (quests, towers, builder, Board details).',
     },
     status: 'playable',
     load: () => import('./towertumble').then((m) => m.default),

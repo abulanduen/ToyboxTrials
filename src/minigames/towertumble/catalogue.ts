@@ -134,7 +134,11 @@ export const towerTier = (id: string) => TOWERS[id].tier;
 
 // ─────────────────────────────────────────────── economy ───────────────────────────────────────────────
 
-export const START_GOLD = 70;
+/**
+ * Owner revision (21 Nov 2026): 70 → 90, so a player who levels the builder first (50) can still
+ * build two towers for round 1.
+ */
+export const START_GOLD = 90;
 export const START_LIVES = 20;
 /** Every Build costs the same and places one random tower (usually tier 1). */
 export const BUILD_COST = 20;

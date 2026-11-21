@@ -1,10 +1,15 @@
 /**
  * Toy Tower Tumble HUD (DOM). Re-renders ten times a second from the live rules state, never per
  * frame. Every committing action is a ≥ 56 px button: the board squares (small on a phone) only
- * select, and the sheet that opens for the selected square carries Build, Merge, Sell and Close.
+ * select, the sheet that opens for the selected square carries Build here or Sell, and Close, and
+ * the Merge / Swap popup (below) carries Merge and Swap.
  * The sheet (and the mouse's hover tip) floats beside its square, clamped inside the safe area: it
- * never moves the board or the columns. With a mouse, clicking or dragging onto a same-tier partner
- * merges too; on touch only the sheet's Merge button merges (a tap just selects the pair).
+ * never moves the board or the columns. On phones the sheet is compact (name, tier, key figures and
+ * its buttons) until More opens the full details; the choice lasts for the page session.
+ * Merging (mouse, keyboard and touch alike): drop a tower on a same-tier tower, or select one and tap
+ * (click, Enter) a glowing partner, and a small Merge / Swap popup floats at the partner, the square
+ * where the merged tower would land (the board marks it, with an arrow from the source). Merge (M)
+ * or Swap (S) answers it; ×, Esc or a press on the board cancels. Nothing merges without it.
  *
  * Looking at a board that is not yours to change (someone else's from the player rail, or the seat
  * an online spectator follows) is the same HUD read-only: that board's gold, lives, quests, towers
@@ -18,13 +23,14 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type RefObject } from 'react';
 import { matchBus, pauseMatch, useMatch } from '../session';
 import { unlockAudio } from '../../game/audio';
+import { isTypingTarget } from '../../game/input';
 import { PALETTE } from '../../game/palette';
 import { useGame } from '../../game/store';
 import type { MinigameSceneProps } from '../types';
 import { subscribePortraits, toyPortrait, portraitCount } from '../toysquad/portraits';
 import { PlayerRail, SpectateOffer, WatchBanner, type RailEntry } from '../shared/PlayerRail';
 import { StatusLegend } from '../shared/StatusIcon';
-import { placePopover } from '../shared/popover';
+import { placePopover, type PopoverSide } from '../shared/popover';
 import { cellName, isBuildable, isPath } from './board';
 import {
   ABILITY_NAME, ABILITY_TEXT, BOSSES, BUILD_COST, BUILDER, DAMAGE_CHECK, ENEMIES, FAMILY, FAMILIES, MAX_BUILDER, MAX_TIER, QUESTS, QUEST_ORDER, TIER_COLOURS, TOWERS, WAVES,
@@ -34,7 +40,7 @@ import {
   SPEEDS, allHumansOut, boardScore, builderCost, canBuild, cycleWatch, inCheck, questProgress, stillGoing, towerAt, twinsOf, viewedBoard, watchable,
   type TdPlayer, type TdState,
 } from './rules';
-import { buildHere, clearTumbleInput, resetTumbleUI, submitTumbleInput, useTumbleUI, type TdPanel } from './local';
+import { buildHere, cancelMerge, chooseMerge, clearTumbleInput, liveChoice, resetTumbleUI, submitTumbleInput, useTumbleUI, type MergeChoice, type TdPanel } from './local';
 import { tumbleScreen, tumbleView } from './camera';
 import { boardSummary } from './info';
 import { TUMBLE_STATUSES } from './status';
@@ -87,66 +93,123 @@ function QuestArt({ s, q }: { s: TdState; q: QuestId }) {
  * quest strip on a phone in landscape; never the bar, the player rail or the dock, which stay reachable),
  * never over the square if there is room. Runs after every render (the HUD re-renders ten times a
  * second), so it follows the board when it is panned or zoomed. Absolutely positioned: nothing moves.
+ * `--ax` / `--ay` give the square's centre inside the popover (the Merge / Swap popup points there).
+ * `keepClear`: squares the popover should rather not cover either (the Merge / Swap popup's source
+ * tower, so both ends of the merge stay in sight; the sheet's glowing partners, so a tap can reach
+ * them). The side (with room) that covers the fewest of them wins, in the usual order.
  */
-function useFloatAt(ref: RefObject<HTMLElement | null>, cell: number | null) {
+function useFloatAt(ref: RefObject<HTMLElement | null>, cell: number | null, keepClear: readonly number[] = []) {
   useLayoutEffect(() => {
     const el = ref.current, hud = el?.closest('.td-hud'), slot = hud?.querySelector('.td-pop-bounds');
     const anchor = cell === null ? null : tumbleScreen.cellRect?.(cell);
     if (!el || !hud || !slot || !anchor) return;
     const h = hud.getBoundingClientRect(), b = slot.getBoundingClientRect();
     el.style.maxWidth = `${Math.floor(b.width)}px`; el.style.maxHeight = `${Math.floor(b.height)}px`;
-    const at = placePopover(anchor, el.offsetWidth, el.offsetHeight, { left: b.left, top: b.top, right: b.right, bottom: b.bottom }, 10);
+    const bounds = { left: b.left, top: b.top, right: b.right, bottom: b.bottom }, w = el.offsetWidth, ht = el.offsetHeight;
+    let at = placePopover(anchor, w, ht, bounds, 10);
+    const clear = keepClear.map((c) => tumbleScreen.cellRect?.(c)).filter((r) => !!r);
+    const hits = (p: { left: number; top: number }) => clear.filter((c) => p.left < c.right && p.left + w > c.left && p.top < c.bottom && p.top + ht > c.top).length;
+    let worst = hits(at);
+    if (worst > 0) {
+      const tall = bounds.bottom - bounds.top > bounds.right - bounds.left;
+      for (const side of (tall ? ['above', 'below', 'right', 'left'] : ['right', 'left', 'above', 'below']) as PopoverSide[]) {
+        const p = placePopover(anchor, w, ht, bounds, 10, [side]), n = hits(p);
+        if (!p.covers && n < worst) { at = p; worst = n; if (!n) break; }
+      }
+    }
     el.style.left = `${at.left - h.left}px`; el.style.top = `${at.top - h.top}px`; el.dataset.side = at.side;
+    const inside = (v: number, size: number) => `${Math.round(Math.min(size - 16, Math.max(16, v)))}px`;
+    el.style.setProperty('--ax', inside((anchor.left + anchor.right) / 2 - at.left, el.offsetWidth));
+    el.style.setProperty('--ay', inside((anchor.top + anchor.bottom) / 2 - at.top, el.offsetHeight));
   });
 }
 
 function TowerFacts({ p, cell }: { p: TdPlayer; cell: number }) {
   const t = towerAt(p, cell)!, d = TOWERS[t.def], f = FAMILY[d.family];
-  const dmg = Math.round(d.damage * (1 + t.auraDamage) * 10) / 10;
+  const dmg = Math.round(d.damage * (1 + t.auraDamage) * 10) / 10, every = (d.cooldownMs / 1000 / (1 + t.auraSpeed)).toFixed(2);
+  const twins = d.tier < MAX_TIER ? twinsOf(p, t).length : 0;
   return <>
     <header className="td-sheet__head">
       <Portrait model={d.model} />
       <span className="td-sheet__title"><strong data-testid="td-sheet-name">{d.name}</strong>
-        <small><b className="td-tier" data-testid="td-sheet-tier">Tier {d.tier}</b> {f.name} · {f.role}</small></span>
+        <small><b className="td-tier" data-testid="td-sheet-tier">Tier {d.tier}</b> <span className="td-sheet__family">{f.name} · {f.role}</span></small>
+        {/* Phones, compact sheet: the key figures on one line (the full paragraph is under More). */}
+        <small className="td-sheet__key" data-testid="td-sheet-key">Hit {dmg} · {Number(every)} s · reach {d.range}{twins ? ` · ${twins} partner${twins > 1 ? 's' : ''}` : ''}</small></span>
     </header>
-    <p className="td-sheet__stats">Hit {dmg}{t.auraDamage ? ` (+${Math.round(t.auraDamage * 100)}% aura)` : ''} every {(d.cooldownMs / 1000 / (1 + t.auraSpeed)).toFixed(2)} s · reach {d.range} squares
-      {d.splash ? ` · splash ${d.splash}` : ''}{d.chain ? ` · jumps to ${d.chain} more` : ''}{d.slow ? ` · slows ${Math.round(d.slow * 100)}%` : ''}
-      {d.aura ? ` · aura: towers within ${d.aura} squares hit ${Math.round(d.auraDamage * 100)}% harder and ${Math.round(d.auraSpeed * 100)}% faster` : ''}</p>
-    {d.abilities.length > 0 && <ul className="td-abilities">{d.abilities.map((a) => <li key={a}><b>{ABILITY_NAME[a]}:</b> {ABILITY_TEXT[a]}</li>)}</ul>}
-    <small className="td-sheet__dealt">Dealt {fmt(t.dealt)} damage · square {cellName(cell)}</small>
+    <div className="td-sheet__detail" data-testid="td-sheet-detail">
+      <p className="td-sheet__stats">Hit {dmg}{t.auraDamage ? ` (+${Math.round(t.auraDamage * 100)}% aura)` : ''} every {every} s · reach {d.range} squares
+        {d.splash ? ` · splash ${d.splash}` : ''}{d.chain ? ` · jumps to ${d.chain} more` : ''}{d.slow ? ` · slows ${Math.round(d.slow * 100)}%` : ''}
+        {d.aura ? ` · aura: towers within ${d.aura} squares hit ${Math.round(d.auraDamage * 100)}% harder and ${Math.round(d.auraSpeed * 100)}% faster` : ''}</p>
+      {d.abilities.length > 0 && <ul className="td-abilities">{d.abilities.map((a) => <li key={a}><b>{ABILITY_NAME[a]}:</b> {ABILITY_TEXT[a]}</li>)}</ul>}
+      <small className="td-sheet__dealt">Dealt {fmt(t.dealt)} damage · square {cellName(cell)}</small>
+    </div>
   </>;
+}
+
+/** Phones: More / Less on the sheet (compact summary or full details), remembered for the page session. Hidden on desktop. */
+function MoreToggle({ full }: { full: boolean }) {
+  return <button className="td-sheet__more" data-testid="td-sheet-more" aria-expanded={full} aria-label={full ? 'Fewer details' : 'More details'}
+    onClick={() => useTumbleUI.setState({ sheetFull: !full })}>{full ? 'Less' : 'More'}</button>;
+}
+/** A square × button (≥ 56 px like every other). */
+function CloseButton({ testId, label, onClick }: { testId: string; label: string; onClick: () => void }) {
+  return <button className="td-x" data-testid={testId} aria-label={label} title={label} onClick={onClick}>
+    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden><path d="m4 4 10 10M14 4 4 14" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg></button>;
 }
 
 /**
  * The selected square's sheet, floating beside it. On your own board it carries the actions; on a
- * board you are only looking at (`owner` names whose) it is read-only: the facts and Close.
- * `pair` (touch) is the tower selected before this one: its Merge button comes first.
+ * board you are only looking at (`owner` names whose) it is read-only: the facts and Close. On a
+ * phone it is compact (name, tier, key figures, buttons) unless `full` (More). Merging is not a
+ * button here: drag onto or tap a glowing partner (the Merge / Swap popup asks), or press M.
  */
-function TowerSheet({ p, cell, send, owner, pair }: { p: TdPlayer; cell: number; send: (i: Parameters<typeof submitTumbleInput>[0]) => void; owner?: string; pair: number | null }) {
+function TowerSheet({ p, cell, send, owner, full }: { p: TdPlayer; cell: number; send: (i: Parameters<typeof submitTumbleInput>[0]) => void; owner?: string; full: boolean }) {
   const ref = useRef<HTMLElement>(null);
-  useFloatAt(ref, cell);
-  const t = towerAt(p, cell), close = () => useTumbleUI.setState({ selected: null, pair: null });
+  const t = towerAt(p, cell), close = () => useTumbleUI.setState({ selected: null, confirm: null });
+  useFloatAt(ref, cell, t && !owner ? twinsOf(p, t).map((o) => o.cell) : []);
   if (!t) {
-    return <section ref={ref} className="td-sheet" data-testid="td-sheet" aria-label={`Empty square ${cellName(cell)}`}>
+    return <section ref={ref} className={`td-sheet${full ? ' is-full' : ''}`} data-testid="td-sheet" aria-label={`Empty square ${cellName(cell)}`}>
       <header className="td-sheet__head"><strong>Empty square {cellName(cell)}</strong></header>
-      <p className="td-sheet__lead">Build places a random tower here (usually tier 1: see the builder odds).</p>
+      <p className="td-sheet__lead td-sheet__detail">Build places a random tower here (usually tier 1: see the builder odds).</p>
       <div className="td-sheet__actions">
         <button className="td-primary" data-testid="td-build-here" disabled={p.gold < BUILD_COST} onClick={() => send({ type: 'build', cell })}>Build here <Cost gold={BUILD_COST} /></button>
-        <button data-testid="td-sheet-close" onClick={close}>Close</button>
+        <CloseButton testId="td-sheet-close" label="Close" onClick={close} />
       </div>
     </section>;
   }
-  const d = TOWERS[t.def], twins = twinsOf(p, t).sort((a, b) => Number(b.cell === pair) - Number(a.cell === pair));
-  return <section ref={ref} className={`td-sheet${owner ? ' is-readonly' : ''}`} data-testid="td-sheet" data-readonly={owner ? true : undefined} style={tierStyle(d.tier)} aria-label={`${d.name}, tier ${d.tier}${owner ? `, on ${owner} board` : ''}`}>
+  const d = TOWERS[t.def], twins = twinsOf(p, t), names = twins.slice(0, 4).map((o) => cellName(o.cell)).join(', ');
+  return <section ref={ref} className={`td-sheet${owner ? ' is-readonly' : ''}${full ? ' is-full' : ''}`} data-testid="td-sheet" data-readonly={owner ? true : undefined} data-full={full || undefined}
+    style={tierStyle(d.tier)} aria-label={`${d.name}, tier ${d.tier}${owner ? `, on ${owner} board` : ''}`}>
     {owner && <small className="td-sheet__owner" data-testid="td-sheet-owner">{owner} board · read-only</small>}
     <TowerFacts p={p} cell={cell} />
+    {!owner && <p className="td-note td-sheet__detail" data-testid="td-merge-hint">{d.tier >= MAX_TIER ? 'Tier 7: the top.'
+      : twins.length === 0 ? `No partner yet: any other tier ${d.tier} tower can merge.`
+        : `To merge, drag onto (or tap) a glowing tier ${d.tier} tower: ${names}${twins.length > 4 ? '…' : ''}. You choose Merge or Swap there.`}</p>}
     <div className="td-sheet__actions">
-      {owner ? null : d.tier >= MAX_TIER ? <span className="td-note">Tier 7: the top.</span>
-        : twins.length === 0 ? <span className="td-note">No partner yet: any other tier {d.tier} tower can merge.</span>
-          : twins.slice(0, 3).map((o) => <button key={o.id} className={`td-primary${o.cell === pair ? ' is-pair' : ''}`} data-testid={`td-merge-${o.cell}`} onClick={() => { send({ type: 'merge', from: o.cell, to: cell }); useTumbleUI.setState({ pair: null }); }}>
-            Merge tier {d.tier} {o.cell === pair ? 'with' : 'at'} {cellName(o.cell)}<small>→ random tier {d.tier + 1} · shortcut M</small></button>)}
       {!owner && <button className="td-sell" data-testid="td-sell" onClick={() => { send({ type: 'sell', cell }); close(); }}>Sell +<Cost gold={sellValue(d.tier)} /></button>}
-      <button data-testid="td-sheet-close" onClick={close}>Close</button>
+      <MoreToggle full={full} />
+      <CloseButton testId="td-sheet-close" label="Close" onClick={close} />
+    </div>
+  </section>;
+}
+
+/**
+ * The Merge / Swap popup, floating at the target tower (`to`: where a merged tower lands; the board
+ * marks that square and draws an arrow to it from the source). Merge (M) or Swap (S); × or Esc cancels.
+ */
+function MergePopup({ p, choice, send, canAct }: { p: TdPlayer; choice: MergeChoice; send: (i: Parameters<typeof submitTumbleInput>[0]) => void; canAct: boolean }) {
+  const ref = useRef<HTMLElement>(null);
+  useFloatAt(ref, choice.to, [choice.from]);
+  const a = TOWERS[towerAt(p, choice.from)!.def], b = TOWERS[towerAt(p, choice.to)!.def], from = cellName(choice.from), to = cellName(choice.to);
+  const pick = (how: 'merge' | 'swap') => { const input = chooseMerge(p, how); if (input) send(input); };
+  return <section ref={ref} className="td-sheet td-choice" data-testid="td-merge-choice" data-from={choice.from} data-to={choice.to} style={tierStyle(b.tier)}
+    role="dialog" aria-label={`${a.name} on ${from} onto ${b.name} on ${to}: merge or swap`}>
+    <p className="td-choice__head"><b>{from} → {to}</b> {a.name} + {b.name}</p>
+    <div className="td-choice__actions">
+      <button className="td-primary" data-testid="td-choice-merge" disabled={!canAct} onClick={() => pick('merge')}>
+        <span>Merge <kbd>M</kbd></span><small>tier {b.tier + 1} on {to}</small></button>
+      <button data-testid="td-choice-swap" disabled={!canAct} onClick={() => pick('swap')}><span>Swap <kbd>S</kbd></span><small>trade squares</small></button>
+      <CloseButton testId="td-choice-cancel" label="Cancel (Esc)" onClick={cancelMerge} />
     </div>
   </section>;
 }
@@ -271,14 +334,24 @@ export function TumbleHud({ getState, localId, contestants }: MinigameSceneProps
   }), [getState, localId]);
 
   const s = getState(), me = s?.kind === 'tower-tumble' ? s.players.find((p) => p.id === localId) : undefined;
-  const panelOpen = ui.panel !== null || ui.selected !== null;
-  // Escape closes the top panel or sheet instead of pausing (the overlay's listener pauses first; undo it).
+  const panelOpen = ui.panel !== null || ui.selected !== null || ui.confirm !== null;
+  // What the Merge / Swap popup's M and S keys need from the latest render.
+  const keys = useRef<{ me?: TdPlayer; canAct: boolean; send: (i: Parameters<typeof submitTumbleInput>[0]) => void }>({ canAct: false, send: () => {} });
+  // Escape closes the popup, the top panel or the sheet instead of pausing (the overlay's listener pauses first; undo it).
+  // While the Merge / Swap popup is open, M merges and S swaps; captured here so the board shortcuts (S moves the cursor) never see them.
   useEffect(() => {
     if (!panelOpen) return;
     const onKey = (e: KeyboardEvent) => {
+      const choice = useTumbleUI.getState().confirm !== null;
+      if (choice && (e.code === 'KeyM' || e.code === 'KeyS') && !isTypingTarget(e.target)) {
+        e.stopPropagation(); e.preventDefault();
+        const k = keys.current, input = !e.repeat && k.canAct ? chooseMerge(k.me, e.code === 'KeyM' ? 'merge' : 'swap') : null;
+        if (input) k.send(input);
+        return;
+      }
       if (e.code !== 'Escape') return;
       e.stopPropagation(); e.preventDefault(); pauseMatch(false);
-      if (useTumbleUI.getState().panel) useTumbleUI.setState({ panel: null }); else useTumbleUI.setState({ selected: null });
+      if (choice) cancelMerge(); else if (useTumbleUI.getState().panel) useTumbleUI.setState({ panel: null }); else useTumbleUI.setState({ selected: null });
     };
     window.addEventListener('keydown', onKey, true); return () => window.removeEventListener('keydown', onKey, true);
   }, [panelOpen]);
@@ -292,7 +365,8 @@ export function TumbleHud({ getState, localId, contestants }: MinigameSceneProps
   const canAct = !readOnly && !me.out && s.phase !== 'over' && !paused && hostPhase === 'playing';
   const send = (input: Parameters<typeof submitTumbleInput>[0]) => { if (canAct || input.type === 'speed') { unlockAudio(); submitTumbleInput(input); } };
   const setPanel = (panel: TdPanel) => useTumbleUI.setState({ panel: ui.panel === panel ? null : panel });
-  const view = (id: string) => useTumbleUI.setState({ watching: id === localId ? null : id, selected: null, pair: null, hover: null, panel: ui.panel === 'quests' ? null : ui.panel });
+  keys.current = { me, canAct, send };
+  const view = (id: string) => useTumbleUI.setState({ watching: id === localId ? null : id, selected: null, confirm: null, hover: null, panel: ui.panel === 'quests' ? null : ui.panel });
   const seconds = Math.max(0, Math.ceil((s.phaseEnds - s.t) / 1000));
   const check = inCheck(s);
   const left = s.phase === 'wave' ? board.enemies.length + Math.max(0, s.spawns.length - board.spawnIdx) : 0;
@@ -304,8 +378,10 @@ export function TumbleHud({ getState, localId, contestants }: MinigameSceneProps
   const looking = readOnly || me.out;
   const selected = ui.selected === null ? null : looking ? (towerAt(board, ui.selected) ? ui.selected : null)
     : towerAt(me, ui.selected) || (isBuildable(ui.selected) && !isPath(ui.selected)) ? ui.selected : null;
+  // The Merge / Swap popup replaces the sheet (and the hover tip) while it is open.
+  const choice = looking ? null : liveChoice(me);
   const touch = useGame.getState().touchUI;
-  const hover = !touch && ui.hover !== null && ui.hover !== selected && ui.dragging === null && towerAt(board, ui.hover) ? ui.hover : null;
+  const hover = !touch && !choice && ui.hover !== null && ui.hover !== selected && ui.dragging === null && towerAt(board, ui.hover) ? ui.hover : null;
   const showQuests = !me.out || viewing;
   // Damage per second on the viewed board over the last second or so.
   const r = rate.current;
@@ -376,7 +452,8 @@ export function TumbleHud({ getState, localId, contestants }: MinigameSceneProps
       </div>
     </section>}
 
-    {selected !== null && <TowerSheet p={looking ? board : me} cell={selected} send={send} owner={looking ? (board === me && !spectator ? 'Your' : `${who}'s`) : undefined} pair={looking ? null : ui.pair} />}
+    {choice ? <MergePopup p={me} choice={choice} send={send} canAct={canAct} />
+      : selected !== null && <TowerSheet p={looking ? board : me} cell={selected} send={send} owner={looking ? (board === me && !spectator ? 'Your' : `${who}'s`) : undefined} full={ui.sheetFull} />}
     {hover !== null && <TowerTip p={board} cell={hover} />}
     {ui.panel === 'odds' && <OddsPanel me={readOnly ? board : me} who={readOnly ? who : undefined} onClose={() => setPanel(null)} />}
     {ui.panel === 'board' && <BoardPanel s={s} p={board} who={readOnly ? `${who}'s board` : 'Your board'} onClose={() => setPanel(null)} />}

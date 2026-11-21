@@ -1,9 +1,11 @@
 /* Toy Tower Tumble, desktop + phone portrait + phone landscape (real touch events on phones).
  *
  * Enter from the Tournament Pavilion's practice list, build (on a chosen square and automatically),
- * merge different towers of the same tier (mouse drag; on phones a tap or touch drag only selects the
- * pair and the floating sheet's Merge button merges, and the sheet never moves the layout),
- * press M without a selection to auto-merge, level the builder and open the odds (prices in the
+ * merge different towers of the same tier (a drag or a tap onto a same-tier tower opens the Merge / Swap
+ * popup at that tower and nothing merges until Merge: mouse drag + S swaps, Esc cancels, drag + M merges;
+ * phone portrait taps with ×, Swap and Merge; phone landscape touch-drags, a tap elsewhere cancels; the
+ * popup and the compact phone sheet (More / Less) float without moving the layout or covering the bar,
+ * rail or dock), press M without a selection to auto-merge, level the builder and open the odds (prices in the
  * bar's coin style), complete a quest (quest pictures), view another player's board from the rail
  * (its quests, towers by tier and family, builder and odds; tap a tower for its read-only sheet; no
  * actions) and come back, pan and zoom the board (wheel on desktop, pinch on phones) and reset the view,
@@ -57,14 +59,47 @@ async function frames(page, n) {
       // The fixed layout: the board slot (where the camera puts the board), the dock, the quest column and the rail.
       const layoutBoxes = () => page.evaluate(() => ['.td-board-slot', '[data-testid="td-dock"]', '.td-side--quests', '[data-testid="player-rail"]', 'canvas']
         .map((q) => { const e = document.querySelector(q); if (!e) return null; const r = e.getBoundingClientRect(); return [q, Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)].join(' '); }));
-      // The sheet floats inside the screen and beside (not over) the tower's square.
-      const floats = async (cell) => {
-        const r = await page.evaluate((c) => { const e = document.querySelector('[data-testid="td-sheet"]').getBoundingClientRect(), a = window.__toybox.tumble.point(c % 8, Math.floor(c / 8), 0.3);
-          return { e: { x: e.x, y: e.y, r: e.right, b: e.bottom }, a, w: innerWidth, h: innerHeight, pos: getComputedStyle(document.querySelector('[data-testid="td-sheet"]')).position }; }, cell);
+      // The sheet (or the Merge / Swap popup) floats inside the screen and beside (not over) its square,
+      // and never over the top bar (wave info), the player rail or the dock.
+      const floats = async (cell, id = 'td-sheet') => {
+        const r = await page.evaluate(([c, q]) => {
+          const el = document.querySelector(`[data-testid="${q}"]`), e = el.getBoundingClientRect(), a = window.__toybox.tumble.point(c % 8, Math.floor(c / 8), 0.3);
+          const hit = ['td-bar', 'player-rail', 'td-dock'].filter((t) => { const o = document.querySelector(`[data-testid="${t}"]`)?.getBoundingClientRect(); return o && e.x < o.right - 0.5 && e.right > o.x + 0.5 && e.y < o.bottom - 0.5 && e.bottom > o.y + 0.5; });
+          return { e: { x: e.x, y: e.y, r: e.right, b: e.bottom }, a, w: innerWidth, h: innerHeight, pos: getComputedStyle(el).position, hit };
+        }, [cell, id]);
         assert.equal(r.pos, 'absolute');
-        assert.ok(r.e.x >= 0 && r.e.y >= 0 && r.e.r <= r.w + 0.5 && r.e.b <= r.h + 0.5, `the sheet is on screen: ${JSON.stringify(r)}`);
-        assert.ok(!(r.a.x > r.e.x && r.a.x < r.e.r && r.a.y > r.e.y && r.a.y < r.e.b), `the sheet does not cover its square: ${JSON.stringify(r)}`);
+        assert.ok(r.e.x >= 0 && r.e.y >= 0 && r.e.r <= r.w + 0.5 && r.e.b <= r.h + 0.5, `${id} is on screen: ${JSON.stringify(r)}`);
+        assert.ok(!(r.a.x > r.e.x && r.a.x < r.e.r && r.a.y > r.e.y && r.a.y < r.e.b), `${id} does not cover its square: ${JSON.stringify(r)}`);
+        assert.deepEqual(r.hit, [], `${id} covers nothing important: ${JSON.stringify(r)}`);
+        return r.e;
       };
+      // Drag one of your towers onto another square: the mouse on desktop, a real touch drag on phones.
+      const dragTower = async (from, to) => {
+        const f = await square(from, 1.4), t = await square(to, 0.3);
+        if (!mobile) {
+          await page.mouse.move(f.x, f.y); await page.mouse.down();
+          await page.mouse.move((f.x + t.x) / 2, (f.y + t.y) / 2, { steps: 4 });
+          await page.mouse.move(t.x, t.y, { steps: 4 });
+          await page.waitForFunction(() => document.querySelector('canvas').style.cursor === 'grabbing');
+          await page.mouse.up(); return;
+        }
+        const cdp = await context.newCDPSession(page);
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: f.x, y: f.y, id: 1 }] });
+        for (let i = 1; i <= 6; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: f.x + (t.x - f.x) * i / 6, y: f.y + (t.y - f.y) * i / 6, id: 1 }] });
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await cdp.detach();
+      };
+      // The Merge / Swap popup, open for `from` onto `to`, with nothing merged yet.
+      const asks = async (from, to, merged = 0) => {
+        await page.waitForSelector(`[data-testid="td-merge-choice"][data-from="${from}"][data-to="${to}"]`);
+        await frames(page, 3);
+        assert.equal(await me('p.merges'), merged, 'nothing merges before Merge is chosen');
+        assert.equal(await me(`p.towers.some(t => t.cell === ${from}) && p.towers.some(t => t.cell === ${to})`), true);
+        assert.match(await page.getByTestId('td-choice-merge').textContent(), new RegExp(`tier 2 on ${'ABCDEFGH'[to % 8]}${Math.floor(to / 8) + 1}`));
+        for (const id of ['td-choice-merge', 'td-choice-swap', 'td-choice-cancel']) await size56(id);
+        const box = await floats(to, 'td-merge-choice'), src = await square(from, 0.3);
+        assert.ok(!(src.x > box.x && src.x < box.r && src.y > box.y && src.y < box.b), `the popup leaves the source square in sight: ${JSON.stringify({ box, src })}`);
+      };
+      const closeSheet = async () => { if (await page.getByTestId('td-sheet-close').count()) { await click('td-sheet-close'); await page.getByTestId('td-sheet').waitFor({ state: 'detached' }); } };
       const peak = { calls: 0, triangles: 0, geometries: 0, meshes: 0, fx: 0 };
       const sample = async () => {
         const r = await page.evaluate(() => ({ ...window.__toybox.renderInfo(), fx: window.__toybox.tumbleFx ? window.__toybox.tumbleFx.peak() : 0 }));
@@ -111,79 +146,130 @@ async function frames(page, n) {
       await click('td-sheet-close');
       await click('td-build'); await until('p.towers.length === 2');
       await click('td-build'); await until('p.towers.length === 3');
-      // 70 start − 3 × 20, plus any quest a lucky roll just completed (e.g. three of the ordered tier 1).
+      // 90 start − 3 × 20, plus any quest a lucky roll just completed (e.g. three of the ordered tier 1).
       const questGold = await page.evaluate(() => { const p = window.__toybox.match.state().players[0]; return { collect5: 40, order1: 25 }[Object.keys(p.quests).find((q) => p.quests[q])] || 0; });
       assert.equal(await me('p.builds'), 3);
-      assert.equal(await me('p.gold'), 70 - 60 + questGold);
+      assert.equal(await me('p.gold'), 90 - 60 + questGold);
       log('built three towers');
       // A fresh build selects its tower; start the merge from no selection.
-      if (await page.getByTestId('td-sheet-close').count()) { await click('td-sheet-close'); await page.getByTestId('td-sheet').waitFor({ state: 'detached' }); }
+      await closeSheet();
 
-      // ── merge different tower types of the same tier ──
+      // ── merge different tower types of the same tier: every way asks Merge or Swap first ──
       const [a, b] = await me('p.towers.slice(0, 2).map(t => t.cell)');
+      const [idA, idB] = await me('p.towers.slice(0, 2).map(t => t.id)');
       await state(() => { const p = window.__toybox.match.state().players[0]; p.towers[0].def = 'tin-sentry'; p.towers[1].def = 'spark-bot'; });
+      const before = await layoutBoxes();
+      const swapped = `p.towers.find(t => t.id === ${idA}).cell === ${b} && p.towers.find(t => t.id === ${idB}).cell === ${a} && p.merges === 0`;
       if (layout === 'desktop') {
-        const from = await square(a, 1.4), to = await square(b, 0.3);
-        await page.mouse.move(from.x, from.y); await page.mouse.down();
-        await page.mouse.move((from.x + to.x) / 2, (from.y + to.y) / 2, { steps: 4 });
-        await page.mouse.move(to.x, to.y, { steps: 4 });
-        await page.waitForFunction(() => document.querySelector('canvas').style.cursor === 'grabbing');
-        await shot('drag');
-        await page.mouse.up();
-      } else {
-        // Phones: a tap on a tower opens its sheet as a floating popover; the board, dock and columns do not move.
-        const before = await layoutBoxes();
+        // Mouse: drag A onto B. The popup floats at B (where a merge would land); S swaps.
+        await dragTower(a, b);
+        await asks(a, b);
+        assert.deepEqual(await layoutBoxes(), before, 'the popup moves nothing');
+        await shot('merge-popup');
+        await page.keyboard.press('KeyS');
+        await until(swapped);
+        await page.getByTestId('td-merge-choice').waitFor({ state: 'detached' });
+        assert.equal(await me(`p.towers.find(t => t.id === ${idA}).cell`), b, 'S swapped (the cursor did not move instead)');
+        // Drag the tower now on A (B's, after the swap) onto B: the popup again; Esc cancels without pausing.
+        // (Select-then-click on a partner is the portrait run's path: on desktop the sheet floats to the right of A, over B.)
+        await closeSheet();
+        await dragTower(a, b); await asks(a, b);
+        await page.keyboard.press('Escape');
+        await page.getByTestId('td-merge-choice').waitFor({ state: 'detached' });
+        assert.equal(await page.getByTestId('td-next').isDisabled(), false, 'Esc closed the popup without pausing');
+        assert.equal(await me('p.merges'), 0);
+        // Drag again and press M: merged onto B.
+        await dragTower(a, b); await asks(a, b);
+        await page.keyboard.press('KeyM');
+      } else if (layout === 'portrait') {
+        // Phone portrait: a tap opens the compact sheet (one summary line and its buttons) beside the tower.
         await tapSquare(a);
-        await page.getByTestId(`td-merge-${b}`).waitFor({ timeout: 90000 }).catch(async (e) => { log(`merge sheet missing: ${JSON.stringify(await me('({ towers: p.towers.map(t => [t.cell, t.def]), sel: document.querySelector("[data-testid=td-sheet-name]")?.textContent })'))} a=${a} b=${b}`); await shot('merge-failed'); throw e; }); // twin found: the sheet offers it, the board highlights it
+        await page.getByTestId('td-sheet-more').waitFor();
         await frames(page, 3);
         assert.deepEqual(await layoutBoxes(), before, 'opening the sheet moves nothing');
-        await floats(a);
-        await shot('popover');
-        if (layout === 'portrait') await tapSquare(b); // a tap on the glowing partner...
-        else { // ...or a touch drag onto it...
-          const from = await square(a, 1.4), to = await square(b, 0.3), cdp = await context.newCDPSession(page);
-          await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: from.x, y: from.y, id: 1 }] });
-          for (let i = 1; i <= 6; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: from.x + (to.x - from.x) * i / 6, y: from.y + (to.y - from.y) * i / 6, id: 1 }] });
-          await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await cdp.detach();
+        assert.equal(await page.getByTestId('td-sheet-detail').isVisible(), false, 'compact by default');
+        assert.equal(await page.getByTestId('td-sheet-key').isVisible(), true);
+        for (const id of ['td-sell', 'td-sheet-more', 'td-sheet-close']) await size56(id);
+        const compact = await floats(a);
+        log(`compact sheet ${Math.round(compact.r - compact.x)}×${Math.round(compact.b - compact.y)}`);
+        assert.ok(compact.b - compact.y <= 125, `the compact sheet is short: ${JSON.stringify(compact)}`);
+        await shot('sheet-compact');
+        await click('td-sheet-more'); // More: the full details
+        await page.waitForFunction(() => document.querySelector('[data-testid="td-sheet-detail"]')?.checkVisibility());
+        await frames(page, 2);
+        const full = await floats(a);
+        assert.ok(full.b - full.y > compact.b - compact.y, 'More shows more');
+        await shot('sheet-full');
+        await click('td-sheet-more'); // Less: back to compact (remembered for the session)
+        await page.waitForFunction(() => !document.querySelector('[data-testid="td-sheet-detail"]')?.checkVisibility());
+        // A tap on the glowing partner opens the popup at the partner; × cancels.
+        await tapSquare(b); await asks(a, b);
+        assert.deepEqual(await layoutBoxes(), before, 'the popup moves nothing');
+        await shot('merge-popup');
+        await click('td-choice-cancel');
+        await page.getByTestId('td-merge-choice').waitFor({ state: 'detached' });
+        assert.equal(await me('p.merges'), 0);
+        // Again, and Swap.
+        await tapSquare(a); await page.getByTestId('td-sheet').waitFor();
+        await tapSquare(b); await asks(a, b);
+        await click('td-choice-swap');
+        await until(swapped);
+        await closeSheet();
+        // Again (the towers have traded squares), and Merge.
+        await tapSquare(a); await page.getByTestId('td-sheet').waitFor();
+        await tapSquare(b); await asks(a, b);
+        await click('td-choice-merge');
+      } else {
+        // Phone landscape: a touch drag onto the partner opens the popup; a tap elsewhere on the board cancels.
+        await dragTower(a, b); await asks(a, b);
+        assert.deepEqual(await layoutBoxes(), before, 'the popup moves nothing');
+        await shot('merge-popup');
+        let away = null;
+        for (const cell of [27, 28, 36, 35, 44, 43, 59, 60, 58, 61, 3, 4]) { // any square clear of the popup (a press there only cancels)
+          const at = await square(cell, 0.3), hit = await page.evaluate((q) => document.elementFromPoint(q.x, q.y)?.tagName, at);
+          if (hit === 'CANVAS') { away = at; break; }
         }
-        // ...only selects the pair: the partner's sheet offers "Merge with" the first tower, first. Nothing merged.
-        await page.waitForSelector(`[data-testid="td-merge-${a}"].is-pair`);
-        await frames(page, 4);
-        assert.equal(await me('p.merges'), 0, 'a tap or drop on a same-tier tower never merges on touch');
-        assert.equal(await me(`p.towers.some(t => t.cell === ${a}) && p.towers.some(t => t.cell === ${b})`), true);
-        assert.match(await page.getByTestId(`td-merge-${a}`).textContent(), /Merge tier 1 with/);
-        assert.deepEqual(await layoutBoxes(), before, 'the sheet still moves nothing');
-        await floats(b);
-        await size56(`td-merge-${a}`);
-        await shot('pair');
-        await click(`td-merge-${a}`); // the Merge button does
+        assert.ok(away, 'a free spot on the board');
+        await page.touchscreen.tap(away.x, away.y);
+        await page.getByTestId('td-merge-choice').waitFor({ state: 'detached' });
+        await frames(page, 3);
+        assert.equal(await page.getByTestId('td-sheet').count(), 0, 'the tap only cancelled');
+        assert.equal(await me('p.merges'), 0);
+        await dragTower(a, b); await asks(a, b);
+        await click('td-choice-merge');
       }
       await until(`p.merges === 1 && p.towers.length === 2 && p.towers.some(t => t.cell === ${b} && t.how !== 'build')`);
       assert.equal(await me(`p.towers.some(t => t.cell === ${a})`), false);
       await frames(page, 2);
       await shot('merge');
-      // Landscape also merges with the sheet's button.
+      // Landscape: select one tower, tap the other, Merge.
       if (layout === 'landscape') {
         await state(() => { const p = window.__toybox.match.state().players[0]; p.towers.forEach((t,i) => { t.def = i ? 'felt-cub' : 'tin-sentry'; }); });
         const cells = await me('p.towers.map(t => t.cell)');
-        // The merged tower is still selected; clear it so the tap selects rather than toggles.
-        if (await page.getByTestId('td-sheet-close').count()) { await click('td-sheet-close'); await page.getByTestId('td-sheet').waitFor({ state: 'detached' }); }
-        await tapSquare(cells[0]);
-        await page.getByTestId(`td-merge-${cells[1]}`).waitFor();
-        await size56(`td-merge-${cells[1]}`);
-        await click(`td-merge-${cells[1]}`);
+        await closeSheet(); // the merged tower is still selected: clear it so the tap selects rather than toggles
+        await tapSquare(cells[0]); await page.getByTestId('td-sheet').waitFor();
+        await floats(cells[0]); await shot('sheet-compact');
+        // On this small board the compact sheet may hide part of the partner: tap a part of it still in sight, as a player would.
+        let spot = null;
+        for (const y of [1.3, 0.9, 0.5, 0.3]) {
+          const at = await square(cells[1], y), ok = await page.evaluate(([q, c]) => document.elementFromPoint(q.x, q.y)?.tagName === 'CANVAS' && window.__toybox.tumble.pick(q.x, q.y).cell === c, [at, cells[1]]);
+          if (ok) { spot = at; break; }
+        }
+        assert.ok(spot, 'part of the partner is in sight beside the sheet');
+        await page.touchscreen.tap(spot.x, spot.y); await asks(cells[0], cells[1], 1);
+        await click('td-choice-merge');
         await until('p.merges === 2 && p.towers.length === 1');
-        await click('td-sheet-close');
+        await closeSheet();
       }
       if (layout === 'desktop') {
         await state(() => { const p = window.__toybox.match.state().players[0]; p.towers.forEach((t,i) => { t.def = i ? 'spark-bot' : 'tin-sentry'; }); });
-        if (await page.getByTestId('td-sheet-close').count()) { await click('td-sheet-close'); await page.getByTestId('td-sheet').waitFor({state:'detached'}); }
+        await closeSheet();
         await page.keyboard.press('KeyM');
         await until('p.merges === 2 && p.towers.length === 1');
         await shot('keyboard-merge');
-        if (await page.getByTestId('td-sheet-close').count()) await click('td-sheet-close');
+        await closeSheet();
       }
-      log(layout === 'desktop' ? 'merged same-tier towers; M works without selection' : 'merged same-tier towers with touch');
+      log(layout === 'desktop' ? 'merge popup: drag + S swapped, Esc cancelled, drag + M merged; M works without selection' : layout === 'portrait' ? 'merge popup on touch: × cancelled, Swap, Merge; compact sheet and More' : 'merge popup on touch: a tap elsewhere cancelled, drag + Merge, tap + Merge; compact sheet');
 
       // ── level the builder and read the odds ──
       await state(() => { window.__toybox.match.state().players[0].gold = 300; });
@@ -257,7 +343,7 @@ async function frames(page, n) {
       { const at = await square(musketeer, 1.3); if (mobile) await page.touchscreen.tap(at.x, at.y); else await page.mouse.click(at.x, at.y); }
       await page.getByTestId('td-sheet-owner').waitFor();
       assert.match(await page.getByTestId('td-sheet-name').textContent(), /Cork Musketeer/);
-      assert.equal(await page.locator('[data-testid="td-sheet"] [data-testid^="td-merge-"], [data-testid="td-sell"]').count(), 0);
+      assert.equal(await page.locator('[data-testid="td-merge-choice"], [data-testid="td-merge-hint"], [data-testid="td-sell"]').count(), 0);
       if (mobile) { await frames(page, 2); assert.deepEqual(await layoutBoxes(), viewBefore, 'the read-only sheet moves nothing'); await floats(musketeer); }
       await frames(page, 2); await shot('rail-view-tower');
       await click('td-sheet-close'); await page.getByTestId('td-sheet').waitFor({ state: 'detached' });

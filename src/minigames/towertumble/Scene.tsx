@@ -9,10 +9,12 @@
  *
  * Input is plain DOM pointer events on the canvas: a press on one of your towers can drag it (move,
  * swap, merge); any other press pans the camera once it moves; a press that barely moves is a tap
- * (select); two fingers pinch-zoom and the wheel zooms, toward the fingers or the cursor. On touch
- * (the shared `touchUI` setting) a tap or drop on a same-tier tower selects the pair instead of
- * merging: only the sheet's Merge button merges. On a board you are only looking at, a tap inspects
- * a tower (read-only), and with a mouse, hovering one shows its floating tip.
+ * (select); two fingers pinch-zoom and the wheel zooms, toward the fingers or the cursor. A drop
+ * on (or, with a tower selected, a tap on) a same-tier tower never merges by itself: it opens the
+ * HUD's Merge / Swap popup at that tower, and the board marks the landing square (a glowing honey
+ * square, ring and arrow from the source). While the popup is open a press anywhere on the board
+ * closes it (and only closes it, unless it becomes a pan). On a board you are only looking at, a tap
+ * inspects a tower (read-only), and with a mouse, hovering one shows its floating tip.
  */
 import { useEffect, useMemo, useRef, type RefObject } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
@@ -20,7 +22,6 @@ import * as THREE from 'three';
 import { PALETTE } from '../../game/palette';
 import { playToyCue, sfx, unlockAudio } from '../../game/audio';
 import { exposeDebug } from '../../game/debug';
-import { useGame } from '../../game/store';
 import { matchBus, useMatch } from '../session';
 import type { MinigameSceneProps } from '../types';
 import { drawQueuedPortrait } from '../toysquad/portraits';
@@ -34,7 +35,7 @@ import { enemyStatus } from './status';
 import { tumbleScreen, tumbleView } from './camera';
 import { StatusIconBatch } from '../shared/statusIcons';
 import { TAP_SLOP, type Ground } from '../shared/panZoom';
-import { canMergeCells, inspectCell, submitTumbleInput, tapCell, useTumbleUI } from './local';
+import { canMergeCells, cancelMerge, dropTower, inspectCell, liveChoice, tapCell, useTumbleUI } from './local';
 import { BRIDGE, CELL, bw, groundY, worldCell } from './space';
 import { TumbleFxLayer, tumbleFxRef } from './Fx';
 import { eventCue, SHOT_VOICE, SHOT_VOICES_PER_TICK } from './sounds';
@@ -58,6 +59,24 @@ const barMat = new THREE.MeshBasicMaterial({ color: '#FFFFFF', toneMapped: false
 const auraMat = new THREE.MeshBasicMaterial({ color: PALETTE.honey, transparent: true, opacity: 0.32, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
 const ringMat = (c: string, opacity = 0.95) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
 const SELECT_MAT = ringMat(PALETTE.white), CURSOR_MAT = ringMat(PALETTE.toyBlue, 0.8), TWIN_MAT = ringMat(PALETTE.honey), DROP_MAT = ringMat(PALETTE.honey, 0.9);
+/** The Merge / Swap popup's landing square (a glowing honey square) and the arrow to it from the source tower. */
+const LAND = new THREE.PlaneGeometry(CELL - 0.3, CELL - 0.3).rotateX(-Math.PI / 2);
+const LAND_MAT = ringMat(PALETTE.honey, 0.5), ARROW_MAT = ringMat(PALETTE.honey, 1), ARROW_EDGE_MAT = ringMat(PALETTE.inkPurple, 1);
+// Drawn over the toys (no depth test), so a tall tower never hides the arrow.
+ARROW_MAT.depthTest = ARROW_EDGE_MAT.depthTest = false;
+/** The arrow's flat shaft (unit length from x = 0 along +x, unit width) and head (base at x = 0, tip at x = 1, unit half-width). */
+const SHAFT = new THREE.PlaneGeometry(1, 1).translate(0.5, 0, 0).rotateX(-Math.PI / 2);
+const HEAD = new THREE.ShapeGeometry(new THREE.Shape([new THREE.Vector2(0, -1), new THREE.Vector2(1, 0), new THREE.Vector2(0, 1)])).rotateX(-Math.PI / 2);
+/** Arrow sizes in cm: honey fill with an ink edge. */
+const AR = { shaft: 0.5, head: 1.1, half: 0.75, edge: 0.16 };
+/** Lay the arrow group's four meshes (edge shaft, edge head, shaft, head) for a length `len` along +x. */
+function layArrow(g: THREE.Group, len: number) {
+  const [es, eh, sh, hd] = g.children, body = Math.max(0.1, len - AR.head), e = AR.edge;
+  es.position.set(-e, 0, 0); es.scale.set(body + e, 1, AR.shaft + e * 2);
+  eh.position.set(body - e * 1.4, 0, 0); eh.scale.set(AR.head + e * 2.4, 1, AR.half + e * 1.8);
+  sh.scale.set(body, 1, AR.shaft);
+  hd.position.set(body, 0, 0); hd.scale.set(AR.head, 1, AR.half);
+}
 let enemyGeometry: Record<string, THREE.BufferGeometry> | null = null;
 const enemyGeo = () => (enemyGeometry ??= Object.fromEntries(ENEMY_KINDS.map((k) => [k, bakeParts(ENEMY_PARTS[k])])));
 const reducedMotion = () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -304,6 +323,7 @@ function putRing(m: THREE.Mesh, cell: number | null, r: number, mine: boolean) {
 }
 function Markers({ drag }: { drag: RefObject<Drag | null> }) {
   const select = useRef<THREE.Mesh>(null!), cursor = useRef<THREE.Mesh>(null!), target = useRef<THREE.Mesh>(null!);
+  const land = useRef<THREE.Mesh>(null!), arrow = useRef<THREE.Group>(null!);
   const twins = useMemo(() => { const m = new THREE.InstancedMesh(RING, TWIN_MAT, BUILDABLE.length); m.count = 0; m.raycast = () => {}; m.frustumCulled = false; return m; }, []);
   const o = useMemo(() => new THREE.Object3D(), []), reduced = useRef(reducedMotion());
   useEffect(() => () => { twins.dispose(); }, [twins]);
@@ -314,7 +334,18 @@ function Markers({ drag }: { drag: RefObject<Drag | null> }) {
     putRing(select.current, ui.selected, CELL * 0.5 * pulse, mine || (!!v.board && ui.selected !== null && !!towerAt(v.board, ui.selected)));
     putRing(cursor.current, ui.cursor !== ui.selected ? ui.cursor : null, CELL * 0.44, mine);
     let n = 0;
-    const from = drag.current?.moved ? drag.current.from : ui.selected;
+    // The Merge / Swap popup is open: mark where the merged tower would land, and the way from the source to it.
+    const choice = mine ? liveChoice(v.me) : null;
+    land.current.visible = arrow.current.visible = !!choice;
+    if (choice) {
+      const fx = bw(choice.from % 8), fz = bw(Math.floor(choice.from / 8)), tx = bw(choice.to % 8), tz = bw(Math.floor(choice.to / 8));
+      land.current.position.set(tx, 0.31, tz); LAND_MAT.opacity = 0.42 + (pulse - 1) * 2;
+      const len = Math.hypot(tx - fx, tz - fz), trim = Math.min(CELL * 0.45, len * 0.3);
+      arrow.current.position.set(fx + ((tx - fx) / len) * trim, 0.5, fz + ((tz - fz) / len) * trim);
+      arrow.current.rotation.set(0, -Math.atan2(tz - fz, tx - fx), 0);
+      layArrow(arrow.current, Math.max(1.2, len - trim * 2));
+    }
+    const from = choice ? null : drag.current?.moved ? drag.current.from : ui.selected;
     const picked = mine && from !== null && v.me ? towerAt(v.me, from) : undefined;
     if (picked && v.me) for (const t of v.me.towers) {
       if (!canMergeTowers(picked, t)) continue;
@@ -322,8 +353,11 @@ function Markers({ drag }: { drag: RefObject<Drag | null> }) {
     }
     twins.count = n; twins.visible = n > 0; if (n) twins.instanceMatrix.needsUpdate = true;
     const d = drag.current;
-    target.current.visible = !!d?.moved && d.over !== null && mine;
-    if (d?.moved && d.over !== null && v.me) {
+    target.current.visible = (!!d?.moved && d.over !== null && mine) || !!choice;
+    if (choice) {
+      (target.current.material as THREE.MeshBasicMaterial).color.set(PALETTE.honey);
+      target.current.position.set(bw(choice.to % 8), 0.34, bw(Math.floor(choice.to / 8))); target.current.scale.setScalar(CELL * 0.58 * pulse);
+    } else if (d?.moved && d.over !== null && v.me) {
       const ok = canMergeCells(v.me, d.from, d.over) || (isBuildable(d.over) && d.over !== d.from);
       (target.current.material as THREE.MeshBasicMaterial).color.set(canMergeCells(v.me, d.from, d.over) ? PALETTE.honey : ok ? PALETTE.white : PALETTE.coral);
       target.current.position.set(bw(d.over % 8), 0.34, bw(Math.floor(d.over / 8))); target.current.scale.setScalar(CELL * 0.52);
@@ -333,6 +367,13 @@ function Markers({ drag }: { drag: RefObject<Drag | null> }) {
     <mesh ref={select} geometry={RING} material={SELECT_MAT} raycast={() => {}} visible={false} />
     <mesh ref={cursor} geometry={RING} material={CURSOR_MAT} raycast={() => {}} visible={false} />
     <mesh ref={target} geometry={RING} material={DROP_MAT} raycast={() => {}} visible={false} />
+    <mesh ref={land} geometry={LAND} material={LAND_MAT} raycast={() => {}} visible={false} />
+    <group ref={arrow} visible={false}>
+      <mesh geometry={SHAFT} material={ARROW_EDGE_MAT} raycast={() => {}} renderOrder={21} />
+      <mesh geometry={HEAD} material={ARROW_EDGE_MAT} raycast={() => {}} renderOrder={21} />
+      <mesh geometry={SHAFT} material={ARROW_MAT} raycast={() => {}} renderOrder={22} />
+      <mesh geometry={HEAD} material={ARROW_MAT} raycast={() => {}} renderOrder={22} />
+    </group>
     <primitive object={twins} />
   </group>;
 }
@@ -371,8 +412,11 @@ function fitCamera(camera: THREE.PerspectiveCamera, slot: DOMRect, canvas: DOMRe
 
 // ───────────── input: tap to select, drag a tower onto a twin to merge, drag elsewhere to pan ─────────────
 interface Drag { pointer: number; from: number; sx: number; sy: number; moved: boolean; x: number; z: number; over: number | null }
-/** A press that is not on one of your towers: a tap if it barely moves, otherwise a pan. */
-interface Press { pointer: number; sx: number; sy: number; cell: number | null; panned: boolean }
+/**
+ * A press that is not on one of your towers: a tap if it barely moves, otherwise a pan. `dismiss`:
+ * it closed the Merge / Swap popup, so as a tap it does nothing else.
+ */
+interface Press { pointer: number; sx: number; sy: number; cell: number | null; panned: boolean; dismiss: boolean }
 const floor = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.3);
 const table = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 const raycaster = new THREE.Raycaster(), ndc = new THREE.Vector2(), groundHit = new THREE.Vector3();
@@ -422,10 +466,13 @@ export function TumbleScene({ getState, localId }: MinigameSceneProps<TdState>) 
       if (tumbleView.pointerCount > 1) return;
       const v = readView(getState, localId);
       const cell = pickCell(rayAt(e.clientX, e.clientY), v.board);
-      if (editable(v) && cell !== null && v.me && towerAt(v.me, cell)) {
+      // A press while the Merge / Swap popup is open closes it (the popup's own buttons are DOM, not the canvas).
+      const open = useTumbleUI.getState().confirm !== null, dismiss = open && liveChoice(v.me) !== null;
+      if (dismiss) cancelMerge(); else if (open) useTumbleUI.setState({ confirm: null }); // a stale choice just goes
+      if (!dismiss && editable(v) && cell !== null && v.me && towerAt(v.me, cell)) {
         drag.current = { pointer: e.pointerId, from: cell, sx: e.clientX, sy: e.clientY, moved: false, x: 0, z: 0, over: cell };
         press.current = null;
-      } else press.current = { pointer: e.pointerId, sx: e.clientX, sy: e.clientY, cell, panned: false };
+      } else press.current = { pointer: e.pointerId, sx: e.clientX, sy: e.clientY, cell, panned: false, dismiss };
     };
     const onMove = (e: PointerEvent) => {
       if (tumbleView.pinching) { tumbleView.move(e.pointerId, e.clientX, e.clientY, ground, apply); return; }
@@ -451,22 +498,16 @@ export function TumbleScene({ getState, localId }: MinigameSceneProps<TdState>) 
       if (d && e.pointerId === d.pointer) {
         dragMove(d, e.clientX, e.clientY);
         const v = readView(getState, localId);
-        if (editable(v) && v.me) {
-          if (!d.moved) tapCell(v.me, d.from, useGame.getState().touchUI);
-          else if (d.over !== null && d.over !== d.from) {
-            // Touch: dropping on a same-tier tower selects the pair; its sheet's Merge button merges.
-            if (canMergeCells(v.me, d.from, d.over) && useGame.getState().touchUI) useTumbleUI.setState({ selected: d.over, cursor: d.over, pair: d.from });
-            else if (canMergeCells(v.me, d.from, d.over)) { submitTumbleInput({ type: 'merge', from: d.from, to: d.over }); useTumbleUI.setState({ selected: d.over, cursor: d.over, pair: null }); }
-            else if (isBuildable(d.over)) { submitTumbleInput({ type: 'move', from: d.from, to: d.over }); useTumbleUI.setState({ selected: d.over, cursor: d.over }); }
-          }
-        }
+        // A drop on a same-tier tower asks Merge or Swap (popup at that tower); elsewhere it moves or swaps at once.
+        if (editable(v) && v.me) { if (!d.moved) tapCell(v.me, d.from); else dropTower(v.me, d.from, d.over); }
         cancel();
       } else if (p && e.pointerId === p.pointer) {
         press.current = null; el.style.cursor = '';
         // A tap (not a pan, not the end of a pinch) selects on your own board, and inspects a tower on one you are only looking at.
         const v = readView(getState, localId);
-        if (!p.panned && !wasPinch && editable(v) && v.me) { if (p.cell === null) useTumbleUI.setState({ selected: null, pair: null }); else tapCell(v.me, p.cell, useGame.getState().touchUI); }
-        else if (!p.panned && !wasPinch && v.board && (v.board !== v.me || v.me.out)) inspectCell(v.board, p.cell);
+        if (p.dismiss || p.panned || wasPinch) { /* closed the popup, panned or pinched: not a tap */ }
+        else if (editable(v) && v.me) { if (p.cell === null) useTumbleUI.setState({ selected: null, confirm: null }); else tapCell(v.me, p.cell); }
+        else if (v.board && (v.board !== v.me || v.me.out)) inspectCell(v.board, p.cell);
       }
     };
     const onCancel = (e: PointerEvent) => { tumbleView.up(e.pointerId); if (drag.current?.pointer === e.pointerId) cancel(); if (press.current?.pointer === e.pointerId) { press.current = null; el.style.cursor = ''; } };
