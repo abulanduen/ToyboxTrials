@@ -66,6 +66,13 @@ export interface ServerGame {
    * `watching` is another seat whose board the viewer is looking at (a game's player rail), if any.
    */
   viewFor?(view: Obj, viewer: string | null, watching?: string | null): Obj;
+  /**
+   * Optional, for large states: before the wire copy, cut the parts no viewer this tick will be
+   * sent (return a shallow copy of the raw state; never mutate it). `views` are the (viewer,
+   * watching) pairs about to be served; `viewFor` must still cut each view on its own. Saves the
+   * server copying data it then throws away (Toybox Siege's eight 75 KB boards).
+   */
+  trimForViews?(state: Obj, views: readonly { viewer: string | null; watching: string | null }[]): Obj;
   config?: Obj;
   repeatInputs?: boolean;
   /** Send a snapshot every N server ticks (default 1). */
@@ -75,6 +82,26 @@ export interface ServerGame {
 const int = (v: unknown, lo: number, hi: number): v is number => typeof v === 'number' && Number.isInteger(v) && v >= lo && v <= hi;
 const num = (v: unknown, lim: number): v is number => typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= lim;
 const opt = <T>(v: unknown, ok: (x: unknown) => x is T) => v === undefined || ok(v);
+
+/** Toybox Siege: which boards one viewer is sent whole (their own and the one they watch; none in the arena). */
+function siegeKeep(v: Obj, viewer: string | null): Set<unknown> {
+  const players = v.players as Obj[];
+  const me = players.find((p) => p.id === viewer);
+  const keep = new Set<unknown>(v.phase === 'arena' || v.phase === 'over' ? [] : [viewer, me?.watching ?? null]);
+  if (!me && v.phase === 'run') keep.add(players.find((p) => p.status === 'alive')?.id ?? players[0]?.id);
+  return keep;
+}
+/** Pooled entity lists on a Siege board (each slot has `on`; the client never reads a dead slot's other fields). */
+const SIEGE_POOLS = ['mobs', 'projs', 'shots', 'gems', 'chests', 'blasts', 'fires', 'bigs'] as const;
+const DEAD_SLOT: Obj = Object.freeze({ on: false }) as Obj;
+/** A board as sent whole: every dead pool slot is just `{ on: false }` (no stale fields to copy, diff and send). */
+const siegeLive = (b: Obj): Obj => {
+  const out: Obj = { ...b };
+  for (const k of SIEGE_POOLS) if (Array.isArray(b[k])) out[k] = (b[k] as Obj[]).map((e) => (e.on ? e : DEAD_SLOT));
+  return out;
+};
+/** A board cut to what other players need: no pooled entities, only its live elites (the HUD's send-limit check). */
+const siegeStub = (b: Obj): Obj => ({ ...b, mobs: [], projs: [], shots: [], gems: [], chests: [], blasts: [], fires: [], bigs: (b.bigs as Obj[]).filter((g) => g.on) });
 
 /** Movement games (Red Light, Wind-Up Dash): the shared MoveInput. */
 function moveInput(i: Obj) {
@@ -132,6 +159,11 @@ const GAMES: ServerGame[] = [
     publicView(v) {
       v.cycles = [];
     },
+    // Online a player sees the light turn red one network trip plus a snapshot late, and their
+    // "stop" reaches the rules another trip plus an input batch later: about 130-180 ms on a good
+    // connection, more than the whole 140 ms grace. Without this, toys kept moving after their
+    // player let go and were caught (flung back) far more often than in practice.
+    config: { graceMs: 140 + 170 },
   },
   {
     id: 'blink-duel',
@@ -307,14 +339,24 @@ const GAMES: ServerGame[] = [
     // elites, ghost position) always go out in full. Once the final arena opens, every board is
     // stubbed: the shared arena (`v.arena`) is what everyone sees, and it goes out whole.
     viewFor(v, viewer) {
-      const players = v.players as Obj[];
-      const me = players.find((p) => p.id === viewer);
-      const keep = new Set<unknown>(v.phase === 'arena' || v.phase === 'over' ? [] : [viewer, me?.watching ?? null]);
-      if (!me && v.phase === 'run') keep.add(players.find((p) => p.status === 'alive')?.id ?? players[0]?.id);
-      const stub = (b: Obj): Obj => ({ ...b, mobs: [], projs: [], shots: [], gems: [], chests: [], blasts: [], fires: [], bigs: (b.bigs as Obj[]).filter((g) => g.on) });
-      return { ...v, players: players.map((p) => (keep.has(p.id) ? p : { ...p, board: stub(p.board as Obj) })) };
+      const keep = siegeKeep(v, viewer);
+      return { ...v, players: (v.players as Obj[]).map((p) => (keep.has(p.id) ? p : { ...p, board: siegeStub(p.board as Obj) })) };
     },
-    snapshotEvery: 2,
+    // The same cut on the raw state before it is copied for the wire: only boards some viewer
+    // keeps are copied in full (with one human and seven bots, one board of eight), and their
+    // dead pool slots go out as `{ on: false }`.
+    trimForViews(state, views) {
+      const keep = new Set<unknown>();
+      for (const w of views) for (const id of siegeKeep(state, w.viewer)) keep.add(id);
+      const arena = state.arena as Obj | null | undefined;
+      return {
+        ...state,
+        players: (state.players as Obj[]).map((p) => ({ ...p, board: keep.has(p.id) ? siegeLive(p.board as Obj) : siegeStub(p.board as Obj) })),
+        ...(arena ? { arena: siegeLive(arena) } : {}),
+      };
+    },
+    // 30 snapshots a second like the other real-time trials (it was 15 while each one copied all
+    // eight boards; the trim above made that cheap).
     // Online, nobody may stall a shared match: the class pick closes after a minute (first class
     // for anyone still choosing) and a level-up or treasure card after 20 s (its first option).
     // The finale needs no extra timer: the prep window settles its own cards after 15 s, the arena

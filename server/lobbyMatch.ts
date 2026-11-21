@@ -366,11 +366,10 @@ export class MatchFlow {
     const run = this.run!;
     const every = run.def.snapshotEvery ?? 1;
     if (this.tickNo % every !== 0 && this.phase === 'playing') return;
-    const base = run.publicView();
     const events = this.events;
     this.events = [];
     const firstHuman = this.field.find((c) => !c.bot)?.id ?? this.field[0]?.id ?? null;
-    const views = new Map<string | null, Obj>();
+    const serving: { m: FlowMember; viewer: string | null; watching: string | null }[] = [];
     for (const m of members) {
       if (!m.connected) continue;
       const seated = this.isSeated(m.id) && !this.gone.has(m.id);
@@ -378,6 +377,11 @@ export class MatchFlow {
       // A seated player may be looking at another seat's board (a game's player rail): games that
       // send other boards only on request (Toy Squad's battles) add that one.
       const watching = seated && m.watch && m.watch !== m.id && this.field.some((c) => c.id === m.watch) ? m.watch : null;
+      serving.push({ m, viewer, watching });
+    }
+    const base = run.publicView(serving);
+    const views = new Map<string | null, Obj>();
+    for (const { m, viewer, watching } of serving) {
       const key = watching ? `${viewer}\u0000${watching}` : viewer;
       let view = views.get(key);
       if (!view) views.set(key, (view = run.viewFor(base, viewer, watching)));

@@ -353,7 +353,13 @@ online"). The other choice in both places is the existing **practice with bots**
 - **State to clients:** after each tick, every member gets their view of the state: a full
   keyframe at the start of each trial (or after a reconnect), then **patches** (`src/net/delta.ts`:
   only what changed, numbers rounded to 3 decimals). **30 snapshots a second** (Toy Squad, whose
-  state is large: 15). Rules events (sounds, animations) travel with them. The browser's match
+  state is large: 15).
+  - A game with a large state can cut what no viewer gets before the copy (`trimForViews` in
+    `server/games.ts`). Toybox Siege copies only the boards some viewer is sent whole, their own and
+    the one they watch, and sends every dead pool slot as `{ on: false }`.
+  - Measured in node, late in a run with 8 toys: a snapshot cost the server 8.1 ms with 1 human
+    and 11.9 ms with 4, and now costs 0.8 ms and 2.5 ms. That is why Siege could go from 15 to 30
+    snapshots a second. Rules events (sounds, animations) travel with them. The browser's match
   host (`src/minigames/remote.ts`, plugged into `session.ts` through `remoteHost`) applies them and
   renders through the game's unchanged `Scene` and `Hud`; between snapshots it runs the state's
   clock `t` on smoothly (at most 120 ms past the newest snapshot, never backwards), which keeps
@@ -370,6 +376,11 @@ online"). The other choice in both places is the existing **practice with bots**
     the server's state clock). Online, the rules accept a press up to 450 ms older than the server
     clock (`maxInputAgeMs`, 120 ms locally) and call a miss correspondingly later. This hides
     latency but means a modified client could claim good timings within that window.
+  - Red Light, Green Light: a player sees red one trip and a snapshot late, and their stop reaches
+    the rules another trip and an input batch later, about 130–180 ms on a good connection. That is
+    more than the whole 140 ms grace, so online toys were caught after their players had let go.
+    Online the grace is 310 ms (`config.graceMs`); practice keeps 140 ms. A modified client could
+    use the extra time; every player gets the same allowance.
   - Blink Duel and Spellbox Showdown: inputs act on the next server step after they arrive, so a
     blink or swing lands one network trip (plus up to ~33 ms of input batching) after the press.
     There is no client-side prediction. Not measured on a real network.

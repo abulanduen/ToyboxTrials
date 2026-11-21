@@ -6,7 +6,8 @@
 import { describe, expect, it } from 'vitest';
 import { GameRun, applyForfeits, STEP_MS } from '../../server/matchRunner';
 import { MatchFlow, PHASE_MS, startProblem, type FlowMember } from '../../server/lobbyMatch';
-import { HIDDEN_FUSE_MS, SERVER_GAMES } from '../../server/games';
+import { HIDDEN_FUSE_MS, SERVER_GAMES, serverGame } from '../../server/games';
+import { rlglRules } from '../../src/minigames/redlight/rules';
 import type { TdState } from '../../src/minigames/towertumble/rules';
 import { makeBots } from '../../src/minigames/bots';
 import { MINIGAME_IDS, type MinigameId } from '../../src/minigames/ids';
@@ -193,6 +194,29 @@ describe('hidden information never leaves the server', () => {
     for (const p of (viewing.players as { id: string; shop: unknown[]; passiveOffers: unknown[]; units: unknown[] }[]).filter((p) => p.id !== 'p1')) {
       expect(p.shop).toEqual([]); expect(p.passiveOffers).toEqual([]); expect(Array.isArray(p.units)).toBe(true);
     }
+  });
+});
+
+describe('online snapshot cost and fairness', () => {
+  it("Toybox Siege: views are the same whether or not unwanted boards (and dead pool slots) are cut before the copy, and the cut copies far less", () => {
+    const run = new GameRun('toybox-siege', field(6, ['p1', 'p2']), 77);
+    for (let i = 0; i < 30 * 90; i++) run.advance(1000 / 30); // past the class pick, into the run
+    expect((run.state as { phase: string }).phase).toBe('run');
+    const serving = [{ viewer: 'p1', watching: null }, { viewer: 'p2', watching: null }, { viewer: null, watching: null }];
+    const full = run.publicView();
+    const trimmed = run.publicView(serving);
+    // the same views, except that a dead pool slot goes out as just { on: false }
+    const live = (v: unknown): unknown =>
+      Array.isArray(v) ? v.map((e) => (e && typeof e === 'object' && 'on' in e && !(e as { on: boolean }).on ? { on: false } : live(e))) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, live(x)])) : v;
+    for (const w of serving) expect(run.viewFor(trimmed, w.viewer)).toEqual(live(run.viewFor(full, w.viewer)));
+    expect(JSON.stringify(trimmed).length).toBeLessThan(JSON.stringify(full).length * 0.5);
+    expect(serverGame('toybox-siege').snapshotEvery ?? 1).toBe(1); // 30 a second, like the other real-time trials
+  });
+
+  it('Red Light online: the grace after red allows for the network trip (practice keeps 140 ms)', () => {
+    const local = new GameRun('red-light-green-light', field(2), 5);
+    expect((local.state as { config: { graceMs: number } }).config.graceMs).toBe(140 + 170);
+    expect((rlglRules.init(field(2), 5) as { config: { graceMs: number } }).config.graceMs).toBe(140);
   });
 });
 

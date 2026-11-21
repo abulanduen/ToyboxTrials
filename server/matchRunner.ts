@@ -138,9 +138,13 @@ export class GameRun {
     return e;
   }
 
-  /** The state as everyone may see it: a JSON-safe copy without hidden information or events. */
-  publicView(): Obj {
-    const v = wireCopy(this.state) as Obj;
+  /**
+   * The state as everyone may see it: a JSON-safe copy without hidden information or events.
+   * `views` (the viewers about to be served) lets a game skip copying parts none of them gets.
+   */
+  publicView(views?: readonly { viewer: string | null; watching: string | null }[]): Obj {
+    const raw = views && this.def.trimForViews ? this.def.trimForViews(this.state, views) : this.state;
+    const v = wireCopy(raw) as Obj;
     v.events = [];
     this.def.publicView?.(v);
     return v;
