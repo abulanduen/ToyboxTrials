@@ -26,12 +26,22 @@ import { Village } from './Village';
  * frustum covering both tables is about 1.24 : 1 in light space (sunRig), so texels stay square.
  * Low (the default on touch devices) has no shadow maps and no post-processing: the toys keep
  * their blob shadows and the room's lighting is baked, so it still reads as a sunlit room.
+ *
+ * Fill cost: with post-processing every frame is drawn into a multisampled half-float buffer and
+ * then through the bloom chain, the focus blur and the final grade, all at the canvas's pixel
+ * size. That is most of the GPU time on laptops, and it grows with the square of the pixel ratio,
+ * so the post tiers cap the ratio (`dpr`) and the multisample count (`msaa`) rather than render a
+ * high-DPI screen at full density: Balanced (the desktop default) at 1.25× with 2 samples, High
+ * at 1.5× with 4. On a 2× laptop screen that is about a third (Balanced) and a half (High) of the
+ * samples per frame they used to cost.
  */
-const QUALITY: Record<Quality, { dpr: [number, number]; shadow: [number, number] | null; post: 'none' | 'tilt' | 'dof'; aa: boolean }> = {
-  low: { dpr: [1, 1.25], shadow: null, post: 'none', aa: false },
-  balanced: { dpr: [1, 1.5], shadow: [2048, 1664], post: 'tilt', aa: true },
-  high: { dpr: [1, 2], shadow: [4096, 3328], post: 'dof', aa: true },
+const QUALITY: Record<Quality, { dpr: [number, number]; shadow: [number, number] | null; post: 'none' | 'tilt' | 'dof'; msaa: number }> = {
+  low: { dpr: [1, 1.25], shadow: null, post: 'none', msaa: 0 },
+  balanced: { dpr: [1, 1.25], shadow: [2048, 1664], post: 'tilt', msaa: 2 },
+  high: { dpr: [1, 1.5], shadow: [4096, 3328], post: 'dof', msaa: 4 },
 };
+/** Bloom's mip chain: 5 levels instead of the default 8 (the glow is a soft rim, not a wide haze). */
+const BLOOM_LEVELS = 5;
 
 function Lights({ quality }: { quality: Quality }) {
   const q = QUALITY[quality];
@@ -104,14 +114,14 @@ function Effects({ quality, sharp }: { quality: Quality; sharp: boolean }) {
   if (q.post === 'none' || perfStep >= 2) return null;
   return (
     // Recreate the pass chain when removing DOF so High never keeps the previous scene buffer.
-    <EffectComposer key={sharp ? 'minigame' : 'hub'} multisampling={q.aa ? 4 : 0} enableNormalPass={false}>
+    <EffectComposer key={sharp ? 'minigame' : 'hub'} multisampling={q.msaa} enableNormalPass={false}>
       {!sharp && (q.post === 'dof' ? (
         <DepthOfField ref={dofRef as never} target={target} worldFocusRange={38} bokehScale={4.5} resolutionScale={0.5} />
       ) : (
-        <TiltShift2 ref={tiltRef as never} blur={0.22} taper={0.42} start={[0, 0.42]} end={[1, 0.42]} samples={8} direction={[1, 1]} />
+        <TiltShift2 ref={tiltRef as never} blur={0.22} taper={0.42} start={[0, 0.42]} end={[1, 0.42]} samples={6} direction={[1, 1]} />
       ))}
       {/* Threshold stays at 1.0: lower let pixel-sized highlights on glossy props flash (hub flicker). */}
-      <Bloom intensity={0.35} luminanceThreshold={1.0} luminanceSmoothing={0.2} mipmapBlur />
+      <Bloom intensity={0.35} luminanceThreshold={1.0} luminanceSmoothing={0.2} mipmapBlur levels={BLOOM_LEVELS} />
       <Vignette offset={0.28} darkness={0.55} eskil={false} />
       {/* The composer renders the scene in linear HDR and switches the renderer's own tone
           mapping off, so apply the same ACES curve here: every tier then shares one grade. */}
