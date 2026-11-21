@@ -74,7 +74,8 @@ const check = (name, ok, detail = '') => { results.push(`${ok ? 'PASS' : 'FAIL'}
 
   // Pause via Escape (no pointer lock in headless)
   await page.keyboard.press('Escape');
-  await page.waitForTimeout(1500);
+  // software GL can take several seconds for the next frame after a match closes: wait for it
+  await page.waitForSelector('.pause', { timeout: 60000 }).catch(() => null);
   check('Esc opens pause menu', await page.isVisible('.pause'));
   await page.screenshot({ path: `${OUT}/12-pause.png` });
   await page.keyboard.press('Escape');
@@ -178,13 +179,15 @@ const check = (name, ok, detail = '') => { results.push(`${ok ? 'PASS' : 'FAIL'}
   await T(() => window.__toybox.teleport(72, -125, Math.atan2(76 - 72, -137.2 + 125)));
   await page.waitForTimeout(500);
   const shot = await T(() => window.__toybox.hubplay.solve());
+  // the free throw above can drop in by luck, so count from here
+  const beforeBasket = await hp();
   await T(([y, p]) => window.__toybox.hubplay.throw(y, p), [shot.yaw, shot.power]);
-  await waitHp(() => window.__toybox.hubplay.state().hoops >= 1, null, 120000);
+  await waitHp((n) => window.__toybox.hubplay.state().hoops >= n + 1, beforeBasket.hoops, 120000);
   await page.waitForTimeout(600);
   await page.screenshot({ path: `${OUT}/15-hubplay-basket.png` });
   const afterBasket = await hp();
-  check('a throw through the hoop scores a basket (yours, and the Hub tally)', afterBasket.hoops === 1 && afterBasket.mine === 1, `power ${shot.power}, hoops ${afterBasket.hoops}, mine ${afterBasket.mine}`);
-  check('…and the HUD shows the tally', ((await page.textContent('[data-testid=hubplay-baskets]').catch(() => '')) || '').includes('Baskets 1'), await page.textContent('[data-testid=hubplay-score]').catch(() => ''));
+  check('a throw through the hoop scores a basket (yours, and the Hub tally)', afterBasket.hoops === beforeBasket.hoops + 1 && afterBasket.mine === beforeBasket.mine + 1, `power ${shot.power}, hoops ${beforeBasket.hoops} → ${afterBasket.hoops}, mine ${beforeBasket.mine} → ${afterBasket.mine}`);
+  check('…and the HUD shows the tally', ((await page.textContent('[data-testid=hubplay-baskets]').catch(() => '')) || '').includes(`Baskets ${afterBasket.hoops}`), await page.textContent('[data-testid=hubplay-score]').catch(() => ''));
   // Dribble: walking with the ball bounces it between hand and floor. Snatch: a ball in mid-air is
   // caught with E (the test freezes the offline ball mid-flight: software GL draws a few frames a second).
   await waitHp(() => window.__toybox.hubplay.state().ballRest, null, 400000);
