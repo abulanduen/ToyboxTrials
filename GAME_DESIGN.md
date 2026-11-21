@@ -479,8 +479,8 @@ owner's five-minute horde-survival brief, in an original toy theme.
   arrows).
 - **Classes.** The choice is untimed: a centred card over a blurred board, with no 3-2-1 before it.
   - Warrior: Tin Soldier, Bayonet Sweep, tough.
-  - Ranger: Pop-Gun Ranger, Pop-Gun, fast.
-  - Mage: Clockwork Wizard, Chime Burst, area.
+  - Ranger: Pop-Gun Ranger, Pop-Gun (a cork at each of the three nearest enemies; each hops on to the next), fast.
+  - Mage: Clockwork Wizard, Chain Lightning (leaps from enemy to enemy), area.
 - **The run.**
   - Swarms of dust bunnies, wind-up mice, rolling marbles and paper planes ramp up over five
     minutes. They drop experience gems, which a magnet reach pulls in.

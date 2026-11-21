@@ -75,7 +75,7 @@ const STAGE = {
       for (const p of s.players) p.invuln = 1e12;
       const me = s.players.find((p) => p.id === 'you');
       me.xpNext = 1e9;
-      me.weapons = [['popgun', 4], ['chime', 3], ['yoyo', 3], ['marbles', 3]].map(([id, level, evolved = false]) => ({ id, level, evolved, cd: 100, aux: 0 }));
+      me.weapons = [['popgun', 4], ['spark', 3], ['yoyo', 3], ['marbles', 3]].map(([id, level, evolved = false]) => ({ id, level, evolved, cd: 100, aux: 0 }));
       me.passives = [{ id: 'gears', level: 3 }, { id: 'magnifier', level: 3 }, { id: 'crayon', level: 2 }];
       s.runT = 233000;
     });

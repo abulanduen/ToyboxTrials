@@ -8,7 +8,7 @@ import { PALETTE as P } from '../../game/palette';
 import { TOY_COLOURS as C } from '../toysquad/models';
 import type { EvoId, PassiveId, WeaponId } from './config';
 
-export type SiegeIconId = WeaponId | PassiveId | 'horn' | 'evolve' | 'chest' | 'heal' | 'send' | 'arena' | 'laser' | 'flame' | 'boiler';
+export type SiegeIconId = WeaponId | PassiveId | 'horn' | 'evolve' | 'chest' | 'heal' | 'send' | 'arena' | 'laser' | 'storm' | 'cyclone' | 'boiler';
 
 const S = { stroke: P.ink, strokeWidth: 1.4, strokeLinejoin: 'round' as const, strokeLinecap: 'round' as const };
 
@@ -27,10 +27,11 @@ const ICONS: Record<SiegeIconId, ReactElement> = {
     <path d="M16 9.5h2.5l1.5 1v4l-1.5 1H16z" fill={C.cork} />
     <path d="M21 8l1.5-1.5M21.5 12.5h1.5M21 17l1.5 1.5" />
   </g>,
-  chime: <g {...S}>
-    <path d="M12 3.5c-3.5 0-5 3-5 7v3.5l-2 3h14l-2-3V10.5c0-4-1.5-7-5-7z" fill={C.lilac} />
-    <circle cx={12} cy={19.5} r={1.8} fill={P.honey} />
-    <path d="M3 9.5a9 9 0 0 1 2-4M21 9.5a9 9 0 0 0-2-4" fill="none" />
+  /** Chain Lightning: a bolt leaping between three little foes. */
+  spark: <g {...S}>
+    <circle cx={4.5} cy={5} r={2.2} fill={P.cream} /><circle cx={19.5} cy={9} r={2.2} fill={P.cream} /><circle cx={7} cy={19.5} r={2.2} fill={P.cream} />
+    <path d="M6 6.5l5 1l-1.5 2.5l8 -0.5l-6 3l1.5 1.5l-5.5 4" fill="none" stroke={C.lilac} strokeWidth={3.4} />
+    <path d="M6 6.5l5 1l-1.5 2.5l8 -0.5l-6 3l1.5 1.5l-5.5 4" fill="none" stroke={P.white} strokeWidth={1.2} />
   </g>,
   yoyo: <g {...S}>
     <circle cx={13} cy={14} r={6.5} fill={P.toyBlue} />
@@ -90,12 +91,17 @@ const ICONS: Record<SiegeIconId, ReactElement> = {
     <path d="M5 15.5l-1 4.5h3l1-4.5z" fill={P.woodMid} />
     <circle cx={7} cy={12} r={1.4} fill={P.honey} />
   </g>,
-  /** Firebell Meteors: a meteor and the pool of flame it leaves. */
-  flame: <g {...S}>
-    <ellipse cx={12} cy={19} rx={9} ry={3} fill={P.coral} />
-    <path d="M8 19c-1.5-3 1-5 2-7c.5 2 2 2.5 2 2.5c0-3 1.5-5 3-6.5c.5 3 3 5 1.5 11z" fill={P.honey} />
-    <circle cx={17.5} cy={5.5} r={2.6} fill={C.lilac} />
-    <path d="M15.6 7.4l-3 3M19.4 7.6l-1.6 2.2" fill="none" />
+  /** Thunderhead: a storm cloud dropping a bolt onto a flash. */
+  storm: <g {...S}>
+    <ellipse cx={12} cy={20.5} rx={7} ry={2.2} fill={P.honey} />
+    <path d="M12.5 10l-3 5h3l-2 5.5l5.5-7h-3l2-3.5z" fill={P.white} />
+    <path d="M5 11a3.5 3.5 0 0 1 1-6.8a5 5 0 0 1 9.2-.6a3.8 3.8 0 0 1 3.3 7.4z" fill={C.lilac} />
+  </g>,
+  /** Yo-Yo Cyclone: a yo-yo in the middle of a whirlwind. */
+  cyclone: <g {...S}>
+    <path d="M12 2.5a9.5 9.5 0 0 1 9.5 9.5M21.5 12a9.5 9.5 0 0 1-9.5 9.5M12 21.5A9.5 9.5 0 0 1 2.5 12M2.5 12A9.5 9.5 0 0 1 12 2.5" fill="none" stroke={P.toyBlue} strokeWidth={2.6} strokeDasharray="9 3.5" />
+    <circle cx={12} cy={12} r={4.6} fill={P.toyBlue} />
+    <circle cx={12} cy={12} r={1.6} fill={P.honey} />
   </g>,
   /** Boiler Heart: a brass boiler with rivets flying out all round. */
   boiler: <g {...S}>
@@ -140,8 +146,8 @@ const ICONS: Record<SiegeIconId, ReactElement> = {
   </g>,
 };
 
-/** The icon of an evolved weapon or horn: the three the owner asked for have their own; the rest share the star. */
-export const EVOLVED_ICON: Record<EvoId, SiegeIconId> = { sweep: 'evolve', popgun: 'laser', chime: 'flame', yoyo: 'evolve', planes: 'evolve', marbles: 'evolve', horn: 'boiler' };
+/** The icon of an evolved weapon or horn: the ones the owner asked for have their own; the rest share the star. */
+export const EVOLVED_ICON: Record<EvoId, SiegeIconId> = { sweep: 'evolve', popgun: 'laser', spark: 'storm', yoyo: 'cyclone', planes: 'evolve', marbles: 'evolve', horn: 'boiler' };
 
 /** A siege item icon, `size` px square. Decorative: the card or chip carries the name. */
 export function SiegeIcon({ id, size = 24 }: { id: SiegeIconId; size?: number }) {

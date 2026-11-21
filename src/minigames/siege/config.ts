@@ -7,13 +7,13 @@
  */
 
 export type ClassId = 'warrior' | 'ranger' | 'mage';
-export type WeaponId = 'sweep' | 'popgun' | 'chime' | 'yoyo' | 'planes' | 'marbles';
+export type WeaponId = 'sweep' | 'popgun' | 'spark' | 'yoyo' | 'planes' | 'marbles';
 export type PassiveId = 'plating' | 'crayon' | 'mainspring' | 'magnifier' | 'gears' | 'magnet';
 export type EliteId = 'bear' | 'drummer' | 'rhino';
 export type BigId = EliteId | 'baron';
 
 export const CLASS_IDS: readonly ClassId[] = ['warrior', 'ranger', 'mage'];
-export const WEAPON_IDS: readonly WeaponId[] = ['sweep', 'popgun', 'chime', 'yoyo', 'planes', 'marbles'];
+export const WEAPON_IDS: readonly WeaponId[] = ['sweep', 'popgun', 'spark', 'yoyo', 'planes', 'marbles'];
 export const PASSIVE_IDS: readonly PassiveId[] = ['plating', 'crayon', 'mainspring', 'magnifier', 'gears', 'magnet'];
 
 /** Every weapon and passive tops out here. */
@@ -23,8 +23,12 @@ export const MAX_WEAPONS = 4;
 export const MAX_PASSIVES = 4;
 /** The Rally Horn active skill (send an elite) has its own three levels. */
 export const HORN_MAX = 3;
-/** A homing cork looks this far (cm) for an enemy ahead of it to curve towards. */
-export const HOMING_SEEK = 12;
+/**
+ * The Ranger's corks (owner redesign, 21 Nov 2026): a volley picks the nearest enemies within
+ * `acquire` cm (one cork each); after each hit a cork hops on to the nearest enemy within `hop` cm
+ * that it has not hit yet. The Prism Ray's beams chain the same way, instantly.
+ */
+export const RANGER = { acquire: 30, hop: 12, beamLife: 200 } as const;
 
 export const ARENA_HALF = 44;
 export const PLAYER_RADIUS = 1.1;
@@ -50,50 +54,62 @@ export interface ClassDef {
 export const CLASSES: Record<ClassId, ClassDef> = {
   warrior: { id: 'warrior', name: 'Tin Soldier', role: 'Warrior · tough', blurb: 'Sweeps its bayonet round in a wide arc. Most health, built-in armour, a little slow.',
     weapon: 'sweep', hp: 150, speed: 9.2, armour: 2, cdMul: 1, areaMul: 1, pickupMul: 1 },
-  ranger: { id: 'ranger', name: 'Pop-Gun Ranger', role: 'Ranger · fast', blurb: 'Pops corks at the nearest enemy. Quickest on its feet and pulls in gems from further away.',
+  ranger: { id: 'ranger', name: 'Pop-Gun Ranger', role: 'Ranger · fast', blurb: 'Pops a cork at each of the three nearest enemies; each cork hops on to the next. Quickest on its feet and pulls in gems from further away.',
     weapon: 'popgun', hp: 115, speed: 11.6, armour: 0, cdMul: 1, areaMul: 1, pickupMul: 1.35 },
-  mage: { id: 'mage', name: 'Clockwork Wizard', role: 'Mage · area', blurb: 'Rings chime meteors down on the swarm, a patch at a time. Bigger blasts, quicker spells, fragile.',
-    weapon: 'chime', hp: 105, speed: 10, armour: 0, cdMul: 0.9, areaMul: 1.15, pickupMul: 1 },
+  mage: { id: 'mage', name: 'Clockwork Wizard', role: 'Mage · area', blurb: 'Casts chain lightning that leaps from enemy to enemy. Longer leaps, quicker spells, fragile.',
+    weapon: 'spark', hp: 105, speed: 10, armour: 0, cdMul: 0.9, areaMul: 1.15, pickupMul: 1 },
 };
 
 /**
  * One row of a weapon table. Not every field matters to every weapon:
  *  sweep: area = reach, arc = degrees per swing, count = swings (1 front, 2 front + back)
- *  popgun: count = corks per volley, pierce = extra enemies a cork passes through, speed, range = lifetime ms,
- *          homing = how fast a cork may turn towards an enemy (radians per second; 0 = flies straight).
- *          Evolved (the Prism Ray laser): count = beams, area = beam half-width, range = beam length, pierce −1 = everything
- *  chime: count = meteors, area = blast radius, range = how far it looks for a target (evolved: each leaves a FLAME pool)
- *  yoyo: count = yo-yos, area = orbit radius, speed = radians per second, cd = per-enemy hit gap
+ *  popgun: count = corks per volley (one at each of the nearest enemies), pierce = hops (after a hit a cork flies on to the
+ *          nearest enemy it has not hit, this many times), area = cork radius, speed, range = lifetime ms.
+ *          Evolved (the Prism Ray): count = beams, pierce = hops, area = beam half-width (looks only), range = reach of the first hit (cm)
+ *  spark: chain lightning. count = bolts (1), pierce = bounces, area = bounce reach (cm, × area), range = reach of the first hit
+ *          (evolved: also SKY strikes)
+ *  yoyo: count = yo-yos, area = orbit radius, speed = radians per second, cd = per-enemy hit gap (evolved: also the AURA)
  *  planes: count = planes, range = how far out before they turn back, speed
  *  marbles: count = marbles per shower, area = splash radius, range = how far it looks for targets
  */
-export interface WeaponStats { cd: number; dmg: number; count: number; area: number; arc: number; speed: number; pierce: number; range: number; knock: number; homing: number }
+export interface WeaponStats { cd: number; dmg: number; count: number; area: number; arc: number; speed: number; pierce: number; range: number; knock: number }
 export interface WeaponDef { id: WeaponId; name: string; blurb: string; levels: WeaponStats[]; evolved: WeaponStats; evolvedName: string; evolvedBlurb: string; partner: PassiveId; levelText: string[] }
 
 const w = (cd: number, dmg: number, count: number, area: number, extra: Partial<WeaponStats> = {}): WeaponStats =>
-  ({ cd, dmg, count, area, arc: 0, speed: 0, pierce: 0, range: 0, knock: 0, homing: 0, ...extra });
+  ({ cd, dmg, count, area, arc: 0, speed: 0, pierce: 0, range: 0, knock: 0, ...extra });
+
+/** The Pop-Gun's levels: corks per volley (count) and hops (pierce) grow; damage per cork stays small. */
+const POP: WeaponStats[] = [
+  w(1000, 8, 3, 0.6, { speed: 42, range: 900, pierce: 1 }), w(1000, 8, 4, 0.6, { speed: 42, range: 900, pierce: 1 }), w(950, 10, 4, 0.6, { speed: 42, range: 900, pierce: 2 }),
+  w(900, 12, 5, 0.6, { speed: 42, range: 900, pierce: 2 }), w(800, 14, 5, 0.6, { speed: 44, range: 900, pierce: 3 }),
+];
 
 export const WEAPONS: Record<WeaponId, WeaponDef> = {
   sweep: { id: 'sweep', name: 'Bayonet Sweep', blurb: 'A wide swing in front of you that shoves enemies back.', partner: 'plating',
     levels: [w(1150, 14, 1, 6, { arc: 150, knock: 9 }), w(1150, 20, 1, 6, { arc: 150, knock: 9 }), w(1100, 20, 2, 6, { arc: 150, knock: 9 }), w(1100, 24, 2, 7.5, { arc: 150, knock: 10 }), w(950, 32, 2, 7.5, { arc: 150, knock: 10 })],
     levelText: ['', '+6 damage', 'Also swings behind you', '+25% reach', '+8 damage, swings faster'],
     evolved: w(850, 44, 1, 9.5, { arc: 360, knock: 14 }), evolvedName: 'Whirling Brigade', evolvedBlurb: 'A full circle of bayonets, every swing.' },
-  // Owner request (20 Nov 2026): the Ranger's corks gain piercing and a gentle homing as they level, and
-  // the secret upgrade is a laser that cuts through every enemy in a line.
-  popgun: { id: 'popgun', name: 'Pop-Gun', blurb: 'Fires corks at the nearest enemy.', partner: 'gears',
-    levels: [w(750, 10, 1, 0.6, { speed: 42, range: 800 }), w(750, 10, 2, 0.6, { speed: 42, range: 800, pierce: 1 }), w(720, 12, 2, 0.6, { speed: 42, range: 800, pierce: 1, homing: 1.6 }),
-      w(700, 17, 2, 0.6, { speed: 42, range: 800, pierce: 2, homing: 1.6 }), w(560, 18, 3, 0.6, { speed: 44, range: 850, pierce: 3, homing: 2.6 })],
-    levelText: ['', '+1 cork, corks pass through 1 enemy', 'Corks curve gently towards enemies, +2 damage', '+5 damage, pass through 2 enemies', '+1 cork, pass through 3, keener homing, fires faster'],
-    evolved: w(400, 52, 1, 0.9, { range: 34, pierce: -1 }), evolvedName: 'Prism Ray', evolvedBlurb: 'The pop-gun becomes a toy ray gun: a laser beam that cuts through every enemy in a line.' },
-  // Owner request (20 Nov 2026): more meteors with each level; the secret upgrade leaves pools of flame.
-  chime: { id: 'chime', name: 'Chime Meteors', blurb: 'Ringing meteors fall on enemies near you.', partner: 'magnifier',
-    levels: [w(1600, 18, 1, 4.5, { range: 20 }), w(1600, 18, 2, 4.5, { range: 20 }), w(1550, 20, 3, 5, { range: 20 }), w(1500, 26, 4, 5, { range: 22 }), w(1300, 26, 5, 5.5, { range: 22 })],
-    levelText: ['', '+1 meteor', '+1 meteor, bigger blast', '+1 meteor, +6 damage', '+1 meteor, rings faster'],
-    evolved: w(1200, 32, 6, 6.5, { range: 24 }), evolvedName: 'Firebell Meteors', evolvedBlurb: 'Six blazing meteors, and each leaves a pool of flame that burns anything standing in it.' },
+  // Owner redesign (21 Nov 2026): three corks a volley, one at each of the three nearest enemies; each cork hits one
+  // enemy, then hops to the nearest one it has not hit. Levels add corks and hops. The secret upgrade (one more of
+  // each) turns them into instant beams that chain from enemy to enemy.
+  popgun: { id: 'popgun', name: 'Pop-Gun', blurb: 'A cork at each of the three nearest enemies; each hits one, then hops to the next nearest.', partner: 'gears',
+    levels: [POP[0], POP[1], POP[2], POP[3], POP[4]],
+    levelText: ['', '+1 cork (4 a volley)', 'Corks hop on twice, +2 damage', '+1 cork (5 a volley), +2 damage', 'Corks hop on three times, +2 damage, fires faster'],
+    evolved: w(750, 20, POP[4].count + 1, 0.3, { range: RANGER.acquire, pierce: POP[4].pierce + 1, knock: 2 }), evolvedName: 'Prism Ray',
+    evolvedBlurb: `Six instant laser beams: each strikes one of the nearest enemies, then chains on to the next nearest, ${POP[4].pierce + 1} times.` },
+  // Owner redesign (21 Nov 2026): chain lightning replaces the meteors. Levels add bounces, cast speed and damage; the
+  // secret upgrade adds lightning strikes from the sky (SKY).
+  spark: { id: 'spark', name: 'Chain Lightning', blurb: 'Lightning strikes the nearest enemy, then leaps on to the next nearest it has not struck.', partner: 'magnifier',
+    levels: [w(1000, 18, 1, 6, { range: 18, pierce: 3, knock: 1 }), w(1000, 18, 1, 6, { range: 18, pierce: 5, knock: 1 }), w(900, 26, 1, 6, { range: 18, pierce: 5, knock: 1 }),
+      w(900, 26, 1, 7, { range: 20, pierce: 7, knock: 1 }), w(750, 34, 1, 7, { range: 20, pierce: 9, knock: 1 })],
+    levelText: ['', '+2 bounces (strikes 6 enemies)', '+8 damage, casts faster', '+2 bounces (8 enemies), leaps further', '+8 damage, +2 bounces (10 enemies), casts faster'],
+    evolved: w(650, 40, 1, 8, { range: 22, pierce: 12, knock: 1 }), evolvedName: 'Thunderhead',
+    evolvedBlurb: 'The lightning strikes 13 enemies, and bolts fall from the sky every 1.3 s, shocking everything around where they land.' },
   yoyo: { id: 'yoyo', name: 'Yo-Yo Orbit', blurb: 'Yo-yos circle you and clip anything they touch.', partner: 'mainspring',
     levels: [w(450, 8, 1, 5.5, { speed: 3.2 }), w(450, 8, 2, 5.5, { speed: 3.2 }), w(450, 13, 2, 5.5, { speed: 3.4 }), w(450, 13, 3, 6.5, { speed: 3.4 }), w(400, 18, 3, 6.5, { speed: 4.6 })],
     levelText: ['', '+1 yo-yo', '+5 damage', '+1 yo-yo, wider orbit', '+5 damage, spins faster'],
-    evolved: w(350, 24, 5, 8, { speed: 5 }), evolvedName: 'Yo-Yo Cyclone', evolvedBlurb: 'Five yo-yos whirl round you in a wide storm.' },
+    // Owner redesign (21 Nov 2026): the secret upgrade keeps the level-5 yo-yos and adds a damage AURA round the toy.
+    evolved: w(400, 18, 3, 6.5, { speed: 4.6 }), evolvedName: 'Yo-Yo Cyclone', evolvedBlurb: 'Your yo-yos keep spinning, and a whirlwind round you grinds down every enemy inside it.' },
   planes: { id: 'planes', name: 'Paper Planes', blurb: 'Planes glide out the way you face, then loop back. They pass through everything.', partner: 'magnet',
     levels: [w(1500, 10, 1, 0.9, { speed: 26, range: 14 }), w(1500, 10, 2, 0.9, { speed: 26, range: 14 }), w(1450, 16, 2, 0.9, { speed: 26, range: 15 }),
       w(1400, 16, 3, 0.9, { speed: 26, range: 15 }), w(1200, 20, 3, 0.9, { speed: 28, range: 20 })],
@@ -122,11 +138,17 @@ export const HORN = { name: 'Rally Horn', blurb: 'Active skill: send an elite to
 export type EvoId = WeaponId | 'horn';
 
 /**
- * The Chime Meteors' secret upgrade (Firebell Meteors): every meteor leaves a pool of flame where it
- * lands. A pool burns every enemy in it once per `tickMs` (rival toys in the arena too, not its owner).
- * Radius and damage scale with the toy's area and damage, like the blast itself. Owner request, 20 Nov 2026.
+ * Thunderhead (Chain Lightning's secret upgrade, owner request 21 Nov 2026): on top of the chain, every `every` ms
+ * `count` bolts fall from the sky, each on a random enemy within `range` (so mostly where the swarm is thickest),
+ * shocking everything within `radius` (× area) for `dmg` (× damage). In the arena they fall on rivals.
  */
-export const FLAME = { radius: 3.2, lifeMs: 3000, tickMs: 400, dmg: 9 } as const;
+export const SKY = { every: 1300, count: 4, radius: 4.5, dmg: 50, range: 20, life: 360 } as const;
+
+/**
+ * Yo-Yo Cyclone (the Yo-Yo's secret upgrade, owner request 21 Nov 2026): the yo-yos keep orbiting, and a whirlwind
+ * of `radius` (× area) round the toy hurts every enemy inside it for `dmg` (× damage) every `tickMs`.
+ */
+export const AURA = { radius: 7, tickMs: 300, dmg: 12 } as const;
 
 /**
  * The Rally Horn's secret upgrade (owner request, 20 Nov 2026): a maxed horn (level 3) plus a chest turns
@@ -271,8 +293,6 @@ export interface SiegeConfig {
   shotCap: number;
   gemCap: number;
   blastCap: number;
-  /** Flame pools (Firebell Meteors). */
-  fireCap: number;
   chestCap: number;
   bigCap: number;
 }
@@ -293,7 +313,6 @@ export const DEFAULT_CONFIG: SiegeConfig = {
   shotCap: 64,
   gemCap: 160,
   blastCap: 40,
-  fireCap: 24,
   chestCap: 4,
   bigCap: 4,
 };

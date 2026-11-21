@@ -21,8 +21,8 @@
  */
 import type { Contestant, MatchEvent, Placement, RulesCore } from '../types';
 import {
-  ARENA_HALF, BASE_PICKUP, BIGS, BOILER, BOSS_AT, FLAME, HOMING_SEEK, BOSS_SUMMON_AT, BOSS_SUMMON_COUNT, CLASSES, CLASS_IDS, DEFAULT_CONFIG, ELITE_SCHEDULE, FINALE, HORN, HORN_MAX, overtime,
-  MAX_LEVEL, MAX_PASSIVES, MAX_WEAPONS, MOBS, PASSIVE_IDS, PASSIVE_PER_LEVEL, PLAYER_RADIUS, POINTS, SENT_GEM_XP, SENT_HP, SNACK_CHANCE,
+  ARENA_HALF, AURA, BASE_PICKUP, BIGS, BOILER, BOSS_AT, BOSS_SUMMON_AT, BOSS_SUMMON_COUNT, CLASSES, CLASS_IDS, DEFAULT_CONFIG, ELITE_SCHEDULE, FINALE, HORN, HORN_MAX, overtime,
+  MAX_LEVEL, MAX_PASSIVES, MAX_WEAPONS, MOBS, PASSIVE_IDS, PASSIVE_PER_LEVEL, PLAYER_RADIUS, POINTS, RANGER, SENT_GEM_XP, SENT_HP, SKY, SNACK_CHANCE,
   SNACK_HEAL, SPAWN_DIST, WAVE_MS, WEAPONS, WEAPON_IDS, dmgScale, hpScale, reviveCost, sentEliteFor, spawnRate, waveSize, xpToNext,
   type BigId, type ClassId, type EvoId, type PassiveId, type SiegeConfig, type WeaponId, type WeaponStats,
 } from './config';
@@ -37,8 +37,10 @@ export interface Big { on: boolean; serial: number; type: BigId; x: number; z: n
   sent: boolean; from: string | null; mode: 0 | 1 | 2; modeT: number; dashT: number; ringT: number; summonT: number; aimX: number; aimZ: number; hurt: number; yo: number; summons: number }
 /**
  * Player projectiles. kind 0 = cork, 1 = paper plane, 2 = Boiler Heart rivet. `own`: the shooter's player index in
- * the arena (−1 on a board). `homing`: the most a cork may turn towards its target, radians per second; `ti` the
- * target (a mob index, −2 − i for elite i on a board, or −2 − j for rival toy j in the arena; −1 none) and `ts` its serial.
+ * the arena (−1 on a board). `homing` > 0: a Pop-Gun cork that flies straight at its target `ti` (on a board a mob
+ * index, or −2 − i for elite i; in the arena a rival's player index j, or −2 − i for summoned boss i; −1 none), whose
+ * hit id is `ts` (a mob's or boss's serial, or −(j + 1) for rival toy j). After each hit it picks the nearest foe
+ * within RANGER.hop that it has not hit (`hits`, `nh`), until its `pierce` runs out.
  */
 export interface Proj { on: boolean; kind: number; x: number; z: number; vx: number; vz: number; r: number; dmg: number; pierce: number; life: number;
   ox: number; oz: number; range: number; back: boolean; hits: number[]; nh: number; own: number; homing: number; ti: number; ts: number }
@@ -48,17 +50,15 @@ export interface Shot { on: boolean; x: number; z: number; vx: number; vz: numbe
 export interface Gem { on: boolean; kind: number; x: number; z: number; v: number; pull: boolean }
 export interface Chest { on: boolean; x: number; z: number }
 /**
- * Area hits. kind 0 sweep (instant), 1 chime meteor (short fuse), 2 marble (falls), 3 revive shockwave, 4 Prism Ray laser
- * (a line from (x, z) along `ang`, `r` long and `w` either side). `age` counts up, damage lands at `delay`. A meteor with
- * `burn` > 0 (Firebell Meteors) leaves a flame pool of radius `w` that deals `burn` per tick.
+ * Area hits. kind 0 sweep (instant), 2 marble (falls), 3 revive shockwave, 6 Thunderhead sky strike (instant, radius `r`).
+ * `age` counts up, damage lands at `delay`. Kinds 4 (a Prism Ray beam) and 5 (a Chain Lightning leap) are looks only,
+ * born `done` (their chain did its damage at once): a segment from (x, z) along `ang`, `r` long, `w` half-wide.
  */
-export interface Blast { on: boolean; kind: number; x: number; z: number; r: number; ang: number; arc: number; delay: number; age: number; life: number; dmg: number; knock: number; done: boolean; own: number; w: number; burn: number }
-/** A pool of flame (Firebell Meteors): burns everything in radius `r` for `dmg` every FLAME.tickMs until `age` reaches `life`. `tick` counts down to the next burn. */
-export interface Fire { on: boolean; x: number; z: number; r: number; age: number; life: number; tick: number; dmg: number; own: number }
+export interface Blast { on: boolean; kind: number; x: number; z: number; r: number; ang: number; arc: number; delay: number; age: number; life: number; dmg: number; knock: number; done: boolean; own: number; w: number }
 
 export interface Board {
   bt: number;
-  mobs: Mob[]; bigs: Big[]; projs: Proj[]; shots: Shot[]; gems: Gem[]; chests: Chest[]; blasts: Blast[]; fires: Fire[];
+  mobs: Mob[]; bigs: Big[]; projs: Proj[]; shots: Shot[]; gems: Gem[]; chests: Chest[]; blasts: Blast[];
   spawnAcc: number; waveT: number; nextElite: number; bossUp: boolean; bossDown: boolean; serial: number; gemCursor: number;
 }
 
@@ -171,7 +171,7 @@ const blankStats = (): Stats => ({ maxHp: 100, armour: 0, speed: 10, dmg: 1, cd:
  */
 const D = 0.5;
 
-function newBoard(c: Pick<SiegeConfig, 'mobCap' | 'bigCap' | 'projectileCap' | 'shotCap' | 'gemCap' | 'chestCap' | 'blastCap' | 'fireCap'>): Board {
+function newBoard(c: Pick<SiegeConfig, 'mobCap' | 'bigCap' | 'projectileCap' | 'shotCap' | 'gemCap' | 'chestCap' | 'blastCap'>): Board {
   const n = <T>(k: number, f: () => T) => Array.from({ length: k }, f);
   return {
     bt: 0,
@@ -182,8 +182,7 @@ function newBoard(c: Pick<SiegeConfig, 'mobCap' | 'bigCap' | 'projectileCap' | '
     shots: n(c.shotCap, () => ({ on: false, x: D, z: D, vx: D, vz: D, r: D, dmg: D, life: D, own: -1 })),
     gems: n(c.gemCap, () => ({ on: false, kind: 0, x: D, z: D, v: 0, pull: false })),
     chests: n(c.chestCap, () => ({ on: false, x: D, z: D })),
-    blasts: n(c.blastCap, () => ({ on: false, kind: 0, x: D, z: D, r: D, ang: D, arc: D, delay: D, age: D, life: D, dmg: D, knock: D, done: false, own: -1, w: D, burn: D })),
-    fires: n(c.fireCap, () => ({ on: false, x: D, z: D, r: D, age: D, life: D, tick: D, dmg: D, own: -1 })),
+    blasts: n(c.blastCap, () => ({ on: false, kind: 0, x: D, z: D, r: D, ang: D, arc: D, delay: D, age: D, life: D, dmg: D, knock: D, done: false, own: -1, w: D })),
     spawnAcc: 0, waveT: WAVE_MS, nextElite: 0, bossUp: false, bossDown: false, serial: 0, gemCursor: 0,
   };
 }
@@ -579,7 +578,7 @@ function addBlast(b: Board, kind: number, x: number, z: number, r: number, ang: 
   for (let i = 0; i < list.length; i++) {
     const k = list[i];
     if (k.on) continue;
-    k.on = true; k.kind = kind; k.x = x; k.z = z; k.r = r; k.ang = ang; k.arc = arc; k.delay = delay; k.age = 0; k.life = life; k.dmg = dmg; k.knock = knock; k.done = false; k.own = own; k.w = 0; k.burn = 0;
+    k.on = true; k.kind = kind; k.x = x; k.z = z; k.r = r; k.ang = ang; k.arc = arc; k.delay = delay; k.age = 0; k.life = life; k.dmg = dmg; k.knock = knock; k.done = false; k.own = own; k.w = 0;
     return k;
   }
   return null;
@@ -626,9 +625,192 @@ function randomEnemy(s: SiegeState, p: SiegePlayer, range: number): boolean {
 /** Nearest / a random enemy (on a board) or rival (in the arena, `own` ≥ 0) within `range`: sets `aim`. */
 const nearestFoe = (s: SiegeState, p: SiegePlayer, range: number, own: number) => (own < 0 ? nearestEnemy(p, range) : foeNearest(s, p, range));
 const randomFoe = (s: SiegeState, p: SiegePlayer, range: number, own: number) => (own < 0 ? randomEnemy(s, p, range) : foeRandom(s, p, range));
-/** How long a chime meteor falls before it lands (ms), and how long a Prism Ray beam stays on screen. */
-export const METEOR_FALL = 200;
-export const LASER_LIFE = 240;
+/** How long a Chain Lightning leap stays on screen (ms). */
+export const BOLT_LIFE = 220;
+
+// ---------------------------------------------------------------- targeting: the nearest few, and instant chains
+
+/**
+ * The foes found by `nearestFoes`, nearest first (scratch, not state): `tId` a target id (on a board a mob index, or
+ * −2 − i for elite i; in the arena a rival's player index, or −2 − i for summoned boss i), `tS` its hit id (a serial,
+ * or −(j + 1) for rival toy j), `tX`/`tZ` where it stands. Ties keep the scan order, which is deterministic.
+ */
+const TMAX = 16;
+const tId = new Int32Array(TMAX), tS = new Int32Array(TMAX), tD = new Float64Array(TMAX), tX = new Float64Array(TMAX), tZ = new Float64Array(TMAX);
+let tN = 0;
+/** Keep (id, d²) if it is among the `k` nearest so far (insertion into the short sorted list). */
+function offerFoe(id: number, hit: number, d: number, x: number, z: number, k: number) {
+  if (tN === k && d >= tD[k - 1]) return;
+  let i = tN < k ? tN++ : k - 1;
+  while (i > 0 && tD[i - 1] > d) { tId[i] = tId[i - 1]; tS[i] = tS[i - 1]; tD[i] = tD[i - 1]; tX[i] = tX[i - 1]; tZ[i] = tZ[i - 1]; i--; }
+  tId[i] = id; tS[i] = hit; tD[i] = d; tX[i] = x; tZ[i] = z;
+}
+/** Up to `k` nearest foes of `p` within `range` (board: mobs and elites; arena, `own` ≥ 0: rival toys and their bosses). Returns how many. */
+function nearestFoes(s: SiegeState, p: SiegePlayer, b: Board, own: number, range: number, k: number): number {
+  tN = 0;
+  if (k > TMAX) k = TMAX;
+  if (k < 1) return 0;
+  const r2 = range * range;
+  if (own < 0) {
+    const n = query(b.mobs, p.x, p.z, range);
+    for (let i = 0; i < n; i++) { const m = b.mobs[near[i]], d = (m.x - p.x) ** 2 + (m.z - p.z) ** 2; if (d <= r2) offerFoe(near[i], m.serial, d, m.x, m.z, k); }
+  } else {
+    for (let j = 0; j < s.players.length; j++) { const v = s.players[j]; if (j === own || v.status !== 'arena') continue; const d = (v.x - p.x) ** 2 + (v.z - p.z) ** 2; if (d <= r2) offerFoe(j, -(j + 1), d, v.x, v.z, k); }
+  }
+  for (let i = 0; i < b.bigs.length; i++) {
+    const g = b.bigs[i];
+    if (!g.on || (own >= 0 && g.from === p.id)) continue;
+    const d = (g.x - p.x) ** 2 + (g.z - p.z) ** 2;
+    if (d <= r2) offerFoe(-2 - i, g.serial, d, g.x, g.z, k);
+  }
+  return tN;
+}
+/** Is hit id `id` among the first `nh` of `hits`? */
+function seen(hits: ArrayLike<number>, nh: number, id: number): boolean {
+  for (let h = 0; h < nh; h++) if (hits[h] === id) return true;
+  return false;
+}
+/**
+ * The nearest foe within `r` of (x, z) not in `hits` (board, `own` < 0: mobs and elites; arena: rival toys and their
+ * bosses, never `p`'s). Returns its target id (−1 if none) and sets `aim` to where it stands and `aimHit` to its hit id.
+ */
+let aimHit = 0;
+function nextFoe(s: SiegeState, p: SiegePlayer, b: Board, own: number, x: number, z: number, r: number, hits: ArrayLike<number>, nh: number): number {
+  let best = r * r, id = -1;
+  if (own < 0) {
+    const mobs = b.mobs, n = query(mobs, x, z, r);
+    for (let k = 0; k < n; k++) {
+      const m = mobs[near[k]], d = (m.x - x) ** 2 + (m.z - z) ** 2;
+      if (d < best && !seen(hits, nh, m.serial)) { best = d; id = near[k]; aim.x = m.x; aim.z = m.z; aimHit = m.serial; }
+    }
+  } else {
+    for (let j = 0; j < s.players.length; j++) {
+      const v = s.players[j];
+      if (j === own || v.status !== 'arena') continue;
+      const d = (v.x - x) ** 2 + (v.z - z) ** 2;
+      if (d < best && !seen(hits, nh, -(j + 1))) { best = d; id = j; aim.x = v.x; aim.z = v.z; aimHit = -(j + 1); }
+    }
+  }
+  for (let i = 0; i < b.bigs.length; i++) {
+    const g = b.bigs[i];
+    if (!g.on || (own >= 0 && g.from === p.id)) continue;
+    const d = (g.x - x) ** 2 + (g.z - z) ** 2;
+    if (d < best && !seen(hits, nh, g.serial)) { best = d; id = -2 - i; aim.x = g.x; aim.z = g.z; aimHit = g.serial; }
+  }
+  return id;
+}
+/** Is target `id` (with hit id `hit`) still there to be hit? Sets `aim` to where it stands. */
+function foeThere(s: SiegeState, b: Board, own: number, id: number, hit: number): boolean {
+  if (id >= 0) {
+    if (own < 0) { const m = b.mobs[id]; if (!m || !m.on || m.serial !== hit) return false; aim.x = m.x; aim.z = m.z; return true; }
+    const v = s.players[id];
+    if (!v || v.status !== 'arena' || id === own) return false;
+    aim.x = v.x; aim.z = v.z; return true;
+  }
+  if (id > -2) return false;
+  const g = b.bigs[-2 - id];
+  if (!g || !g.on || g.serial !== hit) return false;
+  aim.x = g.x; aim.z = g.z; return true;
+}
+
+/** Hit ids struck by the chain in progress (scratch). */
+const chainHits = new Int32Array(32);
+/**
+ * An instant chain (Prism Ray beams, Chain Lightning): strike target `id` (hit id `hit`), then the nearest foe within
+ * `hop` of the last one struck that this chain has not struck yet, `hops` more times. Damage lands at once; each leap
+ * leaves a short-lived blast of `kind` (4 beam, 5 lightning; `w` half-wide, `life` ms) from the last point to the
+ * next, for the renderer. If the first target fell to an earlier chain of the same volley, the chain starts at the
+ * nearest foe within `reach` instead. In the arena the damage carries the arena multiplier.
+ */
+function chain(s: SiegeState, p: SiegePlayer, b: Board, own: number, id: number, hit: number, reach: number, hops: number, hop: number,
+  dmg: number, knock: number, kind: number, w: number, life: number) {
+  let nh = 0, x0 = p.x, z0 = p.z, x = 0, z = 0;
+  if (foeThere(s, b, own, id, hit)) { x = aim.x; z = aim.z; }
+  else { id = nextFoe(s, p, b, own, p.x, p.z, reach, chainHits, 0); hit = aimHit; x = aim.x; z = aim.z; }
+  const mul = FINALE.weaponMul, cap = Math.min(hops + 1, chainHits.length);
+  while (id !== -1) {
+    const dx = x - x0, dz = z - z0, d = Math.sqrt(dx * dx + dz * dz) || 1e-3;
+    const fx = addBlast(b, kind, x0, z0, d, Math.atan2(dx, dz), 0, 0, life, 0, 0, own);
+    if (fx) { fx.done = true; fx.w = w; }
+    chainHits[nh++] = hit;
+    if (own < 0) {
+      if (id >= 0) hitMob(s, p, b.mobs[id], dmg, dx / d, dz / d, knock);
+      else { hitBig(s, p, b.bigs[-2 - id], dmg); if (p.status !== 'alive') return; }
+    } else if (id >= 0) arenaHurt(s, s.players[id], dmg * mul, p);
+    else allyHurt(s, b.bigs[-2 - id], dmg * mul);
+    if (nh >= cap) return;
+    x0 = x; z0 = z;
+    id = nextFoe(s, p, b, own, x0, z0, hop, chainHits, nh); hit = aimHit; x = aim.x; z = aim.z;
+  }
+}
+
+/** Thunderhead's clock (`w.aux` counts down): every SKY.every ms (× cooldowns) SKY.count bolts fall on random foes in reach. */
+function skyStrikes(s: SiegeState, p: SiegePlayer, w: WeaponSlot, b: Board, own: number, dt: number) {
+  w.aux -= dt;
+  if (w.aux > 0) return;
+  w.aux += Math.max(200, SKY.every * p.stat.cd);
+  if (w.aux < 0) w.aux = 0;
+  const r = SKY.radius * p.stat.area, dmg = SKY.dmg * p.stat.dmg;
+  for (let k = 0; k < SKY.count; k++) if (randomFoe(s, p, SKY.range, own)) addBlast(b, 6, aim.x, aim.z, r, 0, 360, 0, SKY.life, dmg, 2, own);
+}
+
+/** Yo-Yo Cyclone's whirlwind (`w.cd` counts down): every AURA.tickMs (× cooldowns) it hurts every foe within its radius. */
+function aura(s: SiegeState, p: SiegePlayer, w: WeaponSlot, b: Board, own: number, dt: number) {
+  w.cd -= dt;
+  if (w.cd > 0) return;
+  w.cd += Math.max(120, AURA.tickMs * p.stat.cd);
+  if (w.cd < 0) w.cd = 0;
+  const r = AURA.radius * p.stat.area, dmg = AURA.dmg * p.stat.dmg;
+  if (own < 0) {
+    const mobs = b.mobs, n = query(mobs, p.x, p.z, r + 1.2);
+    for (let i = 0; i < n; i++) { const m = mobs[near[i]]; if (m.on && (m.x - p.x) ** 2 + (m.z - p.z) ** 2 <= (r + m.r) ** 2) hitMob(s, p, m, dmg, 0, 0, 0); }
+    for (let gi = 0; gi < b.bigs.length; gi++) { const g = b.bigs[gi]; if (g.on && (g.x - p.x) ** 2 + (g.z - p.z) ** 2 <= (r + g.r) ** 2) { hitBig(s, p, g, dmg); if (p.status !== 'alive') return; } }
+    return;
+  }
+  const mul = FINALE.weaponMul;
+  for (let j = 0; j < s.players.length; j++) { const v = s.players[j]; if (j !== own && v.status === 'arena' && (v.x - p.x) ** 2 + (v.z - p.z) ** 2 <= (r + PLAYER_RADIUS) ** 2) arenaHurt(s, v, dmg * mul, p); }
+  for (let gi = 0; gi < b.bigs.length; gi++) { const g = b.bigs[gi]; if (g.on && g.from !== p.id && (g.x - p.x) ** 2 + (g.z - p.z) ** 2 <= (r + g.r) ** 2) allyHurt(s, g, dmg * mul); }
+}
+
+/**
+ * A seeking cork strikes only the foe it is flying at (it passes over the others on its way, so a volley really does
+ * reach the nearest few): on contact it hits, spends a hop (or ends) and will look for the next foe. False if the boss
+ * fell (the board is cleared). In the arena `p` is the cork's owner and the damage carries the arena multiplier.
+ */
+function corkStrike(s: SiegeState, p: SiegePlayer, b: Board, q: Proj): boolean {
+  const id = q.ti;
+  let x = 0, z = 0, r = 0;
+  if (id >= 0) {
+    if (q.own < 0) { const m = b.mobs[id]; if (!m.on || m.serial !== q.ts) return true; x = m.x; z = m.z; r = m.r; }
+    else { const v = s.players[id]; if (!v || v.status !== 'arena') return true; x = v.x; z = v.z; r = PLAYER_RADIUS; }
+  } else {
+    const g = b.bigs[-2 - id];
+    if (!g || !g.on || g.serial !== q.ts) return true;
+    x = g.x; z = g.z; r = g.r;
+  }
+  if ((x - q.x) ** 2 + (z - q.z) ** 2 > (r + q.r) ** 2) return true;
+  if (q.nh < q.hits.length) q.hits[q.nh++] = q.ts;
+  if (q.own < 0) {
+    if (id >= 0) { const sp = Math.sqrt(q.vx * q.vx + q.vz * q.vz) || 1; hitMob(s, p, b.mobs[id], q.dmg, q.vx / sp, q.vz / sp, 3); }
+    else { hitBig(s, p, b.bigs[-2 - id], q.dmg); if (p.status !== 'alive') return false; }
+  } else if (id >= 0) arenaHurt(s, s.players[id], q.dmg * FINALE.weaponMul, p);
+  else allyHurt(s, b.bigs[-2 - id], q.dmg * FINALE.weaponMul);
+  if (q.pierce <= 0) q.on = false; else q.pierce--;
+  q.ti = -1;
+  return true;
+}
+
+/** A Pop-Gun cork's seeker: straight at its target while that is still there, else at the nearest foe within RANGER.hop it has not hit. */
+function seek(s: SiegeState, p: SiegePlayer, b: Board, q: Proj) {
+  if (!foeThere(s, b, q.own, q.ti, q.ts)) {
+    q.ti = nextFoe(s, p, b, q.own, q.x, q.z, RANGER.hop, q.hits, q.nh); q.ts = aimHit;
+    if (q.ti === -1) return; // nothing in reach: fly on
+  }
+  const dx = aim.x - q.x, dz = aim.z - q.z, d = Math.sqrt(dx * dx + dz * dz);
+  if (d < 1e-6) return;
+  const sp = Math.sqrt(q.vx * q.vx + q.vz * q.vz);
+  q.vx = (dx / d) * sp; q.vz = (dz / d) * sp;
+}
 
 /** The Boiler Heart's volley: a ring of rivets all round the toy, turned half a gap from the last ring. */
 function fireRing(p: SiegePlayer, b: Board, own: number) {
@@ -650,19 +832,6 @@ function stepBoiler(p: SiegePlayer, b: Board, own: number, dt: number) {
   fireRing(p, b, own);
 }
 
-/** Light a pool of flame (a full pool replaces its oldest flame). */
-function addFire(b: Board, x: number, z: number, r: number, dmg: number, own: number) {
-  const list = b.fires;
-  if (!list.length) return;
-  let pick = list[0];
-  for (let i = 0; i < list.length; i++) {
-    const f = list[i];
-    if (!f.on) { pick = f; break; }
-    if (f.age > pick.age) pick = f;
-  }
-  pick.on = true; pick.x = x; pick.z = z; pick.r = r; pick.age = 0; pick.life = FLAME.lifeMs; pick.tick = FLAME.tickMs; pick.dmg = dmg; pick.own = own;
-}
-
 /**
  * Fire one volley. On a board (`own` −1) weapons aim at the swarm; in the arena (`own` = the
  * shooter's player index) at rival toys and their summoned bosses, and every hit carries `own`.
@@ -680,32 +849,38 @@ function fire(s: SiegeState, p: SiegePlayer, w: WeaponSlot, st: WeaponStats, b: 
       break;
     }
     case 'popgun': {
+      const n = nearestFoes(s, p, b, own, w.evolved ? st.range : RANGER.acquire, st.count);
       if (w.evolved) {
-        // The Prism Ray: one beam per volley from the toy, at the nearest enemy (else the way it faces),
-        // through everything in its line. Damage lands at once; the beam lingers on screen briefly.
-        for (let k = 0; k < st.count; k++) {
-          const base = nearestFoe(s, p, st.range, own) ? Math.atan2(aim.x - p.x, aim.z - p.z) : face;
-          const beam = addBlast(b, 4, p.x, p.z, st.range, base + k * 0.2, 0, 0, LASER_LIFE, dmg, 2, own);
-          if (beam) beam.w = area;
+        // The Prism Ray: one instant beam per cork, each at one of the nearest foes (extra beams go to the nearest
+        // again), chaining on `pierce` times.
+        for (let k = 0; k < st.count && n > 0; k++) {
+          const t = k % n;
+          chain(s, p, b, own, tId[t], tS[t], st.range, st.pierce, RANGER.hop, dmg, st.knock, 4, area, RANGER.beamLife);
+          if (p.status !== (own < 0 ? 'alive' : 'arena')) return;
         }
         break;
       }
-      const base = nearestFoe(s, p, 30, own) ? Math.atan2(aim.x - p.x, aim.z - p.z) : face, sp = st.speed * p.stat.projSpeed;
+      // Corks: one at each of the nearest foes, extra corks at the nearest again (fanned out a little so they read
+      // as separate corks); with nothing in reach they fan out the way the toy faces and look for a foe as they fly.
+      const sp = st.speed * p.stat.projSpeed;
       for (let k = 0; k < st.count; k++) {
-        const a = base + (k - (st.count - 1) / 2) * 0.14;
+        const t = n > 0 ? k % n : 0, extra = n > 0 ? (k / n) | 0 : 0;
+        const a = n > 0 ? Math.atan2(tX[t] - p.x, tZ[t] - p.z) + (extra & 1 ? 0.3 : -0.3) * ((extra + 1) >> 1) : face + (k - (st.count - 1) / 2) * 0.14;
         const q = addProj(b, 0, p.x, p.z, Math.sin(a) * sp, Math.cos(a) * sp, st.area, dmg, st.pierce, st.range, 0, own);
-        if (q) q.homing = st.homing;
+        if (q) { q.homing = 1; if (n > 0) { q.ti = tId[t]; q.ts = tS[t]; } }
       }
       break;
     }
-    case 'chime':
-      for (let k = 0; k < st.count; k++) {
-        if (!randomFoe(s, p, st.range, own)) { const a = rand(s) * Math.PI * 2, d = 4 + rand(s) * 8; aim.x = p.x + Math.cos(a) * d; aim.z = p.z + Math.sin(a) * d; }
-        const m = addBlast(b, 1, aim.x, aim.z, area, 0, 360, METEOR_FALL, 520, dmg, 3, own);
-        // Firebell Meteors: the meteor leaves a pool of flame where it lands.
-        if (m && w.evolved) { m.w = FLAME.radius * p.stat.area; m.burn = FLAME.dmg * p.stat.dmg; }
+    case 'spark': {
+      // Chain Lightning: strikes the nearest foe, then leaps on (hitscan).
+      const n = nearestFoes(s, p, b, own, st.range, st.count);
+      for (let k = 0; k < st.count && n > 0; k++) {
+        const t = k % n;
+        chain(s, p, b, own, tId[t], tS[t], st.range, st.pierce, area, dmg, st.knock, 5, 0.5, BOLT_LIFE);
+        if (p.status !== (own < 0 ? 'alive' : 'arena')) return;
       }
       break;
+    }
     case 'marbles':
       for (let k = 0; k < st.count; k++) {
         if (!randomFoe(s, p, st.range, own)) { const a = rand(s) * Math.PI * 2, d = 3 + rand(s) * 10; aim.x = p.x + Math.cos(a) * d; aim.z = p.z + Math.sin(a) * d; }
@@ -754,13 +929,17 @@ function weapons(s: SiegeState, p: SiegePlayer, dt: number) {
         }
         for (let gi = 0; gi < b.bigs.length; gi++) { const g = b.bigs[gi]; if (g.on && b.bt - g.yo >= gap && len(g.x - yo.x, g.z - yo.z) < g.r + 0.9) { g.yo = b.bt; hitBig(s, p, g, dmg); } }
       }
+      if (w.evolved && p.status === 'alive') aura(s, p, w, b, -1, dt);
+      if (p.status !== 'alive') return; // the boss fell
       continue;
     }
+    if (w.id === 'spark' && w.evolved) skyStrikes(s, p, w, b, -1, dt);
     w.cd -= dt;
     if (w.cd > 0) continue;
     w.cd += Math.max(120, st.cd * p.stat.cd);
     if (w.cd < 0) w.cd = 0;
     fire(s, p, w, st);
+    if (p.status !== 'alive') return; // the boss fell
   }
   stepBoiler(p, b, -1, dt);
 }
@@ -795,10 +974,10 @@ function stepBoard(s: SiegeState, p: SiegePlayer, dt: number) {
   // The hash again: positions changed above.
   buildHash(b.mobs);
   weapons(s, p, dt);
-  stepProjs(s, p, dt);
-  stepBlasts(s, p, dt);
   if (p.status !== 'alive') return; // the boss fell: the run is won
-  stepFires(s, p, dt);
+  stepProjs(s, p, dt);
+  if (p.status !== 'alive') return;
+  stepBlasts(s, p, dt);
   if (p.status !== 'alive') return;
   stepPickups(s, p, dt);
   openChoice(s, p);
@@ -968,50 +1147,7 @@ function projSeen(q: Proj, serial: number): boolean {
   return false;
 }
 
-/**
- * Turn a projectile's velocity towards (tx, tz) by at most `maxTurn` radians, keeping its speed.
- * Returns the angle it turned (signed). Exported for the unit tests.
- */
-export function steerTowards(q: { x: number; z: number; vx: number; vz: number }, tx: number, tz: number, maxTurn: number): number {
-  const cur = Math.atan2(q.vx, q.vz);
-  let da = Math.atan2(tx - q.x, tz - q.z) - cur;
-  da = Math.atan2(Math.sin(da), Math.cos(da));
-  if (da > maxTurn) da = maxTurn; else if (da < -maxTurn) da = -maxTurn;
-  const sp = Math.sqrt(q.vx * q.vx + q.vz * q.vz), a = cur + da;
-  q.vx = Math.sin(a) * sp; q.vz = Math.cos(a) * sp;
-  return da;
-}
-/** Is (x, z) ahead of projectile q (within 90° of its heading) and within `r2` (squared)? */
-const ahead = (q: Proj, x: number, z: number, r2: number) => { const dx = x - q.x, dz = z - q.z; return dx * dx + dz * dz <= r2 && dx * q.vx + dz * q.vz > 0; };
-
-/**
- * A homing cork on a board: keep its target while that enemy lives and has not been hit by this cork, else
- * pick the nearest enemy ahead of it within HOMING_SEEK; then turn towards it by at most `homing` rad/s.
- */
-function homeOnBoard(q: Proj, b: Board, sec: number) {
-  const mobs = b.mobs;
-  let tx = 0, tz = 0, have = false;
-  if (q.ti >= 0) { const m = mobs[q.ti]; if (m.on && m.serial === q.ts && !projSeen(q, m.serial)) { tx = m.x; tz = m.z; have = true; } }
-  else if (q.ti <= -2) { const g = b.bigs[-2 - q.ti]; if (g && g.on && g.serial === q.ts && !projSeen(q, g.serial)) { tx = g.x; tz = g.z; have = true; } }
-  if (!have) {
-    q.ti = -1;
-    let best = HOMING_SEEK * HOMING_SEEK;
-    const n = query(mobs, q.x, q.z, HOMING_SEEK);
-    for (let k = 0; k < n; k++) {
-      const i = near[k], m = mobs[i];
-      if (!ahead(q, m.x, m.z, best) || projSeen(q, m.serial)) continue;
-      best = (m.x - q.x) ** 2 + (m.z - q.z) ** 2; q.ti = i; q.ts = m.serial; tx = m.x; tz = m.z; have = true;
-    }
-    for (let i = 0; i < b.bigs.length; i++) {
-      const g = b.bigs[i];
-      if (!g.on || !ahead(q, g.x, g.z, best) || projSeen(q, g.serial)) continue;
-      best = (g.x - q.x) ** 2 + (g.z - q.z) ** 2; q.ti = -2 - i; q.ts = g.serial; tx = g.x; tz = g.z; have = true;
-    }
-  }
-  if (have) steerTowards(q, tx, tz, q.homing * sec);
-}
-
-/** Player projectiles: corks (homing ones curve), paper planes and Boiler Heart rivets. */
+/** Player projectiles: Pop-Gun corks (they seek their targets), paper planes and Boiler Heart rivets. */
 function stepProjs(s: SiegeState, p: SiegePlayer, dt: number) {
   const b = p.board, sec = dt / 1000, projs = b.projs, mobs = b.mobs;
   for (let qi = 0; qi < projs.length; qi++) {
@@ -1025,9 +1161,10 @@ function stepProjs(s: SiegeState, p: SiegePlayer, dt: number) {
         q.vx = (dx / dl) * sp; q.vz = (dz / dl) * sp;
         if (dl < 1.5) { q.on = false; continue; }
       }
-    } else if (q.homing > 0) homeOnBoard(q, b, sec);
+    } else if (q.homing > 0) seek(s, p, b, q);
     q.x += q.vx * sec; q.z += q.vz * sec;
     if (q.life <= 0 || Math.abs(q.x) > ARENA_HALF + 4 || Math.abs(q.z) > ARENA_HALF + 4) { q.on = false; continue; }
+    if (q.homing > 0 && q.ti !== -1) { if (!corkStrike(s, p, b, q)) return; continue; }
     const n = query(mobs, q.x, q.z, q.r + 1.2);
     for (let k = 0; k < n && q.on; k++) {
       const m = mobs[near[k]];
@@ -1038,6 +1175,7 @@ function stepProjs(s: SiegeState, p: SiegePlayer, dt: number) {
       const sp = Math.sqrt(q.vx * q.vx + q.vz * q.vz) || 1;
       hitMob(s, p, m, q.dmg, q.vx / sp, q.vz / sp, q.kind === 1 ? 1.5 : 3);
       if (q.pierce >= 0) { if (q.pierce === 0) q.on = false; else q.pierce--; }
+      q.ti = -1; // a cork hops on to the nearest foe it has not hit
     }
     for (let gi = 0; gi < b.bigs.length; gi++) {
       const g = b.bigs[gi];
@@ -1045,48 +1183,22 @@ function stepProjs(s: SiegeState, p: SiegePlayer, dt: number) {
       if (projSeen(q, g.serial)) continue;
       if (q.nh < q.hits.length) q.hits[q.nh++] = g.serial;
       hitBig(s, p, g, q.dmg);
+      if (p.status !== 'alive') return; // the boss fell
       if (q.pierce >= 0) { if (q.pierce === 0) q.on = false; else q.pierce--; }
+      q.ti = -1;
     }
   }
 }
 
-/**
- * Is a circle at (x, z) of radius `r` touched by laser `k` (a line from (k.x, k.z) along `k.ang`, `k.r` long,
- * `k.w` either side)? Exported for the unit tests.
- */
-export function laserHits(k: { x: number; z: number; r: number; ang: number; w: number }, x: number, z: number, r: number): boolean {
-  const dx = Math.sin(k.ang), dz = Math.cos(k.ang), ox = x - k.x, oz = z - k.z;
-  let t = ox * dx + oz * dz;
-  if (t < 0) t = 0; else if (t > k.r) t = k.r;
-  const ex = ox - dx * t, ez = oz - dz * t, reach = k.w + r;
-  return ex * ex + ez * ez <= reach * reach;
-}
-
-/** A Prism Ray beam on a board: everything in its line takes the hit. */
-function laserBoard(s: SiegeState, p: SiegePlayer, k: Blast) {
-  const b = p.board, mobs = b.mobs, dx = Math.sin(k.ang), dz = Math.cos(k.ang);
-  const n = query(mobs, k.x + dx * k.r / 2, k.z + dz * k.r / 2, k.r / 2 + k.w + 1.2);
-  for (let i = 0; i < n; i++) {
-    const m = mobs[near[i]];
-    if (m.on && laserHits(k, m.x, m.z, m.r)) hitMob(s, p, m, k.dmg, dx, dz, k.knock);
-  }
-  for (let gi = 0; gi < b.bigs.length && p.status === 'alive'; gi++) {
-    const g = b.bigs[gi];
-    if (g.on && laserHits(k, g.x, g.z, g.r)) hitBig(s, p, g, k.dmg);
-  }
-}
-
-/** Area hits (sweeps, meteors, marbles, the revive shockwave, laser beams). */
+/** Area hits (sweeps, marbles, the revive shockwave, Thunderhead's sky strikes); beams and leaps only fade. */
 function stepBlasts(s: SiegeState, p: SiegePlayer, dt: number) {
   const b = p.board, blasts = b.blasts, mobs = b.mobs;
   for (let bi = 0; bi < blasts.length; bi++) {
     const k = blasts[bi];
     if (!k.on) continue;
     k.age += dt;
-    if (!k.done && k.age >= k.delay && k.kind === 4) { k.done = true; laserBoard(s, p, k); if (p.status !== 'alive') return; }
     if (!k.done && k.age >= k.delay) {
       k.done = true;
-      if (k.burn > 0) addFire(b, k.x, k.z, k.w, k.burn, -1);
       const n = query(mobs, k.x, k.z, k.r + 1.2), half = (k.arc / 2) * (Math.PI / 180);
       for (let i = 0; i < n; i++) {
         const m = mobs[near[i]];
@@ -1102,34 +1214,11 @@ function stepBlasts(s: SiegeState, p: SiegePlayer, dt: number) {
         if (dd > k.r + g.r) continue;
         if (k.arc < 360 && dd > 0.5) { let da = Math.atan2(dx, dz) - k.ang; da = Math.atan2(Math.sin(da), Math.cos(da)); if (Math.abs(da) > half + 0.3) continue; }
         hitBig(s, p, g, k.dmg);
-        if (p.status !== 'alive') break;
+        if (p.status !== 'alive') return; // the boss fell
       }
       if (k.kind === 3) for (let i = 0; i < b.shots.length; i++) { const sh = b.shots[i]; if (sh.on && len(sh.x - k.x, sh.z - k.z) < k.r) sh.on = false; }
     }
     if (k.age >= k.life) k.on = false;
-  }
-}
-
-/** Pools of flame: each burns everything standing in it once per FLAME.tickMs, then goes out. */
-function stepFires(s: SiegeState, p: SiegePlayer, dt: number) {
-  const b = p.board, fires = b.fires, mobs = b.mobs;
-  for (let fi = 0; fi < fires.length; fi++) {
-    const f = fires[fi];
-    if (!f.on) continue;
-    f.age += dt; f.tick -= dt;
-    if (f.tick <= 0) {
-      f.tick += FLAME.tickMs;
-      const n = query(mobs, f.x, f.z, f.r + 1.2);
-      for (let i = 0; i < n; i++) {
-        const m = mobs[near[i]];
-        if (m.on && (m.x - f.x) ** 2 + (m.z - f.z) ** 2 <= (f.r + m.r) ** 2) hitMob(s, p, m, f.dmg, 0, 0, 0);
-      }
-      for (let gi = 0; gi < b.bigs.length; gi++) {
-        const g = b.bigs[gi];
-        if (g.on && (g.x - f.x) ** 2 + (g.z - f.z) ** 2 <= (f.r + g.r) ** 2) { hitBig(s, p, g, f.dmg); if (p.status !== 'alive') return; }
-      }
-    }
-    if (f.age >= f.life) f.on = false;
   }
 }
 
@@ -1170,7 +1259,6 @@ function enterPrep(s: SiegeState, p: SiegePlayer, chests: number, x: number, z: 
   for (const sh of b.shots) sh.on = false;
   for (const q of b.projs) q.on = false;
   for (const k of b.blasts) k.on = false;
-  for (const f of b.fires) f.on = false;
   b.bossDown = true;
   for (let i = 0; i < chests; i++) {
     const c = b.chests.find((q) => !q.on);
@@ -1222,7 +1310,7 @@ function stepPrep(s: SiegeState, p: SiegePlayer, dt: number) {
 
 /** Arena pools: no swarm, gems or chests; room for every toy's volleys and one summoned boss each. */
 function arenaBoard(c: SiegeConfig, players: number): Board {
-  return newBoard({ mobCap: 0, gemCap: 0, chestCap: 0, bigCap: Math.max(1, players), projectileCap: c.projectileCap * 2, shotCap: c.shotCap * 2, blastCap: c.blastCap * 2, fireCap: c.fireCap * 2 });
+  return newBoard({ mobCap: 0, gemCap: 0, chestCap: 0, bigCap: Math.max(1, players), projectileCap: c.projectileCap * 2, shotCap: c.shotCap * 2, blastCap: c.blastCap * 2 });
 }
 
 /** Open the arena for every toy in prep (downed toys that have not revived become ghosts). Fewer than two: no arena, the match ends. */
@@ -1320,8 +1408,10 @@ function arenaWeapons(s: SiegeState, p: SiegePlayer, own: number, dt: number) {
         }
         for (const g of a.bigs) if (g.on && g.from !== p.id && a.bt - g.yo >= gap && len(g.x - yo.x, g.z - yo.z) < g.r + 0.9) { g.yo = a.bt; allyHurt(s, g, dmg); }
       }
+      if (w.evolved) aura(s, p, w, a, own, dt);
       continue;
     }
+    if (w.id === 'spark' && w.evolved) skyStrikes(s, p, w, a, own, dt);
     w.cd -= dt;
     if (w.cd > 0) continue;
     w.cd += Math.max(120, st.cd * p.stat.cd);
@@ -1329,17 +1419,6 @@ function arenaWeapons(s: SiegeState, p: SiegePlayer, own: number, dt: number) {
     fire(s, p, w, st, a, own);
   }
   stepBoiler(p, a, own, dt);
-}
-
-/** A homing cork in the arena curves towards the nearest rival toy ahead of it (not yet hit by it). */
-function homeInArena(s: SiegeState, q: Proj, sec: number) {
-  let best = HOMING_SEEK * HOMING_SEEK, tx = 0, tz = 0, have = false;
-  for (let j = 0; j < s.players.length; j++) {
-    const v = s.players[j];
-    if (j === q.own || v.status !== 'arena' || !ahead(q, v.x, v.z, best) || projSeen(q, -(j + 1))) continue;
-    best = (v.x - q.x) ** 2 + (v.z - q.z) ** 2; tx = v.x; tz = v.z; have = true;
-  }
-  if (have) steerTowards(q, tx, tz, q.homing * sec);
 }
 
 function stepAllies(s: SiegeState, dt: number) {
@@ -1411,25 +1490,28 @@ function stepArena(s: SiegeState, dt: number) {
         q.vx = (dx / dl) * sp; q.vz = (dz / dl) * sp;
         if (dl < 1.5) { q.on = false; continue; }
       }
-    } else if (q.homing > 0) homeInArena(s, q, sec);
+    } else if (q.homing > 0) seek(s, owner, a, q);
     q.x += q.vx * sec; q.z += q.vz * sec;
     if (q.life <= 0 || Math.abs(q.x) > half + 4 || Math.abs(q.z) > half + 4) { q.on = false; continue; }
+    if (q.homing > 0 && q.ti !== -1) { corkStrike(s, owner, a, q); continue; }
     for (let j = 0; j < s.players.length && q.on; j++) {
       const v = s.players[j];
       if (j === q.own || v.status !== 'arena' || (v.x - q.x) ** 2 + (v.z - q.z) ** 2 > (PLAYER_RADIUS + q.r) ** 2) continue;
       if (!markHit(q, -(j + 1))) continue;
       arenaHurt(s, v, q.dmg * mul, owner);
       if (q.pierce >= 0) { if (q.pierce === 0) q.on = false; else q.pierce--; }
+      q.ti = -1;
     }
     for (const g of a.bigs) {
       if (!q.on || !g.on || g.from === owner.id || (g.x - q.x) ** 2 + (g.z - q.z) ** 2 > (g.r + q.r) ** 2) continue;
       if (!markHit(q, g.serial)) continue;
       allyHurt(s, g, q.dmg * mul);
       if (q.pierce >= 0) { if (q.pierce === 0) q.on = false; else q.pierce--; }
+      q.ti = -1;
     }
   }
 
-  // Area hits (sweeps, meteors, marbles, laser beams).
+  // Area hits (sweeps, marbles, sky strikes); beams and leaps only fade.
   for (let bi = 0; bi < a.blasts.length; bi++) {
     const k = a.blasts[bi];
     if (!k.on) continue;
@@ -1437,9 +1519,7 @@ function stepArena(s: SiegeState, dt: number) {
     if (!k.done && k.age >= k.delay) {
       k.done = true;
       const owner = s.players[k.own], half2 = (k.arc / 2) * (Math.PI / 180);
-      if (k.burn > 0 && owner && owner.status === 'arena') addFire(a, k.x, k.z, k.w, k.burn, k.own);
       const inArc = (x: number, z: number, r: number, slack: number) => {
-        if (k.kind === 4) return laserHits(k, x, z, r);
         const dx = x - k.x, dz = z - k.z, dd = len(dx, dz);
         if (dd > k.r + r) return false;
         if (k.arc >= 360 || dd <= 0.5) return true;
@@ -1452,27 +1532,6 @@ function stepArena(s: SiegeState, dt: number) {
       }
     }
     if (k.age >= k.life) k.on = false;
-  }
-
-  // Pools of flame burn rival toys (and their summoned bosses) standing in them, never their owner.
-  for (let fi = 0; fi < a.fires.length; fi++) {
-    const f = a.fires[fi];
-    if (!f.on) continue;
-    const owner = s.players[f.own];
-    if (!owner || owner.status !== 'arena') { f.on = false; continue; }
-    f.age += dt; f.tick -= dt;
-    if (f.tick <= 0) {
-      f.tick += FLAME.tickMs;
-      for (let j = 0; j < s.players.length; j++) {
-        const v = s.players[j];
-        if (j !== f.own && v.status === 'arena' && (v.x - f.x) ** 2 + (v.z - f.z) ** 2 <= (f.r + PLAYER_RADIUS) ** 2) arenaHurt(s, v, f.dmg * mul, owner);
-      }
-      for (let gi = 0; gi < a.bigs.length; gi++) {
-        const g = a.bigs[gi];
-        if (g.on && g.from !== owner.id && (g.x - f.x) ** 2 + (g.z - f.z) ** 2 <= (f.r + g.r) ** 2) allyHurt(s, g, f.dmg * mul);
-      }
-    }
-    if (f.age >= f.life) f.on = false;
   }
 
   // A summoned boss's bullets.
@@ -1699,5 +1758,5 @@ export function evolutionHint(p: SiegePlayer, o: Option): EvoHint | null {
 /** Debug/test helper: total live entities on a board. */
 export function boardCounts(b: Board) {
   const n = (list: { on: boolean }[]) => list.reduce((k, x) => k + (x.on ? 1 : 0), 0);
-  return { mobs: n(b.mobs), bigs: n(b.bigs), projs: n(b.projs), shots: n(b.shots), gems: n(b.gems), chests: n(b.chests), blasts: n(b.blasts), fires: n(b.fires) };
+  return { mobs: n(b.mobs), bigs: n(b.bigs), projs: n(b.projs), shots: n(b.shots), gems: n(b.gems), chests: n(b.chests), blasts: n(b.blasts) };
 }

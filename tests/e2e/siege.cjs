@@ -151,7 +151,7 @@ async function run(name) {
     await page.getByTestId('siege-levelup').waitFor();
     const staged = await state(() => {
       const p = window.__toybox.match.state().players.find((q) => q.id === 'you');
-      const partner = { sweep: 'plating', popgun: 'gears', chime: 'magnifier' }[p.weapons[0].id];
+      const partner = { sweep: 'plating', popgun: 'gears', spark: 'magnifier' }[p.weapons[0].id];
       if (!p.passives.some((x) => x.id === partner)) p.passives.push({ id: partner, level: 1 });
       p.choice.options = [{ kind: 'weapon', id: p.weapons[0].id, level: 5 }, { kind: 'passive', id: partner, level: 2 }, { kind: 'weapon', id: 'marbles', level: 1 }];
       return p.weapons[0].id;
@@ -238,25 +238,23 @@ async function run(name) {
     await step('5-swarm');
     await shot('5-swarm');
 
-    // ---- The secret upgrades the owner asked for (20 Nov 2026): Prism Ray (a laser through the line),
-    // Firebell Meteors (pools of flame) and the Boiler Heart (a ring of rivets), all at once on our board
+    // ---- The secret upgrades the owner asked for (20-21 Nov 2026): Prism Ray (instant beams chaining from foe to
+    // foe), Thunderhead (chain lightning and bolts from the sky), Yo-Yo Cyclone (a whirlwind round the toy) and the
+    // Boiler Heart (a ring of rivets), all at once on our board
     await state(() => {
       const p = window.__toybox.match.state().players.find((q) => q.id === 'you');
-      for (const id of ['popgun', 'chime']) {
-        const w = p.weapons.find((x) => x.id === id);
-        if (w) Object.assign(w, { level: 5, evolved: true, cd: 0 }); else if (p.weapons.length < 4) p.weapons.push({ id, level: 5, evolved: true, cd: 0, aux: 0 });
-        else Object.assign(p.weapons[p.weapons.length - 1], { id, level: 5, evolved: true, cd: 0, aux: 0 });
-      }
+      const want = ['popgun', 'spark', 'yoyo'];
+      p.weapons = [...want.map((id) => ({ id, level: 5, evolved: true, cd: 0, aux: 0 })), ...p.weapons.filter((x) => !want.includes(x.id)).slice(0, 1)];
       p.horn = { level: 3, readyAt: 0, evolved: true, cd: 0, aux: 0 };
     });
     await page.evaluate(() => window.__toybox.match.timeScale(1));
-    await page.waitForFunction(new Function(`const b = ${me}.board; return b.blasts.some(k => k.on && k.kind === 4) && b.fires.some(f => f.on) && b.projs.some(q => q.on && q.kind === 2)`));
+    await page.waitForFunction(new Function(`const b = ${me}.board; return b.blasts.some(k => k.on && k.kind === 4) && b.blasts.some(k => k.on && k.kind === 5) && b.projs.some(q => q.on && q.kind === 2)`));
     await page.evaluate(() => window.__toybox.match.timeScale(0));
     await page.waitForTimeout(1500);
     const secrets = await state(() => window.__toybox.siege.counts());
-    assert.ok(secrets.fires > 0, 'flame pools on the board');
+    assert.ok(secrets.blasts > 0, 'beams and lightning on the board');
     assert.ok((await page.locator('[data-testid="siege-items"] li[title="Boiler Heart"]').count()) === 1, 'the kit strip shows the Boiler Heart');
-    assert.ok((await page.locator('[data-testid="siege-items"] li[title="Prism Ray"] svg.siege-icon').count()) === 1, 'the kit strip shows the Prism Ray');
+    for (const name of ['Prism Ray', 'Thunderhead', 'Yo-Yo Cyclone']) assert.ok((await page.locator(`[data-testid="siege-items"] li[title="${name}"] svg.siege-icon`).count()) === 1, `the kit strip shows ${name}`);
     console.log(`  [${name}] secret upgrades on the board ${JSON.stringify(secrets)}`);
     await step('5b-secrets');
     await shot('5b-secrets');
