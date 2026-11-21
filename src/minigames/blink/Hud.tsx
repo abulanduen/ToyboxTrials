@@ -38,7 +38,6 @@ export function BlinkHud({getState,localId,contestants}:MinigameSceneProps<Blink
     {toast.current.text&&s.t<toast.current.until&&<div className={`blink-toast${me.alive?'':' blink-toast--out'}`} role="status" data-testid="blink-toast">{toast.current.text}</div>}
     <div className="blink-roster" aria-label="Duel standings">{s.players.map(p=><span key={p.id} className={p.alive?'':'out'}>{p.id===localId?'You':contestants.find(c=>c.id===p.id)?.name} · {p.alive?'In':'Out'}</span>)}</div>
     {active&&<div className="blink-stick"><MoveTouch jump={false}/></div>}
-    {active&&<div className="blink-actions" onKeyDown={e=>{if(e.key==='Enter'||e.key===' ')e.stopPropagation();}}><button data-testid="blink-attack" disabled={busy} {...tapButton(()=>action('slot2'))}>Swing [J]</button><button data-testid="blink-blink" {...tapButton(()=>action('slot1'))}>Blink [Space]<small>No cooldown</small></button></div>}
-    <div className="blink-hint">{me.alive?'Tap arena / mouse to aim. Striped cones warn of a strike. Blink out before they fill.':'Watch the remaining toys. Dead toys cannot attack or block.'}</div>
+    {active&&<div className="blink-actions" onKeyDown={e=>{if(e.key==='Enter'||e.key===' ')e.stopPropagation();}}><button data-testid="blink-attack" disabled={busy} title="J or click: a 0.95-second wind-up, shown by a striped cone. One hit eliminates." {...tapButton(()=>action('slot2'))}>Swing [J]</button><button data-testid="blink-blink" title="Space: teleport forward. No cooldown; cancels your own wind-up." {...tapButton(()=>action('slot1'))}>Blink [Space]<small>No cooldown</small></button></div>}
   </div>;
 }

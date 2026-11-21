@@ -341,7 +341,8 @@ of your towers pans the board; two fingers pinch-zoom and the mouse wheel zooms,
 or the cursor; zoom runs 1–3.2 × and the look-at point is clamped near the board, so it can't be
 lost. A press that moves less than 10 px is a tap, so selecting and building work as before, also
 while zoomed. **Reset view** appears whenever the view has moved. The canvas has `touch-action:
-none`, so the browser's own pinch and scroll never fire over the game.
+none`, so the browser's own pinch and scroll never fire over the game. Toy Squad reuses the same `PanZoom` with its own
+limits (a `panRoom` option: how much pan each zoom allows); Tower Tumble keeps the default.
 
 On a phone a square is small (about 28 px in portrait at the fitted zoom): below the 56 px rule. So
 squares **only select** (a wrong tap just selects another square, and is undone by Close), and every

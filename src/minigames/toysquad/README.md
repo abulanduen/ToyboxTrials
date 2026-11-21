@@ -177,6 +177,22 @@ holds them with stun. These are strategic options, not established optimal build
   On phones the camera frames the board in the space left of the rail. Online, the server is told
   whose board you are viewing (the lobby `watch` message, for a seated player) and adds that
   board's battle to your snapshots; shops and passive offers stay private.
+- **Zoom and pan** (owner request, 21 Nov 2026; `camera.ts` on the shared `shared/panZoom.ts`
+  that Tower Tumble uses): zoom runs from the fitted view (1 ×) to 2.5 × closer. Desktop: the mouse
+  wheel zooms toward the cursor and **+ / −** (Equal/Minus or the keypad) step it by 1.25 ×. Touch:
+  pinch zooms toward the fingers. Everywhere: **+ / −** buttons (56 px, code-drawn magnifier icons)
+  sit right under the player rail (desktop and portrait; the rail gives up room and scrolls only if
+  the column is too short), or beside the Toys button in phone landscape; they step about the middle
+  of the open table. Once zoomed in, dragging the bare table (mouse or one finger) pans, as far as
+  the zoom hides (1 − 1/zoom of 15 cm each way), so every square and the reserve row can be brought
+  into view and the board can't be lost; at 1 × the camera never pans. **It never fights the toys:**
+  a press that starts on one of your toys still drags that toy (a pan never starts from a toy drag),
+  toys drag and drop onto squares at any zoom, a second finger drops a toy drag where it started
+  (nothing moves or sells) and pinches instead, and a tap on the bare table still clears the
+  selection while a drag across it does not. The view resets to fitted whenever the framing changes:
+  build ↔ battle, each new round, and switching to another player's board or back to yours. The
+  zoom keys and wheel are local view controls read by the Scene, never game actions or rules input.
+  `?debug`: `__toybox.squadView` (`get`, `reset`, `zoomAt`, `ground`).
 - **Debuff badges:** the shared code-drawn status badges (`shared/statusIcons.ts`, the same as Tower
   Tumble's) float over fighters that are poisoned, stunned, marked, silenced, or have a net
   negative haste (slowed), armour (armour broken) or damage, spell power or range (weakened)
@@ -216,6 +232,8 @@ It checks the damage overview in battle, then plays all ten rounds, where the pa
 block Q/R/E until a choice is made. Real-device performance, audio quality and strategic balance
 still need human playtesting.
 
+Verification, 21 November 2026 (zoom and pan): see the end of this file.
+
 Verification, 20 November 2026 (player rail, debuff badges, board viewing): 920 unit tests (whole
 suite), the production build and the server build pass; `tests/e2e/toysquad.cjs` passes on desktop,
 portrait-touch and landscape-touch, now with three bot squads, the rail (standings order, compact on
@@ -227,3 +245,13 @@ desktop, portrait-touch and landscape-touch ten-round checks above pass without 
 
 The existing mobile hub/Copycat/Jack/Workshop regression suite passed with the prior unit-kit update. Headless software
 rendering is not a real-device FPS measurement.
+
+Verification, 21 November 2026 (zoom and pan): `npx tsc -b`, the whole unit suite (with a new
+`panRoom` case in `tests/unit/rail-status.test.ts`) and the production build pass.
+`tests/e2e/toysquad.cjs` passes on desktop, portrait-touch and landscape-touch with new zoom checks:
+the + / − buttons are 56 px, on screen and clear of the dock, banner, rail and Toys button; a toy drags
+onto squares while zoomed; desktop wheel zoom keeps the table point under the cursor and + / − keys
+step the zoom; on touch a second finger drops a toy drag (nothing moves) and pinches; a drag across
+the bare table pans and moves no toy; − returns to the fitted view; switching to another board and
+back resets the view. `tests/e2e/towertumble.cjs` (the other `PanZoom` user) still passes on all three
+layouts. Headless software rendering says nothing about real-device feel or frame rate.

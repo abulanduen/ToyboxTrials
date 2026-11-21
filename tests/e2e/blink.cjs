@@ -46,6 +46,9 @@ async function holdStick(page,[dx,dy]){const cdp=await page.context().newCDPSess
     await page.waitForFunction(()=>!!window.__toybox.match.state().players[0].attack);await page.evaluate(()=>window.__toybox.match.timeScale(0));
     {const st=await state();assert.equal(st.players.filter(p=>p.alive).length,st.players.length,JSON.stringify(st.players.map(p=>({id:p.id,alive:p.alive,x:+p.x.toFixed(1),z:+p.z.toFixed(1),outAt:p.outAt,kills:p.kills})))+' t='+st.t);}
     await page.screenshot({path:path.join(out,`blink-${layout}-windup.png`)});
+    // Owner request, 21 Nov 2026: no hint box floats just above the Swing / Blink buttons (the controls are in How to play and on hover).
+    assert.equal(await page.locator('.blink-hint').count(),0);
+    assert.deepEqual(await page.evaluate(()=>{const c=document.querySelector('.blink-actions').getBoundingClientRect();return[...document.querySelectorAll('.blink-hud *')].filter(e=>!e.closest('.blink-actions,.blink-stick')).filter(e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0&&r.bottom>c.top-140&&r.top<c.top&&r.right>c.left&&r.left<c.right;}).map(e=>e.className);}),[],'nothing over the band above the action buttons');
     // Steer a cancel blink sideways while the attack cone stays locked.
     await aim(-10,0);if(mobile)await click('blink-blink');else await page.keyboard.press('Space');await page.evaluate(()=>window.__toybox.match.timeScale(1));
     await page.waitForFunction(()=>{const p=window.__toybox.match.state().players[0];return !p.attack&&p.x<-7;});

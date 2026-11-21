@@ -54,6 +54,9 @@ All numbers below are provisional `BlinkConfig` values, not additional owner-spe
 - **Touch:** steer with the shared floating joystick (lower left); tap the arena to aim; use the Blink
   and Swing buttons, which fire on touch-down so they work while the other thumb holds the stick. All buttons
   are at least 56 px, with both portrait and landscape layouts and safe-area margins.
+- No hint box floats over the arena (owner request, 21 Nov 2026: the old one sat just above the
+  action buttons and kept blocking play). The controls are in How to play and the lobby's controls
+  list; on desktop, hovering Swing or Blink shows its key and what it does.
 - Pause uses the existing host. Local aim/queues and held virtual directions clear on pause,
   blur/unmount; simulation time drives cones, blink bursts and strike flashes. Reduced-motion
   keeps blink rings stationary and removes the decorative sword sweep.

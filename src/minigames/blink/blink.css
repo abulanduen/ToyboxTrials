@@ -16,9 +16,8 @@
 .blink-actions button { width:112px; min-height:62px; background:#EFAE45; }
 .blink-actions button:first-child { background:#E76B62; }
 .blink-actions small { display:block; font:11px Nunito,sans-serif; }
-.blink-hint { position:absolute; left:50%; transform:translateX(-50%); bottom:18px; max-width:390px; text-align:center; font-size:12px; padding:6px 10px; background:#F4E8CE; border-radius:8px; }
-@media(max-width:650px) { .blink-banner strong { font-size:12px; } .blink-banner { padding:6px; } .blink-banner span { font-size:11px; } .blink-roster { top:155px; } .blink-hint { bottom:155px; width:calc(100% - 30px); font-size:11px; } }
-@media(max-height:500px) { .blink-banner { padding:4px 8px; } .blink-banner small { display:none; } .blink-roster { top:88px; } .blink-hint { max-width:360px; bottom:14px; font-size:10px; } }
+@media(max-width:650px) { .blink-banner strong { font-size:12px; } .blink-banner { padding:6px; } .blink-banner span { font-size:11px; } .blink-roster { top:155px; } }
+@media(max-height:500px) { .blink-banner { padding:4px 8px; } .blink-banner small { display:none; } .blink-roster { top:88px; } }
 /* Danger: the local toy stands inside an enemy wind-up cone. */
 .blink-banner--danger { border-color:#E76B62 !important; background:#FBE1DB !important; }
 .blink-banner--danger strong { color:#B53F36; }

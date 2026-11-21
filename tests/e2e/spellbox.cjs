@@ -59,6 +59,14 @@ try{for(const layout of(process.env.SPELLBOX_LAYOUTS||'desktop,portrait,landscap
    assert.ok(g.pageW<=g.vw&&g.cardX<=1,`no horizontal scroll (${g.pageW}/${g.vw}, card ${g.cardX})`);assert.ok(g.l>=0&&g.r<=g.vw&&g.t>=0&&g.b<=g.vh,'card inside the viewport');
    assert.ok(g.pauseOnTop,'Pause stays reachable above the draft');assert.ok(g.targets.every(n=>n>=56),`draft touch targets >= 56 px (${g.targets})`);
    if(!mobile){assert.ok(g.w<=724&&g.w<g.vw*.6,`desktop card is compact (${g.w}px)`);assert.ok(Math.abs((g.l+g.r)/2-g.vw/2)<2&&Math.abs((g.t+g.b)/2-g.vh/2)<g.vh*.08,'desktop card is centred');}}
+  // Owner request, 21 Nov 2026: on every button, all three offers and Lock build fit in the card with no scrolling.
+  for(let slot=0;slot<3;slot++){await click(`spellbox-slot-${slot}`);
+    const f=await page.evaluate(()=>{const card=document.querySelector('[data-testid=spellbox-draft]'),cat=document.querySelector('[data-testid=spellbox-catalogue]'),c=card.getBoundingClientRect(),ready=document.querySelector('[data-testid=spellbox-ready]').getBoundingClientRect();
+      const shown=q=>q.top>=c.top-1&&q.bottom<=c.bottom+1&&q.left>=c.left-1&&q.right<=c.right+1&&q.top>=0&&q.bottom<=innerHeight&&q.left>=0&&q.right<=innerWidth;
+      return{card:card.scrollHeight-card.clientHeight,offers:cat.scrollHeight-cat.clientHeight,count:cat.querySelectorAll('button').length,allShown:[...cat.querySelectorAll('button')].every(b=>shown(b.getBoundingClientRect()))&&shown(ready),
+        readyOnTop:document.elementFromPoint((ready.left+ready.right)/2,(ready.top+ready.bottom)/2)?.closest('[data-testid=spellbox-ready]')!==null};});
+    assert.deepEqual(f,{card:0,offers:0,count:3,allShown:true,readyOnTop:true},`button ${slot}: every offer and Lock build in view without scrolling`);}
+  await click('spellbox-slot-1');
   await page.screenshot({path:path.join(out,`spellbox-${layout}-draft.png`),timeout:240000});
   await page.evaluate(()=>window.__toybox.match.timeScale(.25));await click('spellbox-ready');
   await page.waitForFunction(()=>{const s=window.__toybox.match.state();if(s.fightAt>=0){window.__toybox.match.timeScale(0);return true;}return false;});
@@ -71,6 +79,9 @@ try{for(const layout of(process.env.SPELLBOX_LAYOUTS||'desktop,portrait,landscap
   await aim(11,0);await cast(0);await page.waitForFunction(()=>{const s=window.__toybox.match.state();if(s.players[1].damage>0){window.__toybox.match.timeScale(0);return true;}return false;});
   let s=await state();assert.equal(s.players[1].damage,14);assert.ok(s.players[1].vx>0);assert.equal(s.players[0].casts,1);assert.equal(await page.getByTestId('spellbox-cast-0').isDisabled(),true);
   const sizes=await page.locator('.spellbox-casts button').evaluateAll(buttons=>buttons.map(b=>b.getBoundingClientRect().height));assert.ok(sizes.every(h=>h>=56));
+  // Owner request, 21 Nov 2026: no hint box floats just above the spell buttons (the controls are in How to play and on hover).
+  assert.equal(await page.locator('.spellbox-hint').count(),0);
+  assert.deepEqual(await page.evaluate(()=>{const c=document.querySelector('.spellbox-casts').getBoundingClientRect();return[...document.querySelectorAll('.spellbox-hud *')].filter(e=>!e.closest('.spellbox-casts,.spellbox-stick')).filter(e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0&&r.bottom>c.top-140&&r.top<c.top&&r.right>c.left&&r.left<c.right;}).map(e=>e.className);}),[],'nothing over the band above the spell buttons');
   await page.screenshot({path:path.join(out,`spellbox-${layout}-hit.png`),timeout:240000});
   await page.evaluate(()=>window.__toybox.match.timeScale(1));await page.getByRole('button',{name:'Pause',exact:true}).click();await page.waitForSelector('.pause');const t=(await state()).t;await page.waitForTimeout(250);assert.equal((await state()).t,t);await page.keyboard.press('Escape');await page.waitForSelector('.pause',{state:'detached'});
   // Blink (R): place a bot just ahead, aim through it, cast with the real adapter. The toy teleports, stops beside the bot, and the shockwave pushes it away.

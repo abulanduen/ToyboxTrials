@@ -119,13 +119,19 @@
 
 /* The player rail (standings, tap a player to view their board) on the right, under the pause button. */
 .squad-hud { --rail-w:224px; --rail-top:calc(max(10px,env(safe-area-inset-top)) + 68px); }
-.squad-rail { position:absolute; right:max(8px,env(safe-area-inset-right)); top:var(--rail-top); width:var(--rail-w); max-height:calc(100% - var(--rail-top) - 16px); }
-.squad-hud.is-building .squad-rail { max-height:calc(100% - var(--rail-top) - var(--dock) - 28px); }
+/* The right-hand column: the rail, and the board zoom (+ / −) right under it. The rail shrinks (and scrolls) only when
+   the column is too short for both. Phones in landscape take the zoom out to the top left, beside the Toys button. */
+.squad-side { position:absolute; right:max(8px,env(safe-area-inset-right)); top:var(--rail-top); bottom:16px; width:var(--rail-w); display:flex; flex-direction:column; align-items:flex-end; gap:6px; pointer-events:none; }
+.squad-hud.is-building .squad-side { bottom:calc(var(--dock) + 28px); }
+.squad-rail { position:relative; flex:0 1 auto; min-height:0; width:100%; }
+.squad-zoom { flex:none; display:flex; gap:6px; pointer-events:none; }
+.squad-hud .squad-zoom button { width:56px; height:56px; padding:0; display:grid; place-items:center; background:rgba(255,249,238,.94); box-shadow:0 3px 0 #574D69; }
 .squad-watch { position:absolute; z-index:1; top:calc(max(10px,env(safe-area-inset-top)) + 76px); left:50%; transform:translateX(-50%); max-width:calc(100% - 160px - var(--rail-w)); }
 
 /* Phone portrait: narrow upright cards (picture, name, cost, traits), actions in one row beneath. Panels tuck under the banner, over the far half of the board that is empty while building. */
 @media(max-width:600px) {
   .squad-hud { --dock:40%; --rail-w:64px; --rail-top:calc(max(10px,env(safe-area-inset-top)) + 70px); }
+  .squad-zoom { flex-direction:column; }
   .squad-watch { top:auto; bottom:calc(max(12px,env(safe-area-inset-bottom)) + 64px); left:70px; right:calc(var(--rail-w) + 14px); transform:none; max-width:none; }
   .squad-hud.is-building .squad-watch { bottom:calc(var(--dock) + 24px); }
   .squad-banner { font-size:12px; padding:6px 8px; }
@@ -154,6 +160,11 @@
 /* Phone landscape: one compact row, actions side by side. */
 @media(max-height:500px) {
   .squad-hud { --dock:38%; --rail-w:64px; --rail-top:calc(max(10px,env(safe-area-inset-top)) + 62px); }
+  /* The column dissolves: the rail keeps its own place at the right, the zoom goes beside the Toys button. */
+  .squad-side { display:contents; }
+  .squad-rail { position:absolute; right:max(8px,env(safe-area-inset-right)); top:var(--rail-top); width:var(--rail-w); max-height:calc(100% - var(--rail-top) - 16px); }
+  .squad-hud.is-building .squad-rail { max-height:calc(100% - var(--rail-top) - var(--dock) - 28px); }
+  .squad-zoom { position:absolute; left:calc(max(8px,env(safe-area-inset-left)) + 62px); top:max(10px,env(safe-area-inset-top)); }
   .squad-watch { top:auto; bottom:max(12px,env(safe-area-inset-bottom)); max-width:calc(100% - 160px - var(--rail-w)); }
   .squad-hud.is-building .squad-watch { bottom:calc(var(--dock) + 20px); }
   /* Viewing a squad while building: the banner sits left, clear of the kit panel on the right. */
@@ -172,6 +183,8 @@
   .squad-card .squad-card__rarity,.squad-card__more,.squad-hint { display:none !important; }
   .squad-owned,.squad-upgrade-label { font-size:10px !important; }
   .squad-banner { padding:4px 8px; font-size:12px; }
+  /* Between the zoom buttons (top left) and the Pause button (top right), centred in that gap. */
+  .squad-banner { left:calc(max(8px,env(safe-area-inset-left)) + 184px); right:calc(max(14px,env(safe-area-inset-right)) + 62px); width:auto; max-width:440px; margin:0 auto; transform:none; box-sizing:border-box; }
   .squad-handbook-open { width:56px; height:56px; }
   .squad-damage-open { top:calc(max(10px,env(safe-area-inset-top)) + 62px); width:56px; height:56px; }
   .squad-damage { top:calc(max(10px,env(safe-area-inset-top)) + 62px); width:230px; max-height:calc(100% - 76px); }

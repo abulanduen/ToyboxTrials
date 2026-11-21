@@ -4,6 +4,7 @@ import type { Contestant } from '../../src/minigames/types';
 import { STATUS_BIT, STATUS_KINDS, statusList } from '../../src/minigames/shared/statusKinds';
 import { STATUS_DEFS } from '../../src/minigames/shared/statusIcons';
 import { PanZoom } from '../../src/minigames/shared/panZoom';
+import { SQUAD_ZOOM, squadView } from '../../src/minigames/toysquad/camera';
 import { squadRules, standings, type SquadState } from '../../src/minigames/toysquad/rules';
 import { makeFighters } from '../../src/minigames/toysquad/combat';
 import { SQUAD_STATUSES, fighterStatus } from '../../src/minigames/toysquad/info';
@@ -104,5 +105,18 @@ describe('board pan and zoom', () => {
     expect(v.zoom).toBeCloseTo(2, 6);
     v.up(1); v.up(2);
     expect(v.pinching).toBe(false);
+  });
+  it('Toy Squad: no pan at the fitted zoom, and only as far as the zoom hides (panRoom)', () => {
+    const v = new PanZoom({ minZoom: squadView.limits.minZoom, maxZoom: squadView.limits.maxZoom, panX: 15, panZ: 15, panRoom: squadView.limits.panRoom });
+    const ground = (x: number, y: number) => ({ x: v.panX + (x - 200) / (10 * v.zoom), z: v.panZ + (y - 200) / (10 * v.zoom) });
+    v.down(1, 200, 200); v.startPan(200, 200, ground); v.move(1, -5000, -5000, ground, () => {}); v.up(1);
+    expect(v.panX).toBeCloseTo(0, 9); expect(v.panZ).toBeCloseTo(0, 9);
+    v.zoomAt(2, 200, 200, ground, () => {});
+    v.down(1, 200, 200); v.startPan(200, 200, ground); v.move(1, -5000, 5000, ground, () => {}); v.up(1);
+    expect(v.panX).toBeCloseTo(7.5, 6); expect(v.panZ).toBeCloseTo(-7.5, 6); // 15 × (1 − 1/2)
+    v.zoomAt(100, 200, 200, ground, () => {});
+    expect(v.zoom).toBe(SQUAD_ZOOM.max);
+    v.zoomAt(0.01, 200, 200, ground, () => {});
+    expect(v.zoom).toBe(1); expect(v.panX).toBeCloseTo(0, 9); expect(v.panZ).toBeCloseTo(0, 9); // zooming back out recentres
   });
 });
