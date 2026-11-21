@@ -89,7 +89,7 @@ export const DOG_SPOTS: Record<string, DogSpot> = {
   byTheBed: { id: 'byTheBed', x: 150, z: -55, action: 'sit', hold: 6 },
   rugMid: { id: 'rugMid', x: 40, z: 150, action: 'walk', hold: 0 },
   // up on its hind legs at the spawn table's front edge, looking over at the toys (toys can pet it)
-  perch: { id: 'perch', x: -20, z: TABLE.maxZ + 4, action: 'perch', hold: 10 },
+  perch: { id: 'perch', x: -30, z: TABLE.maxZ + 4, action: 'perch', hold: 10 },
 };
 
 /**
