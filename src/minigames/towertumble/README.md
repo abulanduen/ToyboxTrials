@@ -40,6 +40,14 @@ with towers by tier and by family) read-only; the tower sheet and hover tip floa
 instead of pushing the layout; on touch, a tap (or drop) on another tower never merges: only the
 sheet's Merge button does.
 
+Owner revision, 21 November 2026: merging is direct again (drag, or select and tap/click/Enter), but
+it **asks first**, on touch, mouse and keyboard alike: a small Merge / Swap popup floats at the target
+tower, the square where the merged tower lands (the board marks it, with an arrow from the source).
+The sheet's Merge buttons and the touch "pair" flow are gone (the owner: with the button "it's
+impossible to know exactly where it is merging to"). Start gold is **90** (was 70), so a player who
+levels the builder first can still build two towers for round 1. On phones the tower sheet is compact
+by default (More shows the full details).
+
 ## The board
 
 ```
@@ -143,16 +151,24 @@ non-boss under 15% health). Targeting: the enemy furthest along its route, withi
   uniform within that tier.
 - **Merge:** any two towers of the same tier, regardless of name or family → one random tower of the next tier,
   on the square of the tower you merged *into*. The other square empties. Tier 7 never merges.
-  With a mouse, select a tower and click (or drag it onto) a glowing partner. **On touch a tap never
-  merges** (owner request: stray taps merged towers): tapping or dropping onto a same-tier tower selects
-  it and pairs it with the previous one, and its sheet's first button, *Merge tier N with B3*, merges.
-  Touch is the shared `touchUI` setting (coarse pointer), not the user agent.
+  Drag a tower onto a glowing partner, or select one and tap (click, or Enter on the cursor) a glowing
+  partner. **Nothing merges straight away** (owner request: stray taps merged towers): a small
+  **Merge / Swap popup** floats at the partner, the square where the merged tower would land. The
+  board marks that square (a glowing honey square and ring, an arrow from the source tower, which keeps
+  its white ring). **Merge** (M) merges onto it; **Swap** (S) trades the two towers' squares (the
+  rules' `move`); the ×, Esc or a press anywhere on the board cancels (the press does nothing else
+  unless it turns into a pan). Arrows and Enter wait while it is open; it is the same on touch, mouse
+  and keyboard. The popup's buttons are ≥ 56 px and it floats like the sheet (below), never pushing
+  the layout; it points at the target and, when there is room, keeps clear of the source square too,
+  so both ends of the merge stay in sight. A choice that stops applying (a tower sold or merged away)
+  disappears.
 - **M quick merge:** no selection required. It keeps the result on the selected tower if that
   tower has a partner; otherwise it picks the lowest-tier pair, keeping the lowest-cell position.
   Each press merges one pair; invalid/capped selections fall back to another available pair.
 - **Lucky merge:** with the builder's lucky chance a merge jumps two tiers instead of one, but never
   past tier 5. Tiers 6 and 7 require two same-tier towers from the preceding tier.
-- **Move:** drag a tower onto an empty square (free); onto a different tower to swap.
+- **Move:** drag a tower onto an empty square (free); onto a tower of another tier to swap at once
+  (onto a same-tier tower the popup asks Merge or Swap).
 - **Sell:** 10 gold per tier (10, 20 … 70).
 
 **Builder levels** (`BUILDER`): the odds table shown in the HUD.
@@ -168,7 +184,8 @@ non-boss under 15% health). Targeting: the enemy furthest along its route, withi
 
 ## Economy
 
-- Start: **70 gold, 20 lives**.
+- Start: **90 gold, 20 lives** (owner revision, 21 Nov 2026; was 70): enough to level the
+  builder (50) and still build two towers for round 1.
 - Kill bounty: `2 + floor(wave / 8)` gold per walker, × the enemy's bounty factor (racers and
   gliders ×1, beetles ×1.5, marbles ×0.3, at least 1). Bosses pay `25 + 2 × wave`.
 - Clear bonus: `8 + wave` gold to every board still in when a wave ends. No interest.
@@ -328,20 +345,30 @@ none`, so the browser's own pinch and scroll never fire over the game.
 
 On a phone a square is small (about 28 px in portrait at the fitted zoom): below the 56 px rule. So
 squares **only select** (a wrong tap just selects another square, and is undone by Close), and every
-action that changes the board is a **≥ 56 px button** in the sheet that opens for the selected
-square: *Build here*, *Merge tier N at B3* (up to three partner choices), *Sell* and *Close*. The
-selected square has a white ring and its same-tier partners glow gold. With a mouse, clicking a
-glowing partner (or dragging onto it) also merges; on touch it only selects the pair (see Merge).
-The sheet is a **floating popover** (`shared/popover.ts`, pure and unit-tested): it sits beside its
-square (above or below it in portrait, left or right in landscape and on desktop), clamped inside
+action that changes the board is a **≥ 56 px button**: *Build here*, *Sell* and *Close* in the
+sheet that opens for the selected square, and *Merge* or *Swap* in the popup a drag or tap onto a
+same-tier partner opens (see Merge). The selected square has a white ring and its same-tier partners
+glow gold.
+
+**On phones the sheet is compact by default**: the tower's name and tier, its key figures on one
+line (hit, rate, reach and how many partners it has) and the buttons (*Sell*, *More*, ×);
+an empty square shows just *Build here* and ×. *More* opens the full details (stats, abilities,
+damage dealt, the merge hint) and *Less* folds them away; the choice lasts for the page session
+(`sheetFull` in `local.ts`, untouched by a match reset). The compact sheet is 236 px wide and 110 px
+tall in the phone portrait run (the browser test requires ≤ 125 px; the full sheet it replaced was
+over twice that). Desktop always shows the full sheet.
+The sheet (and the Merge / Swap popup) is a **floating popover** (`shared/popover.ts`, pure and unit-tested): it sits beside its
+square (above or below it in portrait, left or right in landscape and on desktop; of the sides with
+room it takes the one covering fewest of the tower's glowing partners, so they stay tappable), clamped inside
 the board's space (in phone landscape also over the quest strip; never over the bar, the player rail or the dock,
 which stay reachable; panels such as Odds open above it), and follows the square when the board is
 panned. Nothing else moves: the board, the
 columns and the dock keep their places (the browser test compares their boxes). With a mouse,
 resting on a tower shows the same facts as a floating tip. The dock (Build, Builder, Odds, Next wave) is at the bottom in portrait,
 in thumb reach, and at the right in landscape. Prices on the dock and in the sheet use the top
-bar's coin and Fredoka 17 px figure. Keyboard: arrows move a cursor, Enter selects or merges, B
-builds, U levels the builder, M automatically merges a same-tier pair without selection, Q sells,
+bar's coin and Fredoka 17 px figure. Keyboard: arrows move a cursor, Enter selects (on a glowing
+partner of the selected tower: the Merge / Swap popup, answered with M or S, Esc cancels), B
+builds, U levels the builder, M (with no popup open) automatically merges a same-tier pair, Q sells,
 N or Space starts the wave; Tab reaches the rail. Same-tier partner highlights also apply to
 different tower kinds.
 

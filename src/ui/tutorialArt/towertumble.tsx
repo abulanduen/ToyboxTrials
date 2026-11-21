@@ -143,7 +143,7 @@ function Merge({ touch }: { touch?: boolean }) {
       <Arrow x1={58} y1={34} x2={98} y2={34} bend={-10} w={4} />
       {touch && <Finger x={48} y={70} anim="none" />}
       <Arrow x1={136} y1={76} x2={166} y2={76} w={5} />
-      {/* Touch: taps only select the pair; the sheet's Merge button (two squares into one) merges. */}
+      {/* Touch: a drag or tap onto a partner asks first; the popup's Merge button (two squares into one) merges. */}
       {touch && (
         <g>
           <rect x={126} y={88} width={50} height={28} rx={8} fill={PALETTE.honey} {...line} />
