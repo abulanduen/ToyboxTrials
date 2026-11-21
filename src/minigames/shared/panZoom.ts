@@ -7,11 +7,19 @@
  *
  * The game owns its pointer handling and decides which presses pan (for Tower Tumble: anything
  * that does not start on one of your towers) and what a tap is (a press that moves less than
- * `TAP_SLOP` pixels). Written for Toy Tower Tumble; any fixed board camera can use it.
+ * `TAP_SLOP` pixels). Written for Toy Tower Tumble; Toy Squad uses it too (with its own `panRoom`).
  */
 export const TAP_SLOP = 10;
 
-export interface PanZoomLimits { minZoom: number; maxZoom: number; /** How far the look-at point may move from the board centre, in world units. */ panX: number; panZ: number }
+export interface PanZoomLimits {
+  minZoom: number; maxZoom: number;
+  /** How far the look-at point may move from the board centre, in world units. */ panX: number; panZ: number;
+  /**
+   * The share (0–1) of `panX`/`panZ` allowed at a zoom. Default: 0.45 at `minZoom`, growing with the zoom, so the board
+   * stays mostly in view at the fitted zoom (Tower Tumble). A camera that must not move at all when fitted returns 0 there.
+   */
+  panRoom?: (zoom: number) => number;
+}
 export interface Ground { x: number; z: number }
 
 export class PanZoom {
@@ -32,7 +40,7 @@ export class PanZoom {
     const l = this.limits;
     this.zoom = Math.min(l.maxZoom, Math.max(l.minZoom, this.zoom));
     // The further in you zoom, the further you may look around; at the fitted zoom the board stays mostly in view.
-    const k = Math.min(1, 0.45 + (this.zoom - l.minZoom) * 0.4);
+    const k = Math.min(1, Math.max(0, l.panRoom ? l.panRoom(this.zoom) : 0.45 + (this.zoom - l.minZoom) * 0.4));
     this.panX = Math.min(l.panX * k, Math.max(-l.panX * k, this.panX));
     this.panZ = Math.min(l.panZ * k, Math.max(-l.panZ * k, this.panZ));
     this.version++;

@@ -17,10 +17,13 @@ import { RARITY_COLOURS } from './catalogue';
 import { TOY_SPECS, type Motion } from './models';
 import { TIER_GEOMETRY, TOY_GLOW_MATERIAL, TOY_MATERIAL, UNLIT_VERTEX_MATERIAL, standGeometry, toyGeometry } from './toys';
 import { SquadFx, cueKey, unitCues } from './Fx';
+import { SQUAD_ZOOM, squadCamera, squadView } from './camera';
+import { TAP_SLOP, type Ground } from '../shared/panZoom';
 
 interface Drag { unit: number; pointer: number; x: number; z: number; cell: number | null; shop: DOMRect | null; sell: boolean; sx: number; sy: number; moved: boolean; release: () => void }
 type PointerHandler = (e: ThreeEvent<PointerEvent>, id?: number) => void;
 const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.1);
+const tablePlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 /** The board on show: your own, or another player's picked from the player rail (read-only). */
 const viewId = (s: SquadState, localId: string) => viewedSquad(s.players, localId, useSquadUI.getState().watching);
 /** Squad edits are open: your own board on show (not a seat you only follow as a spectator), build phase, not readied, not paused, and no passive choice waiting. */
@@ -245,7 +248,8 @@ export function SquadScene({ getState, localId }: MinigameSceneProps<SquadState>
     if (d.sell !== useSquadUI.getState().overShop) useSquadUI.setState({ overShop: d.sell });
   };
   const down: PointerHandler = (e, id) => {
-    if (id === undefined || drag.current) return;
+    // A second finger is a pinch (the canvas listener below has already counted it): it never picks or drags a toy.
+    if (id === undefined || drag.current || squadView.pointerCount > 1) return;
     if (!editable(getState(), localId)) {
       // A board you are only looking at: a tap picks a toy to read its kit (never moves or merges anything).
       const s = getState();
@@ -272,6 +276,86 @@ export function SquadScene({ getState, localId }: MinigameSceneProps<SquadState>
     }
     cancel();
   };
+  // The fitted camera for this frame (worked out in the frame loop from the screen and the phase); the zoom and pan
+  // (camera.ts) then move it toward its look-at point and slide it across the table.
+  const fit = useRef({ distance: 0, lookZ: 0, ready: false, framing: '' });
+  /** The current press started on the bare table (not on a toy): only then may its click clear the selection. */
+  const tablePress = useRef(false);
+  const placeCamera = () => {
+    const f = fit.current, k = squadView.zoom, x = squadView.panX, z = f.lookZ + squadView.panZ;
+    camera.position.set(x, f.distance / k, z + (f.distance * 0.58 - f.lookZ) / k);
+    camera.lookAt(x, 0, z);
+  };
+  // Pinch, wheel, + / − and pan: plain DOM listeners on the canvas, which hear a press before the pieces' handlers do.
+  useEffect(() => {
+    const el = gl.domElement, raycaster = new THREE.Raycaster(), ndc = new THREE.Vector2(), hit = new THREE.Vector3();
+    const ground = (x: number, y: number): Ground | null => {
+      const r = el.getBoundingClientRect();
+      ndc.set(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1); raycaster.setFromCamera(ndc, camera);
+      return raycaster.ray.intersectPlane(tablePlane, hit) ? { x: hit.x, z: hit.z } : null;
+    };
+    const apply = () => { if (fit.current.ready) { placeCamera(); camera.updateMatrixWorld(); } };
+    // + / − (buttons and keys) zoom about the middle of the open table: across, where the view is centred (left of the
+    // rail on phones); down, halfway between the banner and the shop dock (or the screen's foot in battle). The table
+    // point there stays put.
+    const centre = new THREE.Vector3();
+    const zoomBy = (k: number) => {
+      const r = el.getBoundingClientRect(), box = (q: string) => document.querySelector(q)?.getBoundingClientRect();
+      const top = Math.max(r.top, box('.squad-banner')?.bottom ?? r.top), bottom = Math.min(r.bottom, box('.squad-workbench')?.top ?? r.bottom);
+      centre.set(squadView.panX, 0, fit.current.lookZ + squadView.panZ).project(camera);
+      squadView.zoomAt(k, r.left + (centre.x + 1) / 2 * r.width, bottom > top ? (top + bottom) / 2 : (r.top + r.bottom) / 2, ground, apply);
+    };
+    squadCamera.zoomBy = zoomBy;
+    let press: { id: number; sx: number; sy: number; panned: boolean } | null = null;
+    const endPan = () => { if (press?.panned) el.style.cursor = ''; press = null; };
+    const onDown = (e: PointerEvent) => {
+      tablePress.current = false;
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      // A second finger turns the press into a pinch: any toy drag is dropped where it started (nothing moves or sells).
+      if (squadView.down(e.pointerId, e.clientX, e.clientY)) { cancel(); endPan(); return; }
+      if (squadView.pointerCount === 1) press = { id: e.pointerId, sx: e.clientX, sy: e.clientY, panned: false };
+    };
+    const onMove = (e: PointerEvent) => {
+      const p = press;
+      if (p && p.id === e.pointerId && !p.panned && !squadView.pinching) {
+        // A press on one of your toys drags the toy; any other press pans once it moves, if the view is zoomed in.
+        if (drag.current) press = null;
+        else if (squadView.zoom > SQUAD_ZOOM.min + 1e-3 && Math.hypot(e.clientX - p.sx, e.clientY - p.sy) > TAP_SLOP) {
+          p.panned = true; squadView.startPan(p.sx, p.sy, ground); el.style.cursor = 'grabbing';
+          try { el.setPointerCapture(e.pointerId); } catch { /* not capturable */ }
+        }
+      }
+      squadView.move(e.pointerId, e.clientX, e.clientY, ground, apply);
+    };
+    // On the window, so a finger lifted over the HUD is never left counted as still down.
+    const onUp = (e: PointerEvent) => { squadView.up(e.pointerId); if (press?.id === e.pointerId) endPan(); };
+    const onWheel = (e: WheelEvent) => { e.preventDefault(); squadView.wheel(e.deltaY, e.deltaMode, e.clientX, e.clientY, ground, apply); };
+    // A view control, not a game action (like the wheel): it never reaches the rules. Browser zoom (Ctrl +) is left alone.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || useMatch.getState().paused || (e.target as HTMLElement | null)?.closest?.('input,textarea,select,[contenteditable]')) return;
+      const k = e.code === 'Equal' || e.code === 'NumpadAdd' ? SQUAD_ZOOM.step : e.code === 'Minus' || e.code === 'NumpadSubtract' ? 1 / SQUAD_ZOOM.step : 0;
+      if (k) { e.preventDefault(); zoomBy(k); }
+    };
+    const stop = () => { endPan(); squadView.cancelAll(); };
+    el.addEventListener('pointerdown', onDown); el.addEventListener('pointermove', onMove); el.addEventListener('wheel', onWheel, { passive: false });
+    window.addEventListener('pointerup', onUp); window.addEventListener('pointercancel', onUp); window.addEventListener('keydown', onKey);
+    const off = useMatch.subscribe(m => { if (m.paused || m.phase !== 'playing') stop(); });
+    window.addEventListener('blur', stop);
+    squadView.reset(); squadView.cancelAll();
+    exposeDebug({ squadView: {
+      get: () => ({ zoom: squadView.zoom, panX: squadView.panX, panZ: squadView.panZ, pointers: squadView.pointerCount, pinching: squadView.pinching }),
+      reset: () => squadView.reset(),
+      /** Zoom by `k` about a screen point (what the wheel and pinch do). */
+      zoomAt: (k: number, x: number, y: number) => squadView.zoomAt(k, x, y, ground, apply),
+      /** The table point (x, z in world cm) under a screen point. */
+      ground,
+    } });
+    return () => {
+      off(); window.removeEventListener('blur', stop); stop(); if (squadCamera.zoomBy === zoomBy) squadCamera.zoomBy = null;
+      el.removeEventListener('pointerdown', onDown); el.removeEventListener('pointermove', onMove); el.removeEventListener('wheel', onWheel);
+      window.removeEventListener('pointerup', onUp); window.removeEventListener('pointercancel', onUp); window.removeEventListener('keydown', onKey);
+    };
+  }, [gl, camera]);
   useEffect(() => {
     const previousTouch = gl.domElement.style.touchAction; gl.domElement.style.touchAction = 'none';
     const off = useMatch.subscribe(s => { if (s.paused || s.phase !== 'playing') cancel(); });
@@ -309,8 +393,11 @@ export function SquadScene({ getState, localId }: MinigameSceneProps<SquadState>
     const railPx = rail.current.px, narrow = size.width <= 600 || short;
     const room = narrow && railPx ? Math.max(0.6, (size.width - railPx - 12) / size.width) : 1;
     const distance = Math.max(building ? short ? 68 : 53 : 42, (building ? 31 : 23) / aspect / room);
-    camera.position.set(0, distance, distance * 0.58);
-    camera.lookAt(0, 0, building ? short ? 15 : 11 : 2.5);
+    // A new framing (build ↔ battle, a new round, another player's board) starts from the fitted view again.
+    const shownState = getState(), framing = shownState?.kind === 'toy-squad' ? `${shownState.round}:${building}:${viewId(shownState, localId)}` : '';
+    if (framing !== fit.current.framing) { fit.current.framing = framing; squadView.reset(); }
+    fit.current.distance = distance; fit.current.lookZ = building ? short ? 15 : 11 : 2.5; fit.current.ready = true;
+    placeCamera();
     const cam = camera as THREE.PerspectiveCamera, shift = room < 1 ? Math.round((railPx + 12) / 2) : 0;
     if (shift !== (cam.view?.enabled ? cam.view.offsetX : 0) || (shift && cam.view && (cam.view.fullWidth !== size.width || cam.view.fullHeight !== size.height))) {
       if (shift) cam.setViewOffset(size.width, size.height, shift, 0, size.width, size.height); else cam.clearViewOffset();
@@ -330,7 +417,9 @@ export function SquadScene({ getState, localId }: MinigameSceneProps<SquadState>
     }
   });
   return <group>
-    <mesh position={[0, -0.5, 0]} receiveShadow onPointerDown={() => { if (!drag.current && useSquadUI.getState().selected !== null) useSquadUI.setState({ selected: null }); }}><boxGeometry args={[30, 1, 30]} /><meshStandardMaterial color={PALETTE.woodMid} /></mesh>
+    {/* A tap on the bare table clears the selection (a press on a toy stops before it gets here); a drag across it, a pan, does not. */}
+    <mesh position={[0, -0.5, 0]} receiveShadow onPointerDown={() => { tablePress.current = !drag.current; }}
+      onClick={e => { if (tablePress.current && e.delta <= TAP_SLOP && !drag.current && useSquadUI.getState().selected !== null) useSquadUI.setState({ selected: null }); tablePress.current = false; }}><boxGeometry args={[30, 1, 30]} /><meshStandardMaterial color={PALETTE.woodMid} /></mesh>
     {Array.from({ length: 64 }, (_, i) => <mesh key={i} position={[boardToWorld(i % 8), 0.06, boardToWorld(Math.floor(i / 8))]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
       <planeGeometry args={[CELL_SIZE - 0.12, CELL_SIZE - 0.12]} /><meshStandardMaterial color={(i % 8 + Math.floor(i / 8)) % 2 ? PALETTE.cardboard : PALETTE.cream} />
     </mesh>)}

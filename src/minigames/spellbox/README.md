@@ -29,8 +29,13 @@ These numerical choices and the nine spells are provisional designs for playtest
   never ends while anyone is still choosing; a solo player who idles can pause or quit via the host.
 - Events: `spellbox-countdown` `{seconds}` for 3, 2, 1 (sounded as count ticks), then `spellbox-start`.
 - The HUD shows a compact card (max 720 px wide) centred over a dimmed, blurred arena, with the
-  three slots, the three offers, everyone's lock-in state and the Lock build button. Phones keep it
-  inside the viewport and safe areas; in landscape the card scrolls internally if it must.
+  three slots, the three offers, everyone's lock-in state and the Lock build button. **Everything fits
+  with no scrolling** (owner request, 21 Nov 2026), checked at 1280×720, 390×844 and 844×390 with
+  eight players: the card is a grid in which only the offer row could ever shrink, so Lock build is
+  always in view. Desktop: three offer cards side by side (picture, name, description, stats).
+  Phone portrait: the offers as three rows with the picture at the left, and the lock-in chips
+  shrink to a dot and a name. Phone landscape: the offers side by side with a small picture, and
+  the lock-ins and Lock build in a column at the right. Hovering an offer shows its full text.
 
 | Button | Three options |
 | --- | --- |
@@ -133,7 +138,10 @@ The following actual dimensions are first-pass tuning; the bands and 10-second w
 left-click also casts Q and right-click casts E. Touch uses the shared floating joystick and three labelled cooldown buttons (≥56 px) that fire
 on touch-down, so a spell can be cast while the other thumb holds the stick,
 with both orientations and safe-area placement. Native draft cards and Ready support keyboard
-focus/Enter as well as touch. Reduced-motion removes decorative effect expansion.
+focus/Enter as well as touch. Reduced-motion removes decorative effect expansion. No hint box floats
+over the arena (owner request, 21 Nov 2026: the old one sat just above the spell buttons and kept
+blocking play); the controls are in How to play and the lobby, and on desktop hovering a spell
+button shows its key and description.
 
 `rules.ts` is renderer/DOM-free and internally fixed at 10 ms. `spells.ts` is the nine-spell data
 catalogue. `bot.ts` is fresh per match; `index.ts`/`local.ts` adapt shared actions and bounded pointer

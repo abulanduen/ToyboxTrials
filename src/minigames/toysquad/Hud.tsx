@@ -21,7 +21,8 @@ import { StatusLegend } from '../shared/StatusIcon';
 import { toyPortrait } from './portraits';
 import { Handbook } from './Handbook';
 import { DamagePanel } from './DamagePanel';
-import { BookIcon, CloseIcon, StarIcon, TRAIT_SYMBOLS, TraitIcon } from './TraitIcon';
+import { BookIcon, CloseIcon, StarIcon, TRAIT_SYMBOLS, TraitIcon, ZoomIcon } from './TraitIcon';
+import { SQUAD_ZOOM, squadView, zoomSquad } from './camera';
 import { CogIcon } from '../../ui/itemIcons';
 import './toysquad.css';
 
@@ -85,7 +86,15 @@ export function SquadHud({ getState, localId, contestants }: MinigameSceneProps<
   const seconds = Math.ceil(Math.max(0, s.phaseEnds - s.t) / 1000);
   const tier = shopKind ? 1 : picked?.tier ?? 1;
   return <div className={`squad-hud${building ? ' is-building' : ''}${readOnly ? ' is-viewing' : ''}`} data-viewing={readOnly ? shown.id : undefined}>
-    <PlayerRail className="squad-rail" title="Standings" label="Standings: view a player's board" entries={rail} localId={localId} viewing={viewId} onView={view} ranked />
+    {/* The right-hand column: the standings, then the board zoom right under them (phones in landscape: zoom at the top left). */}
+    <div className="squad-side">
+      <PlayerRail className="squad-rail" title="Standings" label="Standings: view a player's board" entries={rail} localId={localId} viewing={viewId} onView={view} ranked />
+      {/* Board zoom (also the mouse wheel, + / − and pinch; drag the table to look around once zoomed in). */}
+      <div className="squad-zoom" role="group" aria-label="Board zoom" data-testid="squad-zoom" data-zoom={squadView.zoom.toFixed(2)}>
+        <button data-testid="squad-zoom-in" aria-label="Zoom in" title="Zoom in (+, mouse wheel or pinch)" disabled={choosing || squadView.zoom >= SQUAD_ZOOM.max - 1e-3} onClick={() => zoomSquad(SQUAD_ZOOM.step)}><ZoomIcon dir="in" /></button>
+        <button data-testid="squad-zoom-out" aria-label="Zoom out" title="Zoom out (−, mouse wheel or pinch)" disabled={choosing || squadView.zoom <= SQUAD_ZOOM.min + 1e-3} onClick={() => zoomSquad(1 / SQUAD_ZOOM.step)}><ZoomIcon dir="out" /></button>
+      </div>
+    </div>
     {viewing && <WatchBanner className="squad-watch" name={name(viewId)} onBack={() => view(localId)} />}
     <div className="squad-banner" data-testid="squad-banner">
       <strong>Round {s.round}/{s.config.rounds} · Level {shown.level} · {readOnly ? `${who}'s squad` : building ? 'Build your squad' : s.phase === 'battle' ? 'Auto-battle' : 'Round results'}</strong>

@@ -61,3 +61,11 @@ export function BarsIcon({ size = 24 }: { size?: number }) {
     <rect x="3" y="16" width="6" height="4.5" rx="1.5" fill={PALETTE.toyBlue} stroke={INK} strokeWidth="1.4" />
   </svg>;
 }
+/** Zoom in (a magnifier with a plus) or out (with a minus), for the board's zoom buttons. */
+export function ZoomIcon({ size = 26, dir }: { size?: number; dir: 'in' | 'out' }) {
+  return <svg className="squad-icon" viewBox="0 0 24 24" width={size} height={size} aria-hidden="true">
+    <circle cx="10" cy="10" r="6.500" fill={PALETTE.white} stroke={INK} strokeWidth="2" />
+    <path d="M15 15l5.500 5.500" stroke={INK} strokeWidth="3" strokeLinecap="round" />
+    <path d={dir === 'in' ? 'M7 10h6M10 7v6' : 'M7 10h6'} stroke={INK} strokeWidth="2.200" strokeLinecap="round" />
+  </svg>;
+}

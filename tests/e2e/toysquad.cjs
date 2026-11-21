@@ -224,6 +224,68 @@ const out = path.join(__dirname,'output'); fs.mkdirSync(out,{recursive:true});
         await page.waitForFunction(()=>document.querySelector('[data-testid="squad-kit"]')?.textContent.includes('Spring Hare'));
       }
       await purseShows();
+      // ── board zoom (owner request, 21 Nov 2026): wheel and + / − keys on desktop, pinch and the + / − buttons on phones;
+      //    dragging the bare table pans once zoomed; toy drags still place toys; a second finger drops a toy drag to pinch ──
+      const view=()=>page.evaluate(()=>window.__toybox.squadView.get());
+      const cellsNow=()=>page.evaluate(()=>window.__toybox.match.state().players[0].units.map(u=>u.cell).join());
+      await size56('squad-zoom-in'); await size56('squad-zoom-out');
+      { const z=await page.getByTestId('squad-zoom').boundingBox(), boxes={dock:await page.getByTestId('squad-workbench').boundingBox(),banner:await page.getByTestId('squad-banner').boundingBox(),
+          rail:await page.getByTestId('player-rail').boundingBox(),toys:await page.getByTestId('squad-handbook-open').boundingBox()};
+        const apart=(a,b)=>a.x+a.width<=b.x+1||b.x+b.width<=a.x+1||a.y+a.height<=b.y+1||b.y+b.height<=a.y+1;
+        assert.ok(z.x>=0&&z.y>=0&&z.x+z.width<=viewport.width&&z.y+z.height<=viewport.height,`zoom buttons on screen: ${JSON.stringify(z)}`);
+        for(const [k,b] of Object.entries(boxes)) assert.ok(apart(z,b),`zoom buttons clear of the ${k}: ${JSON.stringify({z,b})}`); }
+      assert.equal((await view()).zoom,1); assert.equal(await page.getByTestId('squad-zoom-out').isDisabled(),true);
+      // The + button zooms in a step; toys still drag onto squares at that zoom (there and back again). The drags use
+      // middle squares: zoomed in, the edge columns can sit under the trait column or the rail until you pan.
+      await drag(0,3,4); await page.waitForFunction(()=>window.__toybox.match.state().players[0].units[0].cell===3);
+      await click('squad-zoom-in'); await page.waitForFunction(()=>Math.abs(window.__toybox.squadView.get().zoom-1.25)<1e-6);
+      await page.waitForFunction(()=>!document.querySelector('[data-testid="squad-zoom-out"]').disabled); // the HUD refreshes ten times a second
+      await drag(3,4,6); await page.waitForFunction(()=>window.__toybox.match.state().players[0].units[0].cell===20);
+      await drag(20,3,4); await page.waitForFunction(()=>window.__toybox.match.state().players[0].units[0].cell===3);
+      const cellsBefore=await cellsNow();
+      if(mobile) {
+        // A toy drag, then a second finger: the drag is dropped (nothing moves) and the two fingers pinch-zoom instead.
+        const a=await page.evaluate(()=>window.__toybox.squad.point(3,4,1.4)), z0=(await view()).zoom, cdp=await page.context().newCDPSession(page);
+        const touch=(type,pts)=>cdp.send('Input.dispatchTouchEvent',{type,touchPoints:pts.map(([x,y],i)=>({x,y,id:i+1}))});
+        await touch('touchStart',[[a.x,a.y]]); await page.waitForFunction(()=>document.querySelector('canvas').style.cursor==='grabbing');
+        await touch('touchStart',[[a.x,a.y],[a.x+50,a.y]]); await page.waitForFunction(()=>document.querySelector('canvas').style.cursor==='');
+        for(let i=1;i<=6;i++) await touch('touchMove',[[a.x-i*4,a.y],[a.x+50+i*12,a.y]]);
+        await touch('touchEnd',[]); await cdp.detach();
+        await page.waitForFunction(z=>window.__toybox.squadView.get().zoom>z*1.5&&window.__toybox.squadView.get().pointers===0,z0);
+        assert.equal(await cellsNow(),cellsBefore,'a pinch never moves a toy'); assert.equal(await page.getByTestId('squad-sell-drop').count(),0);
+      } else {
+        // The wheel zooms toward the cursor (the table point under it stays put); + and − step the zoom.
+        const p=await page.evaluate(()=>window.__toybox.squad.point(3.5,5.5)), under=()=>page.evaluate(q=>window.__toybox.squadView.ground(q.x,q.y),p);
+        await page.mouse.move(p.x,p.y); const g0=await under(), z0=(await view()).zoom;
+        await page.mouse.wheel(0,-300); await page.waitForFunction(z=>window.__toybox.squadView.get().zoom>z*1.4,z0);
+        const g1=await under(); assert.ok(Math.hypot(g1.x-g0.x,g1.z-g0.z)<0.3,`the wheel zooms toward the cursor: ${JSON.stringify({g0,g1})}`);
+        const z1=(await view()).zoom; await page.keyboard.press('Equal'); await page.waitForFunction(z=>Math.abs(window.__toybox.squadView.get().zoom-Math.min(2.5,z*1.25))<1e-6,z1);
+        await page.keyboard.press('Minus'); await page.waitForFunction(z=>Math.abs(window.__toybox.squadView.get().zoom-z)<1e-6,Math.min(2.5,z1*1.25)/1.25);
+        assert.equal(await cellsNow(),cellsBefore);
+      }
+      // Dragging the bare table (here the empty enemy half, between squares) pans the zoomed view and moves nothing.
+      { const v0=await view(), p=await page.evaluate(()=>{ // a corner between empty squares, on screen and not under the HUD
+          for(const z of [2.5,1.5,0.5]) for(const x of [3.5,2.5,4.5,1.5,5.5]) { const q=window.__toybox.squad.point(x,z);
+            if(q.x>60&&q.y>60&&q.x<innerWidth-60&&q.y<innerHeight-60&&document.elementFromPoint(q.x,q.y)?.tagName==='CANVAS') return q; }
+          return null; });
+        assert.ok(p,'an empty part of the table is on screen to drag');
+        if(mobile) { const cdp=await page.context().newCDPSession(page);
+          await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{...p,id:1}]});
+          for(let i=1;i<=6;i++) await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:p.x+i*8,y:p.y+i*10,id:1}]});
+          await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]}); await cdp.detach();
+        } else { await page.mouse.move(p.x,p.y); await page.mouse.down(); await page.mouse.move(p.x+48,p.y+60,{steps:6}); await page.mouse.up(); }
+        await page.waitForFunction(()=>window.__toybox.squadView.get().pointers===0);
+        const v1=await view(); assert.ok(Math.hypot(v1.panX-v0.panX,v1.panZ-v0.panZ)>0.5&&v1.zoom===v0.zoom,`table drag pans: ${JSON.stringify({v0,v1})}`);
+        assert.equal(await cellsNow(),cellsBefore,'panning moves no toy'); }
+      await page.screenshot({path:path.join(out,`toysquad-${layout}-zoomed.png`)});
+      // − steps back out to the fitted view (and the pan returns to the middle).
+      for(let i=0;i<8&&(await view()).zoom>1;i++) { const z=(await view()).zoom;
+        await page.waitForFunction(()=>!document.querySelector('[data-testid="squad-zoom-out"]').disabled); await click('squad-zoom-out');
+        await page.waitForFunction(z=>window.__toybox.squadView.get().zoom<z,z); }
+      { const v=await view(); assert.ok(v.zoom===1&&v.panX===0&&v.panZ===0,`back to the fitted view: ${JSON.stringify(v)}`); }
+      await page.waitForFunction(()=>document.querySelector('[data-testid="squad-zoom-out"]').disabled);
+      await drag(3,0,4); await page.waitForFunction(()=>window.__toybox.match.state().players[0].units[0].cell===0); // back where the rest of the test expects it
+      await click('squad-zoom-in'); await page.waitForFunction(()=>window.__toybox.squadView.get().zoom>1);
       // ── view a bot's squad while building: its traits, passives, coins and toys, read-only ──
       const watched=(await state()).players[1].id;
       await page.evaluate(id=>{const s=window.__toybox.match.state(), b=s.players.find(p=>p.id===id);
@@ -232,6 +294,7 @@ const out = path.join(__dirname,'output'); fs.mkdirSync(out,{recursive:true});
       if(mobile) await click(`rail-${watched}`); else await page.getByTestId(`rail-${watched}`).click();
       await page.getByTestId('squad-viewbench').waitFor({state:'visible'});
       assert.equal(await page.getByTestId('squad-workbench').count(),0,'no shop, Reroll, Sell or Ready while viewing');
+      await page.waitForFunction(()=>window.__toybox.squadView.get().zoom===1); // another board: the view starts fitted
       await page.waitForFunction(id=>document.querySelector('[data-testid="squad-traits"]')?.dataset.owner===id,watched);
       assert.deepEqual(await page.locator('[data-testid="squad-traits"] button').evaluateAll(a=>a.map(e=>e.dataset.testid+' '+e.textContent).sort()),['squad-trait-Felt 1/2','squad-trait-Ranger 1/2','squad-trait-Tin 1/2','squad-trait-Vanguard 1/2']);
       assert.match(await page.getByTestId('squad-view-passives').textContent(),/Bargain Bin/);
@@ -248,8 +311,10 @@ const out = path.join(__dirname,'output'); fs.mkdirSync(out,{recursive:true});
       assert.deepEqual((await state()).players.find(p=>p.id===watched).units.map(u=>u.cell),[0,1,-1]);
       await page.screenshot({path:path.join(out,`toysquad-${layout}-view-squad.png`)});
       { const coins=(await state()).players[0].coins; await page.keyboard.press('KeyR'); await page.waitForTimeout(400); assert.equal((await state()).players[0].coins,coins,'shortcuts do nothing while viewing'); }
+      await click('squad-zoom-in'); await page.waitForFunction(()=>window.__toybox.squadView.get().zoom>1); // zoom works on their board too
       await click('watch-back');
       await page.getByTestId('squad-workbench').waitFor({state:'visible'}); await purseShows();
+      await page.waitForFunction(()=>window.__toybox.squadView.get().zoom===1); // back on your own board: fitted again
       await page.getByRole('button',{name:'Pause',exact:true}).click(); await page.waitForSelector('.pause');
       const t=(await state()).t; await page.waitForTimeout(250); assert.equal((await state()).t,t); await page.keyboard.press('Escape');
       await page.waitForSelector('.pause',{state:'detached'}); await page.evaluate(()=>window.__toybox.match.timeScale(0));
