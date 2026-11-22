@@ -89,9 +89,13 @@ describe('predictSiege', () => {
     expect(predictSiege(s, 'nobody', [])).toBeNull();
   });
 
-  it('through an 80 ms link the toy moves on the first frame, glides, and ends where the server puts it', () => {
+  it.each([
+    ['60 fps', 1000 / 60],
+    ['slow 220 ms frames', 220],
+  ])('through an 80 ms link (%s) the toy moves on the first frame, glides, and ends where the server puts it', (_label, FRAME) => {
     const run = siegeInRun(21);
-    const LAT = 80, FRAME = 1000 / 60;
+    const LAT = 80;
+    const slow = FRAME > 50;
     let clock = 0;
     predictClock.now = () => clock;
     type Ev = { at: number; run: () => void };
@@ -147,11 +151,12 @@ describe('predictSiege', () => {
     const firstMove = shown.find((s) => s.x > x0 + 1e-6)!;
     expect(firstMove.t - PRESS).toBeLessThanOrEqual(FRAME + 1);
     // while held it tracks where the stick says (within a fraction of a cm)
-    for (let t = PRESS + 300; t < RELEASE; t += 50) expect(Math.abs(at(t).x - (x0 + speed * (t - PRESS) / 1000))).toBeLessThan(0.6);
+    const track = slow ? speed * FRAME / 1000 + 0.6 : 0.6;
+    for (let t = PRESS + 300; t < RELEASE; t += 50) expect(Math.abs(at(t).x - (x0 + speed * (t - PRESS) / 1000))).toBeLessThan(track);
     // no twitch: no frame moves more than the toy can walk in it, plus a little correction
     for (let i = 1; i < shown.length; i++) expect(Math.abs(shown[i].x - shown[i - 1].x)).toBeLessThan(speed * FRAME / 1000 + 0.25);
-    // it stops on release and settles exactly where the server has the toy
-    expect(Math.abs(at(RELEASE + 2 * FRAME).x - at(RELEASE + 400).x)).toBeLessThan(0.3);
+    // it stops on release (no catching up afterwards) and settles exactly where the server has the toy
+    expect(Math.abs(at(RELEASE + 2 * FRAME).x - at(RELEASE + 400 + 2 * FRAME).x)).toBeLessThan(0.3);
     expect(shown[shown.length - 1].x).toBeCloseTo(meIn(state).x, 3);
   });
 });

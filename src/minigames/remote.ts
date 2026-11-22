@@ -295,8 +295,10 @@ function tickRemote(dtRealMs: number) {
   const fresh = m.module.readLocalInput(getPressLog());
   for (const i of fresh) rt.pending.push(i);
   if (m.module.predictLocal) {
-    // This frame goes out in the next message (q + 1); the replay covers it until the server has stepped that one.
-    rt.frames.push({ q: rt.q + 1, dt: Math.min(Math.max(dtRealMs, 0), 100) * rt.timeScale, inputs: fresh });
+    // This frame goes out in the next message (q + 1); the replay covers it until the server has
+    // stepped that one. Real elapsed time, as the server steps it (capped like its MAX_ADVANCE_MS):
+    // a shorter cap would fall behind the server on slow frames and keep catching up after a stop.
+    rt.frames.push({ q: rt.q + 1, dt: Math.min(Math.max(dtRealMs, 0), 2000) * rt.timeScale, inputs: fresh });
     if (rt.frames.length > MAX_PREDICT_FRAMES) rt.frames.shift();
     rebuildDisplay();
   }
