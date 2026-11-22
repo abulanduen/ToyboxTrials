@@ -76,7 +76,8 @@ describe('predictSiege', () => {
     const out = predictSiege(s, 'p1', frames)!;
     expect(JSON.stringify(s)).toBe(before);
     const p = meIn(out);
-    expect(p.x).toBeCloseTo(me.x + me.stat.speed * 0.2, 5);
+    // the first frame's time passed before the stick moved; the second walks
+    expect(p.x).toBeCloseTo(me.x + me.stat.speed * 0.1, 5);
     expect(p.z).toBeCloseTo(me.z, 5);
     // everyone else is the server's own object
     for (const q of out.players) if (q.id !== 'p1') expect(s.players).toContain(q);
@@ -147,14 +148,15 @@ describe('predictSiege', () => {
     predictClock.now = () => performance.now();
 
     const at = (t: number) => shown.find((s) => s.t >= t)!;
-    // the first frame after the press already moves (without prediction: two trips, 160 ms+, later)
+    // it moves on the next frame after the press is read (without prediction: two trips, 160 ms+, later)
     const firstMove = shown.find((s) => s.x > x0 + 1e-6)!;
-    expect(firstMove.t - PRESS).toBeLessThanOrEqual(FRAME + 1);
+    expect(firstMove.t - PRESS).toBeLessThanOrEqual(2 * FRAME + 1);
     // while held it tracks where the stick says (within a fraction of a cm)
     const track = slow ? speed * FRAME / 1000 + 0.6 : 0.6;
     for (let t = PRESS + 300; t < RELEASE; t += 50) expect(Math.abs(at(t).x - (x0 + speed * (t - PRESS) / 1000))).toBeLessThan(track);
-    // no twitch: no frame moves more than the toy can walk in it, plus a little correction
-    for (let i = 1; i < shown.length; i++) expect(Math.abs(shown[i].x - shown[i - 1].x)).toBeLessThan(speed * FRAME / 1000 + 0.25);
+    // no twitch: no frame moves more than the toy can walk in it, plus at most one server tick's
+    // worth of correction (the server starts and stops an input on its 30 Hz tick)
+    for (let i = 1; i < shown.length; i++) expect(Math.abs(shown[i].x - shown[i - 1].x)).toBeLessThan(speed * (FRAME + TICK) / 1000 + 0.1);
     // it stops on release (no catching up afterwards) and settles exactly where the server has the toy
     expect(Math.abs(at(RELEASE + 2 * FRAME).x - at(RELEASE + 400 + 2 * FRAME).x)).toBeLessThan(0.3);
     expect(shown[shown.length - 1].x).toBeCloseTo(meIn(state).x, 3);
