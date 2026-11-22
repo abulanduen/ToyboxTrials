@@ -113,6 +113,20 @@ export interface MinigameModule<State = unknown, Input = unknown> {
    * match's final state: e.g. Hoop Clash's team totals and each toy's points.
    */
   ResultsExtra?: ComponentType<MinigameSceneProps<State>>;
+  /**
+   * Online only: show the local player's own movement at once instead of a round trip later.
+   * Given the newest server state and this player's inputs the server has not stepped yet (one
+   * entry per rendered frame, oldest first, `dt` in match ms), return the state to draw, or null to
+   * draw the server state as it is. Must not change `state` (it is the base for the next patch);
+   * the server stays in charge, so the next snapshot corrects any guess. See src/minigames/remote.ts.
+   */
+  predictLocal?: (state: State, localId: string, frames: readonly PredictFrame<Input>[]) => State | null;
+}
+
+/** One rendered frame of local input not yet stepped by the server (see `predictLocal`). */
+export interface PredictFrame<Input = unknown> {
+  dt: number;
+  inputs: readonly Input[];
 }
 
 /**

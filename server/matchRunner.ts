@@ -46,6 +46,9 @@ export class GameRun {
   private readonly bot: BotPolicy;
   private readonly botRngs = new Map<string, () => number>();
   private readonly pending = new Map<string, unknown[]>();
+  /** Each human's newest input message number (`q`) received, and the newest one the rules have stepped. */
+  private readonly received = new Map<string, number>();
+  private readonly applied = new Map<string, number>();
   private readonly held = new Map<string, { items: unknown[]; at: number }>();
   private events: MatchEvent[] = [];
   readonly forfeited = new Set<string>();
@@ -68,9 +71,10 @@ export class GameRun {
   }
 
   /** Queue a human player's inputs for the next step. Returns how many were accepted. */
-  input(id: string, items: unknown[]): number {
+  input(id: string, items: unknown[], msgNo?: number): number {
     const seat = this.seats.find((c) => c.id === id);
     if (!seat || seat.bot || this.forfeited.has(id) || this.over) return 0;
+    if (msgNo !== undefined) this.received.set(id, msgNo);
     const ok: unknown[] = [];
     for (const raw of items) {
       const v = raw && typeof raw === 'object' ? this.def.validate(raw as Obj) : null;
@@ -87,6 +91,11 @@ export class GameRun {
     q.push(...ok.slice(0, room));
     this.pending.set(id, q);
     return Math.min(ok.length, room);
+  }
+
+  /** The newest input message number from this player that the rules have stepped (undefined if their client sends none). */
+  ackFor(id: string): number | undefined {
+    return this.applied.get(id);
   }
 
   /** A player is out of this trial for good (left, kicked, or gone too long). */
@@ -128,6 +137,9 @@ export class GameRun {
     }
     this.def.rules.step(this.state, inputs, STEP_MS);
     this.t += STEP_MS;
+    // Everything received so far has now been stepped.
+    for (const [id, q] of this.received) this.applied.set(id, q);
+    this.received.clear();
     for (const e of this.def.rules.drainEvents(this.state)) this.events.push(e);
   }
 

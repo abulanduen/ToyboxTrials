@@ -946,8 +946,8 @@ function weapons(s: SiegeState, p: SiegePlayer, dt: number) {
 
 // ---------------------------------------------------------------- board step
 
-/** Player movement (the latched stick / keys), inside a square of half-size `half`. */
-function movePlayer(p: SiegePlayer, sec: number, half: number) {
+/** Player movement (the latched stick / keys), inside a square of half-size `half`. Online clients replay it for their own toy (predict.ts). */
+export function movePlayer(p: SiegePlayer, sec: number, half: number) {
   const m2 = len(p.ax, p.ay), mag = Math.min(1, m2);
   if (mag <= 0.05) return;
   const nx = p.ax / m2, nz = -p.ay / m2;

@@ -1,11 +1,12 @@
 import { getMoveAxis, type Action } from '../../game/input';
-import { getMatchState, LOCAL_ID } from '../session';
+import { getMatchState, useMatch } from '../session';
 import type { MinigameModule } from '../types';
 import { siegeRules, type SiegeInput, type SiegeState } from './rules';
 import { createSiegeBot } from './bot';
 import { drainSiegeInput } from './local';
 import { SiegeScene } from './Scene';
 import { SiegeHud } from './Hud';
+import { predictSiege } from './predict';
 
 /** WASD / arrows move. Space: Rally Horn (in the arena: summon the Baron), or revive when down, or watch the next board when out. 1–4 pick a card. Q / E: previous / next board. */
 const BINDINGS: Record<Action, string[]> = {
@@ -24,7 +25,9 @@ const game: MinigameModule<SiegeState, SiegeInput> = {
   readLocalInput(presses) {
     const out: SiegeInput[] = drainSiegeInput();
     const s = getMatchState() as SiegeState | null;
-    const me = s?.kind === 'toybox-siege' ? s.players.find((p) => p.id === LOCAL_ID) : undefined;
+    // "You" is LOCAL_ID locally and your server id online (useMatch's localId covers both).
+    const you = useMatch.getState().localId;
+    const me = s?.kind === 'toybox-siege' ? s.players.find((p) => p.id === you) : undefined;
     // The stick / keys, sent only when they change (the rules latch the last value).
     const a = getMoveAxis();
     if (a.x !== lastX || a.y !== lastY || !me || (me.ax !== a.x || me.ay !== a.y)) { lastX = a.x; lastY = a.y; out.push({ type: 'move', x: a.x, y: a.y }); }
@@ -45,5 +48,6 @@ const game: MinigameModule<SiegeState, SiegeInput> = {
   },
   Scene: SiegeScene,
   Hud: SiegeHud,
+  predictLocal: predictSiege,
 };
 export default game;

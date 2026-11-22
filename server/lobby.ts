@@ -157,7 +157,7 @@ export class LobbyBoard {
     this.connected.add(p.id);
     if (msg.t === 'in') {
       const l = this.byPlayer.get(p.id);
-      l?.flow?.input(p.id, msg.m, msg.i);
+      l?.flow?.input(p.id, msg.m, msg.i, msg.q);
       return [];
     }
     if (!this.allow(p.id, now)) return [this.err(p.id, 'slow_down')];

@@ -368,6 +368,12 @@ export interface InputMsg {
   t: 'in';
   m: number;
   i: unknown[];
+  /**
+   * The sender's running count of `in` messages this match (1, 2, 3…). Optional: the server echoes
+   * the newest one it has stepped as the snapshot's `a`, so the client can replay only the inputs
+   * the server has not used yet (own-toy prediction, see src/minigames/remote.ts).
+   */
+  q?: number;
 }
 /** Link a signed-in account to this connection, so the leaderboard shows the username. */
 export interface AuthMsg {
@@ -600,6 +606,8 @@ export interface MatchStateMsg {
   d: unknown;
   e: MatchEventWire[];
   n: number;
+  /** The newest of this recipient's `in` messages (its `q`) that the rules have stepped. Seated players whose client sends `q` only. */
+  a?: number;
 }
 export interface MatchEventWire {
   type: string;
@@ -721,7 +729,7 @@ export function validateClientMessage(m: unknown): ClientMsg | null {
         if (v === null) return null;
         items.push(v);
       }
-      return { t: 'in', m: m.m, i: items };
+      return isInt(m.q) && m.q >= 0 ? { t: 'in', m: m.m, i: items, q: m.q } : { t: 'in', m: m.m, i: items };
     }
     case 'auth':
       return isStr(m.token, 128) && m.token.length > 0 ? { t: 'auth', token: m.token } : null;
@@ -1063,7 +1071,7 @@ export function validateServerMessage(m: unknown): ServerMsg | null {
     case 'ms': {
       if (!isInt(m.m) || (m.k !== 0 && m.k !== 1) || !isNum(m.n) || !Array.isArray(m.e) || m.d === undefined) return null;
       const e = m.e.filter((x): x is MatchEventWire => isObj(x) && typeof x.type === 'string');
-      return { t: 'ms', m: m.m, k: m.k, d: m.d, e, n: m.n };
+      return isInt(m.a) && m.a >= 0 ? { t: 'ms', m: m.m, k: m.k, d: m.d, e, n: m.n, a: m.a } : { t: 'ms', m: m.m, k: m.k, d: m.d, e, n: m.n };
     }
     case 'chat':
       if (!isPlayerId(m.id) || !isStr(m.name, 64) || !isStr(m.text, CHAT_RAW_MAX) || !isInt(m.n)) return null;

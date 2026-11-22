@@ -133,7 +133,7 @@ export class MatchFlow {
   private lastNow: number;
   private tickNo = 0;
   /** Last view sent to each recipient, for patches. */
-  private readonly sent = new Map<string, { seq: number; view: Obj }>();
+  private readonly sent = new Map<string, { seq: number; view: Obj; ack?: number }>();
   private events: MatchEventWire[] = [];
   timeScale: number;
   /** Test servers only: freeze (time scale 0) when the match next enters this phase. */
@@ -185,9 +185,9 @@ export class MatchFlow {
     this.run?.forfeit(id);
   }
 
-  input(id: string, seq: number, items: unknown[]) {
+  input(id: string, seq: number, items: unknown[], q?: number) {
     if (seq !== this.seq || this.phase !== 'playing' || !this.run || this.waiting.has(id) || this.gone.has(id)) return 0;
-    return this.run.input(id, items);
+    return this.run.input(id, items, q);
   }
 
   /** Send this recipient a full keyframe next (they reconnected, or changed whom they watch). */
@@ -386,14 +386,17 @@ export class MatchFlow {
       let view = views.get(key);
       if (!view) views.set(key, (view = run.viewFor(base, viewer, watching)));
       const last = this.sent.get(m.id);
+      // Seated players' clients that number their inputs learn which ones the rules have used.
+      const ack = viewer === m.id ? run.ackFor(m.id) : undefined;
       let msg: MatchStateMsg;
       if (!last || last.seq !== this.seq) msg = { t: 'ms', m: this.seq, k: 1, d: view, e: events, n: this.lastNow };
       else {
         const patch = diff(last.view, view);
-        if (!patch && !events.length) continue;
+        if (!patch && !events.length && ack === last.ack) continue;
         msg = { t: 'ms', m: this.seq, k: 0, d: patch ?? { o: {} }, e: events, n: this.lastNow };
       }
-      this.sent.set(m.id, { seq: this.seq, view });
+      if (ack !== undefined) msg.a = ack;
+      this.sent.set(m.id, { seq: this.seq, view, ack });
       out.snapshots.push({ to: m.id, msg });
     }
   }

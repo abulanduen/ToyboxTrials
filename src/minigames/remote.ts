@@ -11,6 +11,12 @@
  *     server instead of to the local rules (flushed MATCH_TICK_HZ times a second).
  * Rules events arrive with the snapshots and are re-broadcast on `matchBus`, as locally.
  *
+ * Own-toy prediction (games with `predictLocal`, e.g. Toybox Siege): every input message is numbered
+ * (`q`) and the server says which one its rules have stepped (`a`). Each rendered frame's inputs are
+ * kept until then, and the game replays the unstepped ones on the newest server state, so your toy
+ * moves the moment you press instead of a round trip later. With a server that sends no `a` (older
+ * build) nothing is predicted.
+ *
  * Nothing here decides anything: placements, standings and results come from the server.
  */
 import { useGame } from '../game/store';
@@ -23,13 +29,15 @@ import { INPUT_FLUSH_MS, MAX_INPUTS_PER_MSG, MAX_MESSAGE_BYTES, type LobbyMember
 import { GAME_FACTS } from './facts';
 import { gameById } from './registry';
 import { LOCAL_ID, enterMinigameScreen, matchBus, quitMatch, remoteHost, useMatch, type MatchPhase } from './session';
-import type { Contestant, MinigameId } from './types';
+import type { Contestant, MinigameId, PredictFrame } from './types';
 import type { HatId, KeySkinId } from '../game/cosmetics';
 
 type Obj = Record<string, unknown>;
 
 /** How far past the newest snapshot the shown clock may run (ms of real time). */
 const MAX_AHEAD_MS = 120;
+/** Most unstepped frames kept for prediction (about 2 s at 60 fps; older ones are dropped). */
+const MAX_PREDICT_FRAMES = 120;
 
 const rt = {
   /** Match sequence of the state we hold. */
@@ -53,6 +61,11 @@ const rt = {
   /** Spectators: whose view to follow (null: the server's default). */
   watch: null as string | null,
   you: '',
+  /** Input messages sent this match (the next one is numbered q + 1), and the newest the server has stepped (−1: unknown). */
+  q: 0,
+  ack: -1,
+  /** This match's rendered frames of input the server has not stepped yet, each tagged with the message it goes out in. */
+  frames: [] as (PredictFrame & { q: number })[],
 };
 
 remoteHost.getState = () => rt.display;
@@ -63,7 +76,9 @@ remoteHost.follow = (id) => {
   netLink.send({ t: 'lobby', a: 'watch', id: id ?? rt.you });
 };
 
-export const remoteDebug = () => ({ stateSeq: rt.stateSeq, seated: rt.seated, watch: rt.watch, pendingInputs: rt.pending.length, hasState: !!rt.state });
+export const remoteDebug = () => ({ stateSeq: rt.stateSeq, seated: rt.seated, watch: rt.watch, pendingInputs: rt.pending.length, hasState: !!rt.state, sent: rt.q, ack: rt.ack, unstepped: rt.frames.length });
+/** Test hook: the newest server state and the state being drawn (with own-toy prediction). */
+export const remoteStates = () => ({ server: rt.state, shown: rt.display });
 
 /** A lobby member or match seat as the local host's Contestant. */
 function contestant(p: { id: string; name: string; look: MatchSeat['look'] }, you: string, bot: MatchSeat['bot'] = null): Contestant {
@@ -86,6 +101,19 @@ function resetState() {
   rt.display = null;
   rt.stateSeq = -1;
   rt.pending = [];
+  rt.q = 0;
+  rt.ack = -1;
+  rt.frames = [];
+}
+
+/** What the game draws: the newest server state on the shown clock, with the local toy's own movement replayed when the game predicts. */
+function rebuildDisplay() {
+  if (!rt.state) return;
+  const shown = { ...rt.state, t: rt.display ? rt.display.t : rt.snapT };
+  const m = useMatch.getState();
+  const predict = m.module?.predictLocal;
+  const predicted = predict && rt.seated && rt.ack >= 0 && m.phase === 'playing' ? predict(shown, rt.you, rt.frames) : null;
+  rt.display = (predicted as Obj | null) ?? shown;
 }
 
 /** Leave online play's match screen (left, kicked, closed, or the connection is gone). */
@@ -212,7 +240,14 @@ export function onMatchState(msg: MatchStateMsg) {
   }
   rt.recvAt = performance.now();
   rt.snapT = Number(rt.state.t) || 0;
+  if (typeof msg.a === 'number') {
+    rt.ack = msg.a;
+    let drop = 0;
+    while (drop < rt.frames.length && rt.frames[drop].q <= msg.a) drop++;
+    if (drop) rt.frames.splice(0, drop);
+  }
   rt.display = { ...rt.state, t: Math.max(rt.snapT, Math.min(rt.shownT, rt.snapT + MAX_AHEAD_MS * rt.timeScale)) };
+  rebuildDisplay();
   for (const e of msg.e) matchBus.emit('event', e);
 }
 
@@ -254,17 +289,28 @@ function tickRemote(dtRealMs: number) {
   // Input: the game's own adapter, sent to the server instead of the local rules.
   if (m.phase !== 'playing' || !rt.seated || !m.module || m.paused || !rt.state) {
     rt.pending = [];
+    rt.frames.length = 0;
     return;
   }
-  for (const i of m.module.readLocalInput(getPressLog())) rt.pending.push(i);
+  const fresh = m.module.readLocalInput(getPressLog());
+  for (const i of fresh) rt.pending.push(i);
+  if (m.module.predictLocal) {
+    // This frame goes out in the next message (q + 1); the replay covers it until the server has stepped that one.
+    rt.frames.push({ q: rt.q + 1, dt: Math.min(Math.max(dtRealMs, 0), 100) * rt.timeScale, inputs: fresh });
+    if (rt.frames.length > MAX_PREDICT_FRAMES) rt.frames.shift();
+    rebuildDisplay();
+  }
   if (now - rt.lastFlush < INPUT_FLUSH_MS) return;
   rt.lastFlush = now;
   const held = !!(m.gameId && GAME_FACTS[m.gameId]?.heldInputs);
-  if (!rt.pending.length && !held) return;
+  // A predicting game sends a (possibly empty) message every flush, so the server's `a` keeps up
+  // and the replay never covers more than a round trip of frames.
+  if (!rt.pending.length && !held && !m.module.predictLocal) return;
   // Every input in order (a repeated press is two presses); at most the newest MAX_INPUTS_PER_MSG.
   const items = rt.pending.slice(-MAX_INPUTS_PER_MSG);
   rt.pending = [];
   // Stay well inside the server's frame limit (a slow frame can queue a lot of stick samples).
   while (items.length > 1 && JSON.stringify(items).length > MAX_MESSAGE_BYTES - 200) items.shift();
-  netLink.send({ t: 'in', m: rt.stateSeq, i: items });
+  rt.q++;
+  netLink.send({ t: 'in', m: rt.stateSeq, i: items, q: rt.q });
 }

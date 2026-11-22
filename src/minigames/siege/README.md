@@ -416,7 +416,9 @@ The scene holds 137 meshes in total, whatever the entity count.
   board to its live elites; once the arena opens, every board is cut and the shared arena goes out
   whole;
 - accepts the `spectate` input (watch the others, or go back to your own board);
-- snapshots every 2 ticks;
+- snapshots every tick (30 a second), copying only the boards some viewer is sent whole;
+- predicts your own toy's movement on your client (`predict.ts`, see docs/ONLINE.md), so it answers
+  the stick at once instead of a network round trip later;
 - closes the class pick after 60 s and any card after 20 s, so an idle player cannot stall a
   shared match (both untimed locally). The finale needs no extra timer: the prep window settles its
   own cards after 15 s, the arena opens by 5:15 and ends by 90 s.

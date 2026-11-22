@@ -366,9 +366,20 @@ online"). The other choice in both places is the existing **practice with bots**
   host (`src/minigames/remote.ts`, plugged into `session.ts` through `remoteHost`) applies them and
   renders through the game's unchanged `Scene` and `Hud`; between snapshots it runs the state's
   clock `t` on smoothly (at most 120 ms past the newest snapshot, never backwards), which keeps
-  animations and the rhythm song clock at frame rate. Positions are not predicted or
-  interpolated: moving toys step at 30 Hz (the Racer scenes smooth them; Blink Duel and Spellbox
-  show the steps).
+  animations and the rhythm song clock at frame rate. Positions are not interpolated: moving toys
+  step at 30 Hz (the Racer scenes smooth them; Blink Duel and Spellbox show the steps).
+- **Own-toy prediction (Toybox Siege):** a game can give its module a `predictLocal`
+  (`src/minigames/types.ts`). The client numbers its input messages (`q` on `in`; a predicting game
+  sends one every flush, even empty), and the server puts the newest number its rules have stepped
+  on that player's snapshots (`a` on `ms`, `GameRun.ackFor`). The client keeps each rendered
+  frame's inputs until they are stepped and replays them on the newest server state with the rules'
+  own movement (`src/minigames/siege/predict.ts`), so your toy moves the frame you press instead of
+  a round trip later. Only your own toy's position is predicted; enemies, damage, pickups and other
+  toys are the server's. A snapshot that shifts the replayed position fades in over about 0.1 s
+  (jumps over 4 cm show at once). Both fields are optional: a client or server without them behaves
+  as before (no prediction), so no protocol version change. Tested in node through a simulated
+  80 ms each-way link (`tests/unit/siege-predict.test.ts`) and in a browser through a delay proxy;
+  not yet on a real network.
 - **Results and placements come from the server**; the clients only show them.
 - **Disconnects:** a dropped player's seat is kept for 30 s (`RESUME_WINDOW_MS`, the Hub's own
   resume window): the match goes on without their inputs, and on reconnect they get the lobby and
@@ -724,7 +735,8 @@ Railway pushes a new server on every commit to the branch it watches. The client
   Wind-Up Dash, Music Box Rhythm, Copycat Conductor, Inferno Escape and Odd Page Out, with the players idle. The
   other trials' Scenes and Huds have not been watched on server state in a browser yet, and
   nobody has played a trial online by hand.
-- No client-side prediction or position interpolation in online matches (see above); no
+- Client-side prediction only for your own toy in Toybox Siege, and no position interpolation in
+  online matches (see above); no
   matchmaking queues, parties or ranked play (M9/M10). Online matches don't pay cogs or update
   local records yet.
 - One process holds every lobby and match in memory: a restart or redeploy ends them.

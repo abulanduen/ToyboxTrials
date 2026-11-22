@@ -12,7 +12,7 @@ import { sfx } from '../game/audio';
 import { exposeDebug } from '../game/debug';
 import { netLink } from './link';
 import { useNet } from './store';
-import { endOnlineMatch, onMatchState, remoteDebug, syncLobby, watchSeat } from '../minigames/remote';
+import { endOnlineMatch, onMatchState, remoteDebug, remoteStates, syncLobby, watchSeat } from '../minigames/remote';
 import { useMatch } from '../minigames/session';
 import type { LobbiesMsg, LobbyAlertMsg, LobbyErrMsg, LobbySettings, LobbyState, LobbyStateMsg, LobbySummary, MatchPhaseWire } from './protocol';
 
@@ -143,5 +143,6 @@ exposeDebug({
     /** Test servers only (MATCH_DEBUG=1): speed this lobby's match up. */
     timeScale: (k: number, hold?: MatchPhaseWire) => netLink.send({ t: 'lobby', a: 'timescale', k, ...(hold ? { hold } : {}) }),
     remote: () => remoteDebug(),
+    remoteStates: () => remoteStates(),
   },
 });
