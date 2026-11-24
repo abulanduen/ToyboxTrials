@@ -1,0 +1,67 @@
+# Publishes the game's static build to a Base44 app (its https://<name>.base44.app address) on
+# every push to main, alongside the Vercel deploy. Uses Base44's "Deploy a prebuilt site" API
+# (https://docs.base44.com/api-reference/deploy-a-prebuilt-site): the dist/ folder's contents as a
+# .tar.gz replace the app's whole published site (its Base44 code, data and functions are untouched).
+#
+# Repository settings → Secrets and variables → Actions:
+#   secret   BASE44_API_TOKEN  a Base44 personal access token with Full access (workspace settings → Secrets)
+#   secret   BASE44_APP_ID     the Base44 app to publish to (the id in the app's editor URL)
+#   variable VITE_SERVER_URL   optional: the online Hub server (default: the Railway one)
+# Without the two secrets the job builds and stops before uploading.
+# For online play the server's ALLOWED_ORIGINS (Railway) must list the app's https://<name>.base44.app.
+name: Deploy to Base44
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-base44
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_SERVER_URL: ${{ vars.VITE_SERVER_URL || 'wss://toyboxtrials-production.up.railway.app' }}
+
+      - name: Package (index.html at the archive's root)
+        run: |
+          cd dist
+          tar -czf ../site.tar.gz $(ls -A)
+          cd ..
+          echo "files: $(tar -tzf site.tar.gz | grep -vc '/$'), unpacked: $(du -sh dist | cut -f1), archive: $(du -h site.tar.gz | cut -f1)"
+
+      - name: Upload to Base44
+        env:
+          BASE44_API_TOKEN: ${{ secrets.BASE44_API_TOKEN }}
+          BASE44_APP_ID: ${{ secrets.BASE44_APP_ID }}
+        run: |
+          if [ -z "$BASE44_API_TOKEN" ] || [ -z "$BASE44_APP_ID" ]; then
+            echo "::warning::BASE44_API_TOKEN or BASE44_APP_ID is not set: built, not uploaded."
+            exit 0
+          fi
+          code=$(curl -sS -o response.json -w '%{http_code}' -X POST \
+            "https://app.base44.com/api/apps/${BASE44_APP_ID}/deploy-dist" \
+            -H "Authorization: Bearer ${BASE44_API_TOKEN}" \
+            -F "file=@site.tar.gz;type=application/gzip")
+          cat response.json; echo
+          if [ "$code" != "200" ]; then echo "::error::Base44 answered HTTP $code"; exit 1; fi
+          echo "::notice::Live at $(node -p 'require("./response.json").app_url')"

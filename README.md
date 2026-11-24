@@ -4,6 +4,10 @@
 
 ▶ **Play the prototype:** https://toybox-trials.vercel.app (desktop or phone; auto-deploys from `main`)
 
+Also publishable on Base44 (`https://<name>.base44.app`): `.github/workflows/deploy-base44.yml` builds and
+uploads the static build on every push to `main` once the repository has the `BASE44_API_TOKEN` and
+`BASE44_APP_ID` secrets (see the workflow's header). Add the app's address to the server's `ALLOWED_ORIGINS`.
+
 When the humans leave the room, the toys come alive and hold a tournament on the tabletop.
 This repository contains **Milestones 1–2**: the art-direction package and a small, genuinely
 explorable 3D toy-world prototype.

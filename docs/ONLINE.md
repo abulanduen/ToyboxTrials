@@ -710,8 +710,10 @@ the dashboard:
    ALLOWED_ORIGINS=https://toybox-trials.vercel.app
    ```
    Separate several origins with commas. For example, to also allow Vercel preview deployments:
-   `https://toybox-trials.vercel.app,https://toybox-trials-*.vercel.app`. Don't set `PORT`;
-   Railway provides it.
+   `https://toybox-trials.vercel.app,https://toybox-trials-*.vercel.app`. If the game is also
+   published on Base44 (`.github/workflows/deploy-base44.yml`), add that app's address too, e.g.
+   `https://toybox-trials.vercel.app,https://<name>.base44.app`. Don't set `PORT`; Railway
+   provides it.
 4. **Get the public domain.** Go to the service → **Settings** → **Networking** → **Generate
    Domain**. This gives you something like `toybox-hub-production.up.railway.app`. Check it in a
    browser: `https://<domain>/health` should show `{"ok":true,…}`.
