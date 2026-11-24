@@ -16,6 +16,7 @@ import { PadlockIcon } from './icons';
 import { ItemIcon } from './itemIcons';
 import { CategoryTabs, CogCount, GestureSlots, isWearing, unlockText } from './Catalogue';
 import { ShopScreen } from './ShopScreen';
+import { CoachMarks } from './CoachMarks';
 
 export function WorkshopScreen() {
   const mode = useGame((s) => s.workshopMode);
@@ -110,7 +111,7 @@ function Workshop() {
           <h2>The Workshop</h2>
           <CogCount value={profile.wallet.cogs} className="shop-wallet" />
         </div>
-        <label className="workshop-name">
+        <label className="workshop-name" data-coach="workshop-name">
           <span>Name</span>
           <input
             value={s.contenderName}
@@ -124,6 +125,7 @@ function Workshop() {
         <CategoryTabs
           value={tab}
           testPrefix="workshop-tab"
+          coach="workshop-tabs"
           onChange={(c) => {
             setTab(c);
             setInfo(null);
@@ -145,7 +147,7 @@ function Workshop() {
             </div>
           ))
         ) : (
-          <div className="swatches" role="listbox" aria-label={tab}>
+          <div className="swatches" role="listbox" aria-label={tab} data-coach="workshop-items">
             {tab === 'hat' && <Swatch id="none" name={HATS[0].name} category="hat" on={loadout.hat === 'none'} unlocked onClick={() => takeOff('hat')} />}
             {swatches(itemsIn(tab))}
           </div>
@@ -165,7 +167,7 @@ function Workshop() {
           )}
         </div>
 
-        <div className="pause__actions">
+        <div className="pause__actions" data-coach="workshop-actions">
           <ToyButton onClick={done} autoFocus testId="workshop-done">
             {s.workshopReturn === 'playing' ? 'Back to the Playroom' : 'Done'}
           </ToyButton>
@@ -174,6 +176,7 @@ function Workshop() {
           </ToyButton>
         </div>
       </section>
+      <CoachMarks tour="workshop" />
     </div>
   );
 }

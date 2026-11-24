@@ -1,6 +1,6 @@
 /** Shared toy-world UI building blocks used by every screen. */
 import { onlineAvailable } from '../net/client';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useGame, type Quality } from '../game/store';
 import { sfx, unlockAudio } from '../game/audio';
 
@@ -16,6 +16,7 @@ export function ToyButton({
   testId,
   armDelay = 0,
   type = 'button',
+  coach,
 }: {
   children: React.ReactNode;
   onClick: () => void;
@@ -29,6 +30,8 @@ export function ToyButton({
   armDelay?: number;
   /** `submit` inside a form (sign-in), so Enter and password managers work. */
   type?: 'button' | 'submit';
+  /** Marks the button for the first-time menu tips (src/ui/CoachMarks.tsx). */
+  coach?: string;
 }) {
   const ref = useRef<HTMLButtonElement>(null);
   const mountedAt = useRef(performance.now());
@@ -43,6 +46,7 @@ export function ToyButton({
       ref={ref}
       type={type}
       data-testid={testId}
+      data-coach={coach}
       className={`toy-btn toy-btn--${tone} ${className}`}
       disabled={disabled}
       onMouseEnter={() => sfx.tick()}
@@ -125,6 +129,7 @@ export function SettingsForm() {
         <input type="checkbox" checked={s.tutorials} onChange={(e) => s.set({ tutorials: e.target.checked })} data-testid="setting-tutorials" />
         <span>Game tutorials</span>
       </label>
+      <CoachReplayRow />
       {onlineAvailable() && (
         <label className="setting setting--check">
           <input type="checkbox" checked={s.autoOnline} onChange={(e) => s.set({ autoOnline: e.target.checked })} data-testid="setting-auto-online" />
@@ -164,6 +169,31 @@ export function SettingsForm() {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * Settings: clear the menu tips' seen list (src/game/coach.ts) so each menu's tips show again the
+ * next time it opens. The tips follow "Game tutorials", so this switches that on too.
+ */
+function CoachReplayRow() {
+  const [done, setDone] = useState(false);
+  return (
+    <div className="setting setting--coach">
+      <span aria-live="polite">{done ? 'Tips show as you open each menu' : 'Menu tips'}</span>
+      <button
+        type="button"
+        className="coach-replay"
+        data-testid="setting-coach-replay"
+        onClick={() => {
+          sfx.click();
+          useGame.getState().set({ coachSeen: [], tutorials: true });
+          setDone(true);
+        }}
+      >
+        Show menu tips again
+      </button>
     </div>
   );
 }

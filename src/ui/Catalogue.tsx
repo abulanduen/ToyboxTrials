@@ -23,9 +23,9 @@ export function CogCount({ value, testId, className = '' }: { value: number; tes
   );
 }
 
-export function CategoryTabs({ value, onChange, testPrefix = 'tab' }: { value: Category; onChange: (c: Category) => void; testPrefix?: string }) {
+export function CategoryTabs({ value, onChange, testPrefix = 'tab', coach }: { value: Category; onChange: (c: Category) => void; testPrefix?: string; coach?: string }) {
   return (
-    <div className="workshop-tabs" role="tablist">
+    <div className="workshop-tabs" role="tablist" data-coach={coach}>
       {CATEGORIES.map((c) => (
         <button
           key={c}

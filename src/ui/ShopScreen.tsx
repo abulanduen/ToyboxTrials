@@ -36,6 +36,7 @@ import {
   previewItem,
   unlockText,
 } from "./Catalogue";
+import { CoachMarks } from "./CoachMarks";
 
 export function ShopScreen() {
   const profile = useGame((s) => s.profile);
@@ -126,7 +127,7 @@ export function ShopScreen() {
         <div className="tape tape--l" />
         <div className="tape tape--r" />
         <div className="shop-main">
-          <div className="shop-head">
+          <div className="shop-head" data-coach="shop-wallet">
             <h2>Odds &amp; Ends</h2>
             <CogCount
               value={profile.wallet.cogs}
@@ -135,7 +136,11 @@ export function ShopScreen() {
             />
           </div>
 
-          <div className="shop-featured" aria-label="Today's featured items">
+          <div
+            className="shop-featured"
+            aria-label="Today's featured items"
+            data-coach="shop-featured"
+          >
             <div className="shop-featured__title">
               Today’s picks{" "}
               <span>{Math.round(FEATURED_DISCOUNT * 100)}% off</span>
@@ -149,6 +154,7 @@ export function ShopScreen() {
             value={tab}
             onChange={(c) => (setTab(c), setNote(null))}
             testPrefix="shop-tab"
+            coach="shop-tabs"
           />
 
           {tab === "accessory" ? (
@@ -172,6 +178,7 @@ export function ShopScreen() {
         <aside className="shop-side">
           <div
             className="shop-detail"
+            data-coach="shop-detail"
             aria-live="polite"
             data-testid="shop-detail"
           >
@@ -279,6 +286,7 @@ export function ShopScreen() {
           </div>
         </aside>
       </section>
+      <CoachMarks tour="shop" />
     </div>
   );
 }

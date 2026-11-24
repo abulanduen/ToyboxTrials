@@ -8,6 +8,7 @@ import { STORE_VERSION, buyItem, dateKey, equipItem, migratePersisted, rewardSec
 import type { MinigameId } from '../minigames/types';
 import type { TournamentFormat } from '../minigames/tournament';
 import { tourFlag } from './tourFlag';
+import { cleanCoachSeen, type CoachTourId } from './coach';
 import { VOICE_SETTING_DEFAULTS, cleanVoiceSettings, type VoiceSettings } from './voiceSettings';
 
 export type Quality = 'low' | 'balanced' | 'high';
@@ -84,6 +85,11 @@ interface SettingsSlice extends VoiceSettings {
   hubTrack: string;
   /** The first-visit Hub tour has been shown (finished or skipped). */
   tourSeen: boolean;
+  /**
+   * The menus whose first-time tips (src/game/coach.ts) have been shown. Added without a version
+   * bump: older saves simply have none seen (the persist merge fills it in and cleans it).
+   */
+  coachSeen: CoachTourId[];
   /** Online Hub text chat: the chat log, speech bubbles and chat box (off hides them all). */
   textChat: boolean;
   /** When (ms) the last few Who Am I? guesses paid cogs (economy.ts rewardWhoAmI caps them per hour). */
@@ -168,6 +174,7 @@ export const useGame = create<GameState>()(
       voiceVolume: 0.9,
       hubTrack: 'windowsill-waltz',
       tourSeen: false,
+      coachSeen: [],
       textChat: true,
       whoAmIPaid: [],
       // voice chat (src/game/voiceSettings.ts): hearing on, mic in push-to-talk, never on by default
@@ -241,7 +248,7 @@ export const useGame = create<GameState>()(
       // Whatever is stored, the profile that comes out is valid (unknown items dropped, nothing negative).
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<GameState>;
-        return { ...current, ...p, ...cleanVoiceSettings(p), profile: normalizeProfile(p.profile) };
+        return { ...current, ...p, ...cleanVoiceSettings(p), profile: normalizeProfile(p.profile), coachSeen: cleanCoachSeen(p.coachSeen) };
       },
       partialize: (s) => ({
         masterVolume: s.masterVolume,
@@ -265,6 +272,7 @@ export const useGame = create<GameState>()(
         voiceVolume: s.voiceVolume,
         hubTrack: s.hubTrack,
         tourSeen: s.tourSeen,
+        coachSeen: s.coachSeen,
         textChat: s.textChat,
         whoAmIPaid: s.whoAmIPaid,
         voiceHear: s.voiceHear,
