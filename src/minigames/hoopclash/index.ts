@@ -5,6 +5,7 @@ import { createHoopBot } from './bot';
 import { HOOP_BINDINGS, readHoopInput } from './local';
 import { HoopScene } from './Scene';
 import { HoopHud, HoopResults } from './Hud';
+import { predictHoop } from './predict';
 
 const hoopclash: MinigameModule<HoopState, HoopInput> = {
   rules: hoopRules,
@@ -14,6 +15,7 @@ const hoopclash: MinigameModule<HoopState, HoopInput> = {
   Scene: HoopScene,
   Hud: HoopHud,
   ResultsExtra: HoopResults,
+  predictLocal: predictHoop,
 };
 
 export default hoopclash;

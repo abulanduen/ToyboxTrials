@@ -368,18 +368,26 @@ online"). The other choice in both places is the existing **practice with bots**
   clock `t` on smoothly (at most 120 ms past the newest snapshot, never backwards), which keeps
   animations and the rhythm song clock at frame rate. Positions are not interpolated: moving toys
   step at 30 Hz (the Racer scenes smooth them; Blink Duel and Spellbox show the steps).
-- **Own-toy prediction (Toybox Siege):** a game can give its module a `predictLocal`
+- **Own-toy prediction (Toybox Siege, Hoop Clash):** a game can give its module a `predictLocal`
   (`src/minigames/types.ts`). The client numbers its input messages (`q` on `in`; a predicting game
   sends one every flush, even empty), and the server puts the newest number its rules have stepped
   on that player's snapshots (`a` on `ms`, `GameRun.ackFor`). The client keeps each rendered
   frame's inputs until they are stepped and replays them on the newest server state with the rules'
-  own movement (`src/minigames/siege/predict.ts`), so your toy moves the frame you press instead of
-  a round trip later. Only your own toy's position is predicted; enemies, damage, pickups and other
-  toys are the server's. A snapshot that shifts the replayed position fades in over about 0.1 s
-  (jumps over 4 cm show at once). Both fields are optional: a client or server without them behaves
-  as before (no prediction), so no protocol version change. Tested in node through a simulated
-  80 ms each-way link (`tests/unit/siege-predict.test.ts`) and in a browser through a delay proxy;
-  not yet on a real network.
+  own movement (`src/minigames/siege/predict.ts`, `src/minigames/hoopclash/predict.ts`), so your
+  toy moves the frame after you press instead of a round trip later. A frame's inputs act after
+  that frame's time, as on the server. Only your own toy is predicted (in Hoop Clash also its
+  facing and shot meter); enemies, the ball, passes, steals, damage, pickups and other toys are the
+  server's, and so is being pushed by another toy. A snapshot that shifts the replayed position
+  fades in over about 0.1 s (jumps over 4 cm show at once; shared in
+  `src/minigames/shared/predictSmooth.ts`). Both fields are optional: a client or server without
+  them behaves as before (no prediction), so no protocol version change. Tested in node through a
+  simulated 80 ms each-way link at 60 fps and at 220 ms frames (`tests/unit/siege-predict.test.ts`,
+  `tests/unit/hoopclash-predict.test.ts`) and in a browser through a delay proxy; not yet on a
+  real network.
+  - Hoop Clash shots: since the meter is predicted, a let-go carries the charge the meter showed
+    (`charge` on the `in` input), and the rules take it if it is at most 250 ms below or 50 ms above
+    their own count (`CHARGE_CLAIM`), so the power you saw is the power you get. A modified client
+    could choose its power within that window; every player gets the same allowance.
 - **Results and placements come from the server**; the clients only show them.
 - **Disconnects:** a dropped player's seat is kept for 30 s (`RESUME_WINDOW_MS`, the Hub's own
   resume window): the match goes on without their inputs, and on reconnect they get the lobby and

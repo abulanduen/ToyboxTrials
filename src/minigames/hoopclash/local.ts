@@ -4,7 +4,8 @@
  * inputs once per rendered frame. Gameplay never reads raw keys or touches.
  */
 import { getMoveAxis, isDown, stickRunning, type Action } from '../../game/input';
-import type { HoopInput } from './rules';
+import { getMatchState, useMatch } from '../session';
+import type { HoopInput, HoopState } from './rules';
 
 /** WASD / arrows move, Shift sprints, E or Space is the action (hold to charge), Q passes, X cancels a shot. */
 export const HOOP_BINDINGS: Record<Action, string[]> = {
@@ -50,7 +51,9 @@ export function readHoopInput(presses: readonly Action[]): HoopInput[] {
   // A press and release inside one frame still counts: down, then up.
   if (!act && (presses.includes('interact') || mouse.tapped)) out.push({ type: 'in', ax: a.x, ay: a.y, run, act: true });
   mouse.tapped = false;
-  out.push({ type: 'in', ax: a.x, ay: a.y, run, act });
+  // Letting go of a shot: say what the meter showed (online it is predicted on this client).
+  const shown = act ? undefined : (getMatchState() as HoopState | null)?.players?.find((p) => p.id === useMatch.getState().localId)?.charge;
+  out.push(typeof shown === 'number' && shown >= 0 ? { type: 'in', ax: a.x, ay: a.y, run, act, charge: Math.round(shown) } : { type: 'in', ax: a.x, ay: a.y, run, act });
   let passes = presses.filter((p) => p === 'slot1').length + mouse.passes;
   mouse.passes = 0;
   while (passes-- > 0) out.push({ type: 'pass' });

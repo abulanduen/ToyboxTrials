@@ -132,6 +132,13 @@ button's presses and releases in order, so charge time online is the time you he
 and the rules' random stream are hidden from clients. It is a team trial in the online lobby's
 one-trial mode.
 
+Online, your own toy is predicted on your client (`predict.ts`, see docs/ONLINE.md): it moves,
+plants its feet for a shot, turns and winds the meter the frame after you press instead of a
+network round trip later. On letting go, the input carries the charge your meter showed
+(`charge`), which the rules honour within `CHARGE_CLAIM` (250 ms below to 50 ms above their own
+count), so the shot's power is the one you saw. The ball, passes, steals and other toys stay the
+server's.
+
 ## Tournaments
 
 Never: it is the **Team games** section's trial (`group: 'team'` in the registry entry and in

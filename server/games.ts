@@ -396,7 +396,12 @@ const GAMES: ServerGame[] = [
     // see the button's presses and releases in order), passes, and cancelling a shot being charged.
     validate(i) {
       if (i.type === 'cancel') return { type: 'cancel' };
-      if (i.type === 'in') return num(i.ax, 1.5) && num(i.ay, 1.5) && typeof i.run === 'boolean' && typeof i.act === 'boolean' ? { type: 'in', ax: i.ax, ay: i.ay, run: i.run, act: i.act } : null;
+      if (i.type === 'in') {
+        if (!(num(i.ax, 1.5) && num(i.ay, 1.5) && typeof i.run === 'boolean' && typeof i.act === 'boolean')) return null;
+        // `charge`: the meter the player saw on letting go (the rules only take it near their own count).
+        if (i.charge !== undefined && !num(i.charge, 600_000)) return null;
+        return { type: 'in', ax: i.ax, ay: i.ay, run: i.run, act: i.act, ...(i.charge !== undefined ? { charge: i.charge } : {}) };
+      }
       if (i.type === 'pass') return i.to === undefined ? { type: 'pass' } : typeof i.to === 'string' && i.to.length <= 64 ? { type: 'pass', to: i.to } : null;
       return null;
     },

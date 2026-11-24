@@ -75,6 +75,13 @@ export const OT_INTRO_MS = 2600;
 
 /** Holding the ball slows a toy a little; charging a shot roots it. */
 export const BALL_SPEED = 0.9;
+/**
+ * How far a let-go's claimed charge (what the player's meter showed) may sit from the rules' own
+ * count (ms): up to `behind` less (the press reached the server later than the player saw it start,
+ * plus input batching) and `ahead` more (step rounding). Otherwise the rules' count stands. A
+ * modified client could pick its power within that window; every player gets the same allowance.
+ */
+export const CHARGE_CLAIM = { behind: 250, ahead: 50 };
 export const TUNING: MoveTuning = { ...TOY_TUNING, walk: 10, run: 14.5 };
 
 export interface HoopConfig {
@@ -106,7 +113,11 @@ export interface HoopInputState {
 }
 
 export type HoopInput =
-  | ({ type: 'in' } & HoopInputState)
+  /**
+   * `charge`: on letting go of a shot, the charge (ms) the player's meter showed. Online the meter
+   * is predicted on the client, so the rules take it within CHARGE_CLAIM of their own count.
+   */
+  | ({ type: 'in'; charge?: number } & HoopInputState)
   /** Pass (to the teammate nearest your facing, or `to`); without the ball, call for it. */
   | { type: 'pass'; to?: string }
   /** Drop a shot being charged without shooting (the action button must come up before the next press). */
@@ -477,7 +488,7 @@ function applyInput(s: HoopState, p: HoopPlayer, i: HoopInput) {
   const was = p.in.act;
   p.in = { ax, ay, run: !!i.run, act: !!i.act };
   if (p.in.act && !was) press(s, p);
-  if (!p.in.act && was && p.charge >= 0) release(s, p);
+  if (!p.in.act && was && p.charge >= 0) release(s, p, i.charge);
 }
 
 /** The action button went down. */
@@ -500,8 +511,9 @@ function press(s: HoopState, p: HoopPlayer) {
 }
 
 /** The action button came up while charging: shoot. */
-function release(s: HoopState, p: HoopPlayer) {
-  const power = shotPower(p.charge, CHARGE_MS);
+function release(s: HoopState, p: HoopPlayer, claim?: number) {
+  const seen = typeof claim === 'number' && Number.isFinite(claim) && claim >= p.charge - CHARGE_CLAIM.behind && claim <= p.charge + CHARGE_CLAIM.ahead ? Math.max(0, claim) : p.charge;
+  const power = shotPower(seen, CHARGE_MS);
   p.charge = -1;
   if (s.ball.holder !== p.id || s.phase !== 'live') return;
   const hoop = attackHoop(s, p.team);
@@ -724,26 +736,41 @@ function finish(s: HoopState, winner: Team | 'tie') {
 // ---------------------------------------------------------------- movement
 const ZERO = { ax: 0, ay: 0, run: false, jump: false };
 
-function movePlayers(s: HoopState, dtMs: number) {
-  const frozen = s.phase === 'jump' || s.phase === 'half' || s.phase === 'final' || s.phase === 'over';
-  const world = { solids: SOLIDS, bounds: MOVE_BOUNDS };
-  for (const p of s.players) {
-    const holding = s.ball.holder === p.id;
-    const rooted = frozen || p.charge >= 0 || (s.phase === 'inbound' && s.inbound?.by === p.id);
-    const jump = p.hop && !frozen;
-    p.hop = false;
-    if (rooted) {
-      stepMover(p, { ...ZERO, jump }, dtMs, world, TUNING);
-      // Rooted toys still turn to the stick (aiming a shot, picking a pass).
-      if (!frozen && Math.hypot(p.in.ax, p.in.ay) > 0.3) {
-        const want = Math.atan2(p.in.ax, -p.in.ay);
-        const lim = (TUNING.turnRate * dtMs) / 1000;
-        p.yaw = wrap(p.yaw + Math.max(-lim, Math.min(lim, wrap(want - p.yaw))));
-      }
-    } else {
-      stepMover(p, { ax: p.in.ax, ay: p.in.ay, run: p.in.run, jump }, dtMs, world, TUNING, holding ? BALL_SPEED : 1);
+const WORLD = { solids: SOLIDS, bounds: MOVE_BOUNDS };
+export const isFrozen = (s: HoopState) => s.phase === 'jump' || s.phase === 'half' || s.phase === 'final' || s.phase === 'over';
+
+/**
+ * One toy's own movement for one step, before toys are pushed apart: the stick, or rooted (turning
+ * only) while charging a shot or inbounding. `s` is only read. Online clients replay it for their
+ * own toy (predict.ts).
+ */
+export function moveToy(s: HoopState, p: HoopPlayer, dtMs: number) {
+  const frozen = isFrozen(s);
+  const holding = s.ball.holder === p.id;
+  const rooted = frozen || p.charge >= 0 || (s.phase === 'inbound' && s.inbound?.by === p.id);
+  const jump = p.hop && !frozen;
+  p.hop = false;
+  if (rooted) {
+    stepMover(p, { ...ZERO, jump }, dtMs, WORLD, TUNING);
+    // Rooted toys still turn to the stick (aiming a shot, picking a pass).
+    if (!frozen && Math.hypot(p.in.ax, p.in.ay) > 0.3) {
+      const want = Math.atan2(p.in.ax, -p.in.ay);
+      const lim = (TUNING.turnRate * dtMs) / 1000;
+      p.yaw = wrap(p.yaw + Math.max(-lim, Math.min(lim, wrap(want - p.yaw))));
     }
+  } else {
+    stepMover(p, { ax: p.in.ax, ay: p.in.ay, run: p.in.run, jump }, dtMs, WORLD, TUNING, holding ? BALL_SPEED : 1);
   }
+}
+
+/** Toys stay inside the run-off around the court. */
+export function clampToCourt(p: { x: number; z: number }) {
+  p.x = Math.max(MOVE_BOUNDS.minX + TUNING.radius, Math.min(MOVE_BOUNDS.maxX - TUNING.radius, p.x));
+  p.z = Math.max(MOVE_BOUNDS.minZ + TUNING.radius, Math.min(MOVE_BOUNDS.maxZ - TUNING.radius, p.z));
+}
+
+function movePlayers(s: HoopState, dtMs: number) {
+  for (const p of s.players) moveToy(s, p, dtMs);
   // Toys don't overlap: push pairs apart (a holder standing still is a little heavier).
   const R = TUNING.radius * 2;
   for (let i = 0; i < s.players.length; i++) {
@@ -766,10 +793,7 @@ function movePlayers(s: HoopState, dtMs: number) {
       b.z += nz * push * (1 - ka);
     }
   }
-  for (const p of s.players) {
-    p.x = Math.max(MOVE_BOUNDS.minX + TUNING.radius, Math.min(MOVE_BOUNDS.maxX - TUNING.radius, p.x));
-    p.z = Math.max(MOVE_BOUNDS.minZ + TUNING.radius, Math.min(MOVE_BOUNDS.maxZ - TUNING.radius, p.z));
-  }
+  for (const p of s.players) clampToCourt(p);
 }
 
 // ---------------------------------------------------------------- the ball
