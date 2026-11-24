@@ -5,11 +5,11 @@
  * plays automatically. A line without a recording is shown as text only (silent).
  *
  * Pure data, no imports beyond types: the unit tests check that ids are unique and every tour
- * stop and every gate greeter has its line.
+ * stop, every gate greeter and the Tournament Curator has its line.
  */
 import type { MinigameId } from '../minigames/ids';
 
-export type SpeakerId = 'pipwick' | `greeter-${MinigameId}`;
+export type SpeakerId = 'pipwick' | 'tournament-curator' | `greeter-${MinigameId}`;
 
 export interface Speaker {
   id: SpeakerId;
@@ -135,6 +135,22 @@ export const GREETERS: Record<MinigameId, Speaker & { line: string }> = {
 };
 
 /**
+ * The Tournament Curator: a wind-up peg-doll in a tailcoat with a prize rosette, who keeps the
+ * Pavilion (src/scene/Greeters.tsx). Walk in and talk to them to open the tournament panel. Their
+ * bubble works like a greeter's; `line` is the hello, said when you walk up to them.
+ */
+export const CURATOR: Speaker & { line: string } = {
+  id: 'tournament-curator',
+  name: 'Tournament Curator',
+  direction: 'A dapper wind-up curator in a purple tailcoat and a top hat, a prize rosette on the lapel. Warm, proper and gently grand, like a show judge who loves every entrant.',
+  line: 'Welcome to the Pavilion! Blitz is three trials, Normal five and Treasure eight. Most points takes the trophy. Shall I sign you up?',
+};
+
+/** Whoever talks in a speech bubble: a gate greeter (by game) or the Tournament Curator. */
+export type GreeterId = MinigameId | 'curator';
+export const greeterSpeaker = (id: GreeterId): Speaker & { line: string } => (id === 'curator' ? CURATOR : GREETERS[id]);
+
+/**
  * Pipwick's tour (the owner's "In this town…" script, recorded with ElevenLabs as one take and cut
  * into a clip per stop: public/assets/audio/voice/pipwick-tour-<stop>.mp3). Each stop's line is a
  * list of captions with the time (s, into that stop's clip) where Pipwick starts saying it, so the
@@ -208,8 +224,9 @@ export const VOICE_LINES: VoiceLine[] = [
   ...CHAT_LINES.idle.map((text, i) => ({ id: chatLineId(i), speaker: 'pipwick' as const, text })),
   { id: chatLineId('bye'), speaker: 'pipwick', text: CHAT_LINES.bye },
   ...Object.values(GREETERS).map((g) => ({ id: g.id, speaker: g.id, text: g.line })),
+  { id: CURATOR.id, speaker: CURATOR.id, text: CURATOR.line },
 ];
 
-export const SPEAKERS: Speaker[] = [PIPWICK, ...Object.values(GREETERS).map(({ id, name, direction }) => ({ id, name, direction }))];
+export const SPEAKERS: Speaker[] = [PIPWICK, ...[...Object.values(GREETERS), CURATOR].map(({ id, name, direction }) => ({ id, name, direction }))];
 
 export const lineById = (id: string) => VOICE_LINES.find((l) => l.id === id);

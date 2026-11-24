@@ -2,7 +2,7 @@
 
 Status: **implemented** (text, playback hooks and synthesised music). **Pipwick's welcome tour is
 recorded** (the owner's "In this town…" script, ElevenLabs voice "Brian – Calm, Collected and
-Steady"); every other line (Pipwick's chat, the 15 greeters) is shown as text and is silent until
+Steady"); every other line (Pipwick's chat, the 16 greeters, the Tournament Curator) is shown as text and is silent until
 its recording is added.
 
 ### How the tour recording was made
@@ -26,11 +26,16 @@ the `at` times in `TOUR_CAPTIONS` (seconds into each clip where each caption sta
   the Playroom": bright, quick, a little officious, proud of his polished tin. He waits by the
   fountain plaza, flies new players round the Hub on their first visit, and replays the tour when
   you talk to him. Code: `src/scene/Pipwick.tsx`, `src/game/welcome.ts`, `src/game/tour.ts`.
-- **The gate greeters**: one small peg-doll toy by each of the 15 trial arches, dressed for its
+- **The gate greeters**: one small peg-doll toy by each of the 16 trial arches, dressed for its
   game (Maestro Tibbs the conductor by Copycat, Jangles the jester by Jack-in-the-Box, Sir Rally the
   knight by the Siege fort, Ref Rookie the referee by Hoop Clash, and so on). Each says hello, pitches its game in a sentence or two and
   asks "Want to have a go?"; the gate's usual Play prompt opens the trial's intro card.
   Code: `src/scene/Greeters.tsx`.
+- **The Tournament Curator**: a peg-doll toy in a purple tailcoat, cream top hat, monocle and a
+  prize rosette, who keeps the Tournament Pavilion. Stands inside facing the door; says hello in a
+  speech bubble (`CURATOR` in `voiceLines.ts`, id `tournament-curator`) as you come up, and their
+  "Talk to" prompt opens the tournament panel. Code: `src/scene/Greeters.tsx` (same mechanism as the
+  greeters).
 
 All are original characters.
 
@@ -40,7 +45,7 @@ Every spoken line, with its id, speaker and exact text, is in **`src/game/voiceL
 `VOICE_LINES` (the flat list) and `SPEAKERS` (name plus casting/direction notes for each voice).
 Ids are kebab case: `pipwick-tour-hello` … `pipwick-tour-bye`, `pipwick-chat-hello`,
 `pipwick-chat-idle-1` … `pipwick-chat-idle-5`, `pipwick-chat-bye`, and
-`greeter-<trial id>` for each greeter (e.g. `greeter-copycat-conductor`). The on-screen text is
+`greeter-<trial id>` for each greeter (e.g. `greeter-copycat-conductor`), and `tournament-curator`. The on-screen text is
 the same string, so a recording must match it word for word (or change both together).
 
 ## Adding a recording

@@ -5,7 +5,7 @@
  */
 import { useEffect, useState } from 'react';
 import { useGame } from '../game/store';
-import { CHAT_LINES, GREETERS, PIPWICK, TOUR_CAPTIONS, TOUR_LINES, tourLineId, type TourStopId } from '../game/voiceLines';
+import { CHAT_LINES, PIPWICK, TOUR_CAPTIONS, TOUR_LINES, greeterSpeaker, tourLineId, type TourStopId } from '../game/voiceLines';
 import { hasRecording, voiceProgress } from '../game/voice';
 import { TOUR_STOPS } from '../game/tour';
 import { chatChoose, greeterBubble, tourNextPressed, tourRt, tourSkipPressed, useWelcome } from '../game/welcome';
@@ -138,12 +138,12 @@ function ChatCard() {
   );
 }
 
-/** The talking greeter's bubble; the scene (Greeters.tsx) keeps it over the greeter's head. */
+/** The talking greeter's (or the Tournament Curator's) bubble; the scene (Greeters.tsx) keeps it over their head. */
 function GreeterBubble() {
   const game = useWelcome((s) => s.greeter);
   if (!game) return null;
-  const g = GREETERS[game];
-  const accent = gameById(game).accent;
+  const g = greeterSpeaker(game);
+  const accent = game === 'curator' ? PALETTE.honey : gameById(game).accent;
   return (
     <div
       className="greeter-bubble"

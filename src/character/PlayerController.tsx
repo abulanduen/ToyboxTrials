@@ -22,6 +22,7 @@ import { cameraBlockers, player, SPAWN } from '../game/player';
 import { paintJobFor } from '../game/cosmetics';
 import { blobShadowTexture } from '../scene/textures';
 import { exposeDebug } from '../game/debug';
+import { stepPavilionView, pavilionView } from '../scene/pavilionView';
 import { tourFlag } from '../game/tourFlag';
 import { tourCamera } from '../game/welcome';
 
@@ -29,6 +30,10 @@ import { tourCamera } from '../game/welcome';
 const { radius: RADIUS, walk: WALK, run: RUN, boost: BOOST, jumpV: JUMP_V, gravity: GRAVITY, turnRate: TURN_RATE } = HUB_MOTION;
 
 const CAM_DIST = 14;
+/** Inside the Tournament Pavilion (lid off, walls folded down) the camera comes in closer. */
+const CAM_DIST_PAVILION = 10;
+/** ...and looks down into it at least this steeply (rad). */
+const CAM_PITCH_PAVILION = 0.75;
 const CAM_MIN_DIST = 3;
 const PITCH_MIN = -0.12;
 const PITCH_MAX = 1.1;
@@ -515,6 +520,8 @@ export function PlayerController() {
     (shadow.current.material as THREE.MeshBasicMaterial).opacity = sc;
 
     // ---------- camera ----------
+    // walking into the Tournament Pavilion lifts its lid and folds its walls down (src/scene/pavilionView.ts)
+    stepPavilionView(s.pos.x, s.pos.z, playing, dt);
     // Portrait phones: widen the vertical FOV so the horizontal view isn't a keyhole.
     const persp = camera as THREE.PerspectiveCamera;
     const wantFov = persp.aspect < 1 ? 50 + (1 - persp.aspect) * 40 : 50;
@@ -578,14 +585,18 @@ export function PlayerController() {
       s.camTarget.z = damp(s.camTarget.z, s.pos.z, 12, dt);
       s.camTarget.y = damp(s.camTarget.y, (eliminated ? 0 : s.pos.y) + TARGET_H, 6, dt);
 
-      const cp = Math.cos(s.camPitch);
-      tmp.dir.set(Math.sin(s.camYaw) * cp, Math.sin(s.camPitch), Math.cos(s.camYaw) * cp).normalize();
+      // Inside the Pavilion the camera looks down into the room over its folded walls (a doll's-house
+      // view), so the toy does not hide the Curator and a low camera never sits behind a wall's rim.
+      const pitch = Math.max(s.camPitch, THREE.MathUtils.lerp(PITCH_MIN, CAM_PITCH_PAVILION, pavilionView.cut));
+      const cp = Math.cos(pitch);
+      tmp.dir.set(Math.sin(s.camYaw) * cp, Math.sin(pitch), Math.cos(s.camYaw) * cp).normalize();
 
       // camera collision: shorten the boom when a big prop is in the way
-      let want = CAM_DIST;
+      const boom = THREE.MathUtils.lerp(CAM_DIST, CAM_DIST_PAVILION, pavilionView.cut);
+      let want = boom;
       if (cameraBlockers.size) {
         raycaster.set(s.camTarget, tmp.dir);
-        raycaster.far = CAM_DIST + 1;
+        raycaster.far = boom + 1;
         const hits = raycaster.intersectObjects([...cameraBlockers], true);
         if (hits.length) want = Math.max(CAM_MIN_DIST, hits[0].distance - 1.0);
       }
@@ -602,7 +613,7 @@ export function PlayerController() {
       camera.position.copy(s.camPos);
       // look slightly ahead of the toy so the world opens up in front of it
       // Pitching down low turns into looking up at the giant room (worm's-eye view).
-      const lift = LOOK_LIFT + Math.max(0, DEFAULT_PITCH - s.camPitch) * 11;
+      const lift = LOOK_LIFT + Math.max(0, DEFAULT_PITCH - pitch) * 11;
       tmp.look.set(s.camTarget.x + s.vel.x * 0.08, s.camTarget.y + lift, s.camTarget.z + s.vel.y * 0.08);
       camera.lookAt(tmp.look);
     }

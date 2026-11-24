@@ -18,9 +18,11 @@ import { DustMotes, Fingerpost } from './Ambience';
 import { hubFence, hubPathTiles, TILE_SIZE } from './paths';
 import { JackInTheBox, KeyTower, MusicBox, PencilLog, Train, TrainTrack } from './Interactive';
 import { HubPlay } from './HubPlay';
-import { BLOCKS, BLOCK_SIZE, BRIDGE, GATES, GATE_STAND, JUKEBOX, PAVILION, PIPWICK_HOME, SCOREBOARD, SHOP, TREES, TV, WORKSHOP, frontOf, gateLocal, registerHubColliders } from './layout';
+import { BLOCKS, BLOCK_SIZE, BRIDGE, CURATOR, GATES, GATE_STAND, JUKEBOX, PAVILION, PIPWICK_HOME, SCOREBOARD, SHOP, TREES, TV, WORKSHOP, frontOf, gateLocal, pavilionLocal, registerHubColliders } from './layout';
 import { exposeDebug } from '../game/debug';
 import { HubWelcome } from './HubWelcome';
+import { pavilionView } from './pavilionView';
+import { player } from '../game/player';
 
 function roundedRectShape(minX: number, minZ: number, maxX: number, maxZ: number, r: number) {
   const s = new THREE.Shape();
@@ -91,7 +93,7 @@ function DominoFence() {
 function facingTarget(id: string): { x: number; z: number } | null {
   const g = GATES.find((x) => x.id === id);
   if (g) return g;
-  const b: Record<string, { x: number; z: number }> = { pavilion: PAVILION, workshop: WORKSHOP, shop: SHOP, scoreboard: SCOREBOARD, tv: TV, pipwick: PIPWICK_HOME, jukebox: JUKEBOX };
+  const b: Record<string, { x: number; z: number }> = { pavilion: CURATOR, workshop: WORKSHOP, shop: SHOP, scoreboard: SCOREBOARD, tv: TV, pipwick: PIPWICK_HOME, jukebox: JUKEBOX };
   return b[id] ?? null;
 }
 
@@ -115,7 +117,7 @@ export function Village() {
             return { id: g.id, game: g.game, title: g.title, x: g.x, z: g.z, rot: g.rot, standX: stand.x, standZ: stand.z, yaw: g.rot + Math.PI };
           }),
         spot,
-        /** Teleport in front of an interactable (e.g. 'pavilion'), facing it. */
+        /** Teleport in front of an interactable (e.g. 'pavilion': inside, facing the Tournament Curator), facing it. */
         goTo: (id: string) => {
           const s = spot(id);
           if (s) events.emit('player:teleport', { x: s.x, z: s.z, yaw: s.yaw });
@@ -123,11 +125,19 @@ export function Village() {
         },
         walkAreas: () => WALK_AREAS.map((a) => ({ ...a })),
         bridge: () => ({ x: BRIDGE.x, deckA: BRIDGE.deckA, deckB: BRIDGE.deckB, top: BRIDGE.top, ramp: BRIDGE.ramp, start: BRIDGE.deckA + BRIDGE.ramp + 1.5, end: BRIDGE.deckB - BRIDGE.ramp - 1.5 }),
+        /** The Pavilion: where it is, the toy's Pavilion-local position (`me`, lz towards the door),
+         *  whether the toy counts as inside, and how far the lid is off / walls folded down (`cut`). */
+        pavilion: () => {
+          const me = pavilionLocal(player.pos.x, player.pos.z);
+          return { x: PAVILION.x, z: PAVILION.z, rot: PAVILION.rot, w: PAVILION.w, d: PAVILION.d, curator: { x: CURATOR.x, z: CURATOR.z }, me, inside: pavilionView.inside, cut: pavilionView.cut };
+        },
+        /** A Pavilion-local point in world xz, and the yaw that faces into the Pavilion through its door. */
+        pavilionAt: (lx: number, lz: number) => ({ ...gateLocal(PAVILION, lx, lz), yawIn: PAVILION.rot + Math.PI }),
       },
     });
   }, []);
 
-  // bunting: from the Scoreboard's top corners to the Pavilion's front corner and the TV's aerial
+  // bunting: from the Scoreboard's top corners to the knob on the Pavilion's front corner post and the TV's aerial
   const pav = gateLocal(PAVILION, -PAVILION.w / 2, PAVILION.d / 2);
   const aerial = gateLocal(TV, TV_AERIAL_TIP[0], TV_AERIAL_TIP[2]);
   return (
@@ -158,7 +168,7 @@ export function Village() {
       {/* trees and blocks are instanced: a handful of draws for all of them */}
       <FeltTrees trees={TREES} />
       <Blocks items={BLOCKS.map((b) => ({ ...b, size: (b.s ?? 1) * BLOCK_SIZE }))} />
-      <Bunting from={[SCOREBOARD.x + SCOREBOARD.w / 2 - 0.4, SCOREBOARD.h + 0.2, SCOREBOARD.z]} to={[pav.x, PAVILION.h + 0.6, pav.z]} sag={2.5} count={13} />
+      <Bunting from={[SCOREBOARD.x + SCOREBOARD.w / 2 - 0.4, SCOREBOARD.h + 0.2, SCOREBOARD.z]} to={[pav.x, PAVILION.h + 0.25, pav.z]} sag={2.5} count={13} />
       <Bunting from={[SCOREBOARD.x - SCOREBOARD.w / 2 + 0.4, SCOREBOARD.h + 0.2, SCOREBOARD.z]} to={[aerial.x, TV_AERIAL_TIP[1], aerial.z]} sag={1.6} count={6} />
     </group>
   );

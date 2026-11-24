@@ -19,7 +19,7 @@ import { DOG_PERCH } from '../scene/room/roomLayout';
 import { useNet } from '../net/store';
 import { requestCard, wearingCard } from '../net/chat';
 import { CHAT_NOTE_TEXT } from '../net/protocol';
-import { GATES, GATE_STAND, JUKEBOX, MUSICBOX, PAVILION, PIPWICK_HOME, SCOREBOARD, SHOP, TOWER, TV, WORKSHOP, frontOf } from '../scene/layout';
+import { CURATOR, GATES, GATE_STAND, JUKEBOX, MUSICBOX, PAVILION, PIPWICK_HOME, SCOREBOARD, SHOP, TOWER, TV, WORKSHOP, frontOf, gateLocal } from '../scene/layout';
 
 export interface Interactable {
   id: string;
@@ -44,7 +44,8 @@ export const keyAvailable = () => performance.now() > keyCooldownUntil;
 export const INTERACTABLES: Interactable[] = [
   // one gate per playable trial: E / Interact opens that trial's lobby (the practice intro card)
   ...GATES.map((g) => ({ id: g.id, ...frontOf(g.x, g.z, g.rot, GATE_STAND), radius: 4.5, verb: 'Play', label: g.title })),
-  { id: 'pavilion', ...frontOf(PAVILION.x, PAVILION.z, PAVILION.rot, PAVILION.d / 2 + 3), radius: 4.5, verb: 'Enter', label: 'the Tournament Pavilion' },
+  // inside the Pavilion, in front of the Tournament Curator (the id stays 'pavilion': tests and goTo use it)
+  { id: 'pavilion', ...gateLocal(PAVILION, 0, CURATOR.lz + 2.6), radius: 3.2, verb: 'Talk to', label: 'the Tournament Curator' },
   { id: 'workshop', ...frontOf(WORKSHOP.x, WORKSHOP.z, WORKSHOP.rot, WORKSHOP.d / 2 + 2.5), radius: 5, verb: 'Tinker at', label: 'the Workshop' },
   { id: 'shop', ...frontOf(SHOP.x, SHOP.z, SHOP.rot, SHOP.d / 2 + 6), radius: 5, verb: 'Browse', label: 'Odds & Ends Shop' },
   { id: 'scoreboard', ...frontOf(SCOREBOARD.x, SCOREBOARD.z, SCOREBOARD.rot, 3.5), radius: 5, verb: 'Read', label: 'the Scoreboard' },
@@ -106,7 +107,9 @@ export function interact(id: string, facing: { x: number; z: number }) {
 
   switch (id) {
     case 'pavilion':
+      // talking to the Tournament Curator (they hop: src/scene/Greeters.tsx)
       sfx.click();
+      events.emit('curator:talk');
       g.openPanel({ kind: 'tournament', title: 'Tournament Pavilion', subtitle: 'Pick a format', accent: PALETTE.inkPurple });
       break;
     case 'workshop':

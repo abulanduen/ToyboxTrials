@@ -24,6 +24,8 @@ export type GameEvents = {
   'prop:key-collected': void;
   /** The player talked to Pipwick, the welcome mascot (src/game/welcome.ts). */
   'pipwick:talk': void;
+  /** The player talked to the Tournament Curator in the Pavilion (they hop; the tournament panel opens). */
+  'curator:talk': void;
   /** Someone cranked the Hub jukebox (it plays a little flourish). */
   'prop:jukebox-crank': void;
   'gate:open': { id: string };

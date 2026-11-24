@@ -8,10 +8,13 @@ import * as THREE from 'three';
 import { PALETTE } from '../game/palette';
 import { useGame } from '../game/store';
 import { camBlock } from '../game/player';
-import { cardboardTexture, cardFaceTexture, stripeTexture } from './textures';
+import { cardboardTexture, cardFaceTexture, rugTexture, stripeTexture } from './textures';
 import { Dominoes, paintMat, feltMat, woodMat, type DominoSpec } from './props';
 import { DOMINO } from './domino';
-import { FOUNTAIN, PAVILION, SCOREBOARD, SHOP, WORKSHOP } from './layout';
+import { FOUNTAIN, PAVILION, PAVILION_PROPS, PAVILION_WALL, SCOREBOARD, SHOP, WORKSHOP } from './layout';
+import { Kit } from './kit';
+import { buildPavilionInterior, doorTrimGeometry, pavilionWallGeometry } from './pavilionDecor';
+import { pavilionCutEased } from './pavilionView';
 import { SECRET_IDS } from '../game/interactables';
 
 const cardboardMat = (tint: string = PALETTE.cardboard) =>
@@ -114,7 +117,12 @@ export function Fountain() {
 }
 
 // ---------------- Tournament Pavilion: a striped cardboard gift box with a bottle-cap finial ----------------
+// Hollow, with an arched doorway in front: walk in to talk to the Tournament Curator (Greeters.tsx).
+// While you are inside, the lid lifts off and the walls fold down to a low rim so the camera can see
+// in (src/scene/pavilionView.ts). Geometry: src/scene/pavilionDecor.ts.
 const ROOF_H = 6.4;
+/** How far the lid rises before it is hidden while you are inside. */
+const LID_LIFT = 12;
 export function Pavilion() {
   const stripes = useMemo(() => {
     const t = stripeTexture(PALETTE.coral, PALETTE.cream, 10).clone();
@@ -126,73 +134,88 @@ export function Pavilion() {
     t.needsUpdate = true;
     return new THREE.MeshStandardMaterial({ map: t, roughness: 0.9, side: THREE.DoubleSide });
   }, []);
-  const archGeo = useMemo(() => {
-    const s = new THREE.Shape();
-    s.moveTo(-2.6, 0);
-    s.lineTo(2.6, 0);
-    s.lineTo(2.6, 3.4);
-    s.absarc(0, 3.4, 2.6, 0, Math.PI, false);
-    s.lineTo(-2.6, 0);
-    return new THREE.ShapeGeometry(s, 16);
+  const wallGeo = useMemo(pavilionWallGeometry, []);
+  const trimGeo = useMemo(() => doorTrimGeometry(), []);
+  const interior = useMemo(() => {
+    const k = new Kit();
+    buildPavilionInterior(k);
+    return k.build().solid!;
   }, []);
+  const kitMat = useMemo(() => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6 }), []);
+  const rugMat = useMemo(
+    () => new THREE.MeshStandardMaterial({ map: rugTexture(PALETTE.inkPurple, PALETTE.honey), roughness: 1, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }),
+    [],
+  );
+  const { sign } = PAVILION_PROPS;
+  const signMat = useMemo(() => new THREE.MeshStandardMaterial({ map: cardFaceTexture('TOURNAMENTS', 'Blitz · Normal · Treasure', PALETTE.coral, sign.w / sign.h), roughness: 0.8 }), [sign]);
+  const walls = useRef<THREE.Group>(null!);
+  const lid = useRef<THREE.Group>(null!);
+  const banners = useRef<THREE.Group>(null!);
+  const shown = useRef(-1);
   const { w, d, h } = PAVILION;
+  useFrame(() => {
+    const e = pavilionCutEased();
+    if (e === shown.current) return;
+    shown.current = e;
+    walls.current.scale.y = THREE.MathUtils.lerp(1, PAVILION_WALL.cutH / h, e);
+    lid.current.position.y = e * LID_LIFT;
+    lid.current.visible = e < 0.98;
+    banners.current.visible = e < 0.4;
+  });
   return (
     <group position={[PAVILION.x, 0, PAVILION.z]} rotation={[0, PAVILION.rot, 0]}>
-      {/* walls */}
-      <mesh position={[0, h / 2, 0]} castShadow receiveShadow material={stripes} ref={camBlock}>
-        <boxGeometry args={[w, h, d]} />
-      </mesh>
-      {/* cardboard lip */}
-      <mesh position={[0, h + 0.3, 0]} castShadow material={cardboardMat()}>
-        <boxGeometry args={[w + 0.6, 0.6, d + 0.6]} />
-      </mesh>
-      {/* pyramid tent roof. A four-sided cone has its corners on the axes, so it is turned 45° first
-          and only then squashed to the box's proportions (outer group): scaling the turned cone
-          itself gave a skewed rhombus that overhung one side and left the lip bare on the other.
-          The eaves overhang the cardboard lip by about half a centimetre all round. */}
-      <group position={[0, h + 0.6 + ROOF_H / 2, 0]} scale={[1, 1, d / w]}>
-        <mesh rotation={[0, Math.PI / 4, 0]} castShadow material={roofStripes}>
-          <coneGeometry args={[(w / 2 + 0.8) * Math.SQRT2, ROOF_H, 4, 1, true]} />
-        </mesh>
+      {/* walls (they fold down while you are inside) with the doorway trim and the felt banners */}
+      <group ref={walls}>
+        <mesh geometry={wallGeo} castShadow receiveShadow material={stripes} ref={camBlock} />
+        <mesh geometry={trimGeo} position={[0, 0.02, d / 2 + 0.03]} material={paintMat(PALETTE.honey, 0.5)} />
+        <group ref={banners}>
+          {[-1, 1].map((s) => (
+            <group key={s} position={[s * (w / 2 - 2), h - 0.4, d / 2 + 0.05]}>
+              <mesh position={[0, -1.7, 0]} material={feltMat(PALETTE.toyBlue)}>
+                <planeGeometry args={[2, 3.4]} />
+              </mesh>
+              <mesh position={[0, -1.7, 0.02]} material={paintMat(PALETTE.honey, 0.5)}>
+                <circleGeometry args={[0.55, 5]} />
+              </mesh>
+            </group>
+          ))}
+        </group>
       </group>
-      {/* bottle cap finial + flag */}
-      <mesh position={[0, h + 0.6 + ROOF_H + 0.1, 0]} castShadow material={paintMat(PALETTE.honey, 0.3, 0.8)}>
-        <cylinderGeometry args={[1.2, 1.2, 0.6, 21]} />
-      </mesh>
-      <mesh position={[0, h + 9, 0]} material={woodMat(PALETTE.woodDark)}>
-        <cylinderGeometry args={[0.1, 0.1, 4, 6]} />
-      </mesh>
-      <Flag position={[0, h + 10.4, 0]} color={PALETTE.inkPurple} />
-      {/* doorway */}
-      <mesh position={[0, 0.02, d / 2 + 0.03]} geometry={archGeo} scale={[1.12, 1.06, 1]} material={paintMat(PALETTE.honey, 0.5)} />
-      <mesh position={[0, 0.02, d / 2 + 0.07]} geometry={archGeo} material={paintMat(PALETTE.inkPurple, 1)} />
-      {/* trophy glimpsed inside */}
-      <group position={[0, 0, d / 2 - 0.8]}>
-        <mesh position={[0, 0.8, 0]} material={paintMat(PALETTE.coral, 0.6)}>
-          <cylinderGeometry args={[1.3, 1.5, 1.6, 12]} />
+      {/* the lid: cardboard lip, tent roof, bottle-cap finial and flag (it lifts off while you are inside) */}
+      <group ref={lid}>
+        <mesh position={[0, h + 0.3, 0]} castShadow material={cardboardMat()}>
+          <boxGeometry args={[w + 0.6, 0.6, d + 0.6]} />
         </mesh>
-        <mesh position={[0, 2.4, 0]} material={paintMat(PALETTE.honey, 0.25, 0.9)}>
-          <cylinderGeometry args={[0.15, 0.35, 1.6, 10]} />
+        {/* pyramid tent roof. A four-sided cone has its corners on the axes, so it is turned 45° first
+            and only then squashed to the box's proportions (outer group): scaling the turned cone
+            itself gave a skewed rhombus that overhung one side and left the lip bare on the other.
+            The eaves overhang the cardboard lip by about half a centimetre all round. */}
+        <group position={[0, h + 0.6 + ROOF_H / 2, 0]} scale={[1, 1, d / w]}>
+          <mesh rotation={[0, Math.PI / 4, 0]} castShadow material={roofStripes}>
+            <coneGeometry args={[(w / 2 + 0.8) * Math.SQRT2, ROOF_H, 4, 1, true]} />
+          </mesh>
+        </group>
+        {/* bottle cap finial + flag */}
+        <mesh position={[0, h + 0.6 + ROOF_H + 0.1, 0]} castShadow material={paintMat(PALETTE.honey, 0.3, 0.8)}>
+          <cylinderGeometry args={[1.2, 1.2, 0.6, 21]} />
         </mesh>
-        <mesh position={[0, 3.7, 0]} material={paintMat(PALETTE.honey, 0.25, 0.9)}>
-          <cylinderGeometry args={[1.0, 0.35, 1.6, 14]} />
+        <mesh position={[0, h + 9, 0]} material={woodMat(PALETTE.woodDark)}>
+          <cylinderGeometry args={[0.1, 0.1, 4, 6]} />
         </mesh>
+        <Flag position={[0, h + 10.4, 0]} color={PALETTE.inkPurple} />
       </group>
-      {/* felt carpet + steps */}
+      {/* inside: corner posts, bunting, trophy shelf, podium and the sign (one merged mesh), the rug and the sign's face */}
+      <mesh geometry={interior} material={kitMat} castShadow receiveShadow />
+      <mesh position={[0, 0.1, -0.1]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow material={rugMat}>
+        <planeGeometry args={[w - 2 * PAVILION_WALL.t - 0.9, d - 2 * PAVILION_WALL.t - 0.6]} />
+      </mesh>
+      <mesh position={[0, sign.y, sign.lz + 0.105]} material={signMat}>
+        <planeGeometry args={[sign.w, sign.h]} />
+      </mesh>
+      {/* felt carpet up to the door */}
       <mesh position={[0, 0.13, d / 2 + 2.6]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow material={feltMat(PALETTE.coral)}>
         <planeGeometry args={[4, 5.2]} />
       </mesh>
-      {/* hanging felt banners */}
-      {[-1, 1].map((s) => (
-        <group key={s} position={[s * (w / 2 - 2), h - 0.4, d / 2 + 0.05]}>
-          <mesh position={[0, -1.7, 0]} material={feltMat(PALETTE.toyBlue)}>
-            <planeGeometry args={[2, 3.4]} />
-          </mesh>
-          <mesh position={[0, -1.7, 0.02]} material={paintMat(PALETTE.honey, 0.5)}>
-            <circleGeometry args={[0.55, 5]} />
-          </mesh>
-        </group>
-      ))}
     </group>
   );
 }

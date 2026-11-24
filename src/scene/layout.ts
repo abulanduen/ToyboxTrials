@@ -41,8 +41,66 @@ export const TABLES_BOX = {
 // ------------------------------------------------------------------ spawn table
 
 export const FOUNTAIN = { x: 0, z: -1, r: 5.2, top: 1.4 };
-/** Tournament Pavilion: the east side of the plaza, its door facing the fountain. */
+/**
+ * Tournament Pavilion: the east side of the plaza, its door facing the fountain. A hollow striped
+ * gift box: walk in through the doorway in its front (local +z) and talk to the Tournament Curator.
+ */
 export const PAVILION = { x: 34, z: -10, rot: Math.atan2(0 - 34, -1 - -10), w: 14, d: 10, h: 7.5 };
+/**
+ * The Pavilion's cardboard walls: thickness `t` (the colliders reach `pad` further out), the doorway
+ * (width and the top of its arch), and the height the walls drop to while you are inside (the lid
+ * lifts off and the walls fold down so the camera can see in: src/scene/pavilionView.ts).
+ */
+export const PAVILION_WALL = { t: 0.5, pad: 0.3, doorW: 4.6, doorH: 5.6, cutH: 1.4 };
+/**
+ * The Tournament Curator (src/scene/Greeters.tsx), inside the Pavilion by the back wall, facing the
+ * door; talking to them opens the tournament panel. `lz` is Pavilion-local (towards the door).
+ */
+export const CURATOR = { lz: -2.5, ...gateLocal(PAVILION, 0, -2.5), r: 0.9, top: 3.4, yaw: PAVILION.rot };
+/**
+ * Pavilion furniture, in Pavilion-local boxes (lx right, lz towards the door): the trophy shelf and
+ * the winners' podium (first in the middle, highest; hop up on it), and the sign's two legs.
+ */
+export const PAVILION_PROPS = {
+  shelf: { lx: -4.9, lz: -3.95, hx: 1.6, hz: 0.55, top: 4.3 },
+  podium: [
+    { lx: 3.45, lz: -3.75, hx: 0.6, hz: 0.75, top: 1.2, place: 2 },
+    { lx: 4.65, lz: -3.75, hx: 0.6, hz: 0.75, top: 1.8, place: 1 },
+    { lx: 5.85, lz: -3.75, hx: 0.6, hz: 0.75, top: 0.85, place: 3 },
+  ],
+  sign: { lz: -4.05, legX: 1.7, w: 4.2, h: 1.7, y: 4.7 },
+} as const;
+
+/** Pavilion-local coordinates (lx to its right, lz out of its front) of a world point. */
+export function pavilionLocal(x: number, z: number) {
+  const c = Math.cos(PAVILION.rot);
+  const s = Math.sin(PAVILION.rot);
+  const dx = x - PAVILION.x;
+  const dz = z - PAVILION.z;
+  return { lx: dx * c - dz * s, lz: dx * s + dz * c };
+}
+/** Is a world point inside the Pavilion's walls (the doorway counts), grown by `pad`? */
+export function insidePavilion(x: number, z: number, pad = 0) {
+  const { lx, lz } = pavilionLocal(x, z);
+  return Math.abs(lx) < PAVILION.w / 2 + pad && lz > -PAVILION.d / 2 - pad && lz < PAVILION.d / 2 + pad;
+}
+/**
+ * The Pavilion's solid parts as Pavilion-local boxes: the back wall, the two side walls and the front
+ * wall either side of the doorway, each reaching `pad` outside the cardboard.
+ */
+export function pavilionWalls() {
+  const { w, d } = PAVILION;
+  const { t, pad, doorW } = PAVILION_WALL;
+  const th = (t + pad) / 2; // half thickness of a wall collider
+  const side = (w / 2 + pad - doorW / 2) / 2; // half width of each front piece
+  return [
+    { id: 'pavilion-back', lx: 0, lz: -(d / 2 + pad) + th, hx: w / 2 + pad, hz: th },
+    { id: 'pavilion-left', lx: -(w / 2 + pad) + th, lz: 0, hx: th, hz: d / 2 + pad },
+    { id: 'pavilion-right', lx: w / 2 + pad - th, lz: 0, hx: th, hz: d / 2 + pad },
+    { id: 'pavilion-front', lx: -(doorW / 2 + side), lz: d / 2 + pad - th, hx: side, hz: th },
+    { id: 'pavilion-front', lx: doorW / 2 + side, lz: d / 2 + pad - th, hx: side, hz: th },
+  ];
+}
 export const WORKSHOP = { x: -36, z: -6, rot: 0.45, w: 15, d: 7.5, h: 6 };
 export const SHOP = { x: -44, z: 12, rot: Math.PI / 2 - 0.25, w: 11, d: 6.5, h: 8.5 };
 /**
@@ -332,7 +390,15 @@ export function bridgeColliders(): Collider[] {
 export function hubColliders(): Collider[] {
   const list: Collider[] = [];
   list.push({ kind: 'circle', id: 'fountain', x: FOUNTAIN.x, z: FOUNTAIN.z, r: FOUNTAIN.r, top: FOUNTAIN.top });
-  list.push({ kind: 'box', id: 'pavilion', x: PAVILION.x, z: PAVILION.z, hx: PAVILION.w / 2 + 0.3, hz: PAVILION.d / 2 + 0.3, rot: PAVILION.rot, top: 14 });
+  // the Pavilion: hollow, with a doorway in front; the Curator and the furniture inside
+  for (const wl of pavilionWalls()) list.push({ kind: 'box', id: wl.id, ...gateLocal(PAVILION, wl.lx, wl.lz), hx: wl.hx, hz: wl.hz, rot: PAVILION.rot, top: 14 });
+  list.push({ kind: 'circle', id: 'curator', x: CURATOR.x, z: CURATOR.z, r: CURATOR.r, top: CURATOR.top });
+  {
+    const { shelf, podium, sign } = PAVILION_PROPS;
+    list.push({ kind: 'box', id: 'pavilion-shelf', ...gateLocal(PAVILION, shelf.lx, shelf.lz), hx: shelf.hx, hz: shelf.hz, rot: PAVILION.rot, top: shelf.top });
+    for (const p of podium) list.push({ kind: 'box', id: 'pavilion-podium', ...gateLocal(PAVILION, p.lx, p.lz), hx: p.hx, hz: p.hz, rot: PAVILION.rot, top: p.top });
+    for (const sx of [-1, 1]) list.push({ kind: 'circle', id: 'pavilion-sign', ...gateLocal(PAVILION, sx * sign.legX, sign.lz), r: 0.2, top: sign.y + sign.h / 2 });
+  }
   list.push({ kind: 'box', id: 'workshop', x: WORKSHOP.x, z: WORKSHOP.z, hx: WORKSHOP.w / 2, hz: WORKSHOP.d / 2, rot: WORKSHOP.rot, top: 10 });
   list.push({ kind: 'box', id: 'shop', x: SHOP.x, z: SHOP.z, hx: SHOP.w / 2, hz: SHOP.d / 2, rot: SHOP.rot, top: SHOP.h });
   // shop counter (pulled-out matchbox drawer) — low enough to hop onto
