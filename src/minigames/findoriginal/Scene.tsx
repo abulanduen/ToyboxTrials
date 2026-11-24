@@ -125,7 +125,9 @@ export function FindScene({ getState, localId }: MinigameSceneProps<FindState>) 
     });
   }, []);
   /** The parts this round's crowd uses (recomputed when a new crowd arrives). */
-  const active = useRef<{ toys: Toy[] | null; parts: number[] }>({ toys: null, parts: [] });
+  // Keyed by round and crowd size too, not only the array: online the state is patched in place,
+  // so a new round's crowd can arrive in the same array object.
+  const active = useRef<{ toys: Toy[] | null; round: number; n: number; parts: number[] }>({ toys: null, round: -1, n: -1, parts: [] });
   const shadows = useMemo(() => {
     const mesh = new THREE.InstancedMesh(
       new THREE.CircleGeometry(1.7, 20).rotateX(-Math.PI / 2),
@@ -336,8 +338,10 @@ export function FindScene({ getState, localId }: MinigameSceneProps<FindState>) 
     crowd.count = shown ? n : 0;
     crowd.open = phase === 'search' && !!me && !me.found;
     const act = active.current;
-    if (s && s.toys !== act.toys) {
+    if (s && (s.toys !== act.toys || s.round !== act.round || s.toys.length !== act.n)) {
       act.toys = s.toys;
+      act.round = s.round;
+      act.n = s.toys.length;
       act.parts = partsUsed(s.toys.map((t) => t.look));
       meshes.forEach((m, p) => (m.visible = act.parts.includes(p)));
     }

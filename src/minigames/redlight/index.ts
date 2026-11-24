@@ -5,6 +5,7 @@ import { rlglRules, type RlglInput, type RlglState } from './rules';
 import { createRlglBot } from './bot';
 import { RlglScene } from './Scene';
 import { RlglHud } from './Hud';
+import { predictRlgl } from './predict';
 
 const redlight: MinigameModule<RlglState, RlglInput> = {
   rules: rlglRules,
@@ -13,6 +14,7 @@ const redlight: MinigameModule<RlglState, RlglInput> = {
   readLocalInput: readMoveInput,
   Scene: RlglScene,
   Hud: RlglHud,
+  predictLocal: predictRlgl,
 };
 
 export default redlight;
