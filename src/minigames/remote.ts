@@ -68,7 +68,22 @@ const rt = {
   ackAge: 0,
   /** This match's rendered frames of input the server has not stepped yet, each tagged with the message it goes out in. */
   frames: [] as (PredictFrame & { q: number })[],
+  /** When each numbered message went out (for the input round trip), and the newest round trips measured. */
+  sentAt: new Map<number, number>(),
+  rtts: [] as { ms: number; at: number }[],
 };
+
+/**
+ * Your input round trip in this online match: from sending an input to seeing the server's
+ * snapshot that has stepped it (network both ways, plus the server's tick and snapshot timing).
+ * The median of the last few seconds' measurements, or null without recent ones.
+ */
+export function inputRoundTrip(): { median: number; worst: number; samples: number } | null {
+  const now = performance.now();
+  const recent = rt.rtts.filter((r) => now - r.at < 10_000).map((r) => r.ms).sort((a, b) => a - b);
+  if (recent.length < 3) return null;
+  return { median: Math.round(recent[recent.length >> 1]), worst: Math.round(recent[recent.length - 1]), samples: recent.length };
+}
 
 remoteHost.getState = () => rt.display;
 remoteHost.tick = tickRemote;
@@ -107,6 +122,7 @@ function resetState() {
   rt.ack = -1;
   rt.ackAge = 0;
   rt.frames = [];
+  rt.sentAt.clear();
 }
 
 /** What the game draws: the newest server state on the shown clock, with the local toy's own movement replayed when the game predicts. */
@@ -246,6 +262,13 @@ export function onMatchState(msg: MatchStateMsg) {
   if (typeof msg.a === 'number') {
     rt.ack = msg.a;
     rt.ackAge = typeof msg.g === 'number' ? msg.g : 0;
+    const sent = rt.sentAt.get(msg.a);
+    if (sent !== undefined) {
+      const now = performance.now();
+      rt.rtts.push({ ms: now - sent, at: now });
+      if (rt.rtts.length > 120) rt.rtts.shift();
+    }
+    for (const k of rt.sentAt.keys()) if (k <= msg.a) rt.sentAt.delete(k);
     let drop = 0;
     while (drop < rt.frames.length && rt.frames[drop].q <= msg.a) drop++;
     if (drop) rt.frames.splice(0, drop);
@@ -318,5 +341,6 @@ function tickRemote(dtRealMs: number) {
   // Stay well inside the server's frame limit (a slow frame can queue a lot of stick samples).
   while (items.length > 1 && JSON.stringify(items).length > MAX_MESSAGE_BYTES - 200) items.shift();
   rt.q++;
+  if (rt.sentAt.size < 300) rt.sentAt.set(rt.q, now);
   netLink.send({ t: 'in', m: rt.stateSeq, i: items, q: rt.q });
 }

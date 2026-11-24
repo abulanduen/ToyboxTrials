@@ -5541,3 +5541,10 @@ button.chat-line__name {
     min-height: 56px;
   }
 }
+
+/* The online menu's input round-trip line (LobbyUI OnlineMenu). */
+.online-ping {
+  margin: -4px 0 12px;
+  font-size: 0.85rem;
+  color: var(--ink);
+}

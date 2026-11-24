@@ -23,7 +23,7 @@ import {
   startLobby,
   useLobby,
 } from '../net/lobby';
-import { watchSeat } from '../minigames/remote';
+import { inputRoundTrip, watchSeat } from '../minigames/remote';
 import { fetchLeaderboard, useLeaderboard } from '../net/leaderboard';
 import { DEFAULT_LOBBY_SETTINGS, LOBBY_MAX_CAP, LOBBY_MIN_CAP, type LobbyFormat, type LobbySettings, type LobbyState, type LobbySummary } from '../net/protocol';
 import { MINIGAMES, gameById } from '../minigames/registry';
@@ -671,9 +671,22 @@ function OnlineStandings({ lobby, you, final }: { lobby: LobbyState; you: string
 
 /** In play: the menu (Esc / gear) doesn't pause an online match; it offers to leave. */
 function OnlineMenu({ spectating }: { spectating: boolean }) {
+  // Measured just before the menu opened (no inputs go out while it is open).
+  const [rtt] = useState(() => inputRoundTrip());
   return (
     <CardboardSheet title="Menu" icon={<GearIcon />} className="pause">
       <p className="panel__lead">The match keeps going: online trials don't pause. {spectating ? '' : 'Leaving now counts as a forfeit.'}</p>
+      {!spectating && (
+        <p className="online-ping" data-testid="online-ping">
+          {rtt ? (
+            <>
+              Input round trip: <strong>{rtt.median} ms</strong> (slowest {rtt.worst} ms, last few seconds)
+            </>
+          ) : (
+            'Input round trip: not measured yet (play a few seconds first).'
+          )}
+        </p>
+      )}
       <div className="pause__actions">
         <ToyButton armDelay={300} onClick={() => pauseMatch(false)} autoFocus testId="online-menu-back">
           Back to the trial
