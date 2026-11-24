@@ -556,7 +556,8 @@ export function HoopScene({ getState: rawState, contestants, localId }: Minigame
   const rosterKey = useRef('');
   useFrame(() => {
     const s = getState();
-    const key = s ? `${s.seed}:${s.players.map((p) => p.id).join(',')}` : '';
+    // Not the seed: online it is hidden (always 0), so a rematch with reshuffled teams kept old jerseys.
+    const key = s ? s.players.map((p) => `${p.id}:${p.team}:${p.num}`).join(',') : '';
     if (key === rosterKey.current) return;
     rosterKey.current = key;
     setRoster(
