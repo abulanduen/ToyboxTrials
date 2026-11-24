@@ -2,7 +2,7 @@
  * In-canvas side of the minigame host: drives the session clock and shows either the active
  * game's Scene or a contestant lineup / tournament podium on the tabletop.
  */
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { endFrame } from '../game/input';
@@ -12,6 +12,7 @@ import { WindupBot } from '../character/WindupBot';
 import { createToyAnim, type ToyAnim } from '../character/anim';
 import { MiniContender, createMiniAnim, type MiniAnim } from '../character/MiniContender';
 import { feltMat, woodMat } from '../scene/props';
+import { DEFAULT_FOV } from '../scene/cameraDefaults';
 import { getMatchState, tickMatch, useMatch } from './session';
 import { rankStandings } from './scoring';
 
@@ -28,6 +29,7 @@ export function MatchStage() {
 
   const showGame = !!module && phase !== 'final' && phase !== 'reveal' && phase !== 'loading';
   const gameId = useMatch((s) => s.gameId);
+  useDefaultLens(showGame ? gameId : null);
   useWarmShaders(showGame ? `${gameId}:${localId}` : null, phase === 'playing');
   if (showGame) {
     const Scene = module.Scene;
@@ -35,6 +37,26 @@ export function MatchStage() {
     return <Scene key={localId} getState={getMatchState} contestants={contestants} localId={localId} />;
   }
   return <Lineup podium={phase === 'final'} />;
+}
+
+/**
+ * Each trial starts on the canvas's default lens, and play goes back to the Hub on it: a trial that
+ * sets its own field of view (Find the Original's telephoto) must not leave it to the next trial or
+ * the Hub (seen online: Inferno Escape after Find the Original was zoomed right in).
+ */
+function useDefaultLens(gameId: string | null) {
+  const { camera } = useThree();
+  useLayoutEffect(() => {
+    const reset = () => {
+      const cam = camera as THREE.PerspectiveCamera;
+      if (cam.isPerspectiveCamera && cam.fov !== DEFAULT_FOV) {
+        cam.fov = DEFAULT_FOV;
+        cam.updateProjectionMatrix();
+      }
+    };
+    reset();
+    return reset;
+  }, [gameId, camera]);
 }
 
 /**

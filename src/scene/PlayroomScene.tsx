@@ -2,6 +2,7 @@
  * Canvas, lighting, atmosphere and post-processing for the Playroom.
  * Quality tiers trade shadows/post-processing/resolution for frame rate.
  */
+import { DEFAULT_FOV } from './cameraDefaults';
 import { Suspense, useEffect, useMemo, useRef } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { AdaptiveDpr, Environment, Lightformer } from '@react-three/drei';
@@ -173,7 +174,7 @@ export function PlayroomScene() {
       gl={{ antialias: q.post === 'none' && quality !== 'low', powerPreference: 'high-performance', stencil: false }}
       // near/far tuned for depth precision: nothing gets closer than ~0.6 cm to the camera, and
       // the room fits inside 900 cm. A tighter range means less z-fighting on phone GPUs.
-      camera={{ fov: 50, near: 0.6, far: 900, position: [0, 30, 70] }}
+      camera={{ fov: DEFAULT_FOV, near: 0.6, far: 900, position: [0, 30, 70] }}
       onCreated={({ gl }) => {
         gl.toneMapping = THREE.ACESFilmicToneMapping;
         gl.toneMappingExposure = 1.05;
