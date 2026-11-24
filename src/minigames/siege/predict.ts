@@ -25,7 +25,7 @@ function moveHalf(s: SiegeState, p: SiegePlayer): number | null {
 
 const smooth = new PredictSmoother();
 
-export function predictSiege(s: SiegeState, localId: string, frames: readonly PredictFrame<SiegeInput>[]): SiegeState | null {
+export function predictSiege(s: SiegeState, localId: string, frames: readonly PredictFrame<SiegeInput>[], skipMs = 0): SiegeState | null {
   const i = s.players.findIndex((p) => p.id === localId);
   const me = i >= 0 ? s.players[i] : undefined;
   const half = me ? moveHalf(s, me) : null;
@@ -36,14 +36,15 @@ export function predictSiege(s: SiegeState, localId: string, frames: readonly Pr
 
   // A frame's time passed before its inputs were read, so it moves on the stick as it was, and its
   // inputs act from then on, as on the server (which steps an input from the moment it arrives).
-  // Applying them first would run a slow frame's whole length on the new stick, then need
-  // correcting back once the server's position arrives.
+  // The state already holds the first `skipMs` of that time.
   const p = { ...me };
-  let knownX = p.x, knownZ = p.z;
+  let knownX = p.x, knownZ = p.z, skip = skipMs;
   const lastAt = smooth.knownIndex(frames);
   for (let f = 0; f < frames.length; f++) {
     const fr = frames[f];
-    movePlayer(p, fr.dt / 1000, half);
+    const cut = Math.min(skip, fr.dt);
+    skip -= cut;
+    if (fr.dt > cut) movePlayer(p, (fr.dt - cut) / 1000, half);
     for (const inp of fr.inputs) if (inp.type === 'move') { p.ax = Math.max(-1, Math.min(1, Number(inp.x) || 0)); p.ay = Math.max(-1, Math.min(1, Number(inp.y) || 0)); }
     if (f === lastAt) { knownX = p.x; knownZ = p.z; }
   }

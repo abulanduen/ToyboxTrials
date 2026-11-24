@@ -45,6 +45,7 @@ describe('input acknowledgements', () => {
     expect(run.ackFor('p1')).toBeUndefined(); // received, not stepped
     run.advance(TICK);
     expect(run.ackFor('p1')).toBe(4);
+    expect(run.ackAgeFor('p1')).toBe(Math.round(TICK)); // the state holds one tick of it
     run.input('p1', [], 5); // an empty message is acknowledged too
     run.advance(TICK);
     expect(run.ackFor('p1')).toBe(5);
@@ -93,6 +94,7 @@ describe('predictSiege', () => {
   it.each([
     ['60 fps', 1000 / 60],
     ['slow 220 ms frames', 220],
+    ['very slow 650 ms frames', 650],
   ])('through an 80 ms link (%s) the toy moves on the first frame, glides, and ends where the server puts it', (_label, FRAME) => {
     const run = siegeInRun(21);
     const LAT = 80;
@@ -104,7 +106,7 @@ describe('predictSiege', () => {
     const later = (at: number, fn: () => void) => { queue.push({ at, run: fn }); queue.sort((a, b) => a.at - b.at); };
 
     let state = viewOf(run);
-    let ack = -1;
+    let ack = -1, age = 0;
     let q = 0;
     let pending: SiegeInput[] = [];
     let frames: (PredictFrame<SiegeInput> & { q: number })[] = [];
@@ -115,16 +117,16 @@ describe('predictSiege', () => {
     const shown: { t: number; x: number }[] = [];
     let nextFrame = 0, nextFlush = 0, nextTick = 0;
 
-    for (let t = 0; t <= 3000; t++) {
+    for (let t = 0; t <= 3000 + 6 * FRAME; t++) {
       clock = t;
       while (queue.length && queue[0].at <= t) queue.shift()!.run();
       if (t >= nextTick) {
         nextTick += TICK;
         run.advance(TICK);
-        const view = viewOf(run), a = run.ackFor('p1');
+        const view = viewOf(run), a = run.ackFor('p1'), g = run.ackAgeFor('p1') ?? 0;
         later(t + LAT, () => {
           state = view;
-          if (a !== undefined) { ack = a; frames = frames.filter((f) => f.q > a); }
+          if (a !== undefined) { ack = a; age = g; frames = frames.filter((f) => f.q > a); }
         });
       }
       if (t >= nextFrame) {
@@ -134,11 +136,11 @@ describe('predictSiege', () => {
         axis = want;
         pending.push(...inputs);
         frames.push({ q: q + 1, dt: FRAME, inputs });
-        const out = ack >= 0 ? predictSiege(state, 'p1', frames) : null;
+        const out = ack >= 0 ? predictSiege(state, 'p1', frames, age) : null;
         shown.push({ t, x: meIn(out ?? state).x });
-      }
-      if (t >= nextFlush) {
-        nextFlush += TICK;
+        // as remote.ts: a frame flushes its inputs if a flush interval has passed (never between frames)
+        if (t < nextFlush) continue;
+        nextFlush = t + TICK;
         q++;
         const items = pending, n = q;
         pending = [];
@@ -157,8 +159,14 @@ describe('predictSiege', () => {
     // no twitch: no frame moves more than the toy can walk in it, plus at most one server tick's
     // worth of correction (the server starts and stops an input on its 30 Hz tick)
     for (let i = 1; i < shown.length; i++) expect(Math.abs(shown[i].x - shown[i - 1].x)).toBeLessThan(speed * (FRAME + TICK) / 1000 + 0.1);
-    // it stops on release (no catching up afterwards) and settles exactly where the server has the toy
-    expect(Math.abs(at(RELEASE + 2 * FRAME).x - at(RELEASE + 400 + 2 * FRAME).x)).toBeLessThan(0.3);
+    // it stops on release and settles exactly where the server has the toy: any catching up is at
+    // most a server tick and a frame's walk (the server takes an input on its 30 Hz tick, and the
+    // client sends on a frame, so a press and a release can start and end its walk that far apart)
+    const tickWalk = speed * (TICK + Math.min(FRAME, TICK)) / 1000 + 0.05;
+    expect(Math.abs(at(RELEASE + 2 * FRAME).x - at(RELEASE + 400 + 2 * FRAME).x)).toBeLessThan(tickWalk);
     expect(shown[shown.length - 1].x).toBeCloseTo(meIn(state).x, 3);
+    // and never runs past where it stops (no snapping back on release)
+    const final = meIn(state).x;
+    for (const s of shown) expect(s.x).toBeLessThan(final + tickWalk);
   });
 });

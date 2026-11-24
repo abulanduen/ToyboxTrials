@@ -47,7 +47,7 @@ function playLinked(run: GameRun, stick: (t: number) => { ax: number; act: boole
   const queue: { at: number; run: () => void }[] = [];
   const later = (at: number, fn: () => void) => { queue.push({ at, run: fn }); queue.sort((a, b) => a.at - b.at); };
   let state = viewOf(run);
-  let ack = -1, q = 0;
+  let ack = -1, age = 0, q = 0;
   let pending: HoopInput[] = [];
   let frames: (PredictFrame<HoopInput> & { q: number })[] = [];
   const shown: { t: number; x: number; charge: number }[] = [];
@@ -59,26 +59,26 @@ function playLinked(run: GameRun, stick: (t: number) => { ax: number; act: boole
     if (t >= nextTick) {
       nextTick += TICK;
       run.advance(TICK);
-      const view = viewOf(run), a = run.ackFor('p1'), ev = run.takeEvents();
+      const view = viewOf(run), a = run.ackFor('p1'), g = run.ackAgeFor('p1') ?? 0, ev = run.takeEvents();
       for (const e of ev) events.push({ t, e });
       later(t + lat, () => {
         state = view;
-        if (a !== undefined) { ack = a; frames = frames.filter((f) => f.q > a); }
+        if (a !== undefined) { ack = a; age = g; frames = frames.filter((f) => f.q > a); }
       });
     }
     if (t >= nextFrame) {
       nextFrame += frame;
       const want = stick(t);
-      const drawn = ack >= 0 ? predictHoop(state, 'p1', frames) ?? state : state;
+      const drawn = ack >= 0 ? predictHoop(state, 'p1', frames, age) ?? state : state;
       const seen = P(drawn, 'p1').charge;
       const inp: HoopInput = !want.act && seen >= 0 ? { type: 'in', ax: want.ax, ay: 0, run: false, act: false, charge: Math.round(seen) } : { type: 'in', ax: want.ax, ay: 0, run: false, act: want.act };
       pending.push(inp);
       frames.push({ q: q + 1, dt: frame, inputs: [inp] });
-      const out = ack >= 0 ? predictHoop(state, 'p1', frames) ?? state : state;
+      const out = ack >= 0 ? predictHoop(state, 'p1', frames, age) ?? state : state;
       shown.push({ t, x: P(out, 'p1').x, charge: P(out, 'p1').charge });
-    }
-    if (t >= nextFlush) {
-      nextFlush += TICK;
+      // as remote.ts: a frame flushes its inputs if a flush interval has passed (never between frames)
+      if (t < nextFlush) continue;
+      nextFlush = t + TICK;
       q++;
       const items = pending, n = q;
       pending = [];
@@ -153,10 +153,10 @@ describe('predictHoop', () => {
 });
 
 describe('Hoop Clash through an 80 ms each-way link', () => {
-  it.each([['60 fps', 1000 / 60], ['slow 220 ms frames', 220]])('(%s) the toy moves on the next frame, glides, and ends where the server puts it', (_l, FRAME) => {
+  it.each([['60 fps', 1000 / 60], ['slow 220 ms frames', 220], ['very slow 650 ms frames', 650]])('(%s) the toy moves on the next frame, glides, and ends where the server puts it', (_l, FRAME) => {
     const run = liveRun(false);
     const PRESS = 400, RELEASE = 1400;
-    const { shown, state } = playLinked(run, (t) => ({ ax: t >= PRESS && t < RELEASE ? 1 : 0, act: false }), 2600, FRAME);
+    const { shown, state } = playLinked(run, (t) => ({ ax: t >= PRESS && t < RELEASE ? 1 : 0, act: false }), 2600 + 6 * FRAME, FRAME);
     const x0 = shown[0].x;
     const firstMove = shown.find((s) => s.x > x0 + 1e-6)!;
     expect(firstMove.t - PRESS).toBeLessThanOrEqual(2 * FRAME + 1);
@@ -164,8 +164,11 @@ describe('Hoop Clash through an 80 ms each-way link', () => {
     const at = (t: number) => shown.find((s) => s.t >= t)!;
     // no twitch: no frame moves more than a toy can walk in it (and a server tick's correction)
     for (let i = 1; i < shown.length; i++) expect(Math.abs(shown[i].x - shown[i - 1].x)).toBeLessThan(TUNING.walk * (FRAME + TICK) / 1000 + 0.15);
-    expect(Math.abs(at(RELEASE + 400).x - at(RELEASE + 1000).x)).toBeLessThan(0.05);
+    expect(Math.abs(at(RELEASE + 400 + 3 * FRAME).x - at(RELEASE + 1000 + 3 * FRAME).x)).toBeLessThan(0.05);
     expect(shown[shown.length - 1].x).toBeCloseTo(P(state(), 'p1').x, 3);
+    // and never runs past where it stops (no snapping back on release)
+    const final = P(state(), 'p1').x;
+    for (const s of shown) expect(s.x).toBeLessThan(final + TUNING.walk * TICK / 1000 + 0.05); // at most a server tick's walk past
   });
 
   it('the meter winds from the press, and the shot leaves with the power it showed on letting go', () => {

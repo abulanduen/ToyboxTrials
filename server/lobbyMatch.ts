@@ -395,7 +395,10 @@ export class MatchFlow {
         if (!patch && !events.length && ack === last.ack) continue;
         msg = { t: 'ms', m: this.seq, k: 0, d: patch ?? { o: {} }, e: events, n: this.lastNow };
       }
-      if (ack !== undefined) msg.a = ack;
+      if (ack !== undefined) {
+        msg.a = ack;
+        msg.g = run.ackAgeFor(m.id) ?? 0;
+      }
       this.sent.set(m.id, { seq: this.seq, view, ack });
       out.snapshots.push({ to: m.id, msg });
     }

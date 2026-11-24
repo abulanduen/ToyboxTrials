@@ -49,6 +49,8 @@ export class GameRun {
   /** Each human's newest input message number (`q`) received, and the newest one the rules have stepped. */
   private readonly received = new Map<string, number>();
   private readonly applied = new Map<string, number>();
+  /** Match time each player's newest applied message was first stepped. */
+  private readonly appliedAt = new Map<string, number>();
   private readonly held = new Map<string, { items: unknown[]; at: number }>();
   private events: MatchEvent[] = [];
   readonly forfeited = new Set<string>();
@@ -98,6 +100,12 @@ export class GameRun {
     return this.applied.get(id);
   }
 
+  /** Match ms run since that message was first stepped: the state already holds this much of it. */
+  ackAgeFor(id: string): number | undefined {
+    const at = this.appliedAt.get(id);
+    return at === undefined ? undefined : Math.max(0, Math.round(this.t - at));
+  }
+
   /** A player is out of this trial for good (left, kicked, or gone too long). */
   forfeit(id: string) {
     if (this.forfeited.has(id)) return;
@@ -137,8 +145,11 @@ export class GameRun {
     }
     this.def.rules.step(this.state, inputs, STEP_MS);
     this.t += STEP_MS;
-    // Everything received so far has now been stepped.
-    for (const [id, q] of this.received) this.applied.set(id, q);
+    // Everything received so far has now been stepped (from the start of this step).
+    for (const [id, q] of this.received) {
+      this.applied.set(id, q);
+      this.appliedAt.set(id, this.t - STEP_MS);
+    }
     this.received.clear();
     for (const e of this.def.rules.drainEvents(this.state)) this.events.push(e);
   }

@@ -375,7 +375,10 @@ online"). The other choice in both places is the existing **practice with bots**
   frame's inputs until they are stepped and replays them on the newest server state with the rules'
   own movement (`src/minigames/siege/predict.ts`, `src/minigames/hoopclash/predict.ts`), so your
   toy moves the frame after you press instead of a round trip later. A frame's inputs act after
-  that frame's time, as on the server. Only your own toy is predicted (in Hoop Clash also its
+  that frame's time, as on the server. The snapshot also says how long the rules have already run
+  on that newest stepped message (`g` on `ms`, `GameRun.ackAgeFor`), and the replay skips that much
+  of the unstepped frames' time: without it, slow frames walked the toy past its stop by 2–4 cm
+  (measured at 450–650 ms frames) and it snapped back. Only your own toy is predicted (in Hoop Clash also its
   facing and shot meter); enemies, the ball, passes, steals, damage, pickups and other toys are the
   server's, and so is being pushed by another toy. A snapshot that shifts the replayed position
   fades in over about 0.1 s (jumps over 4 cm show at once; shared in

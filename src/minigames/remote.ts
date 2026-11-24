@@ -64,6 +64,8 @@ const rt = {
   /** Input messages sent this match (the next one is numbered q + 1), and the newest the server has stepped (−1: unknown). */
   q: 0,
   ack: -1,
+  /** How much of the unstepped frames' time the newest state already holds (`g`, match ms). */
+  ackAge: 0,
   /** This match's rendered frames of input the server has not stepped yet, each tagged with the message it goes out in. */
   frames: [] as (PredictFrame & { q: number })[],
 };
@@ -103,6 +105,7 @@ function resetState() {
   rt.pending = [];
   rt.q = 0;
   rt.ack = -1;
+  rt.ackAge = 0;
   rt.frames = [];
 }
 
@@ -112,7 +115,7 @@ function rebuildDisplay() {
   const shown = { ...rt.state, t: rt.display ? rt.display.t : rt.snapT };
   const m = useMatch.getState();
   const predict = m.module?.predictLocal;
-  const predicted = predict && rt.seated && rt.ack >= 0 && m.phase === 'playing' ? predict(shown, rt.you, rt.frames) : null;
+  const predicted = predict && rt.seated && rt.ack >= 0 && m.phase === 'playing' ? predict(shown, rt.you, rt.frames, rt.ackAge) : null;
   rt.display = (predicted as Obj | null) ?? shown;
 }
 
@@ -242,6 +245,7 @@ export function onMatchState(msg: MatchStateMsg) {
   rt.snapT = Number(rt.state.t) || 0;
   if (typeof msg.a === 'number') {
     rt.ack = msg.a;
+    rt.ackAge = typeof msg.g === 'number' ? msg.g : 0;
     let drop = 0;
     while (drop < rt.frames.length && rt.frames[drop].q <= msg.a) drop++;
     if (drop) rt.frames.splice(0, drop);

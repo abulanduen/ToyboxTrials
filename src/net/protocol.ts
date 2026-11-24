@@ -608,6 +608,8 @@ export interface MatchStateMsg {
   n: number;
   /** The newest of this recipient's `in` messages (its `q`) that the rules have stepped. Seated players whose client sends `q` only. */
   a?: number;
+  /** With `a`: match ms the rules have run since they first stepped message `a` (the state already holds that much of it). */
+  g?: number;
 }
 export interface MatchEventWire {
   type: string;
@@ -1071,7 +1073,8 @@ export function validateServerMessage(m: unknown): ServerMsg | null {
     case 'ms': {
       if (!isInt(m.m) || (m.k !== 0 && m.k !== 1) || !isNum(m.n) || !Array.isArray(m.e) || m.d === undefined) return null;
       const e = m.e.filter((x): x is MatchEventWire => isObj(x) && typeof x.type === 'string');
-      return isInt(m.a) && m.a >= 0 ? { t: 'ms', m: m.m, k: m.k, d: m.d, e, n: m.n, a: m.a } : { t: 'ms', m: m.m, k: m.k, d: m.d, e, n: m.n };
+      if (!(isInt(m.a) && m.a >= 0)) return { t: 'ms', m: m.m, k: m.k, d: m.d, e, n: m.n };
+      return isNum(m.g) && m.g >= 0 ? { t: 'ms', m: m.m, k: m.k, d: m.d, e, n: m.n, a: m.a, g: m.g } : { t: 'ms', m: m.m, k: m.k, d: m.d, e, n: m.n, a: m.a };
     }
     case 'chat':
       if (!isPlayerId(m.id) || !isStr(m.name, 64) || !isStr(m.text, CHAT_RAW_MAX) || !isInt(m.n)) return null;

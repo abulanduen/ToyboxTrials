@@ -116,11 +116,14 @@ export interface MinigameModule<State = unknown, Input = unknown> {
   /**
    * Online only: show the local player's own movement at once instead of a round trip later.
    * Given the newest server state and this player's inputs the server has not stepped yet (one
-   * entry per rendered frame, oldest first, `dt` in match ms), return the state to draw, or null to
-   * draw the server state as it is. Must not change `state` (it is the base for the next patch);
-   * the server stays in charge, so the next snapshot corrects any guess. See src/minigames/remote.ts.
+   * entry per rendered frame, oldest first, `dt` in match ms: the time before that frame's inputs
+   * were read), return the state to draw, or null to draw the server state as it is. The state
+   * already holds the first `skipMs` of the frames' time (the server ran on the newest stepped
+   * input for that long): replay the frames' inputs, but only the time after that. Must not change
+   * `state` (it is the base for the next patch); the server stays in charge, so the next snapshot
+   * corrects any guess. See src/minigames/remote.ts.
    */
-  predictLocal?: (state: State, localId: string, frames: readonly PredictFrame<Input>[]) => State | null;
+  predictLocal?: (state: State, localId: string, frames: readonly PredictFrame<Input>[], skipMs: number) => State | null;
 }
 
 /** One rendered frame of local input not yet stepped by the server (see `predictLocal`). */

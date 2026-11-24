@@ -19,7 +19,7 @@ import type { PredictFrame } from '../types';
 const smooth = new PredictSmoother();
 const fin = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(-1, Math.min(1, v)) : 0);
 
-export function predictHoop(s: HoopState, localId: string, frames: readonly PredictFrame<HoopInput>[]): HoopState | null {
+export function predictHoop(s: HoopState, localId: string, frames: readonly PredictFrame<HoopInput>[], skipMs = 0): HoopState | null {
   const i = s.players.findIndex((p) => p.id === localId);
   const me = i >= 0 ? s.players[i] : undefined;
   if (!me || me.ai || isFrozen(s)) {
@@ -27,12 +27,15 @@ export function predictHoop(s: HoopState, localId: string, frames: readonly Pred
     return null;
   }
   const p = { ...me, in: { ...me.in } };
-  let knownX = p.x, knownZ = p.z;
+  let knownX = p.x, knownZ = p.z, skip = skipMs;
   const lastAt = smooth.knownIndex(frames);
   for (let f = 0; f < frames.length; f++) {
     const fr = frames[f];
-    // The frame's time on the inputs as they were, in the rules' own steps (charge counts up first, as there).
-    for (let left = fr.dt; left > 1e-6; left -= STEP_MS) {
+    // The frame's time on the inputs as they were (less what the state already holds: `skipMs`),
+    // in the rules' own steps (charge counts up first, as there).
+    const cut = Math.min(skip, fr.dt);
+    skip -= cut;
+    for (let left = fr.dt - cut; left > 1e-6; left -= STEP_MS) {
       const dt = Math.min(STEP_MS, left);
       if (p.charge >= 0) p.charge += dt;
       p.hop = false; // hops come from the server (a swipe or a jump shot)
