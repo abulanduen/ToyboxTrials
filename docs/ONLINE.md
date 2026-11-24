@@ -368,12 +368,13 @@ online"). The other choice in both places is the existing **practice with bots**
   clock `t` on smoothly (at most 120 ms past the newest snapshot, never backwards), which keeps
   animations and the rhythm song clock at frame rate. Positions are not interpolated: moving toys
   step at 30 Hz (the Racer scenes smooth them; Blink Duel and Spellbox show the steps).
-- **Own-toy prediction (Toybox Siege, Hoop Clash):** a game can give its module a `predictLocal`
+- **Own-toy prediction (Toybox Siege, Hoop Clash, Red Light, Green Light, Midnight Hunger, Inferno
+  Escape):** a game can give its module a `predictLocal`
   (`src/minigames/types.ts`). The client numbers its input messages (`q` on `in`; a predicting game
   sends one every flush, even empty), and the server puts the newest number its rules have stepped
   on that player's snapshots (`a` on `ms`, `GameRun.ackFor`). The client keeps each rendered
   frame's inputs until they are stepped and replays them on the newest server state with the rules'
-  own movement (`src/minigames/siege/predict.ts`, `src/minigames/hoopclash/predict.ts`), so your
+  own movement (`src/minigames/<game>/predict.ts`), so your
   toy moves the frame after you press instead of a round trip later. A frame's inputs act after
   that frame's time, as on the server. The snapshot also says how long the rules have already run
   on that newest stepped message (`g` on `ms`, `GameRun.ackAgeFor`), and the replay skips that much
@@ -384,13 +385,26 @@ online"). The other choice in both places is the existing **practice with bots**
   fades in over about 0.1 s (jumps over 4 cm show at once; shared in
   `src/minigames/shared/predictSmooth.ts`). Both fields are optional: a client or server without
   them behaves as before (no prediction), so no protocol version change. Tested in node through a
-  simulated 80 ms each-way link at 60 fps and at 220 ms frames (`tests/unit/siege-predict.test.ts`,
-  `tests/unit/hoopclash-predict.test.ts`) and in a browser through a delay proxy; not yet on a
-  real network.
+  simulated 80 ms each-way link at 60 fps and at 220 ms frames (`tests/unit/*-predict.test.ts`)
+  and in a browser through a delay proxy; not yet on a real network.
   - Hoop Clash shots: since the meter is predicted, a let-go carries the charge the meter showed
     (`charge` on the `in` input), and the rules take it if it is at most 250 ms below or 50 ms above
     their own count (`CHARGE_CLAIM`), so the power you saw is the power you get. A modified client
     could choose its power within that window; every player gets the same allowance.
+  - Midnight Hunger and Inferno Escape (tile games with held inputs): a held direction turns the
+    toy at once and hops it a cell per cooldown; Inferno also predicts breaking the rock ahead.
+    Hops into another toy (a push), building, batteries and the furnace stay the server's. The
+    server keeps stepping a player's newest input batch until the next arrives (`HELD_INPUT_MS`, now
+    in `src/net/protocol.ts`), so the snapshot carries on with that batch: the client passes the
+    newest stepped message's inputs to the replay (`held`), on the server's 60 Hz step grid
+    (`src/minigames/shared/predictGrid.ts`). When the server took each message in is only known to
+    about a tick, so a hop near the moment you let go could go either way. The replay leans late
+    (a hop waits one tick past the cooldown, held repeats stop a tick short), and a hop already
+    drawn is kept up to 250 ms while a new snapshot moves its moment (`GridSettle`). Without these,
+    the toy hopped a cell too far and back. Tested in node through simulated links (10–150 ms each
+    way, 17–240 ms frames) and in a browser through an 80 and a 150 ms delay proxy: the toy moves
+    5–60 ms after the key (the frame after), against 200–400 ms for the server's cell, with no
+    hop taken back. Not yet on a real network.
 - **Results and placements come from the server**; the clients only show them.
 - **Disconnects:** a dropped player's seat is kept for 30 s (`RESUME_WINDOW_MS`, the Hub's own
   resume window): the match goes on without their inputs, and on reconnect they get the lobby and
@@ -403,9 +417,9 @@ online"). The other choice in both places is the existing **practice with bots**
     latency but means a modified client could claim good timings within that window.
   - Red Light, Green Light: a player sees red one trip and a snapshot late, and their stop reaches
     the rules another trip and an input batch later, about 130–180 ms on a good connection. That is
-    more than the whole 140 ms grace, so online toys were caught after their players had let go.
-    Online the grace is 310 ms (`config.graceMs`); practice keeps 140 ms. A modified client could
-    use the extra time; every player gets the same allowance.
+    more than a reaction-sized grace, so online toys were caught after their players had let go.
+    Online the grace is 170 ms longer than practice's 320 ms (`config.graceMs`). A modified client
+    could use the extra time; every player gets the same allowance.
   - Blink Duel and Spellbox Showdown: inputs act on the next server step after they arrive, so a
     blink or swing lands one network trip (plus up to ~33 ms of input batching) after the press.
     There is no client-side prediction. Not measured on a real network.
@@ -748,7 +762,8 @@ Railway pushes a new server on every commit to the branch it watches. The client
   Wind-Up Dash, Music Box Rhythm, Copycat Conductor, Inferno Escape and Odd Page Out, with the players idle. The
   other trials' Scenes and Huds have not been watched on server state in a browser yet, and
   nobody has played a trial online by hand.
-- Client-side prediction only for your own toy in Toybox Siege, and no position interpolation in
+- Client-side prediction only for your own toy, and only in Toybox Siege, Hoop Clash, Red Light,
+  Midnight Hunger and Inferno Escape; no position interpolation in
   online matches (see above); no
   matchmaking queues, parties or ranked play (M9/M10). Online matches don't pay cogs or update
   local records yet.

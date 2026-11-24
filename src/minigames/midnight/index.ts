@@ -3,6 +3,7 @@ import { heldGridDirection } from '../shared/gridStick';
 import type { MinigameModule } from '../types';
 import { hungerRules, type Direction, type HungerInput, type HungerState } from './rules';
 import { createHungerBot } from './bot';
+import { predictHunger } from './predict';
 import { HungerScene } from './Scene';
 import { HungerHud } from './Hud';
 
@@ -14,6 +15,8 @@ const game: MinigameModule<HungerState, HungerInput> = {
     const direction = heldGridDirection(presses);
     return [{ direction: direction as Direction | null, hit: isDown('slot1') || presses.includes('slot1') }];
   },
+  // Online: your toy turns and hops the moment you press, not a round trip later (./predict.ts).
+  predictLocal: predictHunger,
   Scene: HungerScene, Hud: HungerHud,
 };
 export default game;

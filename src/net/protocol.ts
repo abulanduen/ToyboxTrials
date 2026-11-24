@@ -171,6 +171,12 @@ export const MATCH_TICK_HZ = 30;
 export const MAX_INPUTS_PER_MSG = 32;
 /** How often a client flushes its queued match inputs to the server (ms). */
 export const INPUT_FLUSH_MS = 1000 / MATCH_TICK_HZ;
+/**
+ * Held-input games (`heldInputs` in src/minigames/facts.ts): the server keeps stepping a player's
+ * newest input batch until the next one arrives, for at most this long (match ms). Client
+ * prediction replays the same (src/minigames/shared/predictGrid.ts).
+ */
+export const HELD_INPUT_MS = 250;
 
 export const LOBBY_FORMATS = ['blitz', 'normal', 'treasure'] as const;
 export type LobbyFormat = (typeof LOBBY_FORMATS)[number];

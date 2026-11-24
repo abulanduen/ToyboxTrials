@@ -24,3 +24,10 @@ not frame-rate benchmarks.
 
 Centre-spawn revision: 43 unit tests and production build pass, including rock/wall destruction
 timing and wall ownership. Inferno desktop and touch-portrait flows were rerun successfully.
+
+## Online: own-toy prediction
+
+Online, your own toy turns and moves a tile the frame after you press, instead of a network round
+trip later: `predict.ts` replays your not-yet-stepped inputs on the newest server state with the
+rules' timing and the server's held-input repeat (`../shared/predictGrid.ts`; see docs/ONLINE.md,
+"Own-toy prediction"). Everything else stays the server's. Tests: `tests/unit/inferno-predict.test.ts`.

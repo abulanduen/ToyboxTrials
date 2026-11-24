@@ -68,6 +68,8 @@ const rt = {
   ackAge: 0,
   /** This match's rendered frames of input the server has not stepped yet, each tagged with the message it goes out in. */
   frames: [] as (PredictFrame & { q: number })[],
+  /** The inputs of message `ack`: held-input games' servers keep stepping them until the next message arrives. */
+  held: [] as readonly unknown[],
   /** When each numbered message went out (for the input round trip), and the newest round trips measured. */
   sentAt: new Map<number, number>(),
   rtts: [] as { ms: number; at: number }[],
@@ -95,7 +97,7 @@ remoteHost.follow = (id) => {
 
 export const remoteDebug = () => ({ stateSeq: rt.stateSeq, seated: rt.seated, watch: rt.watch, pendingInputs: rt.pending.length, hasState: !!rt.state, sent: rt.q, ack: rt.ack, unstepped: rt.frames.length, frameMs: rt.frames.map((f) => Math.round(f.dt)), frameQ: rt.frames.map((f) => f.q) });
 /** Test hook: the newest server state and the state being drawn (with own-toy prediction). */
-export const remoteStates = () => ({ server: rt.state, shown: rt.display });
+export const remoteStates = () => ({ server: rt.state, shown: rt.display, you: rt.you });
 
 /** A lobby member or match seat as the local host's Contestant. */
 function contestant(p: { id: string; name: string; look: MatchSeat['look'] }, you: string, bot: MatchSeat['bot'] = null): Contestant {
@@ -122,6 +124,7 @@ function resetState() {
   rt.ack = -1;
   rt.ackAge = 0;
   rt.frames = [];
+  rt.held = [];
   rt.sentAt.clear();
 }
 
@@ -131,7 +134,7 @@ function rebuildDisplay() {
   const shown = { ...rt.state, t: rt.display ? rt.display.t : rt.snapT };
   const m = useMatch.getState();
   const predict = m.module?.predictLocal;
-  const predicted = predict && rt.seated && rt.ack >= 0 && m.phase === 'playing' ? predict(shown, rt.you, rt.frames, rt.ackAge) : null;
+  const predicted = predict && rt.seated && rt.ack >= 0 && m.phase === 'playing' ? predict(shown, rt.you, rt.frames, rt.ackAge, rt.held) : null;
   rt.display = (predicted as Obj | null) ?? shown;
 }
 
@@ -271,7 +274,10 @@ export function onMatchState(msg: MatchStateMsg) {
     for (const k of rt.sentAt.keys()) if (k <= msg.a) rt.sentAt.delete(k);
     let drop = 0;
     while (drop < rt.frames.length && rt.frames[drop].q <= msg.a) drop++;
-    if (drop) rt.frames.splice(0, drop);
+    if (drop) {
+      const acked = rt.frames.splice(0, drop).filter((f) => f.q === msg.a);
+      if (acked.length) rt.held = acked.flatMap((f) => f.inputs);
+    }
   }
   rt.display = { ...rt.state, t: Math.max(rt.snapT, Math.min(rt.shownT, rt.snapT + MAX_AHEAD_MS * rt.timeScale)) };
   rebuildDisplay();

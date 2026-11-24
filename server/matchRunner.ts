@@ -10,6 +10,7 @@ import { seededRng, subSeed } from '../src/minigames/rng';
 import type { Contestant, MatchEvent, MinigameResult, Placement } from '../src/minigames/types';
 import type { MinigameId } from '../src/minigames/ids';
 import { wireCopy } from '../src/net/delta';
+import { HELD_INPUT_MS } from '../src/net/protocol';
 import { serverGame, type BotPolicy, type ServerGame } from './games';
 
 /** The rules' fixed step, the same as the local host (src/minigames/session.ts). */
@@ -18,8 +19,6 @@ export const STEP_MS = 1000 / 60;
 export const MAX_ADVANCE_MS = 2000;
 /** Inputs one player may have waiting for the next step; more are dropped. */
 export const MAX_PENDING_INPUTS = 64;
-/** A held-input batch (repeatInputs games) stops repeating after this much match time without a new one. */
-export const HELD_INPUT_MS = 250;
 
 type Obj = Record<string, unknown>;
 

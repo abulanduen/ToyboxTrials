@@ -3,6 +3,7 @@ import { HUB_BINDINGS, isDown } from '../../game/input';
 import type { MinigameModule } from '../types';
 import { infernoRules, type InfernoInput, type InfernoState } from './rules';
 import { createInfernoBot } from './bot';
+import { predictInferno } from './predict';
 import { InfernoScene } from './Scene';
 import { InfernoHud } from './Hud';
 
@@ -18,6 +19,8 @@ const game: MinigameModule<InfernoState, InfernoInput> = {
     if (presses.includes('slot2')) inputs.push({ action: 'build' });
     return inputs;
   },
+  // Online: your toy turns, moves and breaks rock the moment you press, not a round trip later (./predict.ts).
+  predictLocal: predictInferno,
   Scene: InfernoScene, Hud: InfernoHud,
 };
 export default game;

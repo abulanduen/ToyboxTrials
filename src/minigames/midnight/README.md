@@ -1,7 +1,7 @@
 # Midnight Hunger — local first pass
 
 Entry: Tournament Pavilion → **Or practise one trial → Midnight Hunger**. Also available in local
-bot tournaments, 2–8 contenders. Online multiplayer is future work.
+bot tournaments, 2–8 contenders. Also playable online (server-run; see the end of this file).
 
 Move with WASD/arrows or the four held/tapped direction pads. During the 10-second night,
 face a battery-carrying clockwork bot and use **Spacebar / Hit** three times to claim its recharge.
@@ -61,3 +61,10 @@ Collision/combat revision: 59 unit tests and production build pass. Midnight des
 landscape checks verify solid battery collision and exactly three Spacebar/Hit attacks to recharge.
 Inferno desktop/touch checks verify Spacebar breaking, R building and touch equivalents. The
 existing mobile hub/Copycat/Jack/Workshop regression remains green.
+
+## Online: own-toy prediction
+
+Online, your own toy turns and hops a cell the frame after you press, instead of a network round
+trip later: `predict.ts` replays your not-yet-stepped inputs on the newest server state with the
+rules' timing and the server's held-input repeat (`../shared/predictGrid.ts`; see docs/ONLINE.md,
+"Own-toy prediction"). Everything else stays the server's. Tests: `tests/unit/midnight-predict.test.ts`.

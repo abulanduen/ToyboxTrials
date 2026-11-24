@@ -121,9 +121,10 @@ export interface MinigameModule<State = unknown, Input = unknown> {
    * already holds the first `skipMs` of the frames' time (the server ran on the newest stepped
    * input for that long): replay the frames' inputs, but only the time after that. Must not change
    * `state` (it is the base for the next patch); the server stays in charge, so the next snapshot
-   * corrects any guess. See src/minigames/remote.ts.
+   * corrects any guess. `held` is the newest stepped message's inputs, which a held-input game's
+   * server keeps stepping until the frames' first message arrives. See src/minigames/remote.ts.
    */
-  predictLocal?: (state: State, localId: string, frames: readonly PredictFrame<Input>[], skipMs: number) => State | null;
+  predictLocal?: (state: State, localId: string, frames: readonly PredictFrame<Input>[], skipMs: number, held?: readonly Input[]) => State | null;
 }
 
 /** One rendered frame of local input not yet stepped by the server (see `predictLocal`). */
