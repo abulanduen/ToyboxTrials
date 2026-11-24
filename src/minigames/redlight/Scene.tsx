@@ -15,7 +15,7 @@ import type { MinigameSceneProps } from '../types';
 import { ChaseCam, type ChaseShot } from '../shared/ChaseCam';
 import { FinishGate } from '../shared/CourseBits';
 import { Racer, type RacerView } from '../shared/Racer';
-import { DEFAULT_CONFIG, currentCycle, type RlglState } from './rules';
+import { DEFAULT_CONFIG, shownCycle, type RlglState } from './rules';
 
 /** Where the runway sits on the table: rules −z (forward) runs along world −x. */
 const COURSE_POS: [number, number, number] = [-9, 0, -6];
@@ -40,6 +40,10 @@ export function RlglScene({ getState: rawState, contestants, localId }: Minigame
   }, [rawState]);
   const course = useRef<THREE.Group>(null);
   const swat = useRef(-99); // clock time of the last catch (the Signalman lunges)
+  // This warning's length, from the 'warn' event: online the light timings (`cycles`) are hidden
+  // from clients, so the Scene must not read them (it threw every frame of the turn and froze the
+  // screen until red).
+  const warnMs = useRef(0);
   // Before the first countdown there is no state yet: show the empty runway from the start line.
   const cfg = getState()?.config ?? DEFAULT_CONFIG;
 
@@ -51,6 +55,7 @@ export function RlglScene({ getState: rawState, contestants, localId }: Minigame
             sfx.signalGo();
             break;
           case 'warn':
+            warnMs.current = e.ms as number;
             sfx.signalWarn(e.ms as number);
             break;
           case 'stop':
@@ -108,7 +113,7 @@ export function RlglScene({ getState: rawState, contestants, localId }: Minigame
       <Runway halfWidth={cfg.halfWidth} startZ={cfg.startZ} finishZ={cfg.finishZ} length={length} midZ={midZ} />
       <RailLamps getState={getState} halfWidth={cfg.halfWidth} startZ={cfg.startZ} finishZ={cfg.finishZ} />
       <group position={[0, 0, refZ]}>
-        <Signalman getState={getState} swat={swat} />
+        <Signalman getState={getState} swat={swat} warnMs={warnMs} />
       </group>
       {contestants.map((c) => (
         <Racer key={c.id} c={c} view={views.get(c.id)!} />
@@ -202,7 +207,7 @@ function RailLamps({ getState, halfWidth, startZ, finishZ }: { getState: () => R
 // --------------------------------------------------------------------------------- Signalman
 
 /** The referee. Its front is +z (towards the start line) at yaw 0. */
-function Signalman({ getState, swat }: { getState: () => RlglState | null; swat: React.RefObject<number> }) {
+function Signalman({ getState, swat, warnMs }: { getState: () => RlglState | null; swat: React.RefObject<number>; warnMs: React.RefObject<number> }) {
   const turn = useRef<THREE.Group>(null!);
   const head = useRef<THREE.Group>(null!);
   const key = useRef<THREE.Group>(null!);
@@ -221,7 +226,9 @@ function Signalman({ getState, swat }: { getState: () => RlglState | null; swat:
     let wind = 0;
     if (s.phase === 'go') yaw = Math.PI * smooth(Math.min(1, s.phaseT / 280));
     else if (s.phase === 'warn') {
-      const k = Math.min(1, s.phaseT / currentCycle(s).warnMs);
+      // Locally the timings are known; online (hidden) the 'warn' event's length, else the middle of the range.
+      const ms = shownCycle(s)?.warnMs ?? (warnMs.current || (s.config.warnMs[0] + s.config.warnMs[1]) / 2);
+      const k = Math.min(1, s.phaseT / ms);
       // Shudder on the spot first, then whip round in the last 60%.
       yaw = Math.PI * (1 - smooth(Math.max(0, (k - 0.4) / 0.6)));
       wind = 1;

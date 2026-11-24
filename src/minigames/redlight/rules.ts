@@ -108,7 +108,10 @@ export interface RlglState {
   events: MatchEvent[];
 }
 
+/** This cycle's timings (the rules and bots: they always have them). */
 export const currentCycle = (s: RlglState) => s.cycles[s.cycle % s.cycles.length];
+/** For views: undefined in an online client's state, where the server hides the timings (server/games.ts). */
+export const shownCycle = (s: RlglState): Cycle | undefined => (s.cycles.length ? currentCycle(s) : undefined);
 
 /** 0 at the start line, 1 at the finish. */
 export function progressOf(s: RlglState, p: RlglPlayer): number {

@@ -90,3 +90,14 @@ describe('Red Light own-toy prediction', () => {
     expect(shown[shown.length - 1].z).toBeCloseTo(final, 3);
   });
 });
+
+describe('Red Light views without the hidden timings', () => {
+  it('an online client gets no light timings, and the view accessor copes (the Scene froze reading them)', async () => {
+    const { shownCycle, currentCycle } = await import('../../src/minigames/redlight/rules');
+    const run = goRun();
+    const view = viewOf(run);
+    expect(view.cycles).toEqual([]);
+    expect(shownCycle(view)).toBeUndefined();
+    expect(shownCycle(run.state as RlglState)).toEqual(currentCycle(run.state as RlglState));
+  });
+});
