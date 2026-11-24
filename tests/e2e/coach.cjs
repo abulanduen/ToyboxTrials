@@ -138,7 +138,7 @@ async function walk(page, label, tour, { touch, press, shots } = {}) {
   return steps;
 }
 
-const LABEL = { pavilion: 'Pavilion', scoreboard: 'Scoreboard', jukebox: 'Jukebox' };
+const LABEL = { pavilion: 'Curator', scoreboard: 'Scoreboard', jukebox: 'Jukebox' };
 /** Walk up to a Hub spot (teleport) and use it: E on desktop, the prompt button on a phone. */
 async function hubOpen(page, spot, touch, sel) {
   await page.evaluate((s) => window.__toybox.hub.goTo(s), spot);
