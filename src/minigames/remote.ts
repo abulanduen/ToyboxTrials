@@ -76,7 +76,7 @@ remoteHost.follow = (id) => {
   netLink.send({ t: 'lobby', a: 'watch', id: id ?? rt.you });
 };
 
-export const remoteDebug = () => ({ stateSeq: rt.stateSeq, seated: rt.seated, watch: rt.watch, pendingInputs: rt.pending.length, hasState: !!rt.state, sent: rt.q, ack: rt.ack, unstepped: rt.frames.length });
+export const remoteDebug = () => ({ stateSeq: rt.stateSeq, seated: rt.seated, watch: rt.watch, pendingInputs: rt.pending.length, hasState: !!rt.state, sent: rt.q, ack: rt.ack, unstepped: rt.frames.length, frameMs: rt.frames.map((f) => Math.round(f.dt)), frameQ: rt.frames.map((f) => f.q) });
 /** Test hook: the newest server state and the state being drawn (with own-toy prediction). */
 export const remoteStates = () => ({ server: rt.state, shown: rt.display });
 
