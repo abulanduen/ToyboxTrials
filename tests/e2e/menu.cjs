@@ -21,7 +21,7 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
   await page.addInitScript(() => {
     if (!sessionStorage.getItem('seeded')) {
       sessionStorage.setItem('seeded', '1');
-      localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { tourSeen: true, quality: 'balanced' }, version: 0 }));
+      localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { tourSeen: true, coachSeen: ['menu', 'pavilion', 'trial', 'workshop', 'shop', 'scoreboard', 'jukebox', 'lobby'], quality: 'balanced' }, version: 0 }));
     }
   });
 

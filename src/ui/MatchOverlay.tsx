@@ -32,6 +32,7 @@ import { CogIcon } from './itemIcons';
 import type { Reward } from '../game/economy';
 import { GameCardGrid, HostTrialRow, LengthChip, OnlineMatchOverlay, PavilionOnline, PavilionTabs, formatRule, type PavilionTab } from './LobbyUI';
 import { durationLabel } from '../minigames/length';
+import { CoachMarks } from './CoachMarks';
 
 /** "+23 cogs" with the breakdown, and anything an achievement just unlocked. */
 function CogsEarned({ reward, unlocked, testId }: { reward: Reward; unlocked: string[]; testId: string }) {
@@ -173,7 +174,7 @@ function Intro({ touch }: { touch: boolean }) {
           <IntroGuide def={def} touch={touch} />
           {!isTournament && (
             <div className="intro-options">
-              <div className="setting">
+              <div className="setting" data-coach="trial-opponents">
                 <span>Opponents</span>
                 <div className="segmented">
                   {[0, 1, 3, 5, 7].filter((n) => n + 1 >= def.players.min && n + 1 <= def.players.max).map((n) => (
@@ -204,7 +205,7 @@ function Intro({ touch }: { touch: boolean }) {
           )}
         </>
       )}
-      <div className="pause__actions">
+      <div className="pause__actions" data-coach="trial-start">
         {!m.error && (
           <ToyButton armDelay={700} onClick={beginCountdown} autoFocus testId="match-start">
             {isTournament ? 'Ready!' : 'Start'}
@@ -214,6 +215,8 @@ function Intro({ touch }: { touch: boolean }) {
           {isTournament ? 'Quit tournament' : 'Back to the Playroom'}
         </ToyButton>
       </div>
+      {/* First-time tips for the intro card: shown for the first trial a player opens, not per trial. */}
+      {!m.error && <CoachMarks tour="trial" />}
     </CardboardSheet>
   );
 }
@@ -266,7 +269,7 @@ export function IntroGuide({ def, touch }: { def: MinigameDefinition; touch: boo
       {turnedOff ? (
         <p className="tutorial-note" data-testid="tutorial-off-note">Tutorials are off. You can turn them back on in Settings.</p>
       ) : steps ? (
-        <button className="tutorial-open" onClick={() => (sfx.click(), setShowTutorial(true))} data-testid="tutorial-open">
+        <button className="tutorial-open" onClick={() => (sfx.click(), setShowTutorial(true))} data-testid="tutorial-open" data-coach="trial-howto">
           How to play
         </button>
       ) : null}
@@ -286,7 +289,7 @@ function Tutorial({ steps, touch, accent, onClose, onNever }: { steps: TutorialS
   const last = i === steps.length - 1;
   return (
     <section ref={root} className="tutorial" aria-label="How to play" data-testid="tutorial" style={{ ['--accent' as string]: accent }}>
-      <div className="tutorial__head">
+      <div className="tutorial__head" data-coach="trial-howto">
         <span>How to play</span>
         <span aria-live="polite" data-testid="tutorial-step">
           {i + 1} / {steps.length}
@@ -514,7 +517,7 @@ export function TournamentPicker({ onClose }: { onClose: () => void }) {
   return (
     <>
       <PavilionTabs tab={tab} onTab={setTab} />
-      <div className="formats" role="radiogroup" aria-label="Tournament format">
+      <div className="formats" role="radiogroup" aria-label="Tournament format" data-coach="pavilion-formats">
         {(Object.keys(FORMATS) as TournamentFormat[]).map((f) => (
           <button
             key={f}
@@ -534,7 +537,7 @@ export function TournamentPicker({ onClose }: { onClose: () => void }) {
         <PavilionOnline format={format} onClose={onClose} />
       ) : (
         <>
-      <div className="intro-options">
+      <div className="intro-options" data-coach="pavilion-bots">
         <div className="setting">
           <span>Bot opponents</span>
           <div className="segmented">
@@ -547,7 +550,7 @@ export function TournamentPicker({ onClose }: { onClose: () => void }) {
         </div>
         <DifficultyPicker value={difficulty} onChange={setDifficulty} />
       </div>
-      <p className="panel__note" data-testid="format-rule">
+      <p className="panel__note" data-testid="format-rule" data-coach="pavilion-rule">
         Practice against bots, unranked. {formatRule(format)}
       </p>
       <PracticeList onClose={onClose} />
@@ -556,7 +559,7 @@ export function TournamentPicker({ onClose }: { onClose: () => void }) {
           Last: {FORMATS[history[0].format].name}, placed {ordinal(history[0].place)} of {history[0].of}
         </p>
       )}
-      <div className="pause__actions">
+      <div className="pause__actions" data-coach="pavilion-start">
         <ToyButton
           onClick={() => {
             onClose();
@@ -573,6 +576,8 @@ export function TournamentPicker({ onClose }: { onClose: () => void }) {
       </div>
         </>
       )}
+      {/* First-time tips, however the panel was opened. */}
+      <CoachMarks tour="pavilion" />
     </>
   );
 }
@@ -586,7 +591,7 @@ export function unit(plural: string, n: number) {
 function PracticeList({ onClose }: { onClose: () => void }) {
   const records = useGame((s) => s.records);
   return (
-    <div className="practice-list" aria-label="Practice a trial">
+    <div className="practice-list" aria-label="Practice a trial" data-coach="pavilion-practice">
       <span className="practice-list__title">Or practise one trial</span>
       <GameCardGrid
         testPrefix="practice"

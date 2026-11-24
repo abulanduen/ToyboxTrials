@@ -5548,3 +5548,150 @@ button.chat-line__name {
   font-size: 0.85rem;
   color: var(--ink);
 }
+
+/* ---------- first-time menu tips (src/ui/CoachMarks.tsx) ---------- */
+/* Above every menu and sheet. Only the card takes taps: the dimming and outline let them through. */
+.coach {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+}
+.coach__spot {
+  position: fixed;
+  border-radius: 14px;
+  outline: 4px solid var(--honey);
+  outline-offset: 0;
+  box-shadow:
+    0 0 0 7px rgba(43, 36, 51, 0.55),
+    0 0 0 9999px rgba(43, 36, 51, 0.38);
+  pointer-events: none;
+  animation: coach-pulse 1.6s ease-in-out infinite;
+}
+@keyframes coach-pulse {
+  50% {
+    outline-color: var(--cream);
+  }
+}
+.coach__card {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: min(360px, calc(100vw - 20px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+  max-height: calc(100vh - 20px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  overflow: auto;
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px 12px;
+  border-radius: 18px;
+  border: 3px solid var(--ink-deep);
+  background: var(--paper);
+  box-shadow: var(--shadow);
+  color: var(--ink-deep);
+  pointer-events: auto;
+  touch-action: manipulation;
+  animation: prompt-pop 0.25s cubic-bezier(0.2, 1.8, 0.4, 1) both;
+}
+.coach__card:focus {
+  outline: none;
+}
+.coach__card:focus-visible {
+  outline: 4px solid var(--blue);
+  outline-offset: 3px;
+}
+.coach__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.coach__head .pipwick-badge {
+  width: 40px;
+  height: 40px;
+}
+.coach__title {
+  flex: 1;
+  font: 600 1.15rem/1.15 var(--font-display);
+  color: var(--coral);
+}
+.coach__count {
+  font: 700 0.8rem var(--font-body);
+  color: var(--ink);
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+.coach__text {
+  margin: 0;
+  font: 600 0.98rem/1.35 var(--font-body);
+}
+.coach__nav {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding-top: 4px;
+}
+.coach__nav .coach__skip {
+  margin-right: auto;
+}
+.coach__btn {
+  min-height: 56px;
+  min-width: 64px;
+  font-size: 1rem;
+}
+.coach__btn > span {
+  padding: 0.7em 1em;
+  white-space: nowrap;
+}
+.coach__btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.coach__btn:disabled > span {
+  transform: translateY(-6px);
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  /* phone landscape: a wide, short card (words on the left, buttons on the right), so it fits
+     above or below what it points at */
+  .coach__card {
+    width: min(620px, calc(100vw - 20px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+    grid-template-columns: 1fr auto;
+    grid-template-areas: 'head nav' 'text nav';
+    gap: 2px 12px;
+    padding: 6px 10px 8px;
+  }
+  .coach__head {
+    grid-area: head;
+  }
+  .coach__head .pipwick-badge {
+    width: 30px;
+    height: 30px;
+  }
+  .coach__text {
+    grid-area: text;
+    font-size: 0.9rem;
+    line-height: 1.3;
+  }
+  .coach__nav {
+    grid-area: nav;
+    align-self: end;
+    padding-top: 0;
+  }
+}
+/* Settings: "Show menu tips again" */
+.coach-replay {
+  min-height: 56px;
+  padding: 0 14px;
+  border: 2px solid var(--ink);
+  border-radius: 10px;
+  background: var(--cream);
+  color: var(--ink-deep);
+  font: 700 0.95rem var(--font-body);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.coach-replay:active {
+  transform: translateY(1px);
+}
+.coach-replay:focus-visible {
+  outline: 4px solid var(--blue);
+  outline-offset: 2px;
+}

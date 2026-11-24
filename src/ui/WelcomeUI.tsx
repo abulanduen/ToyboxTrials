@@ -188,7 +188,7 @@ export function JukeboxList() {
   ];
   return (
     <div className="jukebox" data-testid="jukebox-list">
-      <ul className="jukebox__list">
+      <ul className="jukebox__list" data-coach="jukebox-tracks">
         {items.map((it) => (
           <li key={it.id}>
             <button type="button" className={`jukebox__track${current === it.id ? ' jukebox__track--on' : ''}`} onClick={() => choose(it.id)} data-testid={`jukebox-${it.id}`} aria-pressed={current === it.id}>
@@ -200,7 +200,7 @@ export function JukeboxList() {
         ))}
       </ul>
       {musicVolume === 0 && <p className="jukebox__hint">Music volume is at zero: turn it up in Settings to hear the jukebox.</p>}
-      <p className="jukebox__note">Every track is composed by the jukebox as it plays, so it never quite repeats. Your choice is saved on this device.</p>
+      <p className="jukebox__note" data-coach="jukebox-note">Every track is composed by the jukebox as it plays, so it never quite repeats. Your choice is saved on this device.</p>
     </div>
   );
 }

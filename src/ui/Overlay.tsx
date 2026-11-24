@@ -29,6 +29,7 @@ import { HubPlayHud } from './HubPlayHud';
 import { HubChat, WhoAmIChip } from './ChatUI';
 import { isTypingTarget } from '../game/input';
 import { PauseVoice, VoiceMicButton } from './VoiceUI';
+import { CoachMarks } from './CoachMarks';
 
 // ---------------------------------------------------------------- HUD
 function Prompt() {
@@ -368,7 +369,7 @@ function Panel() {
         {panel.kind === 'jukebox' && <JukeboxList />}
         {panel.kind === 'scoreboard' && <OnlineLeaderboard />}
         {panel.kind === 'scoreboard' && (
-          <div className="scoreboard">
+          <div className="scoreboard" data-coach="scoreboard-records">
             <div className="scoreboard__row scoreboard__row--muted">
               <strong>Your records (this device)</strong>
             </div>
@@ -401,6 +402,8 @@ function Panel() {
             </div>
           </div>
         )}
+        {panel.kind === 'scoreboard' && <CoachMarks tour="scoreboard" />}
+        {panel.kind === 'jukebox' && <CoachMarks tour="jukebox" />}
         {panel.kind !== 'tournament' && (
           <div className="panel__actions">
             <ToyButton tone="ink" onClick={close} autoFocus>

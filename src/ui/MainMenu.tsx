@@ -17,6 +17,7 @@ import { useAccount } from '../net/account';
 import { AccountSettingsRow, MenuAccountButton } from './AccountUI';
 import { requestTour } from '../game/welcome';
 import { PipwickBadge } from './WelcomeUI';
+import { CoachMarks } from './CoachMarks';
 
 export function MainMenu() {
   const s = useGame();
@@ -60,13 +61,13 @@ export function MainMenu() {
         </div>
 
         <nav className="menu-buttons" aria-label="Main menu">
-          <ToyButton onClick={play} autoFocus className="menu-btn menu-btn--primary" testId="menu-play">
+          <ToyButton onClick={play} autoFocus className="menu-btn menu-btn--primary" testId="menu-play" coach="menu-play">
             Play
           </ToyButton>
-          <ToyButton tone="blue" onClick={() => s.openWorkshop()} className="menu-btn" testId="menu-workshop">
+          <ToyButton tone="blue" onClick={() => s.openWorkshop()} className="menu-btn" testId="menu-workshop" coach="menu-workshop">
             Workshop
           </ToyButton>
-          <div className="menu-row">
+          <div className="menu-row" data-coach="menu-small">
             <ToyButton tone="ink" onClick={() => s.set({ menuSheet: 'settings' })} className="menu-btn menu-btn--small" testId="menu-settings">
               Settings
             </ToyButton>
@@ -75,7 +76,7 @@ export function MainMenu() {
             </ToyButton>
           </div>
         </nav>
-        <div className="menu-online menu-row">
+        <div className="menu-online menu-row" data-coach="menu-online">
           <ToyButton tone="coral" onClick={() => s.openShop()} className="menu-btn menu-btn--online" testId="menu-shop">
             Shop
           </ToyButton>
@@ -125,6 +126,8 @@ export function MainMenu() {
         </CardboardSheet>
       )}
       {s.menuSheet === 'howto' && <HowToPlay onClose={() => s.set({ menuSheet: null })} touch={s.touchUI} />}
+      {/* First-run tips: after the loading card, and never over a sheet. */}
+      <CoachMarks tour="menu" hold={!s.ready || !!s.menuSheet} />
     </div>
   );
 }

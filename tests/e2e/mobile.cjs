@@ -41,7 +41,7 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
   const st = () => page.evaluate(() => window.__toybox.state());
 
   // Pipwick's first-visit Hub tour has its own suite (welcome.cjs); this one starts as a returning player.
-  await page.addInitScript(() => { if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { tourSeen: true, autoOnline: false }, version: 2 })); } });
+  await page.addInitScript(() => { if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { tourSeen: true, coachSeen: ['menu', 'pavilion', 'trial', 'workshop', 'shop', 'scoreboard', 'jukebox', 'lobby'], autoOnline: false }, version: 2 })); } });
   await page.goto(BASE + '?debug');
   await page.waitForTimeout(4000);
   check('main menu shows on touch device', await page.isVisible('[data-testid=menu-play]'));
@@ -368,7 +368,7 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
         cp.setDefaultTimeout(+process.env.E2E_TIMEOUT || 120000);
         const cerr = [];
         cp.on('pageerror', (e) => cerr.push(e.message));
-        await cp.addInitScript((n) => { if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { tourSeen: true, quality: 'low', autoOnline: false, contenderName: n }, version: 2 })); } }, `Phone ${label}`);
+        await cp.addInitScript((n) => { if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { tourSeen: true, coachSeen: ['menu', 'pavilion', 'trial', 'workshop', 'shop', 'scoreboard', 'jukebox', 'lobby'], quality: 'low', autoOnline: false, contenderName: n }, version: 2 })); } }, `Phone ${label}`);
         await cp.goto(process.env.CHAT_BASE_URL + '?debug');
         await cp.waitForSelector('.loading', { state: 'detached', timeout: 600000 });
         await cp.tap('[data-testid=menu-online]');
@@ -464,7 +464,7 @@ async function voiceMicOnline(browser, phone) {
       md.getUserMedia = (c) => { window.__gum++; return real(c); };
     }
     try {
-      if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { tourSeen: true, contenderName: 'Phone' }, version: 2 })); }
+      if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('toybox-trials:prototype:v1', JSON.stringify({ state: { tourSeen: true, coachSeen: ['menu', 'pavilion', 'trial', 'workshop', 'shop', 'scoreboard', 'jukebox', 'lobby'], contenderName: 'Phone' }, version: 2 })); }
     } catch { /* about:blank has no storage */ }
   });
   const p = await ctx.newPage();

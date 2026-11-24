@@ -38,6 +38,7 @@ import { GearIcon } from './icons';
 import { PAINT_JOBS } from '../game/palette';
 import { netLink } from '../net/link';
 import { Countdown, IntroGuide, Medal, Who, unit } from './MatchOverlay';
+import { CoachMarks } from './CoachMarks';
 
 const ordinal = (n: number) => `${n}${n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd' : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th'}`;
 
@@ -340,7 +341,7 @@ export function HostTrialRow({ game }: { game: MinigameId }) {
   const busy = useLobby((s) => s.busy);
   const offline = !isOnlineGame(game);
   return (
-    <div className="setting intro-online" data-testid="online-lobby-note">
+    <div className="setting intro-online" data-testid="online-lobby-note" data-coach="trial-host">
       <span>Online lobby</span>
       <button
         className="host-btn"
@@ -366,7 +367,7 @@ export function PavilionOnline({ format, onClose }: { format: TournamentFormatSe
   const [botFill, setBotFill] = useState(true);
   const [difficulty, setDifficulty] = useState<BotDifficulty>('normal');
   return (
-    <div className="pavilion-online" data-testid="pavilion-online">
+    <div className="pavilion-online" data-testid="pavilion-online" data-coach="pavilion-online">
       <p className="panel__note">
         Host a lobby: everyone in this Hub hears about it and can join at any time unless you lock it. You can kick players, cap the lobby, switch to one trial,
         and start when you're ready. Finished online tournaments go on the leaderboard.
@@ -428,7 +429,7 @@ function LobbyCard({ lobby, you }: { lobby: LobbyState; you: string }) {
       <div className="info-panel__sub" style={{ background: s.mode === 'single' ? def.accent : 'var(--honey)' }} data-testid="lobby-what">
         {s.mode === 'tournament' ? `${FORMATS[s.format].name} tournament · ${FORMATS[s.format].games} trials` : `${def.title} · ${durationLabel(def)}`} · Lobby {lobby.id}
       </div>
-      <ul className="lobby-members" data-testid="lobby-members">
+      <ul className="lobby-members" data-testid="lobby-members" data-coach="lobby-members">
         {lobby.members.map((m) => (
           <li key={m.id} className={`lobby-member${m.id === you ? ' me' : ''}${m.off ? ' off' : ''}`} data-testid={`member-${m.name}`}>
             <span className="who__dot" style={{ background: (PAINT_JOBS[m.look.paint] ?? PAINT_JOBS[0]).body, borderColor: (PAINT_JOBS[m.look.paint] ?? PAINT_JOBS[0]).trim }} />
@@ -452,7 +453,7 @@ function LobbyCard({ lobby, you }: { lobby: LobbyState; you: string }) {
         {s.botFill ? ` · bots fill the empty seats (${s.difficulty})` : ' · no bots'}
         {host ? '' : ' · only the host can change these'}
       </p>
-      <div className="intro-options lobby-settings" data-testid="lobby-settings">
+      <div className="intro-options lobby-settings" data-testid="lobby-settings" data-coach="lobby-settings">
         <LobbySeg label="Play" value={s.mode} options={['single', 'tournament']} labels={{ single: 'One trial', tournament: 'Tournament' }} onChange={(v) => set({ mode: v })} disabled={!host} testId="lobby-mode" />
         {s.mode === 'tournament' ? (
           <LobbySeg label="Format" value={s.format} options={['blitz', 'normal', 'treasure'] as LobbyFormat[]} labels={{ blitz: 'Blitz · 3', normal: 'Normal · 5', treasure: 'Treasure · 8' }} onChange={(v) => set({ format: v })} disabled={!host} testId="lobby-format" />
@@ -473,7 +474,7 @@ function LobbyCard({ lobby, you }: { lobby: LobbyState; you: string }) {
           The server deals the trials. {formatRule(s.format)}
         </p>
       )}
-      <div className="pause__actions">
+      <div className="pause__actions" data-coach="lobby-actions">
         {host ? (
           <ToyButton onClick={startLobby} testId="lobby-start" autoFocus>
             Start
@@ -487,6 +488,7 @@ function LobbyCard({ lobby, you }: { lobby: LobbyState; you: string }) {
           Leave lobby
         </ToyButton>
       </div>
+      <CoachMarks tour="lobby" />
     </CardboardSheet>
   );
 }
@@ -769,7 +771,7 @@ export type PavilionTab = 'practice' | 'online';
 export function PavilionTabs({ tab, onTab }: { tab: PavilionTab; onTab: (t: PavilionTab) => void }) {
   const online = useNet((s) => s.status === 'online');
   return (
-    <div className="pavilion-tabs" role="tablist" aria-label="How to play">
+    <div className="pavilion-tabs" role="tablist" aria-label="How to play" data-coach="pavilion-tabs">
       <button role="tab" aria-selected={tab === 'practice'} className={tab === 'practice' ? 'on' : ''} onClick={() => (sfx.click(), onTab('practice'))} data-testid="pavilion-practice">
         <strong>Practise with bots</strong>
         <span>On your own, any time</span>
@@ -793,7 +795,7 @@ export function OnlineLeaderboard() {
   }, [board]);
   const rows = entry?.data?.entries ?? [];
   return (
-    <section className="leaderboard" data-testid="leaderboard" aria-label="Online leaderboard">
+    <section className="leaderboard" data-testid="leaderboard" aria-label="Online leaderboard" data-coach="scoreboard-online">
       <div className="leaderboard__head">
         <strong>Online tournaments</strong>
         <div className="segmented lobby-seg" role="radiogroup" aria-label="Format">

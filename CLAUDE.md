@@ -93,6 +93,7 @@ node tests/e2e/tutorials.cjs    # every game's How to play pictures + intro thum
 node tests/e2e/spotdiff.cjs     # Odd Page Out (spot the difference), desktop + phone portrait/landscape (ONLY=desktop|portrait|landscape)
 node tests/e2e/towertumble.cjs  # Toy Tower Tumble, desktop + phone portrait/landscape (arg: desktop,portrait,landscape)
 node tests/e2e/welcome.cjs      # Pipwick's first-visit Hub tour, greeters, jukebox, music/voice settings (desktop + phone portrait)
+node tests/e2e/coach.cjs        # first-time menu tips (Pavilion, trial intro, Workshop, shop, Scoreboard, Jukebox, main menu), desktop + phone portrait/landscape (ONLY=desktop|portrait|landscape|off; SHOTS_DIR= saves 2× Pavilion screenshots)
 node tests/e2e/siege.cjs        # Toybox Siege, desktop + phone portrait/landscape (ONLY=desktop|portrait|landscape; slow under software GL)
 node tests/e2e/hoophustle.cjs   # Hoop Hustle, desktop + phone portrait/landscape (HH_LAYOUTS=desktop,portrait,landscape)
 node tests/e2e/hoopclash.cjs    # Hoop Clash (team basketball), desktop + phone portrait/landscape (ONLY=desktop|portrait|landscape)
@@ -106,6 +107,11 @@ node tests/e2e/online.cjs       # online Hub: build with VITE_SERVER_URL=ws://lo
 Welcome and music: `tourSeen` (persisted, store v2) gates Pipwick's first-visit tour. Browser suites that
 start in the Hub as a returning player seed `tourSeen: true` in their saved state; only `welcome.cjs` tests
 the tour itself. See `docs/VOICE.md` for the voice-line script and the background music.
+
+Menu tips: the first time each menu opens (with "Game tutorials" on), Pipwick's speech card points at its
+parts (`src/game/coach.ts` holds the tours and words, `src/ui/CoachMarks.tsx` the card; menus mark parts with
+`data-coach="…"`). `coachSeen` (persisted) lists the tours shown; Settings has "Show menu tips again". Suites
+that keep tutorials on seed `coachSeen` with every tour id; only `coach.cjs` tests the tips themselves.
 
 Online Hub (Railway + `ws`; see `docs/ONLINE.md`): the protocol lives in `src/net/protocol.ts` (shared, no DOM),
 the pure room logic in `server/hubRoom.ts` and `server/hubDirectory.ts`; `server/index.ts` is only the socket
