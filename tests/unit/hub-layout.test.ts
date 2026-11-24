@@ -9,6 +9,7 @@ import { DOMINO, DOMINO_UV, dominoGeometry, dominoRestY } from '../../src/scene/
 import {
   BRIDGE,
   BRIDGE_RAIL_X,
+  CURATOR,
   FOUNTAIN,
   GATE,
   GATES,
@@ -18,6 +19,8 @@ import {
   JACK,
   MUSICBOX,
   PAVILION,
+  PAVILION_PROPS,
+  PAVILION_WALL,
   SCOREBOARD,
   SIGNPOSTS,
   TABLE,
@@ -26,6 +29,8 @@ import {
   TOWER,
   gateLocal,
   hubColliders,
+  insidePavilion,
+  pavilionLocal,
 } from '../../src/scene/layout';
 import { hubFence, hubPathLines, hubPathTiles, tilesOverlap, TILE_STEP } from '../../src/scene/paths';
 import { GATE_THEMES, POST_BOARD, signpostTop, signposts } from '../../src/scene/gateDecor';
@@ -460,5 +465,62 @@ describe('gate surroundings', () => {
         expect(Math.hypot(d.x - hero.x, d.z - hero.z), g.game).toBeLessThan(hero.r);
       }
     }
+  });
+});
+
+describe('the Tournament Pavilion', () => {
+  const at = (lx: number, lz: number) => gateLocal(PAVILION, lx, lz);
+  /** Walk in a straight line with the real collision code; returns where the toy ended up. */
+  function walkTo(from: { x: number; z: number }, to: { x: number; z: number }, speed = 14, dt = 1 / 60) {
+    resetStatic();
+    addStatic(...colliders);
+    const pos = { ...from };
+    const len = Math.hypot(to.x - from.x, to.z - from.z);
+    const dir = [(to.x - from.x) / len, (to.z - from.z) / len];
+    for (let i = 0; i < 4000 && Math.hypot(to.x - pos.x, to.z - pos.z) > speed * dt; i++) {
+      pos.x += dir[0] * speed * dt;
+      pos.z += dir[1] * speed * dt;
+      resolve(pos, PLAYER_R, groundHeightAt(pos.x, pos.z, PLAYER_R, 0));
+    }
+    resetStatic();
+    return pos;
+  }
+  const talk = INTERACTABLES.find((i) => i.id === 'pavilion')!;
+
+  it("is hollow: the toy walks in through the doorway to the Curator's prompt", () => {
+    expect(insidePavilion(talk.x, talk.z)).toBe(true);
+    const end = walkTo(at(0, PAVILION.d / 2 + 6), talk);
+    expect(Math.hypot(end.x - talk.x, end.z - talk.z)).toBeLessThan(0.3);
+    // the prompt is not offered from outside: its circle stays inside the walls
+    expect(pavilionLocal(talk.x, talk.z).lz + talk.radius).toBeLessThan(PAVILION.d / 2 - PAVILION_WALL.t);
+    expect(talk.verb).toBe('Talk to');
+    expect(talk.label).toContain('Tournament Curator');
+  });
+
+  it('the walls still stand either side of the door and all round', () => {
+    const outside: [number, number][] = [[4.5, PAVILION.d / 2 + 4], [-4.5, PAVILION.d / 2 + 4], [0, -PAVILION.d / 2 - 4], [PAVILION.w / 2 + 4, 0], [-PAVILION.w / 2 - 4, 0]];
+    for (const [lx, lz] of outside) {
+      // straight at the wall (walking at it slantwise slides you along it, and in at the door)
+      const end = walkTo(at(lx, lz), at(Math.abs(lx) > PAVILION.w / 2 ? lx * 0.1 : lx, Math.abs(lz) > PAVILION.d / 2 ? lz * 0.1 : lz));
+      expect(insidePavilion(end.x, end.z), `${lx}, ${lz}`).toBe(false);
+    }
+    // the doorway is wide and tall enough for the toy (3.5 cm) with room to spare
+    expect(PAVILION_WALL.doorW - 2 * PLAYER_R).toBeGreaterThan(2.5);
+    expect(PAVILION_WALL.doorH).toBeGreaterThan(5);
+  });
+
+  it('the Curator stands inside facing the door, and the furniture keeps clear of the way in', () => {
+    const c = pavilionLocal(CURATOR.x, CURATOR.z);
+    expect(c.lz).toBeLessThan(-1);
+    expect(Math.abs(c.lx)).toBeLessThan(1e-9);
+    expect(CURATOR.yaw).toBe(PAVILION.rot);
+    // a clear lane from the door to the prompt spot
+    for (let lz = PAVILION.d / 2 + 1; lz > pavilionLocal(talk.x, talk.z).lz; lz -= 0.25) {
+      const p = at(0, lz);
+      expect(hitsAt(p.x, p.z, PLAYER_R), `lz=${lz}`).toEqual([]);
+    }
+    // the lower podium steps can be hopped onto from the floor
+    const jump = 16.5 ** 2 / (2 * 56) + STEP_HEIGHT;
+    for (const p of PAVILION_PROPS.podium) expect(p.top).toBeLessThan(jump);
   });
 });

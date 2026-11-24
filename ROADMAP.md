@@ -168,6 +168,18 @@ the group keeps it out); and every basketball shot meter (Hub ball, Hoop Hustle,
 back and forth while held, with a cancel (X, right click outside Hoop Clash, or sliding off the touch
 button), from one shared helper (`src/minigames/shared/shotMeter.ts`).
 
+**Walk-in Pavilion and the Tournament Curator (owner request, 24 Nov 2026):** the Pavilion is now a
+hollow gift box with an arched doorway facing the fountain. Inside are a rug, a trophy shelf, a
+winners' podium (you can hop up), a TOURNAMENTS sign and bunting, and the **Tournament Curator**, a
+peg-doll toy in a purple tailcoat and top hat with a prize rosette, who faces the door, watches you,
+says hello in a speech bubble and hops when you talk. Talking to them (E or the prompt tap; the
+interactable keeps the id `pavilion`) opens the same tournament panel as before. While you are inside,
+the lid lifts off and the walls fold down to a low rim, and the camera comes in a little and looks
+down into the room (`src/scene/pavilionView.ts`), so it is never trapped behind a wall. Layout and
+colliders: `src/scene/layout.ts` (`PAVILION_WALL`, `PAVILION_PROPS`, `CURATOR`); geometry:
+`src/scene/pavilionDecor.ts`. Checked with unit tests and `tests/e2e/hubgates.cjs pavilion,pavilionphone`
+under software rendering only; no frame rates measured.
+
 ## Current milestone and priorities
 
 **Current milestone: integrate and playtest the seven local games; recover Claude's separate work.**

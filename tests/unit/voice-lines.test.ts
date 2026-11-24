@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { CHAT_LINES, GREETERS, SPEAKERS, TOUR_CAPTIONS, TOUR_LINES, VOICE_LINES, chatLineId, lineById, tourLineId } from '../../src/game/voiceLines';
+import { CHAT_LINES, CURATOR, GREETERS, SPEAKERS, TOUR_CAPTIONS, TOUR_LINES, VOICE_LINES, chatLineId, greeterSpeaker, lineById, tourLineId } from '../../src/game/voiceLines';
 import { TOUR_STOPS } from '../../src/game/tour';
 import { MINIGAMES } from '../../src/minigames/registry';
 import { STORE_VERSION, migratePersisted } from '../../src/game/economy';
@@ -36,6 +36,9 @@ describe('the voice-line script', () => {
       expect(gr.line, g.id).toMatch(/Want to have a go\?$/);
     }
     expect(new Set(Object.values(GREETERS).map((g) => g.name)).size).toBe(Object.keys(GREETERS).length);
+    // the Tournament Curator in the Pavilion has a hello line, shown in their bubble
+    expect(lineById(CURATOR.id)?.text).toBe(CURATOR.line);
+    expect(greeterSpeaker('curator')).toBe(CURATOR);
   });
 
   it('splits every tour line into short captions, in order, starting as the line starts', () => {

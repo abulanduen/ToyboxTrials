@@ -11,12 +11,11 @@ import { create } from 'zustand';
 import { useGame } from './store';
 import { tourFlag } from './tourFlag';
 import { speak, stopVoice, voiceProgress } from './voice';
-import { CHAT_LINES, GREETERS, chatLineId, tourLineId } from './voiceLines';
+import { CHAT_LINES, chatLineId, greeterSpeaker, tourLineId, type GreeterId } from './voiceLines';
 import { TOUR_STOPS, arcPoint, cameraLift, flyTime, tourNext, tourSkip, tourStart, tourStep, type TourState, type Vec3 } from './tour';
 import { clearInput } from './input';
 import { exposeDebug } from './debug';
 import { events } from './events';
-import type { MinigameId } from '../minigames/ids';
 
 export type WelcomeMode = 'tour' | 'chat' | null;
 
@@ -27,8 +26,8 @@ interface WelcomeStore {
   phase: TourState['phase'];
   /** Chat: which line Pipwick is saying ('hello', 'bye' or an idle line index). */
   chat: 'hello' | 'bye' | number;
-  /** The gate whose greeter is talking to the player (bubble shown), or null. */
-  greeter: MinigameId | null;
+  /** Who is talking to the player in a speech bubble: a gate greeter (by game), the Tournament Curator, or null. */
+  greeter: GreeterId | null;
 }
 
 export const useWelcome = create<WelcomeStore>()(() => ({ mode: null, stop: 0, phase: 'fly', chat: 'hello', greeter: null }));
@@ -217,15 +216,15 @@ export function tourCamera(camera: THREE.PerspectiveCamera) {
 /** The greeter speech bubble's DOM element (set by WelcomeUI); the scene moves it each frame. */
 export const greeterBubble = { el: null as HTMLElement | null };
 
-/** Greeter speech bubbles: the scene reports which gate's greeter the player is near. */
-const lastGreet = new Map<MinigameId, number>();
-export function setGreeter(game: MinigameId | null, now: number) {
-  if (useWelcome.getState().greeter === game) return;
-  useWelcome.setState({ greeter: game });
-  if (!game) return;
+/** Greeter speech bubbles: the scene reports which greeter (or the Curator) the player is near. */
+const lastGreet = new Map<GreeterId, number>();
+export function setGreeter(who: GreeterId | null, now: number) {
+  if (useWelcome.getState().greeter === who) return;
+  useWelcome.setState({ greeter: who });
+  if (!who) return;
   // speak when the player walks up, but not again for a while if they hover around the gate
-  if (now - (lastGreet.get(game) ?? -Infinity) > 25) speak(GREETERS[game].id);
-  lastGreet.set(game, now);
+  if (now - (lastGreet.get(who) ?? -Infinity) > 25) speak(greeterSpeaker(who).id);
+  lastGreet.set(who, now);
 }
 
 exposeDebug({

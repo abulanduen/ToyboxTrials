@@ -1,12 +1,14 @@
 /* Hub gates: every playable trial has a gate on the gates table whose prompt opens that trial's
  * lobby (intro card), desktop + phone (touch Interact); walking across the domino bridge from the
  * spawn table to the gates table (keyboard, and the phone joystick) and on to the Copycat gate;
- * the TV beside the Scoreboard (offline card, channel change);
+ * the TV beside the Scoreboard (offline card, channel change); walking into the Tournament Pavilion
+ * through its doorway (keyboard, and the phone joystick) to the Tournament Curator, whose prompt opens
+ * the tournament panel (E, and a real touch on the phone's prompt), and that its walls stop you;
  * plus screenshots of each gate's surroundings, the Scoreboard, opposing gameplay views, the bridge
  * and a whole-hub overview of both tables, with renderer counts.
  *
  *   BASE_URL=http://localhost:4173/ node tests/e2e/hubgates.cjs [only]
- *     only  comma list of parts: gates,phone,bridge,bridgephone,tv,shots,overview (default all)
+ *     only  comma list of parts: gates,phone,bridge,bridgephone,pavilion,pavilionphone,tv,shots,overview (default all)
  *
  * SwiftShader renders at 1–3 fps here: every wait is on a condition, frame counts, never on FPS.
  * Output: tests/e2e/output/hubgates-*.png and hubgates-renderinfo.json.
@@ -179,6 +181,88 @@ const leave = async (page) => {
       async () => { await touch('touchEnd', []); },
     );
     check('no page errors (phone bridge)', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await ctx.close();
+  }
+
+  // Walk into the Tournament Pavilion for real: from the plaza, straight at its doorway, until the
+  // Curator's prompt shows; the lid comes off and the walls fold down while the toy is inside.
+  async function walkIntoPavilion(page, label, hold, release) {
+    const outside = await page.evaluate(() => window.__toybox.hub.pavilionAt(0, 5 + 8));
+    await page.evaluate((v) => { window.__toybox.teleport(v.x, v.z, v.yawIn); window.__toybox.aim(v.yawIn + Math.PI, 0.3); }, outside);
+    await frames(page, 6);
+    const before = await page.evaluate(() => ({ p: window.__toybox.hub.pavilion(), prompt: document.querySelector('.prompt')?.textContent || '' }));
+    check(`${label}: outside the Pavilion, no Curator prompt yet`, !before.p.inside && !before.prompt.includes('Curator'), JSON.stringify({ lz: before.p.me.lz.toFixed(1), prompt: before.prompt }));
+    await hold();
+    const prompt = await page.waitForFunction(() => { const p = document.querySelector('.prompt'); return p && p.textContent.includes('Tournament Curator') ? p.textContent : null; }, null, { timeout: 300000, polling: 300 }).then((h) => h.jsonValue()).catch(() => null);
+    await release();
+    const p = await page.evaluate(() => window.__toybox.hub.pavilion());
+    check(`${label}: walked through the doorway to the Curator's prompt`, !!prompt && p.inside && p.me.lz < p.d / 2 - 0.5 && Math.abs(p.me.lx) < 2, JSON.stringify({ prompt, me: p.me, inside: p.inside }));
+    await page.waitForFunction(() => window.__toybox.hub.pavilion().cut >= 1, null, { timeout: 120000, polling: 250 }).catch(() => {});
+    check(`${label}: inside, the lid is off and the walls are folded down`, (await page.evaluate(() => window.__toybox.hub.pavilion().cut)) >= 1);
+    const bubble = await page.waitForSelector('[data-testid=greeter-bubble][data-game=curator]', { timeout: 120000 }).then((e) => e.textContent()).catch(() => '');
+    check(`${label}: the Curator says hello in a speech bubble`, bubble.includes('Tournament Curator') && bubble.includes('Blitz'), bubble.slice(0, 80));
+    return prompt;
+  }
+
+  if (want('pavilion')) {
+    const { ctx, page, errors } = await open(browser, desktop);
+    const keys = { hold: async () => page.keyboard.down('KeyW'), release: async () => page.keyboard.up('KeyW') };
+    await walkIntoPavilion(page, 'desktop', keys.hold, keys.release);
+    await page.keyboard.press('KeyE');
+    const panel = await page.waitForSelector('[data-testid=pavilion-practice]', { timeout: 120000 }).then(() => true).catch(() => false);
+    check('desktop: E at the Curator opens the tournament panel', panel);
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('[data-testid=pavilion-practice]', { state: 'detached', timeout: 60000 }).catch(() => {});
+    // walking back out puts the lid back on
+    await page.evaluate(() => { const s = window.__toybox.state(); const rot = window.__toybox.hub.pavilion().rot; window.__toybox.teleport(s.x, s.z, rot); window.__toybox.aim(rot + Math.PI, 0.3); });
+    await frames(page, 4);
+    await keys.hold();
+    await page.waitForFunction(() => !window.__toybox.hub.pavilion().inside && window.__toybox.hub.pavilion().me.lz > window.__toybox.hub.pavilion().d / 2 + 2, null, { timeout: 300000, polling: 300 }).catch(() => {});
+    await keys.release();
+    await page.waitForFunction(() => window.__toybox.hub.pavilion().cut <= 0, null, { timeout: 120000, polling: 250 }).catch(() => {});
+    check('desktop: walked back out of the door; the lid is back on', await page.evaluate(() => { const p = window.__toybox.hub.pavilion(); return !p.inside && p.cut <= 0; }));
+    // the walls either side of the doorway still stop you
+    for (const lx of [-4.5, 4.5]) {
+      const v = await page.evaluate((x) => window.__toybox.hub.pavilionAt(x, 5 + 3), lx);
+      await page.evaluate((q) => { window.__toybox.teleport(q.x, q.z, q.yawIn); window.__toybox.aim(q.yawIn + Math.PI, 0.3); }, v);
+      await frames(page, 4);
+      await keys.hold();
+      await frames(page, 40);
+      await keys.release();
+      const p = await page.evaluate(() => window.__toybox.hub.pavilion());
+      check(`desktop: the front wall at lx=${lx} stops the toy`, !p.inside && p.me.lz > p.d / 2, JSON.stringify(p.me));
+    }
+    check('no page errors (pavilion)', errors.length === 0, errors.slice(0, 3).join(' | '));
+    await ctx.close();
+  }
+
+  if (want('pavilionphone')) {
+    const phone = { ...devices['iPhone 13'], deviceScaleFactor: 1 };
+    const { ctx, page, errors } = await open(browser, phone);
+    const cdp = await ctx.newCDPSession(page);
+    const touch = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts.map(([x, y, id = 0]) => ({ x, y, id })) });
+    const zone = await (await page.$('.touch-stick-zone')).boundingBox();
+    const cx = zone.x + zone.width / 2;
+    const cy = zone.y + zone.height / 2;
+    await walkIntoPavilion(
+      page,
+      'phone',
+      async () => { await touch('touchStart', [[cx, cy, 11]]); await touch('touchMove', [[cx, cy - 25, 11]]); await touch('touchMove', [[cx, cy - 45, 11]]); },
+      async () => { await touch('touchEnd', []); },
+    );
+    const btn = await page.$('.touch-btn--interact');
+    check('phone: the Interact button names the Curator', !!btn && ((await btn.getAttribute('aria-label')) || '').includes('Tournament Curator'));
+    const bb = await btn.boundingBox();
+    check('phone: the Interact button is ≥ 56 px', bb.width >= 56 && bb.height >= 56, `${bb.width}x${bb.height}`);
+    // a real tap on the on-screen prompt itself (the Interact button does the same: see the gates' phone part)
+    const pr = await (await page.$('.prompt')).boundingBox();
+    await touch('touchStart', [[pr.x + pr.width / 2, pr.y + pr.height / 2, 7]]);
+    await page.waitForTimeout(150);
+    await touch('touchEnd', []);
+    const panel = await page.waitForSelector('[data-testid=pavilion-practice]', { timeout: 120000 }).then(() => true).catch(() => false);
+    check('phone: tapping the prompt at the Curator opens the tournament panel', panel);
+    if (panel) await page.screenshot({ path: `${OUT}/hubgates-pavilion-panel-phone.png`, timeout: 180000 });
+    check('no page errors (phone pavilion)', errors.length === 0, errors.slice(0, 3).join(' | '));
     await ctx.close();
   }
 
