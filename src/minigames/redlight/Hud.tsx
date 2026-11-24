@@ -22,7 +22,7 @@ export function RlglHud({ getState, contestants, localId }: MinigameSceneProps<R
     return matchBus.on('event', (e) => {
       if (e.type === 'go' && e.first) setPlace(0); // a new race
       if (e.id !== localId) return;
-      if (e.type === 'caught') setNote({ text: 'Caught moving! Back to the start.', v: ++v });
+      if (e.type === 'caught') setNote({ text: 'Caught moving on STOP! You’re out.', v: ++v });
       if (e.type === 'finish') setPlace(e.order as number);
     });
   }, [localId]);
@@ -41,14 +41,15 @@ export function RlglHud({ getState, contestants, localId }: MinigameSceneProps<R
   if (me?.finished) {
     signal = place ? `Home ${ordinal(place)}!` : 'Home!';
     tone = 'done';
-  } else if (s.phase === 'intro') signal = 'Ready…';
+  } else if (me?.out) signal = 'Out!';
+  else if (s.phase === 'intro') signal = 'Ready…';
   else if (s.phase === 'go') {
-    signal = me?.held ? 'Get up… GO!' : 'GO!';
+    signal = 'GO!';
     tone = 'go';
   } else if (s.phase === 'warn') {
     signal = 'It’s turning…';
     tone = 'warn';
-  } else if (s.phase === 'stop') signal = me?.held ? 'Caught!' : 'STOP!';
+  } else if (s.phase === 'stop') signal = 'STOP!';
   else signal = 'Race over!';
 
   return (
@@ -70,7 +71,7 @@ export function RlglHud({ getState, contestants, localId }: MinigameSceneProps<R
               colour: c?.paint.body ?? '#fff',
               progress: progressOf(s, p),
               me: p.id === localId,
-              state: p.finished ? 'done' : p.held ? 'hurt' : '',
+              state: p.finished ? 'done' : p.out ? 'hurt' : '',
             };
           })}
         />

@@ -5,12 +5,14 @@
  *
  *   go    the Signalman faces away. Run!
  *   warn  the tell: its key ratchets and it starts to turn (always at least `warnMs[0]` long).
- *   stop  it faces the runway. After a short grace, any toy still moving is caught: flicked
- *         back to the start line (`knockBack`) and held there until the next go.
+ *   stop  it faces the runway ("STOP!"). After a grace long enough to react to that, any toy
+ *         still pushing on and moving is caught: knocked out of the trial (it falls over where it
+ *         stands). Letting go in time is enough: coasting to a stop is not caught.
  *
  * Every cycle's lengths are rolled from the seed up front, so the timing never depends on inputs.
  * First across the line wins; once somebody finishes, the rest have `closingMs` to get home.
- * Placement: finish time, then distance (GAME_DESIGN "progress" scoring).
+ * The trial ends when every toy is home or out (or the clock runs out). Placement: finish time,
+ * then toys still racing by distance, then knocked-out toys by distance (owner change, Nov 2026).
  *
  * Coordinates: 1 unit = 1 cm, runway along −z (start at `startZ`, finish at `finishZ`).
  */
@@ -33,13 +35,10 @@ export interface RlglConfig {
   snapGoMs: [number, number];
   warnMs: [number, number];
   stopMs: [number, number];
-  /** After the light turns red, movement is forgiven for this long. */
+  /** After the light turns red ("STOP!"), movement is forgiven for this long: time to see it and let go. */
   graceMs: number;
   /** Horizontal speed (cm/s) above which a toy counts as moving. */
   moveThreshold: number;
-  /** How far a caught toy is flicked back (cm). The default is further than the runway: back to the start. */
-  knockBack: number;
-  flingMs: number;
   limitMs: number;
   /** Time left for everyone else once the first toy finishes. */
   closingMs: number;
@@ -55,10 +54,9 @@ export const DEFAULT_CONFIG: RlglConfig = {
   snapGoMs: [750, 1150],
   warnMs: [600, 900],
   stopMs: [1700, 2900],
-  graceMs: 140,
+  // A human needs ~250 ms to react to "STOP!" appearing, and the toy a moment to stop.
+  graceMs: 320,
   moveThreshold: 1,
-  knockBack: 1000,
-  flingMs: 700,
   limitMs: 90000,
   closingMs: 15000,
 };
@@ -71,12 +69,6 @@ export interface Cycle {
   stopMs: number;
 }
 
-export interface Fling {
-  t: number;
-  fromZ: number;
-  toZ: number;
-}
-
 export interface RlglPlayer {
   id: string;
   m: Mover;
@@ -86,10 +78,9 @@ export interface RlglPlayer {
   finishT: number;
   /** Times caught. */
   caught: number;
-  /** Being flicked back right now. */
-  fling: Fling | null;
-  /** Caught this stop: can't move (and can't be caught again) until the next go. */
-  held: boolean;
+  /** Caught moving on red: out of the trial (no more moving), and when (match ms). */
+  out: boolean;
+  outT: number;
 }
 
 export interface RlglState {
@@ -145,15 +136,17 @@ function rollCycles(rng: () => number, cfg: RlglConfig): Cycle[] {
   return out;
 }
 
+/** The player is pushing to move (the stick past its dead zone, or a jump). */
+const driving = (i: MoveInput) => Math.hypot(i.ax, i.ay) > 0.15 || i.jump;
+
 function catchPlayer(s: RlglState, p: RlglPlayer) {
-  const c = s.config;
   p.caught++;
-  p.held = true;
-  p.fling = { t: 0, fromZ: p.m.z, toZ: Math.min(c.startZ, p.m.z + c.knockBack) };
+  p.out = true;
+  p.outT = s.t;
   p.m.vx = p.m.vz = p.m.vy = 0;
   p.m.y = 0;
   p.m.grounded = true;
-  s.events.push({ type: 'caught', id: p.id, back: p.fling.toZ - p.fling.fromZ });
+  s.events.push({ type: 'caught', id: p.id });
 }
 
 function finish(s: RlglState, p: RlglPlayer) {
@@ -188,8 +181,8 @@ export const rlglRules: RulesCore<RlglState, RlglInput, RlglConfig> = {
         finished: false,
         finishT: 0,
         caught: 0,
-        fling: null,
-        held: false,
+        out: false,
+        outT: 0,
       })),
       // Room to back up behind the start line and to run on past the finish.
       world: { solids: [], bounds: { minX: -cfg.halfWidth, maxX: cfg.halfWidth, minZ: cfg.finishZ - 7, maxZ: cfg.startZ + 3 } },
@@ -217,7 +210,6 @@ export const rlglRules: RulesCore<RlglState, RlglInput, RlglConfig> = {
     } else if (s.phase === 'stop' && s.phaseT >= cyc.stopMs) {
       s.cycle++;
       setPhase(s, 'go');
-      for (const p of s.players) if (!p.fling) p.held = false;
       s.events.push({ type: 'go', first: false });
     }
 
@@ -225,24 +217,12 @@ export const rlglRules: RulesCore<RlglState, RlglInput, RlglConfig> = {
     const watching = s.phase === 'stop' && s.phaseT > c.graceMs;
     for (const p of s.players) {
       p.input = latchInput(p.input, inputs[p.id]);
-
-      if (p.fling) {
-        // Flicked back along the runway; the Scene adds the arc.
-        p.fling.t += dtMs;
-        const k = Math.min(1, p.fling.t / c.flingMs);
-        p.m.z = p.fling.fromZ + (p.fling.toZ - p.fling.fromZ) * (1 - (1 - k) * (1 - k));
-        if (k >= 1) {
-          p.fling = null;
-          if (s.phase !== 'stop') p.held = false;
-          s.events.push({ type: 'landed', id: p.id });
-        }
-        continue;
-      }
+      if (p.out) continue; // knocked out: lies where it fell
 
       let input = p.input;
       // Home toys keep their own controls (they can no longer be caught), so a player can wander
       // the finish area while the others race in. Bots trot a little past the line themselves.
-      if (!p.finished && (p.held || s.phase === 'intro')) {
+      if (!p.finished && s.phase === 'intro') {
         input = NO_INPUT;
       }
       const rep = stepMover(p.m, input, dtMs, s.world, TOY_TUNING);
@@ -251,10 +231,13 @@ export const rlglRules: RulesCore<RlglState, RlglInput, RlglConfig> = {
 
       if (p.finished) continue;
       if (p.m.z <= c.finishZ) finish(s, p);
-      else if (watching && !p.held && moverSpeed(p.m) > c.moveThreshold) catchPlayer(s, p);
+      // Caught: still pushing on (stick or keys) and still moving once the grace is up. A toy whose
+      // player has let go may coast to a stop (that takes ~250 ms from a run).
+      else if (watching && driving(input) && moverSpeed(p.m) > c.moveThreshold) catchPlayer(s, p);
     }
 
-    if (s.finishers === s.players.length || s.t >= s.endAt) {
+    const done = s.players.every((p) => p.finished || p.out);
+    if (done || s.t >= s.endAt) {
       setPhase(s, 'over');
       s.events.push({ type: 'over' });
     }
@@ -272,15 +255,17 @@ export const rlglRules: RulesCore<RlglState, RlglInput, RlglConfig> = {
           contestantId: p.id,
           // Finishers: 100 + seconds left on the clock. Everyone else: percent of the runway covered.
           score: p.finished ? 100 + Math.max(0, Math.round(limitS - p.finishT / 1000)) : Math.min(99, Math.floor(prog * 100)),
-          key: p.finished ? `f|${Math.round(p.finishT)}` : `d|${Math.round(prog * 1000)}`,
-          finished: p.finished,
+          key: p.finished ? `f|${Math.round(p.finishT)}` : `${p.out ? 'o' : 'd'}|${Math.round(prog * 1000)}`,
+          // home first, then still racing, then knocked out
+          tier: p.finished ? 0 : p.out ? 2 : 1,
+          eliminated: p.out || undefined,
           finishT: p.finishT,
           prog,
         };
       })
       .sort((a, b) => {
-        if (a.finished !== b.finished) return a.finished ? -1 : 1;
-        return a.finished ? a.finishT - b.finishT : Math.round(b.prog * 1000) - Math.round(a.prog * 1000);
+        if (a.tier !== b.tier) return a.tier - b.tier;
+        return a.tier === 0 ? a.finishT - b.finishT : Math.round(b.prog * 1000) - Math.round(a.prog * 1000);
       });
     return {
       placements: rankByKey(ordered),

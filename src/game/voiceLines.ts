@@ -58,7 +58,7 @@ export const GREETERS: Record<MinigameId, Speaker & { line: string }> = {
     id: 'greeter-red-light-green-light',
     name: 'Signal Sal',
     direction: 'A crossing-guard toy with a stop-go lollipop sign. Brisk, sporty, encouraging.',
-    line: "Hey there! Run on green and freeze on red. If the Signalman sees you move, it's back to the start! Want to have a go?",
+    line: "Hey there! Run on green and freeze on red. If the Signalman sees you move, you're out! Want to have a go?",
   },
   'wind-up-dash': {
     id: 'greeter-wind-up-dash',

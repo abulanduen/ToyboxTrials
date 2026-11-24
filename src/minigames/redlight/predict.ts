@@ -3,8 +3,8 @@
  * ../remote.ts). Without it your toy kept walking for a whole network round trip after you let go,
  * which shows most on red, the moment everyone stops. Your client replays its own unstepped stick
  * input with the rules' own movement (`stepMover`, 60 Hz steps) whenever the rules let the toy walk:
- * not during the intro, not while being flicked back, not while held after a catch. Whether you are
- * caught stays the server's call (its grace allows for the network trip, see server/games.ts).
+ * not during the intro, and not once it is knocked out. Whether you are caught stays the server's
+ * call (its grace allows for the network trip, see server/games.ts).
  */
 import { TOY_TUNING, latchInput, stepMover } from '../shared/movement';
 import { PredictSmoother } from '../shared/predictSmooth';
@@ -17,7 +17,7 @@ const smooth = new PredictSmoother();
 export function predictRlgl(s: RlglState, localId: string, frames: readonly PredictFrame<RlglInput>[], skipMs = 0): RlglState | null {
   const i = s.players.findIndex((p) => p.id === localId);
   const me = i >= 0 ? s.players[i] : undefined;
-  if (!me || me.fling || s.phase === 'intro' || s.phase === 'over' || (me.held && !me.finished)) {
+  if (!me || me.out || s.phase === 'intro' || s.phase === 'over') {
     smooth.reset();
     return null;
   }

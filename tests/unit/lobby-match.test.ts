@@ -213,10 +213,10 @@ describe('online snapshot cost and fairness', () => {
     expect(serverGame('toybox-siege').snapshotEvery ?? 1).toBe(1); // 30 a second, like the other real-time trials
   });
 
-  it('Red Light online: the grace after red allows for the network trip (practice keeps 140 ms)', () => {
+  it('Red Light online: the grace after red allows for the network trip (practice keeps 320 ms)', () => {
     const local = new GameRun('red-light-green-light', field(2), 5);
-    expect((local.state as { config: { graceMs: number } }).config.graceMs).toBe(140 + 170);
-    expect((rlglRules.init(field(2), 5) as { config: { graceMs: number } }).config.graceMs).toBe(140);
+    expect((local.state as { config: { graceMs: number } }).config.graceMs).toBe(320 + 170);
+    expect((rlglRules.init(field(2), 5) as { config: { graceMs: number } }).config.graceMs).toBe(320);
   });
 });
 

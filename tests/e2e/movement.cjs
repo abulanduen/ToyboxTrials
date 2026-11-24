@@ -59,7 +59,7 @@ function kit(page) {
         host: window.__toybox.match.phase(),
         dash,
         s: { phase: s.phase, phaseT: s.phaseT, t: s.t, cycle: s.cycle, n: s.players.length },
-        me: { x: p.m.x, y: p.m.y, z: p.m.z, vx: p.m.vx, speed: Math.hypot(p.m.vx, p.m.vz), grounded: p.m.grounded, caught: p.caught, held: p.held, fling: !!p.fling, finished: p.finished, prog, stun: p.stunMs, snaps: p.snaps, toppled: p.toppled, bonks: p.bonks, bumps: p.bumps, toss: !!p.toss },
+        me: { x: p.m.x, y: p.m.y, z: p.m.z, vx: p.m.vx, speed: Math.hypot(p.m.vx, p.m.vz), grounded: p.m.grounded, caught: p.caught, out: !!p.out, finished: p.finished, prog, stun: p.stunMs, snaps: p.snaps, toppled: p.toppled, bonks: p.bonks, bumps: p.bumps, toss: !!p.toss },
       };
     });
   const waitFor = async (pred, label, ms = 240000, every = 60) => {
@@ -143,28 +143,13 @@ async function desktopRlgl(browser) {
   check('RLGL: signal says STOP on red', await textHas('[data-testid=rl-signal]', 'STOP'));
   check('RLGL: stopping on the tell is safe (not caught, progress kept)', r.me.caught === 0 && r.me.prog >= atTell - 0.001 && r.me.speed === 0, `caught=${r.me.caught} prog=${(r.me.prog * 100).toFixed(0)}%`);
 
-  // Now break the rule: keep running through the red light.
-  r = await ff((r) => r.s.phase === 'go', 'second green');
-  await page.keyboard.down('KeyW');
-  r = await waitFor((r) => r.me.caught > 0, 'caught on red');
-  check('RLGL: moving on red is caught', r.s.phase === 'stop' && r.me.caught === 1 && r.me.held, `phase=${r.s.phase} t=${r.s.phaseT.toFixed(0)}ms`);
-  await page.waitForSelector('[data-testid=rl-note]', { timeout: 30000 });
-  check('RLGL: the HUD says why', await textHas('[data-testid=rl-note]', 'Caught'));
-  await snap('m6-05-rlgl-caught.png', 1);
-  r = await ff((r) => !r.me.fling, 'landed');
-  check('RLGL: the penalty is a knock-back to the start line', r.me.prog === 0, `progress ${(r.me.prog * 100).toFixed(0)}%`);
-  await page.waitForTimeout(700);
-  r = await R();
-  check('RLGL: a caught toy is held until the next green (key still down)', r.s.phase !== 'stop' || (r.me.speed === 0 && r.me.caught === 1), `speed=${r.me.speed.toFixed(1)} caught=${r.me.caught}`);
-  await page.keyboard.up('KeyW');
-
   // Play properly to the finish: run on green, let go on the tell.
   let down = false;
   const t0 = Date.now();
   while (Date.now() - t0 < 400000) {
     r = await R();
     if (!r.s || r.host !== 'playing' || r.me.finished) break;
-    const want = r.s.phase === 'go' && !r.me.held;
+    const want = r.s.phase === 'go';
     if (want !== down) {
       await page.keyboard[want ? 'down' : 'up']('KeyW');
       down = want;
@@ -184,9 +169,24 @@ async function desktopRlgl(browser) {
   const rec = await page.evaluate(() => JSON.parse(localStorage.getItem('toybox-trials:prototype:v1')).state.records['red-light-green-light']);
   check('RLGL: record saved (finishers score over 100)', rec?.best > 100 && rec?.plays === 1, JSON.stringify(rec));
 
-  // Pause works, and leaving returns to the hub.
+  // Again, and this time break the rule: keep running through STOP!
   await page.click('[data-testid=results-again]');
   await page.waitForSelector('.countdown', { timeout: 30000 });
+  r = await ff((r) => r.host === 'playing' && r.s.phase === 'go', 'green (second race)');
+  await page.keyboard.down('KeyW');
+  r = await waitFor((r) => r.me.caught > 0, 'caught on red');
+  check('RLGL: pushing on after STOP! is caught', r.s.phase === 'stop' && r.me.caught === 1 && r.me.out, `phase=${r.s.phase} t=${r.s.phaseT.toFixed(0)}ms`);
+  await page.waitForSelector('[data-testid=rl-note]', { timeout: 30000 });
+  check('RLGL: the HUD says you are out', (await textHas('[data-testid=rl-note]', 'out')) && (await textHas('[data-testid=rl-signal]', 'Out')));
+  await snap('m6-05-rlgl-caught.png', 1);
+  const caughtAt = r.me.prog;
+  r = await ff((r) => r.s.phase === 'go', 'the next green');
+  await page.waitForTimeout(700);
+  r = await R();
+  check('RLGL: a caught toy is out of the trial: it stays where it fell, key still down, through the next green', r.me.out && r.me.speed === 0 && Math.abs(r.me.prog - caughtAt) < 0.001 && r.me.caught === 1, `prog ${(r.me.prog * 100).toFixed(0)}% (caught at ${(caughtAt * 100).toFixed(0)}%) speed=${r.me.speed.toFixed(1)}`);
+  await page.keyboard.up('KeyW');
+
+  // Pause works, and leaving returns to the hub.
   await page.keyboard.press('Escape');
   await page.waitForTimeout(800);
   check('RLGL: Esc pauses the match', await page.isVisible('.pause'));
@@ -248,7 +248,7 @@ async function phoneRlgl(browser) {
   await touch('touchEnd', []);
   r = await R();
   check('RLGL phone: pushing the stick right steers right', r.me.x > x0 + 0.5, `x ${x0.toFixed(1)} → ${r.me.x.toFixed(1)}`);
-  r = await ff((r) => r.s.phase === 'go' && r.s.phaseT > 50 && r.me.grounded && !r.me.held, 'green 3');
+  r = await ff((r) => r.s.phase === 'go' && r.s.phaseT > 50 && r.me.grounded && !r.me.out, 'green 3');
   await touch('touchStart', [[jb.x + jb.width / 2, jb.y + jb.height / 2, 2]]);
   let peak = 0;
   for (let i = 0; i < 30; i++) {
@@ -266,7 +266,7 @@ async function phoneRlgl(browser) {
   const pause = await page.locator('.match-pause').boundingBox();
   const jb2 = await page.locator('[data-testid=mv-jump]').boundingBox();
   check('RLGL phone: portrait HUD fits and clears the pause button', inView(top, 412, 915) && !overlap(top, pause) && inView(jb2, 412, 915), JSON.stringify(top));
-  r = await ff((r) => r.s.phase === 'go' && r.s.phaseT > 50 && !r.me.held, 'green (portrait)');
+  r = await ff((r) => r.s.phase === 'go' && r.s.phaseT > 50 && !r.me.out, 'green (portrait)');
   const z1 = r.me.z;
   await touch('touchStart', [[120, 760, 3]]);
   await touch('touchMove', [[120, 730, 3]]);
@@ -279,7 +279,7 @@ async function phoneRlgl(browser) {
     `z ${z1.toFixed(1)} → ${r.me.z.toFixed(1)}`);
 
   // Run a red light in portrait for the screenshot of the penalty, then leave via the pause button.
-  r = await ff((r) => r.s.phase === 'go' && r.s.phaseT > 50 && !r.me.held, 'green (portrait 2)');
+  r = await ff((r) => r.s.phase === 'go' && r.s.phaseT > 50 && !r.me.out, 'green (portrait 2)');
   const before = r.me.caught;
   await touch('touchStart', [[120, 760, 4]]);
   await touch('touchMove', [[120, 696, 4]]);

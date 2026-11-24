@@ -22,7 +22,7 @@ import { hungerRules } from '../src/minigames/midnight/rules';
 import { createHungerBot } from '../src/minigames/midnight/bot';
 import { findRules } from '../src/minigames/findoriginal/rules';
 import { createFindBot } from '../src/minigames/findoriginal/bot';
-import { rlglRules } from '../src/minigames/redlight/rules';
+import { DEFAULT_CONFIG as RLGL_DEFAULTS, rlglRules } from '../src/minigames/redlight/rules';
 import { createRlglBot } from '../src/minigames/redlight/bot';
 import { blinkRules } from '../src/minigames/blink/rules';
 import { createBlinkBot } from '../src/minigames/blink/bot';
@@ -159,11 +159,11 @@ const GAMES: ServerGame[] = [
     publicView(v) {
       v.cycles = [];
     },
-    // Online a player sees the light turn red one network trip plus a snapshot late, and their
-    // "stop" reaches the rules another trip plus an input batch later: about 130-180 ms on a good
-    // connection, more than the whole 140 ms grace. Without this, toys kept moving after their
-    // player let go and were caught (flung back) far more often than in practice.
-    config: { graceMs: 140 + 170 },
+    // Online a player sees "STOP!" one network trip plus a snapshot late, and their stop reaches
+    // the rules another trip plus an input batch later: about 130-180 ms on a good connection, on
+    // top of the practice grace (time to react to "STOP!"). Without this, toys were caught after
+    // their player let go.
+    config: { graceMs: RLGL_DEFAULTS.graceMs + 170 },
   },
   {
     id: 'blink-duel',

@@ -66,7 +66,7 @@ export function createRlglBot(): BotPolicy<RlglState, RlglInput> {
       }
 
       const moving = s.phase === 'go' ? s.t >= m.at : s.t < m.at;
-      if (!moving || p.held) return [NO_INPUT];
+      if (!moving || p.out) return [NO_INPUT];
       const dx = m.aimX - p.m.x;
       const out: MoveInput = { ax: Math.max(-0.35, Math.min(0.35, dx * 0.4)), ay: m.pace, run: true, jump: false };
       return [out];

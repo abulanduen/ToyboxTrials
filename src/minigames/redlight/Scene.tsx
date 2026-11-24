@@ -78,15 +78,16 @@ export function RlglScene({ getState: rawState, contestants, localId }: Minigame
   const views = useMemo(() => {
     const out = new Map<string, () => RacerView | null>();
     for (const c of contestants) {
-      const v: RacerView = { m: null as never, tossK: -1, tossH: 9, dizzy: false, cheer: false };
+      const v: RacerView = { m: null as never, tossK: -1, tossH: 9, dizzy: false, cheer: false, down: 0 };
       out.set(c.id, () => {
         const s = getState();
         const p = s?.players.find((x) => x.id === c.id);
         if (!s || !p) return null;
         v.m = p.m;
-        v.tossK = p.fling ? Math.min(1, p.fling.t / s.config.flingMs) : -1;
-        v.tossH = p.fling ? 5 + Math.min(9, (p.fling.toZ - p.fling.fromZ) * 0.12) : 9;
-        v.dizzy = p.held && !p.fling;
+        v.tossK = -1;
+        // Knocked out: topples over where it was caught (on the shown clock, so it falls smoothly online too).
+        v.down = p.out ? Math.min(1, Math.max(0, s.t - p.outT) / 420) : 0;
+        v.dizzy = false;
         v.cheer = p.finished;
         return v;
       });

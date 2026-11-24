@@ -27,6 +27,7 @@
 .ta-wind,
 .ta-shrink,
 .ta-flick,
+.ta-topple,
 .ta-knock {
   transform-box: fill-box;
 }
@@ -203,6 +204,17 @@
   0%, 25% { transform: translate(0, 0) rotate(0deg); }
   55% { transform: translate(calc(var(--dx, -100px) * 0.5), var(--dy, -40px)) rotate(-200deg); }
   80%, 100% { transform: translate(var(--dx, -100px), 0) rotate(-360deg); }
+}
+
+/* a toy toppling over backwards where it stands (knocked out), then lying still */
+.ta-topple {
+  transform-origin: 50% 100%;
+  animation: ta-topple var(--t, 2.6s) var(--d, 0s) ease-in infinite;
+}
+@keyframes ta-topple {
+  0%, 30% { transform: rotate(0deg); }
+  50% { transform: rotate(-96deg); }
+  56%, 100% { transform: rotate(-88deg); }
 }
 
 /* a toy knocked flying (hit, pushed out of the ring) */

@@ -149,12 +149,11 @@ function Caught() {
     <Art>
       <Runway lamp={STOP} />
       <Signalman x={222} y={126} face={-1} signal={STOP} raise="stop" />
-      <Arrow x1={140} y1={78} x2={24} y2={100} bend={-34} color={PALETTE.coral} dashed w={4} />
       <Toy x={86} y={126} s={0.8} />
       <Tick x={94} y={68} s={0.8} />
       <Burst x={146} y={104} r={20} fill={PALETTE.coral} />
       <SpeedLines x={150} y={126} s={0.8} />
-      <Toy x={150} y={126} s={0.8} paint={RIVAL} className="ta-flick" style={vars({ dx: -124, dy: -50, t: '2.8s' })} />
+      <Toy x={150} y={126} s={0.8} paint={RIVAL} className="ta-topple" style={vars({ t: '2.8s' })} />
     </Art>
   );
 }

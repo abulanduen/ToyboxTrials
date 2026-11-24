@@ -134,7 +134,7 @@ export const MINIGAMES: MinigameDefinition[] = [
     title: 'Red Light, Green Light',
     tagline: 'Run on green. Freeze when the Signalman turns round.',
     description:
-      'Race down the runway to the finish line. The clockwork Signalman has its back turned while the lamps are green. When its key starts to ratchet it is about to turn round: stop dead before the lamps go red. Any toy still moving on red is flicked all the way back to the start. First across the line wins. Everyone else is placed by how far they got.',
+      'Race down the runway to the finish line. The clockwork Signalman has its back turned while the lamps are green. When its key starts to ratchet it is about to turn round: keep going while it turns, but let go the moment it says STOP! Any toy still pushing on once the lamps are red is knocked out of the trial. First across the line wins. Everyone else is placed by how far they got, and knocked-out toys come last.',
     category: 'reflex',
     accent: PALETTE.coral,
     players: { min: 2, max: 8 },

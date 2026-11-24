@@ -31,6 +31,8 @@ export interface RacerView {
   dizzy: boolean;
   /** Finished: celebrates. */
   cheer: boolean;
+  /** Knocked out: 0 standing … 1 lying on its back where it fell (optional). */
+  down?: number;
 }
 
 const wrapAngle = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -82,9 +84,10 @@ export function Racer({ c, view }: { c: Contestant; view: () => RacerView | null
 
     const speed = tossing ? 0 : moverSpeed(m);
     const t = state.clock.elapsedTime;
-    // Tumble while thrown, wobble while dizzy.
-    tilt.current.rotation.x = tossing ? -v.tossK * Math.PI * 2 : 0;
-    tilt.current.rotation.z = v.dizzy && !tossing ? Math.sin(t * 9) * 0.14 : c.isLocal ? 0 : Math.sin(s.phase) * 0.09 * Math.min(1, speed / 8);
+    // Tumble while thrown, wobble while dizzy, topple over backwards when knocked out.
+    const down = tossing ? 0 : Math.max(0, Math.min(1, v.down ?? 0));
+    tilt.current.rotation.x = tossing ? -v.tossK * Math.PI * 2 : -down * down * 1.45;
+    tilt.current.rotation.z = down > 0 ? 0 : v.dizzy && !tossing ? Math.sin(t * 9) * 0.14 : c.isLocal ? 0 : Math.sin(s.phase) * 0.09 * Math.min(1, speed / 8);
     const pivot = tossing ? 1.7 : 0; // spin about the middle, not the feet
     tilt.current.position.y = pivot;
     inner.current.position.y = -pivot;

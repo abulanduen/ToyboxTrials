@@ -261,9 +261,13 @@ original clockwork referee on a turntable) at the far end.
 - Cycle: **go** (1.3–2.7 s, with an occasional 0.75–1.15 s "snap" go, never twice running and never first) →
   **tell** (0.6–0.9 s: its key ratchets, the lamps flicker amber and it swings round) → **stop** (1.7–2.9 s).
   The whole schedule is rolled from the match seed, so timing never depends on inputs.
-- 140 ms after the lamps turn red, any toy moving faster than 1 cm/s is caught. **Decision: a knock-back, not
-  elimination.** The toy is flicked back to the start line and held until the next green, so everyone keeps
-  playing. A partial knock-back (24 cm) was tried first, but then never stopping still finished the race.
+- Toys may keep moving while it turns; only after the lamps turn red ("STOP!") does it watch. 320 ms after that
+  (time to see it and let go; online +170 ms for the network), any toy whose player is still pushing on and that is
+  moving faster than 1 cm/s is caught. Letting go in time is enough: coasting to a stop (~250 ms) is not caught.
+- **Decision (owner, Nov 2026): elimination.** A caught toy topples over where it stands and is out of the trial;
+  its player watches the rest. The trial ends when every toy is home or out (or on time). Placings: finishers by
+  time, then toys still racing by distance, then knocked-out toys by distance. (Earlier: a knock-back to the start
+  line, held until the next green; before that a 24 cm knock-back, but never stopping still finished the race.)
 - The signal is shown four ways: the Signalman's facing and paddles, its beacon, lamps along both kerbs, and the
   HUD word (GO! / It's turning… / STOP!), plus a different sound for each. It never relies on colour alone.
 - First across the line wins. Once somebody finishes, the rest have 15 s. The clock is 90 s. Placement is finish

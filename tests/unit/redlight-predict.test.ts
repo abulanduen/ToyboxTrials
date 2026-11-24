@@ -66,11 +66,11 @@ function playLinked(run: GameRun, stickY: (t: number) => number, endMs: number, 
 }
 
 describe('Red Light own-toy prediction', () => {
-  it('predicts nothing while the toy is held, flung or before the start', () => {
+  it('predicts nothing once the toy is knocked out, or before the start', () => {
     const s = viewOf(goRun());
     const f: PredictFrame<RlglInput>[] = [{ dt: 50, inputs: [{ ax: 0, ay: 1, run: true, jump: false }] }];
     expect(predictRlgl({ ...s, phase: 'intro' }, 'p1', f)).toBeNull();
-    expect(predictRlgl({ ...s, players: s.players.map((p) => (p.id === 'p1' ? { ...p, held: true } : p)) }, 'p1', f)).toBeNull();
+    expect(predictRlgl({ ...s, players: s.players.map((p) => (p.id === 'p1' ? { ...p, out: true } : p)) }, 'p1', f)).toBeNull();
     const before = JSON.stringify(s);
     expect(predictRlgl(s, 'p1', [...f, { dt: 100, inputs: [] }])).not.toBeNull();
     expect(JSON.stringify(s)).toBe(before);

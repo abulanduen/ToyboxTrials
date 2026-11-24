@@ -110,7 +110,7 @@ describe('Red Light, Green Light rules', () => {
     }
   });
 
-  it('moving on red is caught after the grace: flicked back to the start and held until the next green', () => {
+  it('moving after "STOP!" (once the grace is up) knocks the toy out of the trial, where it stands', () => {
     const s = rlglRules.init([human('you'), human('b')], 3);
     const pol: Policy = (st, id) => (id === 'you' ? reckless(st, id) : NO_INPUT);
     const ev = run(s, pol, (s) => me(s).caught > 0);
@@ -118,39 +118,58 @@ describe('Red Light, Green Light rules', () => {
     expect(s.phaseT).toBeGreaterThan(DEFAULT_CONFIG.graceMs);
     expect(s.phaseT).toBeLessThan(DEFAULT_CONFIG.graceMs + 2 * DT);
     expect(ev.find((e) => e.type === 'caught')!.id).toBe('you');
-    expect(progressOf(s, me(s))).toBeGreaterThan(0.2);
-    expect(me(s).held).toBe(true);
-    // Still holding forward: lands on the start line, isn't caught again, and can't move until green.
-    run(s, pol, (s) => !me(s).fling);
-    expect(me(s).m.z).toBe(DEFAULT_CONFIG.startZ);
-    run(s, pol, (s) => s.phase === 'go');
+    expect(me(s).out).toBe(true);
+    const z = me(s).m.z;
+    expect(progressOf(s, me(s))).toBeGreaterThan(0.2); // no knock-back: it stays where it was caught
+    // Still holding forward through the next green: it never moves again and isn't caught twice.
+    run(s, pol, (s) => s.cycle >= 3);
+    expect(me(s).m.z).toBe(z);
     expect(me(s).caught).toBe(1);
-    expect(me(s).m.z).toBeCloseTo(DEFAULT_CONFIG.startZ, 1);
-    expect(me(s).held).toBe(false);
-    // …and is free to run again on green.
-    run(s, pol, (s) => s.phase !== 'go');
-    expect(me(s).m.z).toBeLessThan(DEFAULT_CONFIG.startZ - 5);
     // The toy that stood still was never caught.
     expect(me(s, 'b').caught).toBe(0);
   });
 
-  it('the knock-back distance is configurable and never goes behind the start line', () => {
-    const s = rlglRules.init([human('you'), human('b')], 3, { knockBack: 10 });
-    run(s, (st, id) => (id === 'you' ? reckless(st, id) : NO_INPUT), (s) => me(s).caught > 0);
-    const z = me(s).m.z;
-    run(s, () => NO_INPUT, (s) => !me(s).fling);
-    expect(me(s).m.z).toBeCloseTo(z + 10, 6);
-    const near = rlglRules.init([human('you'), human('b')], 4, { goMs: [300, 300], snapChance: 0, knockBack: 30 });
-    run(near, (st, id) => (id === 'you' ? reckless(st, id) : NO_INPUT), (s) => me(s).caught > 0 && !me(s).fling);
-    expect(near.players[0].m.z).toBe(DEFAULT_CONFIG.startZ);
+  it('no catching before "STOP!": moving all through the turn (the warning) is safe', () => {
+    for (let seed = 0; seed < 20; seed++) {
+      const s = rlglRules.init([human('you'), human('b')], seed);
+      // run through go and the whole warning, let go the moment the light is red
+      const pol: Policy = (st, id) => (id === 'you' && (st.phase === 'go' || st.phase === 'warn') ? FWD : NO_INPUT);
+      run(s, pol, (s) => s.cycle >= 4 || me(s).finished);
+      expect(me(s).caught).toBe(0);
+    }
   });
 
-  it('recklessness never pays: a toy that never stops never finishes', () => {
+  it('the grace leaves time to react to "STOP!": letting go 220 ms after it appears is safe', () => {
+    for (let seed = 0; seed < 20; seed++) {
+      const s = rlglRules.init([human('you'), human('b')], seed);
+      const pol: Policy = (st, id) => (id === 'you' && (st.phase === 'go' || st.phase === 'warn' || (st.phase === 'stop' && st.phaseT < 220)) ? FWD : NO_INPUT);
+      run(s, pol, (s) => s.cycle >= 4 || me(s).finished);
+      expect(me(s).caught).toBe(0);
+    }
+  });
+
+  it('recklessness never pays: a toy that never stops is out at the first red and never finishes', () => {
     const s = rlglRules.init([human('you'), human('b')], 21);
     run(s, (st, id) => (id === 'you' ? reckless(st, id) : NO_INPUT));
     expect(me(s).finished).toBe(false);
-    expect(me(s).caught).toBeGreaterThan(5);
-    expect(s.t).toBeGreaterThanOrEqual(DEFAULT_CONFIG.limitMs);
+    expect(me(s).caught).toBe(1);
+    expect(me(s).out).toBe(true);
+  });
+
+  it('the trial ends once every toy is home or out, and knocked-out toys place last', () => {
+    const s = rlglRules.init([human('you'), human('b'), human('c')], 12);
+    // you: careful and gets home; b: reckless, out early; c: careful but slow, still racing when the clock ends
+    const pol: Policy = (st, id) => (id === 'b' ? FWD : st.phase === 'go' ? { ...FWD, ay: id === 'c' ? 0.15 : 1 } : NO_INPUT);
+    run(s, pol);
+    const r = rlglRules.result(s);
+    expect(r.placements.map((p) => p.contestantId)).toEqual(['you', 'c', 'b']);
+    expect(r.placements.find((p) => p.contestantId === 'b')!.eliminated).toBe(true);
+    // everyone out ends it at once
+    const all = rlglRules.init([human('you'), human('b')], 13);
+    run(all, reckless);
+    expect(all.players.every((p) => p.out)).toBe(true);
+    expect(all.phase).toBe('over');
+    expect(all.t).toBeLessThan(DEFAULT_CONFIG.limitMs);
   });
 
   it('first across the line wins; finish order, then distance, decides the placings', () => {
@@ -203,7 +222,7 @@ describe('Red Light, Green Light rules', () => {
     const x0 = me(s).m.x, z0 = me(s).m.z;
     run(s, (_st, id) => (id === 'you' ? { ax: 1, ay: -1, run: false, jump: false } : NO_INPUT), () => false, 400);
     expect(Math.hypot(me(s).m.x - x0, me(s).m.z - z0)).toBeGreaterThan(1);
-    expect(me(s).held).toBe(false);
+    expect(me(s).out).toBe(false);
     expect(me(s).finished).toBe(true);
   });
 
