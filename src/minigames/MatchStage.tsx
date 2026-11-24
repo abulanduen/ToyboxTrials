@@ -22,8 +22,11 @@ export function MatchStage() {
   const phase = useMatch((s) => s.phase);
   const localId = useMatch((s) => s.localId);
 
-  useFrame((_, dt) => {
-    tickMatch(dt * 1000);
+  // Step the match (and, online, rebuild the predicted view) before the game's Scene draws this
+  // frame: with the default order the Scene's own callbacks ran first and drew the previous frame's
+  // state, a frame behind the input. Hoop Clash's toys run at −1, so this goes earlier still.
+  useFrame((_, dt) => tickMatch(dt * 1000), -2);
+  useFrame(() => {
     endFrame(); // the hub controller isn't mounted, so the host owns the input frame boundary
   });
 

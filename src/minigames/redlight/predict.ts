@@ -12,6 +12,14 @@ import type { PredictFrame } from '../types';
 import type { RlglInput, RlglState } from './rules';
 
 const STEP_MS = 1000 / 60;
+
+/**
+ * Offline, a key moves the toy over the frame it was read in; the replay only starts it on the next
+ * frame. So the drawn toy runs on by the newest frame's time on the newest input (at most 50 ms):
+ * the same feel, one frame sooner. It is added after the smoothing, which only sees the replay.
+ */
+const LOOK_MAX_MS = 50;
+const lookMs = (frames: readonly PredictFrame<unknown>[]) => Math.min(frames.length ? frames[frames.length - 1].dt : 0, LOOK_MAX_MS);
 const smooth = new PredictSmoother();
 
 export function predictRlgl(s: RlglState, localId: string, frames: readonly PredictFrame<RlglInput>[], skipMs = 0): RlglState | null {
@@ -38,6 +46,8 @@ export function predictRlgl(s: RlglState, localId: string, frames: readonly Pred
     if (f === lastAt) { knownX = m.x; knownZ = m.z; }
   }
   const { ox, oz } = smooth.settle(localId, frames, knownX, knownZ, m.x, m.z);
+  const look = { ...input, jump: false };
+  for (let left = lookMs(frames); left > 1e-6; left -= STEP_MS) stepMover(m, look, Math.min(STEP_MS, left), s.world, TOY_TUNING);
   const b = s.world.bounds;
   if (b) {
     const r = TOY_TUNING.radius;

@@ -25,6 +25,14 @@ function moveHalf(s: SiegeState, p: SiegePlayer): number | null {
 
 const smooth = new PredictSmoother();
 
+/**
+ * Offline, a key moves the toy over the frame it was read in; the replay only starts it on the next
+ * frame. So the drawn toy runs on by the newest frame's time on the newest input (at most 50 ms):
+ * the same feel, one frame sooner. It is added after the smoothing, which only sees the replay.
+ */
+const LOOK_MAX_MS = 50;
+const lookMs = (frames: readonly PredictFrame<unknown>[]) => Math.min(frames.length ? frames[frames.length - 1].dt : 0, LOOK_MAX_MS);
+
 export function predictSiege(s: SiegeState, localId: string, frames: readonly PredictFrame<SiegeInput>[], skipMs = 0): SiegeState | null {
   const i = s.players.findIndex((p) => p.id === localId);
   const me = i >= 0 ? s.players[i] : undefined;
@@ -49,6 +57,8 @@ export function predictSiege(s: SiegeState, localId: string, frames: readonly Pr
     if (f === lastAt) { knownX = p.x; knownZ = p.z; }
   }
   const { ox, oz } = smooth.settle(localId, frames, knownX, knownZ, p.x, p.z);
+  const look = lookMs(frames);
+  if (look > 0) movePlayer(p, look / 1000, half);
   const lim = half - PLAYER_RADIUS;
   p.x = Math.max(-lim, Math.min(lim, p.x + ox));
   p.z = Math.max(-lim, Math.min(lim, p.z + oz));

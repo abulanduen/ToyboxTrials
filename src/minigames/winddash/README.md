@@ -40,3 +40,11 @@ the match seed. Design notes are in `GAME_DESIGN.md` §4 · 07.
 
 Trap timing and spacing, the level budget and bot skill are first guesses checked by headless
 simulation only. Nobody has played these courses on a real phone.
+
+## Online: own-toy prediction
+
+Online, your own toy answers the stick on the frame you press it instead of a network round trip
+later: `predict.ts` replays your not-yet-stepped stick input on the newest server state with the
+rules' own movement (`moveDashToy`) against the course's walls at each moment (`dashWorld`), both
+shared with `rules.ts`. What traps do to a toy and toppling dominoes stay the server's. See
+docs/ONLINE.md, "Own-toy prediction". Tests: `tests/unit/winddash-predict.test.ts`.

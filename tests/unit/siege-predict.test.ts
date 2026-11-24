@@ -77,8 +77,9 @@ describe('predictSiege', () => {
     const out = predictSiege(s, 'p1', frames)!;
     expect(JSON.stringify(s)).toBe(before);
     const p = meIn(out);
-    // the first frame's time passed before the stick moved; the second walks
-    expect(p.x).toBeCloseTo(me.x + me.stat.speed * 0.1, 5);
+    // the first frame's time passed before the stick moved; the second walks, and the drawn toy
+    // runs on by the newest frame's time (capped at 50 ms), as offline play would show it
+    expect(p.x).toBeCloseTo(me.x + me.stat.speed * (0.1 + 0.05), 5);
     expect(p.z).toBeCloseTo(me.z, 5);
     // everyone else is the server's own object
     for (const q of out.players) if (q.id !== 'p1') expect(s.players).toContain(q);

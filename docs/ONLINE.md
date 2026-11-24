@@ -368,8 +368,8 @@ online"). The other choice in both places is the existing **practice with bots**
   clock `t` on smoothly (at most 120 ms past the newest snapshot, never backwards), which keeps
   animations and the rhythm song clock at frame rate. Positions are not interpolated: moving toys
   step at 30 Hz (the Racer scenes smooth them; Blink Duel and Spellbox show the steps).
-- **Own-toy prediction (Toybox Siege, Hoop Clash, Red Light, Green Light, Midnight Hunger, Inferno
-  Escape):** a game can give its module a `predictLocal`
+- **Own-toy prediction (Toybox Siege, Hoop Clash, Red Light, Green Light, Wind-Up Dash, Midnight
+  Hunger, Inferno Escape):** a game can give its module a `predictLocal`
   (`src/minigames/types.ts`). The client numbers its input messages (`q` on `in`; a predicting game
   sends one every flush, even empty), and the server puts the newest number its rules have stepped
   on that player's snapshots (`a` on `ms`, `GameRun.ackFor`). The client keeps each rendered
@@ -380,10 +380,16 @@ online"). The other choice in both places is the existing **practice with bots**
   on that newest stepped message (`g` on `ms`, `GameRun.ackAgeFor`), and the replay skips that much
   of the unstepped frames' time: without it, slow frames walked the toy past its stop by 2–4 cm
   (measured at 450–650 ms frames) and it snapped back. Only your own toy is predicted (in Hoop Clash also its
-  facing and shot meter); enemies, the ball, passes, steals, damage, pickups and other toys are the
+  facing and shot meter); in Wind-Up Dash what traps do to a toy (snaps, knocks, bounces, the
+  spring) and toppling dominoes are the server's (the toy's own movement is the rules'
+  `moveDashToy` against `dashWorld`, shared with them); enemies, the ball, passes, steals, damage, pickups and other toys are the
   server's, and so is being pushed by another toy. A snapshot that shifts the replayed position
   fades in over about 0.1 s (jumps over 4 cm show at once; shared in
-  `src/minigames/shared/predictSmooth.ts`). Both fields are optional: a client or server without
+  `src/minigames/shared/predictSmooth.ts`). Offline, a key moves the toy over the frame it was
+  read in; the strict replay only starts it on the next frame, so the drawn toy (in the games with
+  smooth movement) runs on by the newest frame's time on the newest input, at most 50 ms, after the
+  smoothing: online then answers on the same frame as offline. (The tile games already hop on the
+  frame the key is read.) Both fields are optional: a client or server without
   them behaves as before (no prediction), so no protocol version change. Tested in node through a
   simulated 80 ms each-way link at 60 fps and at 220 ms frames (`tests/unit/*-predict.test.ts`)
   and in a browser through a delay proxy; not yet on a real network.
@@ -763,7 +769,7 @@ Railway pushes a new server on every commit to the branch it watches. The client
   other trials' Scenes and Huds have not been watched on server state in a browser yet, and
   nobody has played a trial online by hand.
 - Client-side prediction only for your own toy, and only in Toybox Siege, Hoop Clash, Red Light,
-  Midnight Hunger and Inferno Escape; no position interpolation in
+  Wind-Up Dash, Midnight Hunger and Inferno Escape; no position interpolation in
   online matches (see above); no
   matchmaking queues, parties or ranked play (M9/M10). Online matches don't pay cogs or update
   local records yet.

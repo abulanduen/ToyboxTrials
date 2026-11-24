@@ -18,6 +18,11 @@ const cardboardMat = (tint: string = PALETTE.cardboard) =>
   new THREE.MeshStandardMaterial({ color: '#ffffff', map: cardboardTexture(tint, [1, 1]), roughness: 0.95 });
 
 // ---------------- Fountain: an upturned bottle cap with a marble on a thread spool ----------------
+/** The pool's surface, and how far the spool, marble and jets sit below their modelled heights so the
+ *  spool's bottom flange stands on the water (it floated almost 1 cm above it before). */
+const FOUNTAIN_WATER_Y = FOUNTAIN.top - 0.25;
+const SPOOL_DROP = 2.2 - 0.175 - FOUNTAIN_WATER_Y;
+
 export function Fountain() {
   const capGeo = useMemo(() => {
     // crimped bottle-cap ring: alternate vertex radii
@@ -46,7 +51,7 @@ export function Fountain() {
       const ang = (jet / 4) * Math.PI * 2 + 0.4;
       const k = ((t * 0.9 + i / N) % 1 + 1) % 1;
       const r = 0.8 + k * 3.2;
-      dummy.position.set(FOUNTAIN.x + Math.cos(ang) * r, 4.3 + Math.sin(k * Math.PI) * 1.6 - k * 3.2, FOUNTAIN.z + Math.sin(ang) * r);
+      dummy.position.set(FOUNTAIN.x + Math.cos(ang) * r, 4.3 - SPOOL_DROP + Math.sin(k * Math.PI) * 1.6 - k * 3.2, FOUNTAIN.z + Math.sin(ang) * r);
       dummy.scale.setScalar(0.22 * (1 - k * 0.4));
       dummy.updateMatrix();
       drops.current.setMatrixAt(i, dummy.matrix);
@@ -64,14 +69,15 @@ export function Fountain() {
         </mesh>
         {/* Water and glass stay fairly rough on purpose: near-mirror surfaces threw pixel-sized sun
             highlights above the bloom threshold that flashed on and off as the camera turned. */}
-        <mesh ref={water} position={[0, FOUNTAIN.top - 0.25, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <mesh ref={water} position={[0, FOUNTAIN_WATER_Y, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
           <circleGeometry args={[FOUNTAIN.r - 0.3, 32]} />
           {/* Low specular: seen towards the window, a normal-strength sun reflection turned the whole
               pool from blue to near-white within a few degrees of camera turn (with bloom on top),
               which read as the fountain flickering while panning. Painted toy water, not a mirror. */}
           <meshPhysicalMaterial color={PALETTE.toyBlue} emissive={PALETTE.toyBlue} emissiveIntensity={0.25} roughness={0.5} metalness={0} specularIntensity={0.25} />
         </mesh>
-        {/* thread spool pillar */}
+        {/* thread spool pillar, standing in the pool (the group lowers it onto the water) */}
+        <group position={[0, -SPOOL_DROP, 0]}>
         <mesh position={[0, 2.2, 0]} castShadow material={woodMat(PALETTE.woodLight)}>
           <cylinderGeometry args={[0.9, 0.9, 0.35, 16]} />
         </mesh>
@@ -94,6 +100,7 @@ export function Fountain() {
           <torusGeometry args={[0.55, 0.12, 6, 18, Math.PI * 1.2]} />
           <meshStandardMaterial color={PALETTE.coral} emissive={PALETTE.coral} emissiveIntensity={0.3} />
         </mesh>
+        </group>
       </group>
       <instancedMesh ref={drops} args={[undefined, undefined, N]}>
         <sphereGeometry args={[1, 8, 6]} />

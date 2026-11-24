@@ -17,6 +17,13 @@ import { PredictSmoother } from '../shared/predictSmooth';
 import type { PredictFrame } from '../types';
 
 const smooth = new PredictSmoother();
+/**
+ * Offline, a key moves the toy over the frame it was read in; the replay only starts it on the next
+ * frame. So the drawn toy runs on by the newest frame's time on the newest input (at most 50 ms):
+ * the same feel, one frame sooner. It is added after the smoothing, which only sees the replay.
+ */
+const LOOK_MAX_MS = 50;
+const lookMs = (frames: readonly PredictFrame<unknown>[]) => Math.min(frames.length ? frames[frames.length - 1].dt : 0, LOOK_MAX_MS);
 const fin = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(-1, Math.min(1, v)) : 0);
 
 export function predictHoop(s: HoopState, localId: string, frames: readonly PredictFrame<HoopInput>[], skipMs = 0): HoopState | null {
@@ -61,8 +68,10 @@ export function predictHoop(s: HoopState, localId: string, frames: readonly Pred
     if (f === lastAt) { knownX = p.x; knownZ = p.z; }
   }
   const { ox, oz } = smooth.settle(localId, frames, knownX, knownZ, p.x, p.z);
-  p.x += ox;
-  p.z += oz;
+  const ahead = { ...p, in: { ...p.in } };
+  for (let left = lookMs(frames); left > 1e-6; left -= STEP_MS) moveToy(s, ahead, Math.min(STEP_MS, left));
+  p.x = ahead.x + ox;
+  p.z = ahead.z + oz;
   clampToCourt(p);
   const players = s.players.slice();
   players[i] = p;
