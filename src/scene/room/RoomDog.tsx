@@ -19,10 +19,12 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { ROOM } from '../../game/palette';
 import { exposeDebug } from '../../game/debug';
 import { FLOOR_Y } from '../layout';
-import { DOG_SPOTS, dogArrivalTime, dogPose } from './roomLayout';
+import { dogArrivalTime, dogPose } from './roomLayout';
 import { irradiance } from './bake';
-import { DOG_VISIT, dogVisit, endVisit, perchStay } from '../../game/dogVisit';
+import { DOG_VISIT, dogLoopTime, dogNow, dogSync, dogVisit, setDogLoopTime } from '../../game/dogVisit';
+import { dogPerched } from '../../game/dogRoute';
 import { player } from '../../game/player';
+import { useGame } from '../../game/store';
 
 /** Stand-in dimensions (cm): height at the shoulder and of the head's top when standing. */
 export const DOG_SIZE = { shoulder: 42, head: 54, length: 72 };
@@ -130,7 +132,7 @@ export function RoomDog() {
     m.frustumCulled = false;
     return m;
   }, [parts, mat]);
-  const st = useRef({ offset: 0, blend: { sit: 0, lie: 0, sniff: 0, perch: 0 }, tmp: new THREE.Object3D(), headAt: new THREE.Vector3(), lookYaw: 0, faceX: 0, faceZ: 1, perchSince: -1 });
+  const st = useRef({ shown: 'walk' as string, blend: { sit: 0, lie: 0, sniff: 0, perch: 0 }, tmp: new THREE.Object3D(), headAt: new THREE.Vector3(), lookYaw: 0, faceX: 0, faceZ: 1 });
   const hearts = useMemo(() => {
     const m = new THREE.InstancedMesh(heartGeometry(), new THREE.MeshBasicMaterial({ color: ROOM.dogHeart }), 8);
     m.frustumCulled = false;
@@ -149,16 +151,12 @@ export function RoomDog() {
   useEffect(() => {
     exposeDebug({
       dog: {
-        pose: () => ({ ...dogPose(performance.now() / 1000 + st.current.offset), y: FLOOR_Y }),
-        /** Jump the stand-in to `t` seconds into its loop (screenshots). */
-        at: (t: number) => {
-          st.current.offset = t - performance.now() / 1000;
-        },
+        pose: () => ({ ...dogPose(dogLoopTime()), y: FLOOR_Y }),
+        /** Jump the stand-in to `t` seconds into its loop (screenshots; online the room's next word wins). */
+        at: (t: number) => setDogLoopTime(t),
         /** Jump to just before the dog stands up at the spawn table (its perch). */
-        perch: (early = 0.5) => {
-          st.current.offset = dogArrivalTime('perch')! - early - performance.now() / 1000;
-        },
-        visit: () => ({ ...dogVisit, hearts: dogVisit.hearts.length, offset: st.current.offset }),
+        perch: (early = 0.5) => setDogLoopTime(dogArrivalTime('perch')! - early),
+        visit: () => ({ ...dogVisit, hearts: dogVisit.hearts.length, offset: dogSync.clock.offset, online: dogSync.online, clock: { ...dogSync.clock }, shown: st.current.shown }),
         /** Tests on a slow software renderer: how long it waits after the last pet (s; normally 10). */
         patience: (sec: number) => {
           DOG_VISIT.stay = sec;
@@ -185,41 +183,23 @@ export function RoomDog() {
     const dt = Math.min(rawDt, 0.1);
     const s = st.current;
     const nowS = performance.now() / 1000;
-    let t = nowS + s.offset;
-    let p = dogPose(t);
-    // Up at the table: it stays while it's being petted (10 s after the last pet), then strolls on.
-    // A long frame can step the clock past the end of the perch: if a pet still keeps it, step back.
-    if (p.action !== 'perch' && dogVisit.perched && nowS - dogVisit.lastPetAt < DOG_VISIT.stay) {
-      const end = dogArrivalTime('perch')! + DOG_SPOTS.perch.hold;
-      const k = ((t % p.loop) + p.loop) % p.loop;
-      if (k > end) {
-        s.offset -= k - end + 0.01;
-        t = nowS + s.offset;
-        p = dogPose(t);
-      }
-    }
-    if (p.action === 'perch') {
-      // (never wind back to or past its arrival, where rounding could read it as still walking up:
-      // a longer stay is held a frame at a time)
-      const stay = Math.min(DOG_SPOTS.perch.hold - 0.05, perchStay(nowS, p.holdLeft));
-      if (stay > p.holdLeft) {
-        s.offset -= stay - p.holdLeft;
-        t = nowS + s.offset;
-        p = dogPose(t);
-      }
-    }
+    // Where it is in its stroll: on the page's clock offline, the room's (shared) clock online.
+    // A pet holds it up at the table until DOG_VISIT.stay s after the last one (src/game/dogRoute.ts).
+    const t = dogLoopTime();
+    const p = dogPose(t);
+    // During a trial the table is the trial's set: the dog sits by it instead of standing up with
+    // its paws on it (and can't be petted). Same place and time, so it stays in step with the room.
+    const inTrial = useGame.getState().screen === 'minigame';
+    const action = inTrial && p.action === 'perch' ? 'sit' : p.action;
+    s.shown = action;
     const k = 1 - Math.exp(-4 * dt);
     const b = s.blend;
-    b.sit += ((p.action === 'sit' ? 1 : 0) - b.sit) * k;
-    b.lie += ((p.action === 'lie' || p.action === 'sleep' ? 1 : 0) - b.lie) * k;
-    b.sniff += ((p.action === 'sniff' ? 1 : 0) - b.sniff) * k;
-    b.perch += ((p.action === 'perch' ? 1 : 0) - b.perch) * (1 - Math.exp(-3 * dt));
-    // ready to pet half a second after arriving (by the clock, so a slow frame rate doesn't delay it)
-    if (p.action !== 'perch') s.perchSince = -1;
-    else if (s.perchSince < 0) s.perchSince = nowS;
-    const perched = p.action === 'perch' && nowS - s.perchSince > 0.5;
-    if (dogVisit.perched && !perched) endVisit();
-    dogVisit.perched = perched;
+    b.sit += ((action === 'sit' ? 1 : 0) - b.sit) * k;
+    b.lie += ((action === 'lie' || action === 'sleep' ? 1 : 0) - b.lie) * k;
+    b.sniff += ((action === 'sniff' ? 1 : 0) - b.sniff) * k;
+    b.perch += ((action === 'perch' ? 1 : 0) - b.perch) * (1 - Math.exp(-3 * dt));
+    // ready to pet half a second after it stands up
+    dogVisit.perched = action === 'perch' && dogPerched(dogNow(), dogSync.clock);
     const happy = Math.max(0, 1 - (nowS - dogVisit.lastPetAt) / 2.5);
     const walk = p.moving ? Math.sin(t * 7.5) : 0;
 
@@ -241,7 +221,7 @@ export function RoomDog() {
     torso.current.rotation.x = -0.5 * b.sit - PERCH.pitch * pr;
     // head: up and alert, nose down to sniff, resting on the paws asleep; perched, it peers over the
     // table, sniffing, and looks at you when you're near (else round at the toys)
-    const sleep = p.action === 'sleep' ? 1 : 0;
+    const sleep = action === 'sleep' ? 1 : 0;
     head.current.position.set(0, 13 + b.sit * 2 + pr * (PERCH.headY - 13), 30 + pr * (PERCH.headZ - 30));
     const sniffPerch = pr * (PERCH.look + Math.sin(t * 7) * 0.06 * (1 - happy));
     head.current.rotation.order = 'YXZ';

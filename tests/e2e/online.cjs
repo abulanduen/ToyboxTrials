@@ -15,6 +15,8 @@
    button is pressed, a link that connects and carries sound when close, closes when apart, a mute
    that silences, and push to talk on V. Phones: the mic button's size and place.
    ONLY=voice runs just the raw-socket checks, A + B and the voice checks.
+   The shared dog (A and B): the same dog on both screens; brought to the table (test server), A
+   pets it and B sees the heart and the hold. ONLY=dog runs just A + B and the dog checks.
    Software rendering is slow: page loads wait up to LOAD_TIMEOUT (default 10 min). */
 const { chromium } = require('playwright');
 const { spawn } = require('child_process');
@@ -41,6 +43,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /** The protocol version this test expects (src/net/protocol.ts PROTOCOL_VERSION). */
 const PROTO = 6; // v6: proximity voice chat; v5: chat and Who Am I? cards (v4: hub play)
 const VOICE_ONLY = process.env.ONLY === 'voice';
+const DOG_ONLY = process.env.ONLY === 'dog';
 
 // ---------------------------------------------------------------- server
 async function startServer() {
@@ -177,6 +180,31 @@ async function micMode(P, mode) {
   await P.page.click(`[data-testid=setting-mic-mode] button[data-mode=${mode}]`);
   await P.page.click('.pause__actions .toy-btn >> nth=0');
   await P.page.waitForSelector('.pause', { state: 'detached' });
+}
+/** The family dog is the room's: both see it in the same place, and a pet by A shows on B's screen too. */
+async function dogChecks(A, B) {
+  const visit = (P) => P.page.evaluate(() => window.__toybox.dog.visit());
+  const pose = (P) => P.page.evaluate(() => window.__toybox.dog.pose());
+  const [va, vb] = [await visit(A), await visit(B)];
+  check("dog: both players have the room's dog (the server's clock)", va.online && vb.online && va.offset === vb.offset, JSON.stringify({ a: va.clock, b: vb.clock }));
+  const [pa, pb] = await Promise.all([pose(A), pose(B)]);
+  check('dog: …in the same place on both screens', Math.hypot(pa.x - pb.x, pa.z - pb.z) < 8, JSON.stringify({ a: [pa.x, pa.z, pa.action], b: [pb.x, pb.z, pb.action] }));
+  // A walks to the pet spot (in front of the spawn table's west end); then the dog comes to the table
+  await walk(A, B, [[-8, 26], [-18, 30], [-26, 32.5], [-30, 33]], Math.PI);
+  await A.page.evaluate(() => window.__toybox.dog.patience(60)); // software GL: give the pets time
+  await B.page.evaluate(() => window.__toybox.dog.patience(60));
+  await A.page.evaluate(() => window.__toybox.dog.perch(-1)); // test server: the room's dog, 1 s into its perch
+  await Promise.all([A, B].map((P) => P.page.waitForFunction(() => window.__toybox.dog.visit().perched, null, { timeout: 60000, polling: 200 }).catch(() => null)));
+  check('dog: brought to the table, it is up there on both screens', (await visit(A)).perched && (await visit(B)).perched);
+  await A.page.evaluate(() => document.activeElement && document.activeElement.blur());
+  await A.page.keyboard.press('e');
+  await B.page.waitForFunction(() => window.__toybox.dog.visit().clock.lastPet > 0, null, { timeout: 20000, polling: 100 }).catch(() => null);
+  const [a1, b1] = [await visit(A), await visit(B)];
+  check("dog: A pets it; B sees the heart, and the pet counts in the room's dog", a1.hearts >= 1 && b1.hearts >= 1 && b1.clock.lastPet > 0 && b1.pets === 1 && a1.pets === 1, JSON.stringify({ a: { hearts: a1.hearts, pets: a1.pets }, b: { hearts: b1.hearts, pets: b1.pets, lastPet: b1.clock.lastPet } }));
+  await shot(B.page, 'dog-01-petted-seen-by-B.png');
+  await A.page.evaluate(() => window.__toybox.dog.patience(10));
+  await B.page.evaluate(() => window.__toybox.dog.patience(10));
+  await walk(A, B, [[-18, 30], [-8, 26], [5, 21.5]], Math.PI); // back where the rest of the run expects A
 }
 async function voiceChecks(A, B) {
   const aId = await net(A.page, 'selfId');
@@ -382,11 +410,15 @@ async function phoneMic(P, w, h, label, file) {
     await waitNet(B.page, 'online');
     check('B joins with the code', (await net(B.page, 'room')).code === code);
 
-    // ONLY=voice: just A and B and the voice checks (the full run does them after the emotes, with C in the room too).
-    if (VOICE_ONLY) {
+    // ONLY=voice / ONLY=dog: just A and B and those checks (the full run does them after the emotes, with C in the room too).
+    if (VOICE_ONLY || DOG_ONLY) {
       await A.page.setViewportSize({ width: 1280, height: 720 });
       await Promise.all([waitTags(A.page, ['Bravo']), waitTags(B.page, ['Alpha'])]).catch(() => null);
-      await voiceChecks(A, B);
+      if (DOG_ONLY) await dogChecks(A, B);
+      else {
+        await voiceChecks(A, B);
+        await dogChecks(A, B);
+      }
       await A.ctx.close();
       await B.ctx.close();
     } else {
@@ -603,6 +635,7 @@ async function phoneMic(P, w, h, label, file) {
     }
     // ------------------------------------------------------------ proximity voice chat
     await voiceChecks(A, B);
+    await dogChecks(A, B);
 
     // ------------------------------------------------------------ hub play: one shared marble, ball and score per room
     const hp = (p) => p.evaluate(() => window.__toybox.hubplay.state());

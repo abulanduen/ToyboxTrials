@@ -14,6 +14,7 @@
 import { clampToBounds } from '../src/game/collision';
 import { HUB_MAX_SPEED, HUB_MAX_Y, HUB_MOTION, HUB_SPAWN } from '../src/game/hubMotion';
 import { EMOTE_COOLDOWN, EMOTE_DURATION, type EmoteId } from '../src/game/emotes';
+import { DOG_PERCH, DOG_VISIT, dogPet, newDogClock, settleDog, type DogClock } from '../src/game/dogRoute';
 import {
   REACH_SLACK,
   DRIBBLE_SPEED,
@@ -37,6 +38,7 @@ import {
   parseRoomId,
   type Activity,
   type ClientMsg,
+  type DogWire,
   type ErrorCode,
   type BallMsg,
   type HelloMsg,
@@ -185,6 +187,11 @@ export class HubRoom {
   private readonly chat: HubChat;
   /** Proximity voice chat: mic states and the WebRTC handshake relay (voiceRelay.ts). */
   private readonly voice = new VoiceRelay();
+  /**
+   * The family dog's stroll (src/game/dogRoute.ts), on the room clock in seconds: everyone in the
+   * room sees the same dog, and a pet from anyone keeps it at the table. Stepped only by pets.
+   */
+  private readonly dog: DogClock = newDogClock();
 
   /** Throws for an id that is neither `public-<n>` nor a valid room code. */
   constructor(opts: RoomOptions) {
@@ -245,6 +252,10 @@ export class HubRoom {
   /** The shared marble and basketball (tests). */
   get hubPlay(): Readonly<HubPlayState> {
     return this.play;
+  }
+  /** The room's dog (tests). */
+  get dogClock(): Readonly<DogClock> {
+    return this.dog;
   }
   /** Voice chat state (tests). */
   get voiceRelay(): VoiceRelay {
@@ -316,6 +327,12 @@ export class HubRoom {
         return this.fromLobby(msg.a === 'deal' ? this.chat.deal(this.chatPlayer(p), now) : this.chat.peel(this.chatPlayer(p)));
       case 'mic':
         return this.setMic(p, msg.on, now);
+      case 'dog':
+        if (msg.at === undefined) return this.petDog(p, now);
+        if (!this.matchDebug) return [];
+        // test servers: jump the room's dog to a point in its loop (a fresh visit)
+        Object.assign(this.dog, newDogClock(msg.at - now / 1000));
+        return [{ kind: 'send', to: this.conns(), msg: { t: 'dog', c: this.dogWire(now) } }];
       case 'sig':
         return this.relaySignal(p, msg, now);
       case 'kick':
@@ -531,6 +548,23 @@ export class HubRoom {
     return others.length ? [{ kind: 'send', to: others, msg: { t: 'emote', id: p.id, emote: id } }] : [];
   }
 
+  /**
+   * `p` pets the dog: they must be on the Hub floor, by its pet spot, while it is up at the table.
+   * Everyone hears of it (the heart, the lick); a pet that doesn't count just resyncs the petter.
+   */
+  private petDog(p: Player, now: number): Outgoing[] {
+    const ok = !p.activity && Math.hypot(p.x - DOG_PERCH.pet.x, p.z - DOG_PERCH.pet.z) <= DOG_VISIT.reach;
+    const r = ok ? dogPet(now / 1000, this.dog) : null;
+    if (!r) return p.conn ? [{ kind: 'send', to: [p.conn], msg: { t: 'dog', c: this.dogWire(now) } }] : [];
+    return [{ kind: 'send', to: this.conns(), msg: { t: 'dog', c: this.dogWire(now), k: r, by: p.id } }];
+  }
+
+  private dogWire(now: number): DogWire {
+    settleDog(now / 1000, this.dog);
+    const d = this.dog;
+    return { o: d.offset, p: d.lastPet, e: d.perchEnd, n: d.pets, v: d.visit };
+  }
+
   private setLook(p: Player, look: Look, now: number): Outgoing[] {
     if (now - p.lastLookAt < LOOK_COOLDOWN_MS) return [];
     p.lastLookAt = now;
@@ -713,6 +747,7 @@ export class HubRoom {
         players: [...this.players.values()].map((q) => this.playerInfo(q)),
         spawn: { x: p.x, y: p.y, z: p.z, yaw: p.yaw },
         now,
+        dog: this.dogWire(now),
       },
     };
   }

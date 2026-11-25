@@ -4,6 +4,7 @@
  * and turns room messages into the net store (roster, status) and remote-player objects
  * (positions, emotes). Gameplay never waits on any of this: offline play is unchanged.
  */
+import { dogFromServer, dogOffline, lickCheer, setDogSkew } from '../game/dogVisit';
 import { SERVER_URL, OFFLINE_TEXT } from './config';
 import { wsTransport, type Transport, type TransportConn } from './transport';
 import {
@@ -185,6 +186,7 @@ function reset() {
   sentLook = '';
   sent.x = NaN;
   setHubPlayOnline(false);
+  dogOffline();
 }
 
 /** Give up: back to offline play, with a message. */
@@ -255,6 +257,9 @@ const handlers: { [K in ServerMsg['t']]: (m: Extract<ServerMsg, { t: K }>) => vo
     remotes.clear();
     netClock.reset();
     setHubPlayOnline(true);
+    // the room's dog: everyone here sees the same one
+    setDogSkew(m.now);
+    dogFromServer(m.dog);
     // Who wears a card comes next (a `cards` message, only when someone does).
     useChat.getState().set({ cards: {} });
     // A fresh slot (not a resume) has no lobby: leave any lobby screen we were on.
@@ -293,6 +298,9 @@ const handlers: { [K in ServerMsg['t']]: (m: Extract<ServerMsg, { t: K }>) => vo
   },
   room(m) {
     useNet.getState().set({ room: m.room });
+  },
+  dog(m) {
+    if (dogFromServer(m.c, m.k && m.by ? { k: m.k, by: m.by } : undefined, useNet.getState().selfId)) lickCheer();
   },
   snap(m) {
     netClock.update(m.now, performance.now());

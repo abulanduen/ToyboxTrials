@@ -14,8 +14,8 @@ import { openPractice } from '../minigames/session';
 import { BALL, MARBLE } from './hubPlay';
 import { ballFree, ballInAir, canSnatch, canSteal, grab, iHold, kick, startCharge } from '../hubplay/runtime';
 import { JACK_SPOT } from './whoAmI';
-import { dogVisit, petDog } from './dogVisit';
-import { DOG_PERCH } from '../scene/room/roomLayout';
+import { dogVisit, lickCheer, petDog } from './dogVisit';
+import { DOG_PERCH } from './dogRoute';
 import { useNet } from '../net/store';
 import { requestCard, wearingCard } from '../net/chat';
 import { CHAT_NOTE_TEXT } from '../net/protocol';
@@ -156,13 +156,12 @@ export function interact(id: string, facing: { x: number; z: number }) {
       startCharge();
       break;
     case 'dog': {
-      const r = petDog(performance.now() / 1000);
+      // offline the page decides at once; online the room's server does (a lick arrives with its answer)
+      const r = petDog();
       if (!r) return;
       events.emit('dog:pet', { lick: r === 'lick' });
-      if (r === 'lick') {
-        sfx.dogLick();
-        g.pushTicket({ title: 'Slobbery lick!', body: 'Ten pets and the dog licked you. It loves you.', tone: 'reward' });
-      } else sfx.dogPet();
+      if (r === 'lick') lickCheer();
+      else sfx.dogPet();
       break;
     }
     case 'jack':

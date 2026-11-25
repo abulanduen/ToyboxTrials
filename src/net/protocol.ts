@@ -19,8 +19,9 @@ import { CHAT_RAW_MAX } from './chatFilter';
  * v5: Hub text chat (`chat` both ways, `chatNote`) and Who Am I? cards at the suspicious box
  *     (`card` both ways, `cards`).
  * v6: proximity voice chat: mic state (`mic`, `mics`) and WebRTC signalling (`sig`).
+ * v7: the shared family dog: its clock in `welcome` (`dog`), petting it (`dog` both ways).
  */
-export const PROTOCOL_VERSION = 6;
+export const PROTOCOL_VERSION = 7;
 
 // ---------------------------------------------------------------- limits and rates
 /** Largest client → server message the server accepts (bytes), except voice signalling (`sig`). */
@@ -414,7 +415,16 @@ export interface CardActionMsg {
   t: 'card';
   a: 'deal' | 'peel';
 }
-export type ClientMsg = HelloMsg | MoveMsg | EmoteMsg | ActivityMsg | LookMsg | LeaveMsg | LobbyMsg | InputMsg | AuthMsg | KickMsg | BallMsg | HubPlayDebugMsg | ChatSendMsg | CardActionMsg | MicMsg | SignalMsg;
+// ---------------------------------------------------------------- the family dog (v7)
+/**
+ * Pet the dog (it must be up at the spawn table and you by its pet spot: the server checks).
+ * With `at`, test servers only (MATCH_DEBUG=1): put the room's dog `at` seconds into its loop.
+ */
+export interface DogPetMsg {
+  t: 'dog';
+  at?: number;
+}
+export type ClientMsg = HelloMsg | MoveMsg | EmoteMsg | ActivityMsg | LookMsg | LeaveMsg | LobbyMsg | InputMsg | AuthMsg | KickMsg | BallMsg | HubPlayDebugMsg | ChatSendMsg | CardActionMsg | MicMsg | SignalMsg | DogPetMsg;
 
 // ---------------------------------------------------------------- server → client
 export interface WelcomeMsg {
@@ -430,6 +440,27 @@ export interface WelcomeMsg {
   spawn: { x: number; y: number; z: number; yaw: number };
   /** Server clock (ms), the same clock as snapshot `now`. */
   now: number;
+  /** The room's dog (v7). */
+  dog: DogWire;
+}
+/**
+ * The room's family dog (src/game/dogRoute.ts DogClock), in seconds on the server clock (snapshot
+ * `now` / 1000): `o` offset, `p` last pet (0: none), `e` the held perch's end, `n` pets this visit,
+ * `v` the visit they count for.
+ */
+export interface DogWire {
+  o: number;
+  p: number;
+  e: number;
+  n: number;
+  v: number;
+}
+/** The dog changed: `by` petted it (`k`: a pet, or the lick that ends a run of ten); or just its clock. */
+export interface DogMsg {
+  t: 'dog';
+  c: DogWire;
+  k?: 'pet' | 'lick';
+  by?: string;
 }
 export interface JoinedMsg {
   t: 'joined';
@@ -524,7 +555,8 @@ export type ServerMsg =
   | CardsMsg
   | MicEventMsg
   | MicsMsg
-  | SignalEventMsg;
+  | SignalEventMsg
+  | DogMsg;
 
 /**
  * A chat line, as this recipient may see it: `name` comes from the server's roster, `text` is
@@ -639,6 +671,10 @@ type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v);
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const isStr = (v: unknown, max: number): v is string => typeof v === 'string' && v.length <= max;
+function parseDog(v: unknown): DogWire | null {
+  if (!isObj(v) || !isNum(v.o) || !isNum(v.p) || !isNum(v.e) || !isNum(v.n) || !isNum(v.v)) return null;
+  return { o: v.o, p: v.p, e: v.e, n: Math.max(0, Math.floor(v.n)), v: Math.floor(v.v) };
+}
 
 function parseJson(raw: unknown, maxLength: number): Obj | null {
   if (typeof raw !== 'string' || raw.length > maxLength) return null;
@@ -755,6 +791,9 @@ export function validateClientMessage(m: unknown): ClientMsg | null {
       return m.a === 'deal' || m.a === 'peel' ? { t: 'card', a: m.a } : null;
     case 'mic':
       return typeof m.on === 'boolean' ? { t: 'mic', on: m.on } : null;
+    case 'dog':
+      if (m.at === undefined) return { t: 'dog' };
+      return isNum(m.at) ? { t: 'dog', at: m.at } : null;
     case 'sig': {
       if (!isPlayerId(m.to)) return null;
       const body = parseSignalBody(m);
@@ -1022,7 +1061,9 @@ export function validateServerMessage(m: unknown): ServerMsg | null {
       const s = m.spawn;
       if (!isNum(s.x) || !isNum(s.y) || !isNum(s.z) || !isNum(s.yaw)) return null;
       const players = m.players.map(parsePlayerInfo).filter((p): p is PlayerInfo => !!p);
-      return { t: 'welcome', v: m.v, you: m.you, resume: m.resume, resumed: !!m.resumed, room, players, spawn: { x: s.x, y: s.y, z: s.z, yaw: s.yaw }, now: m.now };
+      const dog = parseDog(m.dog);
+      if (!dog) return null;
+      return { t: 'welcome', v: m.v, you: m.you, resume: m.resume, resumed: !!m.resumed, room, players, spawn: { x: s.x, y: s.y, z: s.z, yaw: s.yaw }, now: m.now, dog };
     }
     case 'joined': {
       const player = parsePlayerInfo(m.player);
@@ -1110,6 +1151,13 @@ export function validateServerMessage(m: unknown): ServerMsg | null {
       return isPlayerId(m.id) && typeof m.on === 'boolean' ? { t: 'mic', id: m.id, on: m.on } : null;
     case 'mics':
       return Array.isArray(m.on) ? { t: 'mics', on: m.on.filter(isPlayerId) } : null;
+    case 'dog': {
+      const c = parseDog(m.c);
+      if (!c) return null;
+      const msg: DogMsg = { t: 'dog', c };
+      if ((m.k === 'pet' || m.k === 'lick') && isPlayerId(m.by)) Object.assign(msg, { k: m.k, by: m.by });
+      return msg;
+    }
     case 'sig': {
       if (!isPlayerId(m.from)) return null;
       const body = parseSignalBody(m);

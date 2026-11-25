@@ -290,6 +290,27 @@ Hub-only, and the microphone is never asked for until the player presses the mic
 - No moderation beyond per-player mute and switching hearing off: no reporting, no blocking across
   sessions, no age gate. Anyone in a public Hub can talk to players standing near them.
 
+### The family dog (shared)
+
+The dog that strolls round the room and stands up at the spawn table now and then is the **room's**
+dog online: everyone in a room sees it in the same place, and a pet from anyone keeps it at the
+table for everyone. Its route and clock are pure (`src/game/dogRoute.ts`): where it is follows from
+a few numbers (`DogClock`: the loop offset, the last pet, the held perch's end, the pets this visit)
+and the server clock, so the server only steps it when someone pets it, and never per tick.
+
+- **Joining:** `welcome` carries the room's dog (`dog`). The client then runs the dog on the server
+  clock (the snapshot clock, or the welcome's `now` until the first snapshot).
+- **Petting:** the client sends `dog`; the server checks the petter is on the Hub floor (no
+  activity), within 9 cm of the pet spot, and the dog is up and ready (half a second after it
+  stands up). If so it tells everyone (`dog` with `k` pet/lick and `by`); the tenth pet in a visit,
+  by anyone, is the lick, and only the one who gave it gets the "Slobbery lick!" ticket. A pet that
+  doesn't count just sends the petter the current dog. The petter's own heart shows at once.
+- **Trials:** during a match the dog sits by the table at its perch time instead of standing up
+  (nobody in a trial can pet it anyway). It is the same place and time, so it stays in step.
+- **Offline / leaving:** the page takes the dog over from wherever it is (no jump).
+- **Tests:** on a test server (`MATCH_DEBUG=1`), `dog` with `at` moves the room's dog to a point in
+  its loop (`__toybox.dog.perch()` online); a production server ignores it.
+
 ### Reconnects and limits
 
 - The welcome message carries a secret resume token. If a connection drops, the player's slot is
@@ -504,8 +525,9 @@ online"). The other choice in both places is the existing **practice with bots**
 - **In the game:** the Hub Scoreboard panel shows the top ten per format above your local records
   (which stay on this device), and the TV beside it has a "Leaderboard" channel (Blitz).
 
-## Protocol (version 6)
+## Protocol (version 7)
 
+Version 7 (the shared dog): `welcome` carries `dog`, and adds `dog` both ways.
 Version 6 (voice chat): adds `mic`, `mics` and `sig`, and allows `sig` frames up to 8 KB.
 Version 5 (chat and Who Am I?): adds `chat` (both ways), `chatNote`, `card` (both ways) and `cards`.
 Version 4 (hub play): adds `kick`, `ball` and the test-only `hpdebug`, the snapshot's `hp` and the
@@ -535,10 +557,12 @@ Client → server:
 | `hpdebug` | `x, z` | Test servers only (`MATCH_DEBUG=1`): put the marble at (x, z). |
 | `chat` | `text` (at most 300 characters as sent) | Say something in the room (v5). Cleaned to at most 120 characters, filtered, rate-limited (3, then 1 per 1.5 s). |
 | `card` | `a`: `deal` or `peel` | Who Am I? at the suspicious box (v5): ask for a card, or give up on yours. |
+| `dog` | `at?` (test servers only) | Pet the room's dog (v7): checked on the server (in the Hub, by the pet spot, the dog up at the table). |
 | `mic` | `on` (boolean) | Voice chat (v6): my mic is on (willing to send) or off. Refused outside the Hub; 6 in a burst, 1 a second. |
 | `sig` | `to` (player id), `c` (link id, positive integer chosen by the listener), `s` (1 = sent by the link's speaker side, 0 = listener side), `k`: `offer` (s 0, `d` SDP) / `answer` (s 1, `d` SDP) / `ice` (`d`: 1–8 `{c, m, i}` candidates) / `bye` | WebRTC handshake for one voice link (v6). Relayed only to a connected player in the same room, both in the Hub; offers only to a player whose mic is on, answers only from one. SDP ≤ 6000 characters; up to 8 KB per frame. |
 
-Server → client: `welcome` (your id, resume token, room, roster, spawn point, server time),
+Server → client: `welcome` (your id, resume token, room, roster, spawn point, server time, and
+from v7 `dog`: the room's dog `{o, p, e, n, v}`, seconds on the server clock),
 `joined`, `left`, `room` (host changed), `snap` (`now`, players: `id x y z r s g e es a off`, and
 from v4 `hp`: `m` marble `[x, z, vx, vz]`, `n` in a net, `b` ball `[x, y, z, vx, vy, vz]`, `h` holder,
 `s` goals `[Coral, Blue]`, `k` baskets), `play` (`e`: hub play events `{k, by?, net?, score?, total?,
@@ -564,6 +588,9 @@ tournament table and result; `null` with a reason when you left, were kicked or 
 Voice chat (v6): `mic` (`id`, `on`: a player's mic changed; sent to the others, and to the player
 only when the server overrode them), `mics` (`on`: the ids whose mic is on, sent right after
 `welcome` when there are any), and `sig` (`from`, set by the server, plus `c`, `s`, `k`, `d` as sent).
+
+The dog (v7): `dog` (`c`: the room's dog `{o, p, e, n, v}`, plus `k` pet/lick and `by` when someone
+petted it; to everyone, or to the petter alone when their pet didn't count).
 
 ## Optional accounts
 

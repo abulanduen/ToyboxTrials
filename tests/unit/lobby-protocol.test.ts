@@ -6,7 +6,7 @@ const P = (v: unknown) => parseClientMessage(JSON.stringify(v));
 const S = (v: unknown) => parseServerMessage(JSON.stringify(v));
 
 describe('lobby and match messages (protocol v3)', () => {
-  it('is protocol version 6 (lobbies arrived in v3, chat in v5, voice chat in v6)', () => expect(PROTOCOL_VERSION).toBe(6));
+  it('is protocol version 7 (lobbies arrived in v3, chat in v5, voice chat in v6, the shared dog in v7)', () => expect(PROTOCOL_VERSION).toBe(7));
 
   it('accepts every lobby action with valid fields', () => {
     expect(P({ t: 'lobby', a: 'create', settings: LOBBY_DEFAULTS })).toEqual({ t: 'lobby', a: 'create', settings: LOBBY_DEFAULTS });

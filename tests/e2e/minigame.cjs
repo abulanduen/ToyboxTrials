@@ -97,6 +97,12 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   await page.click('[data-testid=match-start]');
   await page.waitForSelector('.countdown', { timeout: 30000 });
   check('countdown appears', true);
+  // The dog never stands up at the table during a trial (the table is the trial's set): at its perch
+  // time it sits on the floor beside the table instead, and can't be petted.
+  await page.evaluate(() => window.__toybox.dog.perch(-1));
+  await page.waitForFunction(() => window.__toybox.dog.visit().shown === 'sit', null, { timeout: 30000, polling: 200 }).catch(() => null);
+  const dogInTrial = await page.evaluate(() => ({ at: window.__toybox.dog.pose().action, shown: window.__toybox.dog.visit().shown, perched: window.__toybox.dog.visit().perched }));
+  check('during a trial the dog sits by the table at its perch time (never up on it, not pettable)', dogInTrial.at === 'perch' && dogInTrial.shown === 'sit' && !dogInTrial.perched, JSON.stringify(dogInTrial));
   // Screenshots are slow under software rendering: freeze match time while capturing.
   const snap = async (name) => {
     await page.evaluate(() => window.__toybox.match.timeScale(0));
