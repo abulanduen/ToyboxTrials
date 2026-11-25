@@ -972,6 +972,19 @@ textarea,
     max-width: calc(100vw - 24px);
   }
 }
+/* Landscape phones: the screen is short, so 150 px up put the prompt mid-screen, over whatever the
+   toy faces (the Tournament Curator's face, inside the Pavilion). The thumbs sit in the bottom
+   corners, so the bottom edge between them is free: the prompt goes there, narrow enough to stay
+   between the joystick and the buttons (it wraps rather than run under a thumb). */
+@media (orientation: landscape) and (max-height: 500px) {
+  .prompt--touch {
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    max-width: 46vw;
+    white-space: normal;
+    text-align: left;
+    line-height: 1.15;
+  }
+}
 /* Short landscape phones: compact the Copycat bench so panels need little scrolling. */
 @media (max-height: 500px) {
   .instrument {
