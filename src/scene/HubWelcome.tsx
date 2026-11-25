@@ -1,5 +1,5 @@
 /**
- * Welcoming players in the Hub: Pipwick the mascot (and his tour), the gate greeters and the
+ * Welcoming players in the Hub: Pipwick the mascot (and his tour), the machine greeters and the
  * Jukebox. Mounted by Village.tsx; each part lives in its own module.
  */
 import { Greeters } from './Greeters';

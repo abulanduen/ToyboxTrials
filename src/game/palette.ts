@@ -23,7 +23,7 @@ export const PALETTE = {
   white: '#FFF9EE',
   /** Knocked-out toys (MiniContender greys them) and other dull tin. */
   tinGrey: '#8E8A93',
-  /** Painted cheeks and tutus (Pipwick, the gate greeters). */
+  /** Painted cheeks and tutus (Pipwick, the machine greeters). */
   blush: '#EE9A8E',
   /** Polished steel (the greeter knight's helmet, fencing foils). */
   steel: '#C9CED6',

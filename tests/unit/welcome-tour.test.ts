@@ -1,12 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { STEP_HEIGHT, overlaps } from '../../src/game/collision';
-import { isWalkable } from '../../src/game/hubBounds';
+import { GATES_WALK, LEVEL_WALK, isWalkable } from '../../src/game/hubBounds';
 import { HUB_SPAWN } from '../../src/game/hubMotion';
 import { INTERACTABLES } from '../../src/game/interactables';
 import { TOUR_STOPS, arcPoint, cameraLift, ease, flightFrom, flyTime, mascotFlight, tourNext, tourSkip, tourStart, tourStep, type TourState } from '../../src/game/tour';
 import { TOUR_LINES } from '../../src/game/voiceLines';
-import { GATES, GATE_ROAD, GATE_STAND, GREETER, JUKEBOX, PIPWICK_HOME, gateLocal, greeterSpot, hubColliders } from '../../src/scene/layout';
-import { hubPathTiles } from '../../src/scene/paths';
+import { GREETER, JUKEBOX, MACHINES, PIPWICK_HOME, greeterSpot, hubColliders, machineStand } from '../../src/scene/layout';
 
 const colliders = hubColliders();
 const solid = colliders.filter((c) => c.top > STEP_HEIGHT);
@@ -123,21 +122,21 @@ describe('tour stops', () => {
 });
 
 describe('greeters, Pipwick and the jukebox in the Hub layout', () => {
-  it('every gate has a greeter, solid, beside its path and clear of where you stand to play', () => {
-    const tiles = hubPathTiles();
-    for (const g of GATES) {
+  it('every machine has a greeter in the arcade, solid, clear of where you stand to play and of the machines', () => {
+    const floor = colliders.filter((k) => k.lv === 'floor');
+    for (const g of MACHINES) {
       const c = colliders.find((k) => k.id === `${g.id}-greeter`);
       expect(c, g.id).toBeDefined();
+      expect(c!.lv, g.id).toBe('floor');
       const p = greeterSpot(g);
-      expect(isWalkable(p.x, p.z, GREETER.r), g.id).toBe(true);
-      // not on the stub path, the loop road or the welcome mat
-      for (const lz of [0, 1.5, GATE_STAND, GATE_ROAD]) {
-        const q = gateLocal(g, 0, lz);
-        expect(Math.hypot(q.x - p.x, q.z - p.z), `${g.id} lz=${lz}`).toBeGreaterThan(GREETER.r + 0.85 + 1.5);
+      expect(isWalkable(p.x, p.z, GREETER.r, LEVEL_WALK.floor), g.id).toBe(true);
+      // not where you stand to play (or on the way there), and touching no machine
+      for (const k of [0, 0.5, 1]) {
+        const q = machineStand(g, k);
+        expect(Math.hypot(q.x - p.x, q.z - p.z), `${g.id} stand`).toBeGreaterThan(GREETER.r + 0.85 + 1);
       }
-      // no path tile under it
-      for (const t of tiles) expect(Math.hypot(t.x - p.x, t.z - p.z), `${g.id} tile`).toBeGreaterThan(GREETER.r + 0.6);
-      // close enough to its gate to read as its greeter
+      expect(floor.filter((k) => k.id !== c!.id && overlaps(k, p.x, p.z, GREETER.r + 0.2)).map((k) => k.id), g.id).toEqual([]);
+      // close enough to its machine to read as its greeter
       expect(Math.hypot(p.x - g.x, p.z - g.z), g.id).toBeLessThan(7);
     }
   });
@@ -155,9 +154,7 @@ describe('greeters, Pipwick and the jukebox in the Hub layout', () => {
     }
     // at spawn you are not already in Pipwick's range (no prompt the moment you arrive)
     expect(Math.hypot(pip.x - HUB_SPAWN.x, pip.z - HUB_SPAWN.z)).toBeGreaterThan(pip.radius);
-    // the jukebox stands by the Music Box Rhythm gate, and its prompt does not overlap a gate's
-    const mb = GATES.find((g) => g.game === 'music-box-rhythm')!;
-    expect(Math.hypot(JUKEBOX.x - mb.x, JUKEBOX.z - mb.z)).toBeLessThan(16);
-    for (const g of INTERACTABLES.filter((i) => i.id.startsWith('gate-'))) expect(Math.hypot(g.x - juke.x, g.z - juke.z), g.id).toBeGreaterThan(g.radius + juke.radius - 2);
+    // the jukebox stands on the gates table by the window (the ball games' ground)
+    expect(isWalkable(JUKEBOX.x, JUKEBOX.z, 0, [GATES_WALK])).toBe(true);
   });
 });

@@ -1,7 +1,7 @@
 /**
- * The arcade: a den on the room floor under the spawn table (docs/ARCADE_PLAN.md, phase 1: the
- * shell). Toys get here on the toy-car ride and leave by the toy lift (phase 2); the trials' machines
- * come in phase 3. For now: a glow-in-the-dark arcade carpet, a low wall of toy bricks round it (open
+ * The arcade: a den on the room floor under the spawn table (docs/ARCADE_PLAN.md). Toys get here
+ * on the toy car and leave by the lift (Rides.tsx); the trials' machines stand round it
+ * (Machines.tsx). This is its shell: a glow-in-the-dark arcade carpet, a low wall of toy bricks round it (open
  * at the front), strings of bulbs hung under the table's apron, and the sign over the way in.
  *
  * Cheap on purpose (a handful of draw calls: instanced bricks and bulbs, one merged wire) and lit by

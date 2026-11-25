@@ -85,7 +85,7 @@ node tests/e2e/functional.cjs   # desktop gameplay checks (preview server runnin
 node tests/e2e/secrets.cjs
 node tests/e2e/mobile.cjs       # touch/phone checks
 node tests/e2e/menu.cjs         # main menu, Workshop, unlocks, persistence, deep links
-node tests/e2e/hubgates.cjs     # hub: every trial gate opens its lobby (desktop + phone Interact), gate screenshots
+node tests/e2e/hubgates.cjs     # hub: every trial's arcade machine opens its lobby (desktop + phone Interact), the bridge, the Pavilion, the TV, machine screenshots
 node tests/e2e/arcade.cjs       # the arcade under the spawn table (floor level): the toy-car ride down and the lift up, walking, edges, camera, no prompts from the table above (desktop + phone; ONLY=desktop|phone)
 node tests/e2e/shop.cjs         # Odds & Ends shop: earn cogs, buy, try on, equip, gestures, persistence (desktop + phone)
 node tests/e2e/minigame.cjs     # Copycat + Jack-in-the-Box practice, full Blitz tournament flow

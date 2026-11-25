@@ -185,7 +185,7 @@ function Intro({ touch }: { touch: boolean }) {
                 </div>
               </div>
               {m.opponents > 0 && <DifficultyPicker value={m.difficulty} onChange={(d) => setPracticeOpponents(m.opponents, d)} />}
-              {/* The other choice at a gate: host this trial as an online lobby (server-run). */}
+              {/* The other choice at a machine: host this trial as an online lobby (server-run). */}
               <HostTrialRow game={def.id} />
             </div>
           )}
@@ -587,7 +587,7 @@ export function unit(plural: string, n: number) {
   return n === 1 && plural.endsWith('s') ? plural.slice(0, -1) : plural;
 }
 
-/** Every playable trial as picture cards, for solo/bot practice (each also has its own gate in the hub). */
+/** Every playable trial as picture cards, for solo/bot practice (each also has its own machine in the Hub's arcade). */
 function PracticeList({ onClose }: { onClose: () => void }) {
   const records = useGame((s) => s.records);
   return (

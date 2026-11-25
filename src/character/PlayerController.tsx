@@ -284,10 +284,10 @@ export function PlayerController() {
   // ---------- test hooks (?debug only) ----------
   useEffect(() => {
     exposeDebug({
-      /** Put the toy at (x, z), on `level` if given (else the one it's on): tests only, no ride needed. */
+      /** Put the toy at (x, z), on `level` (default: the tables): tests only, no ride needed. */
       teleport: (x: number, z: number, yaw?: number, level?: HubLevel) => {
         const s = sim.current;
-        if (isHubLevel(level)) s.level = level;
+        s.level = isHubLevel(level) ? level : 'table';
         s.pos.set(x, groundHeightAt(x, z, RADIUS, LEVEL_Y[s.level] + 99, s.level), z);
         s.vel.set(0, 0);
         if (yaw !== undefined) s.yaw = yaw;

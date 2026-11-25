@@ -5,7 +5,7 @@ the Hub's basketball. The owner asked for "a longer 4v4 or 2v2 game of actual ba
 basketball rules, like you would play in the hub, but give each player a jersey for their team,
 blue vs red". "Hoop Clash" is a working title: it lives only in the registry entry
 (`src/minigames/registry.ts`); the HUD, the results card and the lobby read it from there (the
-tutorial text, the gate greeter's line and this README name it too).
+tutorial text, the machine greeter's line and this README name it too).
 
 ## Files
 

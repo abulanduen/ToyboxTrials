@@ -1,10 +1,11 @@
-/* Hub gates: every playable trial has a gate on the gates table whose prompt opens that trial's
- * lobby (intro card), desktop + phone (touch Interact); walking across the domino bridge from the
- * spawn table to the gates table (keyboard, and the phone joystick) and on to the Copycat gate;
+/* Hub machines: every playable trial has an arcade machine in the arcade under the spawn table whose
+ * prompt opens that trial's lobby (intro card), desktop + phone (touch Interact); walking across the
+ * domino bridge from the spawn table to the gates table (keyboard, and the phone joystick) and on to
+ * the ball games (the basketball's prompt);
  * the TV beside the Scoreboard (offline card, channel change); walking into the Tournament Pavilion
  * through its doorway (keyboard, and the phone joystick) to the Tournament Curator, whose prompt opens
  * the tournament panel (E, and a real touch on the phone's prompt), and that its walls stop you;
- * plus screenshots of each gate's surroundings, the Scoreboard, opposing gameplay views, the bridge
+ * plus screenshots of each machine, the Scoreboard, opposing gameplay views, the bridge
  * and a whole-hub overview of both tables, with renderer counts.
  *
  *   BASE_URL=http://localhost:4173/ node tests/e2e/hubgates.cjs [only]
@@ -58,12 +59,12 @@ const leave = async (page) => {
 
   if (want('gates')) {
     const { ctx, page, errors } = await open(browser, desktop);
-    const gates = await page.evaluate(() => window.__toybox.hub.gates());
-    check('sixteen gates in the hub', gates.length === 16, gates.map((g) => g.game).join(','));
+    const gates = await page.evaluate(() => window.__toybox.hub.machines());
+    check('sixteen machines in the arcade', gates.length === 16 && gates.every((g) => g.level === 'floor'), gates.map((g) => g.game).join(','));
     for (const g of gates) {
-      await page.evaluate((v) => window.__toybox.teleport(v.standX, v.standZ, v.yaw), g);
+      await page.evaluate((v) => window.__toybox.teleport(v.standX, v.standZ, v.yaw, v.level), g);
       const prompt = await page.waitForFunction((t) => { const p = document.querySelector('.prompt'); return p && p.textContent.includes(t) ? p.textContent : null; }, g.title, { timeout: 120000 }).then((h) => h.jsonValue()).catch(() => null);
-      check(`${g.game}: prompt at its gate`, !!prompt && prompt.includes('Play'), JSON.stringify(prompt));
+      check(`${g.game}: prompt at its machine`, !!prompt && prompt.includes('Play'), JSON.stringify(prompt));
       await page.keyboard.press('KeyE');
       const h2 = await page.waitForSelector('.match-intro h2', { timeout: 120000 }).then((e) => e.textContent()).catch(() => '');
       check(`${g.game}: E opens its lobby (intro card)`, h2.includes(g.title), h2);
@@ -74,20 +75,20 @@ const leave = async (page) => {
       }
       await leave(page);
     }
-    check('no page errors (desktop gates)', errors.length === 0, errors.slice(0, 3).join(' | '));
+    check('no page errors (desktop machines)', errors.length === 0, errors.slice(0, 3).join(' | '));
     await ctx.close();
   }
 
   if (want('phone')) {
     const phone = { ...devices['iPhone 13'], deviceScaleFactor: 1 };
     const { ctx, page, errors } = await open(browser, phone);
-    const gates = await page.evaluate(() => window.__toybox.hub.gates());
+    const gates = await page.evaluate(() => window.__toybox.hub.machines());
     // real touch input through the DevTools protocol (as tests/e2e/mobile.cjs does)
     const cdp = await ctx.newCDPSession(page);
     const touch = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts.map(([x, y, id = 0]) => ({ x, y, id })) });
     for (const id of ['toy-squad', 'spellbox-showdown', 'red-light-green-light']) {
       const g = gates.find((x) => x.game === id);
-      await page.evaluate((v) => window.__toybox.teleport(v.standX, v.standZ, v.yaw), g);
+      await page.evaluate((v) => window.__toybox.teleport(v.standX, v.standZ, v.yaw, v.level), g);
       await page.waitForFunction((t) => document.querySelector('.touch-btn--interact')?.getAttribute('aria-label')?.includes(t), g.title, { timeout: 120000 }).catch(() => null);
       const btn = await page.$('.touch-btn--interact');
       check(`phone ${id}: Interact button names the trial`, !!btn && ((await btn.getAttribute('aria-label')) || '').includes(g.title));
@@ -142,16 +143,13 @@ const leave = async (page) => {
     const { ctx, page, errors } = await open(browser, desktop);
     const keys = { hold: async () => { await page.keyboard.down('ShiftLeft'); await page.keyboard.down('KeyW'); }, release: async () => { await page.keyboard.up('KeyW'); await page.keyboard.up('ShiftLeft'); } };
     const br = await walkBridge(page, 'desktop', keys.hold, keys.release);
-    // straight on to the Copycat gate at the head of the gates table's avenue, and into its lobby
-    await page.evaluate(() => window.__toybox.aim(0, 0.32));
+    // on over the gates table to the basketball (the ball games' ground), and pick it up
+    const ball = await page.evaluate(() => window.__toybox.hubplay.state().ball);
+    await page.evaluate((b) => { const s = window.__toybox.state(); window.__toybox.aim(Math.atan2(s.x - b.x, s.z - b.z), 0.32); }, ball);
     await keys.hold();
-    const prompt = await page.waitForFunction(() => { const p = document.querySelector('.prompt'); return p && p.textContent.includes('Copycat') ? p.textContent : null; }, null, { timeout: 300000, polling: 300 }).then((h) => h.jsonValue()).catch(() => null);
+    const prompt = await page.waitForFunction(() => { const p = document.querySelector('.prompt'); return p && p.textContent.includes('basketball') ? p.textContent : null; }, null, { timeout: 300000, polling: 300 }).then((h) => h.jsonValue()).catch(() => null);
     await keys.release();
-    check('walked on from the bridge to the Copycat gate prompt', !!prompt, JSON.stringify(prompt));
-    await page.keyboard.press('KeyE');
-    const h2 = await page.waitForSelector('.match-intro h2', { timeout: 120000 }).then((e) => e.textContent()).catch(() => '');
-    check('the gates table gate opens its lobby after the walk', h2.includes('Copycat'), h2);
-    await leave(page);
+    check('walked on from the bridge to the basketball on the gates table', !!prompt, JSON.stringify(prompt));
     // trying to step off the side of the bridge: hold a sideways key on the deck
     await page.evaluate((b) => { window.__toybox.teleport(b.x, (b.deckA + b.deckB) / 2, Math.PI); window.__toybox.aim(0, 0.32); }, br);
     await frames(page, 4);
@@ -301,11 +299,10 @@ const leave = async (page) => {
     const q = process.env.SHOT_QUALITY || 'balanced';
     const { ctx, page } = await open(browser, desktop, q);
     await page.addStyleTag({ content: '.hud-hint,.ticket-stack,.prompt{display:none!important}' }).catch(() => {});
-    const gates = await page.evaluate(() => window.__toybox.hub.gates());
+    const gates = await page.evaluate(() => window.__toybox.hub.machines());
     for (const g of gates) {
-      // stand in front of the gate, camera swung out to the side so the arch and both of its
-      // themed spots are in frame (straight behind, a building can shorten the camera boom)
-      await page.evaluate((v) => { const d = 5; window.__toybox.teleport(v.x + Math.sin(v.rot) * d, v.z + Math.cos(v.rot) * d, v.yaw); window.__toybox.aim(v.rot + 0.85, 0.32); }, g);
+      // stand in front of the machine, camera swung out to the side so the cabinet and its greeter are in frame
+      await page.evaluate((v) => { const d = 6; window.__toybox.teleport(v.x + Math.sin(v.rot) * d, v.z + Math.cos(v.rot) * d, v.yaw, 'floor'); window.__toybox.aim(v.rot + 0.7, 0.25); }, g);
       await frames(page, 10);
       await page.screenshot({ path: `${OUT}/hubgates-gate-${g.game}.png`, timeout: 180000 });
     }

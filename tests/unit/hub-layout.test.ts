@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { PLAY_BOUNDS, STEP_HEIGHT, clampToBounds, groundHeightAt, overlaps, resolve, resetStatic, addStatic, type Collider } from '../../src/game/collision';
-import { BRIDGE_WALK, GATES_WALK, HUB_WALK, WALK_AREAS, isWalkable } from '../../src/game/hubBounds';
+import { BRIDGE_WALK, GATES_WALK, HUB_WALK, LEVEL_WALK, WALK_AREAS, isWalkable } from '../../src/game/hubBounds';
 import { HUB_SPAWN } from '../../src/game/hubMotion';
 import { INTERACTABLES } from '../../src/game/interactables';
 import { MINIGAMES } from '../../src/minigames/registry';
@@ -11,11 +11,8 @@ import {
   BRIDGE_RAIL_X,
   CURATOR,
   FOUNTAIN,
-  GATE,
-  GATES,
-  GATE_DECOR,
-  GATE_ROAD,
-  GATE_STAND,
+  MACHINE,
+  MACHINES,
   JACK,
   MUSICBOX,
   PAVILION,
@@ -30,10 +27,12 @@ import {
   gateLocal,
   hubColliders,
   insidePavilion,
+  machineStand,
   pavilionLocal,
 } from '../../src/scene/layout';
 import { hubFence, hubPathLines, hubPathTiles, tilesOverlap, TILE_STEP } from '../../src/scene/paths';
-import { GATE_THEMES, POST_BOARD, signpostTop, signposts } from '../../src/scene/gateDecor';
+import { POST_BOARD, signpostTop, signposts } from '../../src/scene/signposts';
+import { CAR, RIDES, RIDE_KINDS } from '../../src/game/hubRides';
 import { bridgeDominoes } from '../../src/scene/Bridge';
 import { sunRig } from '../../src/scene/room/bake';
 import { Kit } from '../../src/scene/kit';
@@ -50,78 +49,81 @@ const inBounds = (x: number, z: number, r = PLAYER_R) => {
 };
 const hitsAt = (x: number, z: number, r: number, list: Collider[] = blocking) => list.filter((c) => overlaps(c, x, z, r)).map((c) => c.id);
 
-describe('hub gates', () => {
+describe('the arcade machines', () => {
   const playable = MINIGAMES.filter((g) => g.status === 'playable');
+  const floorSolid = colliders.filter((c) => c.lv === 'floor');
 
-  it('every playable game has exactly one gate, in its accent colour', () => {
+  it('every playable game has exactly one machine, in its accent colour', () => {
     expect(playable.length).toBe(16);
     for (const g of playable) {
-      const mine = GATES.filter((x) => x.game === g.id);
+      const mine = MACHINES.filter((x) => x.game === g.id);
       expect(mine.length, g.id).toBe(1);
-      expect(mine[0].id).toBe(`gate-${g.id}`);
+      expect(mine[0].id).toBe(`machine-${g.id}`);
       expect(mine[0].color).toBe(g.accent);
       expect(mine[0].title).toBe(g.title);
     }
-    expect(GATES.length).toBe(playable.length);
-    expect(new Set(GATES.map((g) => g.id)).size).toBe(GATES.length);
+    expect(MACHINES.length).toBe(playable.length);
+    expect(new Set(MACHINES.map((g) => g.id)).size).toBe(MACHINES.length);
   });
 
-  it('gates all stand on the gates table, face the loop road and keep their distance from each other', () => {
-    const loop = hubPathLines().find((l) => l.id === 'loop')!;
-    for (const g of GATES) {
-      expect(isWalkable(g.x, g.z, PLAYER_R, [GATES_WALK]), g.id).toBe(true);
-      // the road point in front of the arch (local +z) is a corner of the loop road
-      const road = gateLocal(g, 0, GATE_ROAD);
-      expect(loop.pts.some(([x, z]) => Math.hypot(x - road.x, z - road.z) < 1e-6), g.id).toBe(true);
-      for (const o of GATES) if (o !== g) expect(Math.hypot(o.x - g.x, o.z - g.z), `${g.id} / ${o.id}`).toBeGreaterThan(22);
-    }
-    // nothing of the trials is left on the spawn table
-    for (const g of GATES) expect(isWalkable(g.x, g.z, 0, [HUB_WALK]), g.id).toBe(false);
-  });
-
-  it('the spot where you stand to open a gate is reachable and clear, and so is the way through the arch', () => {
-    for (const g of GATES) {
-      for (const lz of [GATE_ROAD, GATE_STAND, 1, 0]) {
-        const p = gateLocal(g, 0, lz);
-        expect(inBounds(p.x, p.z), `${g.id} lz=${lz}`).toBe(true);
-        expect(hitsAt(p.x, p.z, PLAYER_R), `${g.id} lz=${lz}`).toEqual([]);
+  it('machines stand in the arcade, inside its walls, apart from each other and clear of the rides’ landing spots', () => {
+    for (const m of MACHINES) {
+      // every corner of the cabinet is on the arcade floor
+      for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+        const c = gateLocal(m, (sx * MACHINE.w) / 2, (sz * MACHINE.d) / 2);
+        expect(isWalkable(c.x, c.z, 0, LEVEL_WALK.floor), m.id).toBe(true);
       }
-    }
-  });
-
-  it("a gate's pillars and themed props do not overlap anything else that is solid", () => {
-    for (const g of GATES) {
-      const others = colliders.filter((c) => !c.id?.startsWith(g.id));
-      const pts: { x: number; z: number; r: number; what: string }[] = [];
-      for (const side of [-1, 1]) {
-        // sample the pillar footprint
-        for (const dx of [-1, 0, 1]) for (const dz of [-1, 0, 1]) {
-          const p = gateLocal(g, side * (GATE.width / 2 - GATE.pillar / 2) + (dx * GATE.pillar) / 2, (dz * GATE.depth) / 2);
-          pts.push({ ...p, r: 0.05, what: 'pillar' });
+      const box = colliders.find((c) => c.id === m.id)!;
+      expect(box.lv).toBe('floor');
+      // no two cabinets overlap (the middle pairs stand back to back, a hair apart)
+      for (const o of MACHINES) {
+        if (o === m) continue;
+        const ob = colliders.find((c) => c.id === o.id)!;
+        for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1], [0, 0]]) {
+          const c = gateLocal(m, (sx * MACHINE.w) / 2 * 0.98, (sz * MACHINE.d) / 2 * 0.98);
+          expect(overlaps(ob, c.x, c.z, 0), `${m.id} / ${o.id}`).toBe(false);
         }
       }
-      for (const [k, d] of Object.entries(GATE_DECOR)) pts.push({ ...gateLocal(g, d.lx, d.lz), r: d.r, what: k });
-      for (const p of pts) expect(hitsAt(p.x, p.z, p.r, others), `${g.id} ${p.what}`).toEqual([]);
+      for (const r of RIDE_KINDS) {
+        const spot = RIDES[r].from === 'floor' ? RIDES[r].board : RIDES[r].land;
+        expect(Math.hypot(spot.x - m.x, spot.z - m.z), `${m.id} / ${r}`).toBeGreaterThan(12);
+      }
     }
+  });
+
+  it('the spot where you stand to play a machine is reachable on the arcade floor and clear', () => {
+    for (const m of MACHINES) {
+      for (const k of [0, 0.6, 2]) {
+        const p = machineStand(m, k);
+        expect(isWalkable(p.x, p.z, PLAYER_R, LEVEL_WALK.floor), `${m.id} +${k}`).toBe(true);
+        expect(hitsAt(p.x, p.z, PLAYER_R, floorSolid), `${m.id} +${k}`).toEqual([]);
+      }
+      // its prompt is there, down on the floor
+      const it = INTERACTABLES.find((i) => i.id === m.id)!;
+      expect(it.level).toBe('floor');
+      const p = machineStand(m);
+      expect(Math.hypot(it.x - p.x, it.z - p.z)).toBeLessThan(1e-6);
+    }
+    // no two machines' prompts overlap
+    const its = INTERACTABLES.filter((i) => i.id.startsWith('machine-'));
+    for (const a of its) for (const b of its) if (a !== b) expect(Math.hypot(a.x - b.x, a.z - b.z), `${a.id} / ${b.id}`).toBeGreaterThan(a.radius + b.radius);
   });
 });
 
 describe('hub streets', () => {
   const lines = hubPathLines();
 
-  it('every gate is on a street: a stub to its arch from the loop road, which the bridge landing joins', () => {
-    for (const g of GATES) expect(lines.some((l) => l.id === `stub:${g.id}`), g.id).toBe(true);
-    const loop = lines.find((l) => l.id === 'loop')!;
+  it('the road to the bridge and the path off its landing meet the ramps; a path leads to the toy car', () => {
     const landing = lines.find((l) => l.id === 'landing')!;
-    const end = landing.pts[landing.pts.length - 1];
-    expect(loop.pts[0]).toEqual(end);
-    expect(loop.pts[loop.pts.length - 1]).toEqual(end);
     // the road to the bridge ends at the foot of the ramp, on the bridge's centre line
     const toBridge = lines.find((l) => l.id === 'to-bridge')!;
     const foot = toBridge.pts[toBridge.pts.length - 1];
     expect(foot[0]).toBeCloseTo(BRIDGE.x, 6);
     expect(foot[1]).toBeGreaterThan(BRIDGE.deckA + BRIDGE.ramp);
     expect(landing.pts[0][1]).toBeLessThan(BRIDGE.deckB - BRIDGE.ramp);
+    const toCar = lines.find((l) => l.id === 'to-arcade')!;
+    const end = toCar.pts[toCar.pts.length - 1];
+    expect(Math.hypot(end[0] - CAR.x, end[1] - CAR.boardZ)).toBeLessThan(RIDES.car.reach);
   });
 
   it('walking lanes are clear: nothing solid stands on a street', () => {
@@ -145,7 +147,7 @@ describe('hub streets', () => {
 
   it('tiles: none under a solid prop, none coplanar with a tile it overlaps', () => {
     const tiles = hubPathTiles();
-    expect(tiles.length).toBeGreaterThan(200);
+    expect(tiles.length).toBeGreaterThan(80);
     expect(tiles.length).toBeLessThan(700);
     for (const t of tiles) expect(hitsAt(t.x, t.z, 0.5, colliders.filter((c) => c.top > 0.5)), `${t.x},${t.z}`).toEqual([]);
     for (let i = 0; i < tiles.length; i++)
@@ -216,11 +218,13 @@ describe('hub bounds and fence', () => {
     expect(Math.hypot(FOUNTAIN.x - door.x, FOUNTAIN.z - door.z)).toBeCloseTo(Math.hypot(FOUNTAIN.x - PAVILION.x, FOUNTAIN.z - PAVILION.z) - 1, 6);
   });
 
-  it('every interactable stands on walkable ground with its spot clear of anything solid', () => {
+  it('every interactable stands on walkable ground of its own level with its spot clear of anything solid there', () => {
     for (const it of INTERACTABLES) {
-      expect(isWalkable(it.x, it.z, PLAYER_R), it.id).toBe(true);
+      const lv = it.level ?? 'table';
+      expect(isWalkable(it.x, it.z, PLAYER_R, LEVEL_WALK[lv]), it.id).toBe(true);
       if (it.id === 'key' || it.id === 'marble') continue; // on top of the tower / the marble itself
-      expect(hitsAt(it.x, it.z, PLAYER_R), it.id).toEqual([]);
+      const here = lv === 'floor' ? colliders.filter((c) => c.lv === 'floor') : blocking.filter((c) => (c.lv ?? 'table') === 'table');
+      expect(hitsAt(it.x, it.z, PLAYER_R, here), it.id).toEqual([]);
     }
   });
 });
@@ -321,12 +325,11 @@ describe('the domino bridge', () => {
       expect(signpostTop(p.boards.length)).toBeCloseTo(SIGNPOSTS[p.id].h, 6);
       expect(p.boards.every((b, i) => b.y === POST_BOARD.y0 + i * POST_BOARD.step)).toBe(true);
     }
-    // the spawn post's lowest board (the one in view) points the way to the trials
-    expect(posts.find((p) => p.id === 'spawn')!.boards[0].label).toBe('Trials table');
+    // the spawn post's lowest board (the one in view) points the way to the trials: the arcade, down the toy car
+    expect(posts.find((p) => p.id === 'spawn')!.boards[0].label).toBe('Arcade');
     // every board face fits in the sign atlas
     const atlas = new SignAtlas();
     for (const p of posts) for (const b of p.boards) for (const arrow of ['left', 'right'] as const) atlas.board({ title: b.label, sub: b.sub, accent: b.accent, arrow });
-    for (const g of GATES) atlas.board({ title: g.title, sub: g.sub, accent: g.color, arrow: null });
     expect(atlas.boards.length).toBeLessThanOrEqual(MAX_BOARDS);
   });
 });
@@ -396,75 +399,6 @@ describe('dominoes', () => {
     expect(dominoRestY({ x: 0, z: 0, rot: 0, roll: Math.PI / 2, s: 2 })).toBeCloseTo(DOMINO.w, 9);
     expect(SCOREBOARD.w / (DOMINO.h * SCOREBOARD.s)).toBeCloseTo(3, 9);
     expect(SCOREBOARD.h / SCOREBOARD.s).toBeCloseTo(2 * DOMINO.h + DOMINO.w, 9);
-  });
-});
-
-describe('gate surroundings', () => {
-  const tiles = hubPathTiles();
-  const tileHalf = 0.95;
-  const onTile = (x: number, z: number) =>
-    tiles.some((t) => {
-      // into the tile's frame (three.js rotation.y)
-      const dx = x - t.x;
-      const dz = z - t.z;
-      const c = Math.cos(t.rot);
-      const s = Math.sin(t.rot);
-      const lx = dx * c - dz * s;
-      const lz = dx * s + dz * c;
-      return Math.abs(lx) < tileHalf && Math.abs(lz) < tileHalf;
-    });
-
-  it('every playable game has a theme, and each theme builds its own props', () => {
-    for (const g of GATES) {
-      expect(GATE_THEMES[g.game], g.game).toBeTypeOf('function');
-      const k = new Kit();
-      const extras = { dominoes: [] as DominoSpec[] };
-      k.push(g.x, 0, g.z, g.rot);
-      GATE_THEMES[g.game](k, new SignAtlas(), g, extras);
-      k.pop();
-      const c = k.counts();
-      expect(c.solid + c.decal + extras.dominoes.length, g.game).toBeGreaterThan(5);
-    }
-  });
-
-  it('anything taller than a step stands inside the gate’s two solid spots; flat decals keep off the path tiles', () => {
-    for (const g of GATES) {
-      const k = new Kit();
-      const extras = { dominoes: [] as DominoSpec[] };
-      k.push(g.x, 0, g.z, g.rot);
-      GATE_THEMES[g.game](k, new SignAtlas(), g, extras);
-      k.pop();
-      const geos = k.build();
-      const spots = Object.values(GATE_DECOR).map((d) => ({ ...gateLocal(g, d.lx, d.lz), r: d.r + 0.35, top: d.top + 0.6 }));
-      for (const [layer, geo] of Object.entries(geos)) {
-        const pos = geo!.attributes.position;
-        const v = [0, 1, 2].map(() => ({ x: 0, y: 0, z: 0 }));
-        for (let t = 0; t < pos.count; t += 3) {
-          for (let j = 0; j < 3; j++) v[j] = { x: pos.getX(t + j), y: pos.getY(t + j), z: pos.getZ(t + j) };
-          for (const { x, y, z } of v) {
-            if (y > GATE.height - 2.5) continue; // the lintel stickers sit on the arch itself
-            const spot = spots.find((sp) => Math.hypot(x - sp.x, z - sp.z) <= sp.r);
-            if (y > STEP_HEIGHT) {
-              expect(spot, `${g.game} ${layer} vertex at ${x.toFixed(2)}, ${y.toFixed(2)}, ${z.toFixed(2)}`).toBeDefined();
-              expect(y, g.game).toBeLessThanOrEqual(spot!.top);
-            } else if (!spot) {
-              expect(onTile(x, z), `${g.game} ${layer} piece at ${x.toFixed(2)}, ${z.toFixed(2)} lies on a path tile`).toBe(false);
-            }
-          }
-          // upward-facing flat faces near the felt (0.075) would z-fight with it: keep them ≥ 0.04 above
-          const ux = v[1].x - v[0].x, uy = v[1].y - v[0].y, uz = v[1].z - v[0].z;
-          const wx = v[2].x - v[0].x, wy = v[2].y - v[0].y, wz = v[2].z - v[0].z;
-          const nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx;
-          const up = ny / (Math.hypot(nx, ny, nz) || 1);
-          if (up > 0.99 && v[0].y < STEP_HEIGHT) expect(v[0].y, `${g.game} ${layer} flat face at ${v[0].x.toFixed(2)}, ${v[0].z.toFixed(2)}`).toBeGreaterThanOrEqual(0.075 + 0.04 - 1e-6);
-        }
-      }
-      // real dominoes (Wind-Up Dash) stand in the hero spot
-      for (const d of extras.dominoes) {
-        const hero = spots[0];
-        expect(Math.hypot(d.x - hero.x, d.z - hero.z), g.game).toBeLessThan(hero.r);
-      }
-    }
   });
 });
 

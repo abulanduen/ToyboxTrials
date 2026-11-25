@@ -5,11 +5,13 @@
  *
  * The hub spans two tables of the same height: the spawn table (fountain plaza, Scoreboard and
  * its TV, Pavilion, Workshop, shop, the secrets) and, across a 26 cm gap, the gates table (a desk
- * under the window) with every trial gate. A domino bridge joins them. Where you can walk is the
- * union of rectangles in src/game/hubBounds.ts, shared with the online server.
+ * under the window) with the ball games. A domino bridge joins them. Under the spawn table, on the
+ * room floor, is the arcade with a machine for every trial (reached by the toy car, left by the
+ * lift: src/game/hubRides.ts). Where you can walk is the union of rectangles per level in
+ * src/game/hubBounds.ts, shared with the online server.
  */
 import { addStatic, resetStatic, type Collider } from '../game/collision';
-import { ARCADE_CEILING, BRIDGE_WALK, BRIDGE_X, GATES_WALK, HUB_WALK, WALK_AREAS } from '../game/hubBounds';
+import { ARCADE_CEILING, BRIDGE_WALK, BRIDGE_X, GATES_WALK, HUB_WALK, LEVEL_Y, WALK_AREAS } from '../game/hubBounds';
 import { hubPlayColliders } from '../game/hubPlay';
 import { PALETTE } from '../game/palette';
 import { JACK_BOX } from '../game/whoAmI';
@@ -148,7 +150,7 @@ export const JACK = JACK_BOX;
 
 /**
  * Signposts: wooden fingerposts with an arrow board per destination (labels and colours in
- * gateDecor.ts `signposts()`): one by spawn, one at each end of the domino bridge.
+ * signposts.ts `signposts()`): one by spawn, one at each end of the domino bridge.
  */
 export const FINGERPOST = { x: -5.5, z: 14, h: 9.8 };
 export const SIGNPOSTS = {
@@ -196,124 +198,89 @@ export const BRIDGE_RAIL_X = BRIDGE.halfW + BRIDGE.rail.t / 2 + 0.02;
 /** Number of collider steps per ramp (each rise is well under the step height). */
 const RAMP_STEPS = 4;
 
-// ------------------------------------------------------------------ gates table
+// ------------------------------------------------------------------ the arcade's machines
 
 /**
- * Minigame gates: one building-block arch per playable trial, all on the gates table. Five stand
- * along its north side facing south (Copycat in the middle, straight ahead off the bridge), four
- * along its south side facing north, either side of the bridge landing, and one at each end
- * facing in. A loop road passes GATE_ROAD in front of every arch; interacting at a gate opens that
- * trial's lobby (the shared practice intro card).
+ * One arcade machine per playable trial, on the arcade floor under the spawn table
+ * (docs/ARCADE_PLAN.md phase 3; src/scene/Machines.tsx): six along its back wall facing the way in,
+ * three down each side wall facing in, and two back-to-back pairs in the middle. Walk up and press
+ * Interact (or tap the prompt) to open that trial's lobby (the shared practice intro card).
  * Positions are data: add a playable game to the registry and give it a spot here.
+ * Machine-local +z is the machine's front (its screen); `rot` is three.js rotation.y.
  */
-type District = 'west' | 'centre' | 'east';
-const N_ROW = -148;
-const S_ROW = -104;
-const END_W = -61;
-const END_E = 115;
-const END_Z = -126;
-const GATE_SPOTS: Record<MinigameId, { x: number; z: number; rot: number; district: District; short: string }> = {
-  // north row, facing south (towards the bridge and the spawn table)
-  'toy-squad': { x: -50, z: N_ROW, rot: 0, district: 'west', short: 'Toy Squad' },
-  'jack-in-the-box': { x: -14, z: N_ROW, rot: 0, district: 'west', short: 'Jack' },
-  'copycat-conductor': { x: BRIDGE_X, z: N_ROW, rot: 0, district: 'centre', short: 'Copycat' },
-  'music-box-rhythm': { x: 60, z: N_ROW, rot: 0, district: 'east', short: 'Music Box' },
-  'wind-up-dash': { x: 96, z: N_ROW, rot: 0, district: 'east', short: 'Dash' },
-  // south row, facing north, either side of the bridge landing
-  'find-the-original': { x: -54, z: S_ROW, rot: Math.PI, district: 'west', short: 'Find the Original' },
-  'midnight-hunger': { x: -20, z: S_ROW, rot: Math.PI, district: 'west', short: 'Midnight' },
-  'blink-duel': { x: 68, z: S_ROW, rot: Math.PI, district: 'east', short: 'Blink Duel' },
-  'red-light-green-light': { x: 102, z: S_ROW, rot: Math.PI, district: 'east', short: 'Red Light' },
-  // the two ends, facing in
-  'inferno-escape': { x: END_W, z: END_Z, rot: Math.PI / 2, district: 'west', short: 'Inferno' },
-  'spellbox-showdown': { x: END_E, z: END_Z, rot: -Math.PI / 2, district: 'east', short: 'Spellbox' },
-  // south row, between Midnight and the bridge landing
-  'odd-page-out': { x: 3, z: S_ROW, rot: Math.PI, district: 'west', short: 'Odd Page' },
-  // south row, between the bridge landing and Blink Duel (Odd Page Out's mirror on the east side)
-  'toy-tower-tumble': { x: 45, z: S_ROW, rot: Math.PI, district: 'east', short: 'Towers' },
-  // inside the loop, east of the avenue, facing it: a fort in the middle of the table (both
-  // south-row spots beside the bridge landing are taken)
-  'toybox-siege': { x: 46, z: -127, rot: -Math.PI / 2, district: 'east', short: 'Siege' },
-  // its mirror west of the avenue, facing it: a little basketball court gate
-  'hoop-hustle': { x: 2, z: -131, rot: Math.PI / 2, district: 'west', short: 'Hoops' },
-  // inside the loop on the west half of the pitch, facing east up the pitch (a short detour off the
-  // road between Odd Page Out and Midnight, like the Siege fort's); clear of the west net's mouth
-  'hoop-clash': { x: -23, z: -127, rot: Math.PI / 2, district: 'west', short: 'Hoop Clash' },
+const BACK_Z = -46;
+const SIDE_X = 66;
+const ISLAND_X = 20;
+const ISLAND_Z = -12;
+/** A cabinet: footprint (w across, d deep) and height (cm): about twice a toy's height, like a real arcade cabinet beside a child. */
+export const MACHINE = { w: 4.8, d: 3.6, h: 7.6 };
+/** Where a toy stands to play (cm in front of the cabinet's front face). */
+export const MACHINE_STAND = 2.6;
+const ISLAND_HALF = MACHINE.d / 2 + 0.15;
+const MACHINE_SPOTS: Record<MinigameId, { x: number; z: number; rot: number; short: string }> = {
+  // the back wall, facing the way in: the memory and music games in the middle
+  'toy-squad': { x: -50, z: BACK_Z, rot: 0, short: 'Toy Squad' },
+  'jack-in-the-box': { x: -30, z: BACK_Z, rot: 0, short: 'Jack' },
+  'copycat-conductor': { x: -10, z: BACK_Z, rot: 0, short: 'Copycat' },
+  'music-box-rhythm': { x: 10, z: BACK_Z, rot: 0, short: 'Music Box' },
+  'wind-up-dash': { x: 30, z: BACK_Z, rot: 0, short: 'Dash' },
+  'red-light-green-light': { x: 50, z: BACK_Z, rot: 0, short: 'Red Light' },
+  // the west wall, facing east: the looking games
+  'find-the-original': { x: -SIDE_X, z: -28, rot: Math.PI / 2, short: 'Find the Original' },
+  'odd-page-out': { x: -SIDE_X, z: -8, rot: Math.PI / 2, short: 'Odd Page' },
+  'midnight-hunger': { x: -SIDE_X, z: 12, rot: Math.PI / 2, short: 'Midnight' },
+  // the east wall, facing west: the duels and the escape
+  'blink-duel': { x: SIDE_X, z: -28, rot: -Math.PI / 2, short: 'Blink Duel' },
+  'spellbox-showdown': { x: SIDE_X, z: -8, rot: -Math.PI / 2, short: 'Spellbox' },
+  'inferno-escape': { x: SIDE_X, z: 12, rot: -Math.PI / 2, short: 'Inferno' },
+  // the middle: back-to-back pairs, the building games west, the ball games east
+  'toy-tower-tumble': { x: -ISLAND_X, z: ISLAND_Z + ISLAND_HALF, rot: 0, short: 'Towers' },
+  'toybox-siege': { x: -ISLAND_X, z: ISLAND_Z - ISLAND_HALF, rot: Math.PI, short: 'Siege' },
+  'hoop-hustle': { x: ISLAND_X, z: ISLAND_Z + ISLAND_HALF, rot: 0, short: 'Hoops' },
+  'hoop-clash': { x: ISLAND_X, z: ISLAND_Z - ISLAND_HALF, rot: Math.PI, short: 'Hoop Clash' },
 };
 
 const CATEGORY_LABEL: Record<string, string> = { pvp: 'Versus' };
 
-export interface HubGate {
-  /** Interactable id, `gate-<game id>`. */
+export interface HubMachine {
+  /** Interactable id, `machine-<game id>`. */
   id: string;
   game: MinigameId;
   title: string;
-  /** Short name for the signposts. */
+  /** Short name (TV cards). */
   short: string;
-  /** Short line under the title on the gate's name board. */
+  /** Short line under the title on the machine's marquee. */
   sub: string;
   x: number;
   z: number;
-  /** Local +z is the gate's front; it faces the loop road. */
+  /** Local +z is the machine's front (its screen). */
   rot: number;
   color: string;
-  district: District;
 }
 
-export const GATES: HubGate[] = MINIGAMES.filter((g) => g.status === 'playable' && GATE_SPOTS[g.id]).map((g) => {
-  const p = GATE_SPOTS[g.id];
+export const MACHINES: HubMachine[] = MINIGAMES.filter((g) => g.status === 'playable' && MACHINE_SPOTS[g.id]).map((g) => {
+  const p = MACHINE_SPOTS[g.id];
   const cat = CATEGORY_LABEL[g.category] ?? `${g.category[0].toUpperCase()}${g.category.slice(1)}`;
   const players = g.players.min === g.players.max ? `${g.players.min}` : `${g.players.min}–${g.players.max}`;
-  return {
-    id: `gate-${g.id}`,
-    game: g.id,
-    title: g.title,
-    short: p.short,
-    sub: `${cat} · ${players} players`,
-    x: p.x,
-    z: p.z,
-    rot: p.rot,
-    color: g.accent,
-    district: p.district,
-  };
+  return { id: `machine-${g.id}`, game: g.id, title: g.title, short: p.short, sub: `${cat} · ${players} players`, x: p.x, z: p.z, rot: p.rot, color: g.accent };
 });
-/** The gates signpost's trial boards: one per wing. */
-export const GATE_DISTRICTS: { id: District; label: string }[] = [
-  { id: 'west', label: 'West wing' },
-  { id: 'centre', label: 'Straight on' },
-  { id: 'east', label: 'East wing' },
-];
-export const gateFor = (game: MinigameId) => GATES.find((g) => g.game === game);
-export const GATE = { width: 9, pillar: 2.6, height: 8.5, depth: 3 };
-/** Where the player stands to use a gate, and where the loop road passes (cm in front of the arch). */
-export const GATE_STAND = 2.2;
-export const GATE_ROAD = 5.5;
-/** The loop road on the gates table: its north and south lanes (z) and its west and east ends (x). */
-export const GATE_LOOP = { north: N_ROW + GATE_ROAD, south: S_ROW - GATE_ROAD, west: END_W + GATE_ROAD, east: END_E - GATE_ROAD, z: END_Z };
-/**
- * Themed props beside every gate (see `gateDecor.ts`), in gate-local centimetres: a tall "hero"
- * piece on the gate's left and a low cluster on its right. Both are solid.
- */
-export const GATE_DECOR = {
-  hero: { lx: -7.2, lz: -0.5, r: 2.0, top: 7 },
-  side: { lx: 6.8, lz: -0.3, r: 1.8, top: 3.2 },
-};
+export const machineFor = (game: MinigameId) => MACHINES.find((g) => g.game === game);
+/** Where a toy stands to play a machine (on the arcade floor), facing it. */
+export const machineStand = (m: HubMachine, extra = 0) => frontOf(m.x, m.z, m.rot, MACHINE.d / 2 + MACHINE_STAND + extra);
 
 /**
- * The gate greeters (src/scene/Greeters.tsx): a small toy at the front of every arch, to the
- * right of its path as you walk up, in front of the gate's low prop. Gate-local cm. Solid, but
- * clear of the arch, the gate's stub path, the loop road and the spot where you stand to play.
+ * The machine greeters (src/scene/Greeters.tsx): a small toy beside every machine, on its right as
+ * you face it, a little forward. Machine-local cm. Solid, but clear of the cabinet, of the spot where
+ * you stand to play, and of the next machine.
  */
-export const GREETER = { lx: 5.0, lz: 2.6, r: 0.9, top: 3 };
-/** Gates whose greeter stands on the other side (the Siege fort's right-hand side is on the loop road). */
-const GREETER_LEFT: readonly MinigameId[] = ['toybox-siege'];
-export const greeterSpot = (g: { x: number; z: number; rot: number; game: MinigameId }) => gateLocal(g, GREETER_LEFT.includes(g.game) ? -GREETER.lx : GREETER.lx, GREETER.lz);
+export const GREETER = { lx: 4.4, lz: 1.6, r: 0.9, top: 3 };
+export const greeterSpot = (m: { x: number; z: number; rot: number }) => gateLocal(m, -GREETER.lx, GREETER.lz);
 
 /** Where Pipwick, the welcome mascot, waits between tours: by the plaza, ahead-right of spawn. */
 export const PIPWICK_HOME = { x: 7, z: 15, r: 1.2, top: 3.8, yaw: Math.PI + 0.5 };
 /**
- * The Jukebox (src/scene/Jukebox.tsx): on the gates table's north row, just east of the Music Box
- * Rhythm gate, facing the road like the arches. Picks the Hub's background track.
+ * The Jukebox (src/scene/Jukebox.tsx): on the gates table's north side, by the window, behind the
+ * basketball hoop. Picks the Hub's background track.
  */
 export const JUKEBOX = { x: 73, z: -150, rot: 0, w: 5, d: 3.4, h: 6.6 };
 
@@ -346,7 +313,7 @@ export const DESK = {
 };
 
 export const TREES: [number, number, number][] = [
-  // x, z, scale — kept off the streets, the loop road and the gates' props
+  // x, z, scale — kept off the streets and the props
   // spawn table: a few round the edges, so the plaza stays open
   [-20, -30, 1.1],
   [-52, -34, 1.0],
@@ -384,7 +351,7 @@ export const BLOCKS: { x: number; z: number; y: number; rot: number; color: stri
 ];
 export const BLOCK_SIZE = 3;
 
-/** Gate-local point (lx to the gate's right, lz out of its front) in world xz. */
+/** Object-local point (lx to its right, lz out of its front; a machine, the Pavilion, the TV…) in world xz. */
 export function gateLocal(g: { x: number; z: number; rot: number }, lx: number, lz: number) {
   const c = Math.cos(g.rot);
   const s = Math.sin(g.rot);
@@ -435,17 +402,11 @@ export function hubColliders(): Collider[] {
     list.push({ kind: 'box', id: 'scoreboard', x: c.x, z: c.z, hx: SCOREBOARD.w / 2, hz: 1.8, rot: SCOREBOARD.rot, top: SCOREBOARD.h });
   }
   list.push({ kind: 'box', id: 'tv', x: TV.x, z: TV.z, hx: TV.w / 2, hz: TV.d / 2, rot: TV.rot, top: TV.h });
-  for (const g of GATES) {
-    for (const side of [-1, 1]) {
-      const p = gateLocal(g, side * (GATE.width / 2 - GATE.pillar / 2), 0);
-      list.push({ kind: 'box', id: `${g.id}-pillar`, x: p.x, z: p.z, hx: GATE.pillar / 2, hz: GATE.depth / 2, rot: g.rot, top: GATE.height });
-    }
-    for (const [k, d] of Object.entries(GATE_DECOR)) {
-      const p = gateLocal(g, d.lx, d.lz);
-      list.push({ kind: 'circle', id: `${g.id}-${k}`, x: p.x, z: p.z, r: d.r, top: d.top });
-    }
-    const gr = greeterSpot(g);
-    list.push({ kind: 'circle', id: `${g.id}-greeter`, x: gr.x, z: gr.z, r: GREETER.r, top: GREETER.top });
+  // the arcade's machines and their greeters, down on the floor
+  for (const m of MACHINES) {
+    list.push({ kind: 'box', id: m.id, x: m.x, z: m.z, hx: MACHINE.w / 2, hz: MACHINE.d / 2, rot: m.rot, top: LEVEL_Y.floor + MACHINE.h, lv: 'floor' });
+    const gr = greeterSpot(m);
+    list.push({ kind: 'circle', id: `${m.id}-greeter`, x: gr.x, z: gr.z, r: GREETER.r, top: LEVEL_Y.floor + GREETER.top, lv: 'floor' });
   }
   list.push({ kind: 'circle', id: 'pipwick', x: PIPWICK_HOME.x, z: PIPWICK_HOME.z, r: PIPWICK_HOME.r, top: PIPWICK_HOME.top });
   list.push({ kind: 'box', id: 'jukebox', x: JUKEBOX.x, z: JUKEBOX.z, hx: JUKEBOX.w / 2, hz: JUKEBOX.d / 2, rot: JUKEBOX.rot, top: JUKEBOX.h });

@@ -1,6 +1,6 @@
 /**
  * Welcoming players to the Hub: Pipwick's first-visit tour, chatting with Pipwick afterwards, and
- * the gate greeters' bubbles. Glue between the pure tour machine (tour.ts), the voice lines
+ * the machine greeters' bubbles. Glue between the pure tour machine (tour.ts), the voice lines
  * (voice.ts, voiceLines.ts), the persisted store (`tourSeen`) and the scene/UI.
  *
  * The React side reads `useWelcome` (changes only when a phase or line changes); per-frame values
@@ -26,7 +26,7 @@ interface WelcomeStore {
   phase: TourState['phase'];
   /** Chat: which line Pipwick is saying ('hello', 'bye' or an idle line index). */
   chat: 'hello' | 'bye' | number;
-  /** Who is talking to the player in a speech bubble: a gate greeter (by game), the Tournament Curator, or null. */
+  /** Who is talking to the player in a speech bubble: a machine greeter (by game), the Tournament Curator, or null. */
   greeter: GreeterId | null;
 }
 

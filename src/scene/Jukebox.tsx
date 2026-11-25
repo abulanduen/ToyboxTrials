@@ -1,5 +1,5 @@
 /**
- * The Hub's Jukebox: a chunky wooden music-box cabinet beside the Music Box Rhythm gate. Crank it
+ * The Hub's Jukebox: a chunky wooden music-box cabinet on the gates table by the window. Crank it
  * (interact) to open the track list and pick the Hub's background music (src/ui/WelcomeUI.tsx,
  * src/game/musicScore.ts HUB_TRACKS). Its pinned brass drum turns while music plays and little
  * notes drift up from the top.

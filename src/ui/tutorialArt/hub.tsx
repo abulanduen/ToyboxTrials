@@ -82,11 +82,14 @@ function Jump() {
 function Interact() {
   return (
     <Panels left={<Key x={44} y={76} k="E" w={30} press />} right={<TapBtn x={216} y={76} r={24} label="Enter" fs={11} fill={PALETTE.coral} press />}>
-      {/* a trial gate */}
-      <path d="M100 124V62a30 30 0 0 1 60 0v62" fill="none" stroke={PALETTE.woodMid} strokeWidth={10} />
-      <path d="M100 124V62a30 30 0 0 1 60 0v62" fill="none" stroke={INK} strokeWidth={1.6} />
-      <rect x={112} y={22} width={36} height={14} rx={3} fill={PALETTE.honey} {...line} />
-      <path d="M110 124V64a20 20 0 0 1 40 0v60z" fill={PALETTE.inkPurple} opacity={0.5} />
+      {/* a trial's arcade machine: cabinet, glowing screen, marquee, controls */}
+      <rect x={104} y={34} width={52} height={90} rx={5} fill={PALETTE.coral} {...line} />
+      <rect x={100} y={24} width={60} height={14} rx={3} fill={INK} {...line} />
+      <rect x={110} y={28} width={40} height={6} rx={2} fill={PALETTE.honey} />
+      <rect x={110} y={44} width={40} height={28} rx={2} fill={PALETTE.toyBlue} stroke={INK} strokeWidth={1.6} />
+      <rect x={106} y={78} width={48} height={8} rx={2} fill={INK} />
+      <circle cx={118} cy={80} r={2.6} fill={PALETTE.honey} />
+      <circle cx={140} cy={81} r={2.2} fill={PALETTE.sage} />
       <Toy x={130} y={126} s={0.8} className="ta-bob" />
       <g className="ta-pulse">
         <circle cx={130} cy={50} r={8} fill={PALETTE.coral} {...thin} />

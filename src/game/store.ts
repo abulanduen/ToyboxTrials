@@ -80,7 +80,7 @@ interface SettingsSlice extends VoiceSettings {
   squadFavourites: string[];
   /** Background music volume (0..1, times the master volume). Music Box Rhythm's own music ignores it. */
   musicVolume: number;
-  /** Spoken lines (Pipwick and the gate greeters), 0..1 times the master volume. */
+  /** Spoken lines (Pipwick and the machine greeters), 0..1 times the master volume. */
   voiceVolume: number;
   /** The Hub's background track, picked at the jukebox (src/game/musicScore.ts HUB_TRACKS, or 'off'). Local only. */
   hubTrack: string;

@@ -13,8 +13,10 @@ import { audioOut } from './audio';
 import { useGame } from './store';
 import { duckMusic } from './music';
 import { exposeDebug } from './debug';
+import { STALE_RECORDINGS } from './voiceLines';
 
-const have = new Set<string>(recorded);
+// (a recording whose line has been reworded since is not played: voiceLines.ts STALE_RECORDINGS)
+const have = new Set<string>(recorded.filter((id) => !STALE_RECORDINGS.includes(id)));
 const cache = new Map<string, Promise<AudioBuffer | null>>();
 let current: { src: AudioBufferSourceNode; gain: GainNode } | null = null;
 /**

@@ -171,9 +171,9 @@ const LOUD = 0.001;
 const QUIET = 0.0005;
 const inLink = (st, id) => st.inbound.find((l) => l.id === id) ?? null;
 /** Move a toy through waypoints, waiting until `watcher` draws it at each one (the server limits speed). */
-async function walk(P, watcher, pts, yaw) {
+async function walk(P, watcher, pts, yaw, level = 'table') {
   for (const [x, z] of pts) {
-    await P.page.evaluate(([x, z, y]) => window.__toybox.teleport(x, z, y), [x, z, yaw]);
+    await P.page.evaluate(([x, z, y, lv]) => window.__toybox.teleport(x, z, y, lv), [x, z, yaw, level]);
     await watcher.page.waitForFunction(([n, x, z]) => { const r = window.__toybox.net.remotes().find((q) => q.name === n); return r && r.x !== null && Math.hypot(r.x - x, r.z - z) < 0.5; }, [P.name, x, z], { timeout: 120000, polling: 250 }).catch(() => null);
   }
 }
@@ -235,7 +235,7 @@ async function rideChecks(A, B) {
   const down = await seen();
   check('ride: A lands in the arcade, and B sees A down there', a.level === 'floor' && down && Math.abs(down.y - FLOOR_Y) < 0.1 && Math.hypot(down.x - a.x, down.z - a.z) < 1, JSON.stringify({ a: [a.level, a.x, a.y, a.z], seen: down }));
   // over to the lift (on the arcade floor) and back up
-  await walk(A, B, [[8, 30], [-4, 30]], 0);
+  await walk(A, B, [[8, 30], [-4, 30]], 0, 'floor');
   await press(A);
   await A.page.waitForFunction(() => window.__toybox.ride.state().kind === 'lift', null, { timeout: 20000, polling: 100 }).catch(() => null);
   check('ride: A boards the lift', (await ride(A)).kind === 'lift');

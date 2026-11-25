@@ -80,7 +80,7 @@ export const COACH_TOURS: Record<CoachTourId, readonly CoachStep[]> = {
     {
       target: 'pavilion-practice',
       title: 'Just one trial',
-      text: 'Open a section and pick any trial to practise it on its own. Every trial also has its own gate in the Hub, over the domino bridge.',
+      text: 'Open a section and pick any trial to practise it on its own. Every trial also has its own machine in the Hub’s arcade: ride the toy car down from the plaza.',
     },
     {
       target: 'pavilion-start',

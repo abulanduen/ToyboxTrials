@@ -1,5 +1,5 @@
 /**
- * DOM side of welcoming players in the Hub: Pipwick's tour card and chat card, the gate greeters'
+ * DOM side of welcoming players in the Hub: Pipwick's tour card and chat card, the machine greeters'
  * speech bubble, and the Jukebox's track list (shown in the shared info panel).
  * Touch targets are ≥ 56 px and the cards sit inside the safe-area insets.
  */

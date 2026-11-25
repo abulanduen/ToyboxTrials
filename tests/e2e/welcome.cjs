@@ -96,7 +96,7 @@ async function desktop(browser) {
   await page.click('[data-testid=tour-next]');
   await waitPhase(page, 2, 'talk');
   await frames(page, 4);
-  check('the Trials Table stop', (await page.getAttribute('[data-testid=tour-card]', 'data-stop')) === 'trials');
+  check('the arcade stop (by the toy car)', (await page.getAttribute('[data-testid=tour-card]', 'data-stop')) === 'trials');
   await page.screenshot({ path: `${OUT}/welcome-desktop-03-trials.png` });
   // --- on its own: with auto-advance back on, the Workshop's short line plays and the tour moves on to the shop
   await page.click('[data-testid=tour-next]');
@@ -165,9 +165,9 @@ async function desktop(browser) {
   await page.waitForSelector('[data-testid=tour-card]', { state: 'detached', timeout: 60000 });
 
   // --- a gate greeter talks, and the gate still opens its trial
-  const gates = await page.evaluate(() => window.__toybox.hub.gates());
+  const gates = await page.evaluate(() => window.__toybox.hub.machines());
   const cc = gates.find((g) => g.game === 'copycat-conductor');
-  await page.evaluate((g) => window.__toybox.teleport(g.standX, g.standZ, g.yaw), cc);
+  await page.evaluate((g) => window.__toybox.teleport(g.standX, g.standZ, g.yaw, g.level), cc);
   await page.waitForSelector('[data-testid=greeter-bubble][data-game=copycat-conductor]', { timeout: 60000 });
   await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-testid=greeter-bubble]')).opacity === '1', null, { timeout: 30000 });
   await frames(page, 3);
@@ -192,7 +192,7 @@ async function desktop(browser) {
 
   // Music Box Rhythm: no background music at all
   const mb = gates.find((g) => g.game === 'music-box-rhythm');
-  await page.evaluate((g) => window.__toybox.teleport(g.standX, g.standZ, g.yaw), mb);
+  await page.evaluate((g) => window.__toybox.teleport(g.standX, g.standZ, g.yaw, g.level), mb);
   await page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Music Box'), null, { timeout: 60000 });
   await page.keyboard.press('e');
   await page.waitForSelector('.match-intro', { timeout: 120000 });
@@ -295,9 +295,9 @@ async function phone(browser) {
   check('phone: the joystick is back', await page.isVisible('.touch-stick-zone'));
 
   // a greeter's bubble on a narrow screen
-  const gates = await page.evaluate(() => window.__toybox.hub.gates());
+  const gates = await page.evaluate(() => window.__toybox.hub.machines());
   const sq = gates.find((g) => g.game === 'toy-squad');
-  await page.evaluate((g) => window.__toybox.teleport(g.standX, g.standZ, g.yaw), sq);
+  await page.evaluate((g) => window.__toybox.teleport(g.standX, g.standZ, g.yaw, g.level), sq);
   await page.waitForSelector('[data-testid=greeter-bubble][data-game=toy-squad]', { timeout: 60000 });
   await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-testid=greeter-bubble]')).opacity === '1', null, { timeout: 30000 });
   await frames(page, 3);

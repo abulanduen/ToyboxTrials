@@ -1,7 +1,8 @@
 # Arcade under the table: plan (proposal)
 
-Status: agreed in outline with the owner on 25 Nov 2026. **Phases 1 and 2 are built** (two levels,
-the arcade shell, the toy-car ride down and the lift up). Phases 3–5 are planned.
+Status: agreed in outline with the owner on 25 Nov 2026. **Phases 1–3 are built** (two levels, the
+arcade shell, the toy-car ride down and the lift up, a machine for every trial in place of the
+gates). Phases 4 and 5 are planned.
 It moves the trials off the gates table into an arcade on the floor under the spawn table, turns the
 gates table into the Hub's sports ground, and adds wandering NPC toys.
 
@@ -70,7 +71,12 @@ desktop and phone.
      Interact (the phone Interact button too).
    - Online, others see you ride. The server times the journey, so positions on it are valid.
    - The car track runs off the front edge with a dip and a loop; the lift is beside it.
-3. **Machines for every trial; the arches go.**
+3. **Machines for every trial; the arches go.** *(Built.)* `src/scene/layout.ts` (MACHINES,
+   machineStand, GREETER), `src/scene/Machines.tsx` (instanced cabinets; screens and marquees on one
+   atlas, the trials' thumbnails), `src/scene/signposts.ts` (the signposts' boards, now pointing to
+   the arcade and the ball games), `src/scene/Greeters.tsx` (by the machines); `Gates.tsx` and
+   `gateDecor.ts` (the arches and their themed props) are gone. The tour's trials stop is at the toy
+   car; three recorded tour clips are stale until re-recorded (docs/VOICE.md).
    - Each playable game gets a machine showing its intro picture and title (the intro thumbnails
      already exist). Walk up and Play opens the same intro card as the gates do today: practice,
      bots, or hosting an online lobby.

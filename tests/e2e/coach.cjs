@@ -256,7 +256,7 @@ async function desktop(browser) {
 
   // --- a trial's intro card (once, for the first trial opened)
   const openGate = async (game) => {
-    const title = await page.evaluate((id) => { const g = window.__toybox.hub.gates().find((x) => x.game === id); window.__toybox.teleport(g.standX, g.standZ, g.yaw); return g.title; }, game);
+    const title = await page.evaluate((id) => { const g = window.__toybox.hub.machines().find((x) => x.game === id); window.__toybox.teleport(g.standX, g.standZ, g.yaw, g.level); return g.title; }, game);
     await page.waitForFunction((t) => document.querySelector('.prompt')?.textContent.includes(t), title, { timeout: 120000 });
     await sleep(400);
     await page.keyboard.press('KeyE');

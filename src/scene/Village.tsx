@@ -15,12 +15,12 @@ import { Arcade } from './Arcade';
 import { Rides } from './Rides';
 import { Bridge } from './Bridge';
 import { HubTV, TV_AERIAL_TIP } from './HubTV';
-import { Gates } from './Gates';
+import { Machines } from './Machines';
 import { DustMotes, Fingerpost } from './Ambience';
 import { hubFence, hubPathTiles, TILE_SIZE } from './paths';
 import { JackInTheBox, KeyTower, MusicBox, PencilLog, Train, TrainTrack } from './Interactive';
 import { HubPlay } from './HubPlay';
-import { BLOCKS, BLOCK_SIZE, BRIDGE, CURATOR, GATES, GATE_STAND, JUKEBOX, PAVILION, PIPWICK_HOME, SCOREBOARD, SHOP, TREES, TV, WORKSHOP, frontOf, gateLocal, pavilionLocal, registerHubColliders } from './layout';
+import { BLOCKS, BLOCK_SIZE, BRIDGE, CURATOR, MACHINES, machineStand, JUKEBOX, PAVILION, PIPWICK_HOME, SCOREBOARD, SHOP, TREES, TV, WORKSHOP, gateLocal, pavilionLocal, registerHubColliders } from './layout';
 import { exposeDebug } from '../game/debug';
 import { HubWelcome } from './HubWelcome';
 import { pavilionView } from './pavilionView';
@@ -73,7 +73,7 @@ function Playmat({ b }: { b: WalkRect }) {
 // Path-tile maths lives in paths.ts (pure, unit tested); re-exported for the older tile tests.
 export { TILE_STEP, tilesOverlap, withTileHeights } from './paths';
 
-/** Wooden tile paths: the plaza ring, the streets from it and the Trials Ring road past every gate. */
+/** Wooden tile paths: the plaza ring, the streets from it and the path across the gates table. */
 function Paths() {
   const tiles = useMemo(() => hubPathTiles(), []);
   return (
@@ -91,9 +91,9 @@ function DominoFence() {
   return <Dominoes items={items} />;
 }
 
-/** What an interactable belongs to, so a test hook can face it (gates, buildings). */
+/** What an interactable belongs to, so a test hook can face it (machines, buildings). */
 function facingTarget(id: string): { x: number; z: number } | null {
-  const g = GATES.find((x) => x.id === id);
+  const g = MACHINES.find((x) => x.id === id);
   if (g) return g;
   const b: Record<string, { x: number; z: number }> = { pavilion: CURATOR, workshop: WORKSHOP, shop: SHOP, scoreboard: SCOREBOARD, tv: TV, pipwick: PIPWICK_HOME, jukebox: JUKEBOX };
   return b[id] ?? null;
@@ -102,27 +102,28 @@ function facingTarget(id: string): { x: number; z: number } | null {
 export function Village() {
   useEffect(() => {
     registerHubColliders();
-    // ?debug only (tests): where each gate is and where to stand to open its lobby (facing the
+    // ?debug only (tests): where each machine is and where to stand to open its lobby (facing the
     // arch); where to stand for any interactable; the walkable rectangles and the bridge.
     const spot = (id: string) => {
       const it = INTERACTABLES.find((x) => x.id === id);
       if (!it) return null;
       const t = facingTarget(id);
       const yaw = t ? Math.atan2(t.x - it.x, t.z - it.z) : Math.PI;
-      return { id, x: it.x, z: it.z, yaw };
+      return { id, x: it.x, z: it.z, yaw, level: it.level ?? 'table' };
     };
     exposeDebug({
       hub: {
-        gates: () =>
-          GATES.map((g) => {
-            const stand = frontOf(g.x, g.z, g.rot, GATE_STAND + 1.2);
-            return { id: g.id, game: g.game, title: g.title, x: g.x, z: g.z, rot: g.rot, standX: stand.x, standZ: stand.z, yaw: g.rot + Math.PI };
+        /** The arcade's machines: where each is, and where to stand to play it (on the arcade floor), facing it. */
+        machines: () =>
+          MACHINES.map((g) => {
+            const stand = machineStand(g, 0.6);
+            return { id: g.id, game: g.game, title: g.title, x: g.x, z: g.z, rot: g.rot, standX: stand.x, standZ: stand.z, yaw: g.rot + Math.PI, level: 'floor' };
           }),
         spot,
         /** Teleport in front of an interactable (e.g. 'pavilion': inside, facing the Tournament Curator), facing it. */
         goTo: (id: string) => {
           const s = spot(id);
-          if (s) events.emit('player:teleport', { x: s.x, z: s.z, yaw: s.yaw });
+          if (s) events.emit('player:teleport', { x: s.x, z: s.z, yaw: s.yaw, level: s.level });
           return s;
         },
         walkAreas: () => WALK_AREAS.map((a) => ({ ...a })),
@@ -155,7 +156,6 @@ export function Village() {
       <Shop />
       <Scoreboard />
       <HubTV />
-      <Gates />
       <Fingerpost />
       <DustMotes />
       <TrainTrack />
@@ -164,6 +164,7 @@ export function Village() {
       <HubPlay />
       <Arcade />
       <Rides />
+      <Machines />
       <MusicBox />
       <JackInTheBox />
       <KeyTower />

@@ -48,7 +48,7 @@ describe('the menu tours', () => {
     const points = COACH_TOURS.pavilion.find((s) => s.target === 'pavilion-rule')!.text;
     expect(points).toContain(`${POINTS_TABLE[0]} for 1st`);
     expect(points).toContain(`${POINTS_TABLE[1]} for 2nd`);
-    expect(COACH_TOURS.pavilion.find((s) => s.target === 'pavilion-practice')!.text).toMatch(/gate/);
+    expect(COACH_TOURS.pavilion.find((s) => s.target === 'pavilion-practice')!.text).toMatch(/machine/);
   });
   it('touch words replace the default only on touch', () => {
     const s = { target: 'x', title: 'x', text: 'Pick it', touch: 'Tap it' };

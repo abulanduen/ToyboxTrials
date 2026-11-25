@@ -1,8 +1,9 @@
 /**
- * The gate greeters: a small wind-up peg-doll toy at the front of every trial's arch, dressed for
- * its game (a conductor by Copycat, a jester by Jack-in-the-Box, a knight by the Siege fort…). It
- * turns to face you as you approach, hops, and a speech bubble (src/ui/WelcomeUI.tsx) says hello,
- * pitches the game and asks if you want a go; the gate's usual Play prompt opens the trial.
+ * The machine greeters: a small wind-up peg-doll toy beside every trial's arcade machine, down in the
+ * arcade, dressed for its game (a conductor by Copycat, a jester by Jack-in-the-Box, a knight by the
+ * Siege machine…). It turns to face you as you approach, hops, and a speech bubble
+ * (src/ui/WelcomeUI.tsx) says hello, pitches the game and asks if you want a go; the machine's usual
+ * Play prompt opens the trial.
  * Lines: src/game/voiceLines.ts GREETERS.
  *
  * The Tournament Curator, who keeps the Pavilion, is one of the family: a peg-doll in a purple
@@ -23,7 +24,8 @@ import { greeterBubble, setGreeter, useWelcome } from '../game/welcome';
 import { events } from '../game/events';
 import type { GreeterId } from '../game/voiceLines';
 import type { MinigameId } from '../minigames/ids';
-import { CURATOR, GATES, greeterSpot, type HubGate } from './layout';
+import { CURATOR, MACHINES, greeterSpot, type HubMachine } from './layout';
+import { LEVEL_Y, type HubLevel } from '../game/hubBounds';
 import { Kit } from './kit';
 import { rosette } from './pavilionDecor';
 import { pavilionView } from './pavilionView';
@@ -65,7 +67,7 @@ const HAND: [number, number, number] = [0.72, 1.22, 0.27];
 /** A hat sitting on the head (top of head ≈ 2.55). */
 const HEAD_TOP = 2.5;
 
-type Outfit = (k: Kit, g: HubGate) => void;
+type Outfit = (k: Kit, g: HubMachine) => void;
 const OUTFITS: Record<MinigameId, Outfit> = {
   'copycat-conductor': (k) => {
     pegDoll(k, P.ink, P.honey);
@@ -219,14 +221,14 @@ function curatorOutfit(k: Kit) {
   k.cyl(0.11, 0.11, 0.85, 0.74, 1.28, 0.32, P.cream, 10, { rz: 0.45 }); // the sign-up scroll
   for (const e of [-1, 1]) k.ball(0.07, 0.74 - e * 0.18, 1.28 + e * 0.38, 0.32, P.brass, 8);
 }
-/** The Curator is a little taller than the gate greeters. */
+/** The Curator is a little taller than the machine greeters. */
 const CURATOR_SCALE = 1.15;
 
 let built: Map<string, THREE.BufferGeometry> | null = null;
 function greeterGeos() {
   if (built) return built;
   built = new Map();
-  for (const g of GATES) {
+  for (const g of MACHINES) {
     const k = new Kit();
     OUTFITS[g.game](k, g);
     built.set(g.id, k.build().solid!);
@@ -249,6 +251,8 @@ interface Spot {
   key: string;
   x: number;
   z: number;
+  /** The level they stand on (the machine greeters down in the arcade, the Curator up in the Pavilion). */
+  level: HubLevel;
   /** Where they face when nobody is near. */
   home: number;
   watchR: number;
@@ -269,10 +273,10 @@ export function Greeters() {
   const mat = useMemo(() => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5 }), []);
   const spots = useMemo<Spot[]>(
     () => [
-      ...GATES.map((g) => ({ who: g.game, key: g.id, ...greeterSpot(g), home: g.rot + 0.35, watchR: WATCH_R, bubbleR: BUBBLE_R, bubbleY: GREETER_BUBBLE_Y, near: always, yaw: g.rot + 0.35, hop: 0, phase: Math.random() * 6 })),
+      ...MACHINES.map((g) => ({ who: g.game, key: g.id, ...greeterSpot(g), level: 'floor' as HubLevel, home: g.rot - 0.35, watchR: WATCH_R, bubbleR: BUBBLE_R, bubbleY: GREETER_BUBBLE_Y, near: always, yaw: g.rot - 0.35, hop: 0, phase: Math.random() * 6 })),
       // the Curator watches you from the moment you step in, and says hello as you come up to them
       // (with their prompt; from the doorway you see the sign behind them first, which the bubble covers)
-      { who: 'curator', key: 'curator', x: CURATOR.x, z: CURATOR.z, home: CURATOR.yaw, watchR: 10, bubbleR: 6, bubbleY: 4.5, near: inPavilion, yaw: CURATOR.yaw, hop: 0, phase: Math.random() * 6 },
+      { who: 'curator', key: 'curator', x: CURATOR.x, z: CURATOR.z, level: 'table' as HubLevel, home: CURATOR.yaw, watchR: 10, bubbleR: 6, bubbleY: 4.5, near: inPavilion, yaw: CURATOR.yaw, hop: 0, phase: Math.random() * 6 },
     ],
     [],
   );
@@ -300,7 +304,7 @@ export function Greeters() {
       const s = spots[i];
       const m = refs.current[i];
       if (!m) continue;
-      const d = player.level === 'table' ? Math.hypot(player.pos.x - s.x, player.pos.z - s.z) : Infinity;
+      const d = player.level === s.level ? Math.hypot(player.pos.x - s.x, player.pos.z - s.z) : Infinity;
       const near = s.near();
       const want = d < s.watchR && near ? Math.atan2(player.pos.x - s.x, player.pos.z - s.z) : s.home;
       s.yaw += wrap(want - s.yaw) * Math.min(1, dt * 5);
@@ -314,7 +318,7 @@ export function Greeters() {
         y += Math.sin(Math.min(1, s.hop / 0.3) * Math.PI) * 0.45;
         if (s.hop > 0.3) s.hop = 0;
       }
-      m.position.set(s.x, y, s.z);
+      m.position.set(s.x, LEVEL_Y[s.level] + y, s.z);
       m.rotation.set(0, s.yaw, s.hop > 0 && s.hop < 0.3 ? Math.sin(s.hop * 20) * 0.08 : 0);
     }
     const cur = useWelcome.getState().greeter;
@@ -326,7 +330,7 @@ export function Greeters() {
     // keep the DOM bubble over the greeter's head
     const el = greeterBubble.el;
     if (el && nearest) {
-      v.set(nearest.x, nearest.bubbleY, nearest.z).project(camera);
+      v.set(nearest.x, LEVEL_Y[nearest.level] + nearest.bubbleY, nearest.z).project(camera);
       const vis = v.z < 1;
       el.style.opacity = vis ? '1' : '0';
       // keep the whole bubble on screen (it is centred above its anchor point)
@@ -348,7 +352,7 @@ export function Greeters() {
           }}
           geometry={geos.get(s.key)}
           material={mat}
-          position={[s.x, 0, s.z]}
+          position={[s.x, LEVEL_Y[s.level], s.z]}
           rotation={[0, s.yaw, 0]}
           castShadow={!low}
         />

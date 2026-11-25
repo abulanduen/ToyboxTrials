@@ -79,7 +79,7 @@ async function open(browser, tier, opts, hash) {
       }
       // ---- a minigame set on the same table (Copycat Conductor practice), to check the room behind it ----
       if (want('match')) {
-        await page.evaluate(() => { const g = window.__toybox.hub.gates().find((x) => x.game === 'copycat-conductor'); window.__toybox.teleport(g.standX, g.standZ, g.yaw); window.__toybox.aim(g.rot, 0.3); });
+        await page.evaluate(() => { const g = window.__toybox.hub.machines().find((x) => x.game === 'copycat-conductor'); window.__toybox.teleport(g.standX, g.standZ, g.yaw, g.level); window.__toybox.aim(g.rot, 0.3); });
         await settle(page, 10);
         await page.keyboard.press('KeyE');
         const intro = await page.waitForSelector('.match-intro', { timeout: 120000 }).catch(() => null);

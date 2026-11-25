@@ -1,6 +1,6 @@
 /**
  * Online lobby UI: the Hub alert ("Ticker is hosting a Blitz tournament · 3/8 · Join"), the
- * Lobbies button and sheet, the host choices at the Pavilion and the trial gates, the lobby
+ * Lobbies button and sheet, the host choices at the Pavilion and the arcade machines, the lobby
  * screen (members, settings, host controls), and the server-run match's reveal, results,
  * standings and final cards. Also the game card grid (thumbnail, length chip, players) shared by
  * the host's trial picker and the Pavilion's "practise one trial" list.
@@ -292,7 +292,7 @@ export function HubLobbies() {
           )}
         </ul>
       ) : (
-        <p className="hub-lobbies__none">None open. Host one at the Pavilion or a trial gate.</p>
+        <p className="hub-lobbies__none">None open. Host one at the Pavilion or a trial’s machine in the arcade.</p>
       )}
     </section>
   );
@@ -326,7 +326,7 @@ export function LobbyList({ empty }: { empty?: string }) {
   );
 }
 
-// ---------------------------------------------------------------- host choices (gates and Pavilion)
+// ---------------------------------------------------------------- host choices (arcade machines and Pavilion)
 /** Why hosting isn't possible right now, or null. */
 function useHostBlock(): string | null {
   const status = useNet((s) => s.status);

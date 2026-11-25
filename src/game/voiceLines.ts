@@ -5,7 +5,7 @@
  * plays automatically. A line without a recording is shown as text only (silent).
  *
  * Pure data, no imports beyond types: the unit tests check that ids are unique and every tour
- * stop, every gate greeter and the Tournament Curator has its line.
+ * stop, every machine greeter and the Tournament Curator has its line.
  */
 import type { MinigameId } from '../minigames/ids';
 
@@ -34,7 +34,7 @@ export const PIPWICK: Speaker = {
     "A small wind-up tin songbird, the self-appointed official Welcomer of the Playroom. Bright, quick and chirpy, proud of his polished tin and a little officious, but warm. Short breathy pauses as if his spring needs a turn. The tour is voiced by ElevenLabs' Brian (Calm, Collected and Steady), a man's voice: Pipwick is he.",
 };
 
-/** The gate greeters: one small wind-up toy by each trial's arch (src/scene/Greeters.tsx). */
+/** The machine greeters: one small wind-up toy by each trial's arcade machine (src/scene/Greeters.tsx). */
 export const GREETERS: Record<MinigameId, Speaker & { line: string }> = {
   'copycat-conductor': {
     id: 'greeter-copycat-conductor',
@@ -146,7 +146,7 @@ export const CURATOR: Speaker & { line: string } = {
   line: 'Welcome to the Pavilion! Blitz is three trials, Normal five and Treasure eight. Most points takes the trophy. Shall I sign you up?',
 };
 
-/** Whoever talks in a speech bubble: a gate greeter (by game) or the Tournament Curator. */
+/** Whoever talks in a speech bubble: a machine greeter (by game) or the Tournament Curator. */
 export type GreeterId = MinigameId | 'curator';
 export const greeterSpeaker = (id: GreeterId): Speaker & { line: string } => (id === 'curator' ? CURATOR : GREETERS[id]);
 
@@ -174,22 +174,22 @@ export const TOUR_CAPTIONS = {
     { at: 8.64, text: 'Most points wins!' },
   ],
   trials: [
-    { at: 0, text: 'Prefer one little adventure? Cross the domino bridge to the Trials Table by the window.' },
-    { at: 2.97, text: 'Every arch holds a different game.' },
+    { at: 0, text: 'Prefer one little adventure? Ride this toy car down to the arcade, under our table.' },
+    { at: 2.97, text: 'Every machine holds a different game.' },
     { at: 4.95, text: 'Walk up, press E—or tap the prompt—and choose your challenge.' },
     { at: 7.76, text: 'Earn cogs. Find secrets. Make a name for yourself.' },
   ],
   workshop: [{ at: 0, text: 'Then visit the Workshop, left of the fountain, to put your own stamp on that splendid little body.' }],
   shop: [{ at: 0, text: 'Odds and Ends, right beside it, has more cosmetics for your hard-earned cogs.' }],
   scoreboard: [{ at: 0, text: 'Fancy boasting? The scoreboard behind the fountain keeps the evidence.' }],
-  jukebox: [{ at: 0, text: 'Fancy a tune? The jukebox waits by the Music Box arch.' }],
+  jukebox: [{ at: 0, text: 'Fancy a tune? The jukebox waits over the bridge, by the window.' }],
   play: [
     { at: 0, text: 'Between trials, explore! Kick a ball. Shoot a basket.' },
     { at: 2.85, text: 'There are four secrets hiding around here.' },
   ],
   bye: [
     { at: 0, text: 'And whenever you open somewhere new, I’ll show you which buttons do what.' },
-    { at: 2.72, text: 'Now… choose an arch, or start a Blitz.' },
+    { at: 2.72, text: 'Now… choose a machine, or start a Blitz.' },
     { at: 4.72, text: 'In this town, legends don’t arrive ready-made.' },
     { at: 6.72, text: 'They arrive needing a little winding.' },
   ],
@@ -207,14 +207,22 @@ export const CHAT_LINES = {
   bye: 'Right you are! Keep your spring wound!',
   idle: [
     'Did you know I polish my tin every morning? Twice on Sundays.',
-    "When a gate's bell rings, someone has just stepped into a trial.",
-    'The Jukebox by the Music Box gate takes requests. Well, cranks.',
+    "When a machine's screen flashes, someone has just stepped into a trial.",
+    'The Jukebox by the window takes requests. Well, cranks.',
     'Tournaments are the quickest way to earn a pile of cogs.',
     "I'd tell you where the secrets are, but then they wouldn't be secrets, would they?",
   ],
 } as const;
 
 export const tourLineId = (stop: TourStopId) => `pipwick-tour-${stop}`;
+
+/**
+ * Recorded lines whose text has changed since they were recorded (the trials moved from the gates
+ * over the bridge to the arcade's machines, docs/ARCADE_PLAN.md): their clips no longer match, so
+ * they play as text only until they are recorded again (docs/VOICE.md). Remove an id once its new
+ * recording is in.
+ */
+export const STALE_RECORDINGS: readonly string[] = [tourLineId('trials'), tourLineId('jukebox'), tourLineId('bye')];
 export const chatLineId = (key: 'hello' | 'bye' | number) => (typeof key === 'number' ? `pipwick-chat-idle-${key + 1}` : `pipwick-chat-${key}`);
 
 /** Every line, flattened: the complete recording script. */

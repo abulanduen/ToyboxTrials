@@ -57,7 +57,7 @@ const check = (name, ok, detail = '') => { results.push(`${ok ? 'PASS' : 'FAIL'}
   // Step onto the domino slab (0.75 tall) requires jump; walking onto the book from the domino also needs jump.
   // Interaction prompt + Copycat panel
   // gates are data: stand where the hub says the Copycat gate's lobby opens
-  await page.evaluate((id) => { const g = window.__toybox.hub.gates().find((x) => x.game === id); window.__toybox.teleport(g.standX, g.standZ, g.yaw); }, 'copycat-conductor');
+  await page.evaluate((id) => { const g = window.__toybox.hub.machines().find((x) => x.game === id); window.__toybox.teleport(g.standX, g.standZ, g.yaw, g.level); }, 'copycat-conductor');
   await page.waitForFunction((t) => document.querySelector('.prompt')?.textContent.includes(t), 'Copycat', { timeout: 120000 }).catch(() => null);
   const promptTxt = await page.textContent('.prompt').catch(() => null);
   check('prompt shows at Copycat gate', !!promptTxt && promptTxt.includes('Copycat'), JSON.stringify(promptTxt));

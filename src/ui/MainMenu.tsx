@@ -144,7 +144,7 @@ function HowToPlay({ onClose, touch }: { onClose: () => void; touch: boolean }) 
   return (
     <CardboardSheet title="How to play" className="howto" onBackdrop={onClose}>
       <p className="panel__lead">
-        Explore the Playroom, step through the gates to enter trials, and hunt for the four hidden secrets. Each secret unlocks something new in the Workshop. Trials, tournaments and secrets pay cogs to spend at the Odds &amp; Ends shop.
+        Explore the Playroom, ride the toy car down to the arcade to play the trials, and hunt for the four hidden secrets. Each secret unlocks something new in the Workshop. Trials, tournaments and secrets pay cogs to spend at the Odds &amp; Ends shop.
       </p>
       <ul className="howto__pics" data-testid="howto-pics" aria-label="Controls: keyboard and mouse on the left of each picture, touch on the right">
         {HUB_PICS.map((p) => (

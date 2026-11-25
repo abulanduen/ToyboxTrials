@@ -99,7 +99,7 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
 
   // Interact button at the Copycat gate opens the game; play a round with the touch pads.
   await page.evaluate(() => window.__toybox.match.timeScale(4));
-  await page.evaluate((id) => { const g = window.__toybox.hub.gates().find((x) => x.game === id); window.__toybox.teleport(g.standX, g.standZ, g.yaw); }, 'copycat-conductor');
+  await page.evaluate((id) => { const g = window.__toybox.hub.machines().find((x) => x.game === id); window.__toybox.teleport(g.standX, g.standZ, g.yaw, g.level); }, 'copycat-conductor');
   await page.waitForFunction(() => document.querySelector('.touch-btn--interact')?.getAttribute('aria-label')?.includes('Copycat'), null, { timeout: 120000 }).catch(() => null);
   check('Interact button appears with a prompt', await page.isVisible('.touch-btn--interact'), await page.textContent('.touch-btn--interact').catch(() => ''));
   await page.screenshot({ path: `${OUT}/mobile-02-gate-prompt.png` });
@@ -277,7 +277,7 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
 
   // Jack-in-the-Box in portrait: the answer box sits high (clear of the phone keyboard), tap Crank! to pass.
   await page.evaluate(() => window.__toybox.match.timeScale(2));
-  await page.evaluate((id) => { const g = window.__toybox.hub.gates().find((x) => x.game === id); window.__toybox.teleport(g.standX, g.standZ, g.yaw); }, 'jack-in-the-box');
+  await page.evaluate((id) => { const g = window.__toybox.hub.machines().find((x) => x.game === id); window.__toybox.teleport(g.standX, g.standZ, g.yaw, g.level); }, 'jack-in-the-box');
   await page.waitForFunction(() => document.querySelector('.touch-btn--interact')?.getAttribute('aria-label')?.includes('Jack-in-the-Box'));
   const jib = await (await page.$('.touch-btn--interact')).boundingBox();
   await touch('touchStart', [[jib.x + jib.width / 2, jib.y + jib.height / 2, 6]]);

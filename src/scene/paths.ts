@@ -14,9 +14,6 @@ import {
   BRIDGE_RAIL_X,
   DESK,
   FOUNTAIN,
-  GATES,
-  GATE_LOOP,
-  GATE_ROAD,
   MUG,
   PAVILION,
   SCOREBOARD,
@@ -24,9 +21,7 @@ import {
   TV,
   WORKSHOP,
   frontOf,
-  gateLocal,
   hubColliders,
-  type HubGate,
 } from './layout';
 
 /** Height step between overlapping path tiles: big enough to survive a 16-bit depth buffer on phones. */
@@ -79,22 +74,17 @@ function plazaEdge(x: number, z: number): Pt {
   const a = Math.atan2(z - FOUNTAIN.z, x - FOUNTAIN.x);
   return [FOUNTAIN.x + Math.cos(a) * RING_R, FOUNTAIN.z + Math.sin(a) * RING_R];
 }
-const roadPoint = (g: HubGate): Pt => {
-  const p = gateLocal(g, 0, GATE_ROAD);
-  return [p.x, p.z];
-};
-const gate = (id: string) => GATES.find((g) => g.game === id)!;
-
 /** Where the road to the bridge bends, between the Scoreboard and the Pavilion. */
 export const BRIDGE_ROAD_BEND: Pt = [19, -20];
+
+/** Where the path off the bridge ends on the gates table (the ball games' ground). */
+const GATES_LANDING_Z = -110;
 
 /**
  * Every street in the hub.
  * Spawn table: the approach from spawn; the avenue to the Scoreboard; spokes to the Pavilion,
- * Workshop, shop and TV; and the road from the plaza past the Scoreboard to the bridge.
- * Gates table: from the bridge landing onto the loop road, which passes in front of every gate
- * (south lane, the two ends, north lane), the avenue straight on to Copycat, and a short stub up
- * to each arch.
+ * Workshop, shop and TV; the path to the toy car down to the arcade; and the road from the plaza
+ * past the Scoreboard to the bridge. Gates table: a short path off the bridge's landing.
  */
 export function hubPathLines(): PathLine[] {
   const toFront = (x: number, z: number, rot: number, d: number): Pt => {
@@ -115,35 +105,10 @@ export function hubPathLines(): PathLine[] {
   // to the bridge: past the Scoreboard's east end, then north to the foot of the ramp
   lines.push({ id: 'to-bridge', pts: [plazaEdge(...BRIDGE_ROAD_BEND), BRIDGE_ROAD_BEND, [BRIDGE.x, BRIDGE.deckA + BRIDGE.ramp + 0.6]] });
 
-  // gates table
-  const landing: Pt = [BRIDGE.x, GATE_LOOP.south];
-  lines.push({ id: 'landing', pts: [[BRIDGE.x, BRIDGE.deckB - BRIDGE.ramp - 0.6], landing] });
-  lines.push({ id: 'avenue-gates', pts: [landing, [BRIDGE.x, GATE_LOOP.north]] });
-  const loop: Pt[] = [
-    landing,
-    roadPoint(gate('hoop-hustle')), // a short detour inside the loop to the court gate facing the avenue
-    roadPoint(gate('odd-page-out')),
-    roadPoint(gate('hoop-clash')), // a short detour inside the loop to the court gate on the pitch
-    roadPoint(gate('midnight-hunger')),
-    roadPoint(gate('find-the-original')),
-    roadPoint(gate('inferno-escape')),
-    roadPoint(gate('toy-squad')),
-    roadPoint(gate('jack-in-the-box')),
-    roadPoint(gate('copycat-conductor')),
-    roadPoint(gate('music-box-rhythm')),
-    roadPoint(gate('wind-up-dash')),
-    roadPoint(gate('spellbox-showdown')),
-    roadPoint(gate('red-light-green-light')),
-    roadPoint(gate('blink-duel')),
-    roadPoint(gate('toy-tower-tumble')),
-    roadPoint(gate('toybox-siege')), // a short detour inside the loop to the fort facing the avenue
-    landing,
-  ];
-  lines.push({ id: 'loop', pts: loop });
-  for (const g of GATES) {
-    const mat = gateLocal(g, 0, 1.5);
-    lines.push({ id: `stub:${g.id}`, pts: [roadPoint(g), [mat.x, mat.z]] });
-  }
+  // to the toy car down to the arcade (hubRides.ts CAR), off the approach from spawn
+  lines.push({ id: 'to-arcade', pts: [[0.5, 32], [CAR.x - 2.5, CAR.boardZ - 0.5]] });
+  // gates table: off the bridge onto the ball games' ground
+  lines.push({ id: 'landing', pts: [[BRIDGE.x, BRIDGE.deckB - BRIDGE.ramp - 0.6], [BRIDGE.x, GATES_LANDING_Z]] });
   return lines;
 }
 

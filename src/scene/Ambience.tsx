@@ -10,7 +10,9 @@ import { PALETTE } from '../game/palette';
 import { useGame } from '../game/store';
 import { woodMat } from './props';
 import { camBlock } from '../game/player';
-import { POST_BOARD, signpostTop, signposts } from './gateDecor';
+import { POST_BOARD, buildSignFaces, signpostTop, signposts } from './signposts';
+import { Kit } from './kit';
+import { SignAtlas, signAtlasTexture } from './signAtlas';
 import { LAMP_AIM, LAMP_HEAD } from './Room';
 
 /** Arrow-shaped board outline (points along +x), centred on its own origin. */
@@ -30,11 +32,23 @@ function useArrowBoardGeometry(len: number, h: number) {
   }, [len, h]);
 }
 
+/** The signposts' painted board faces: one merged mesh on the shared sign atlas (built once). */
+let faces: { geo: THREE.BufferGeometry | undefined; atlas: THREE.Texture } | null = null;
+function SignFaces() {
+  if (!faces) {
+    const k = new Kit();
+    const atlas = new SignAtlas();
+    buildSignFaces(k, atlas);
+    faces = { geo: k.build().decal, atlas: signAtlasTexture(atlas) };
+  }
+  const mat = useMemo(() => new THREE.MeshStandardMaterial({ vertexColors: true, map: faces!.atlas, roughness: 0.85 }), []);
+  return faces.geo ? <mesh geometry={faces.geo} material={mat} castShadow receiveShadow /> : null;
+}
+
 /**
  * The signposts (one by spawn, one at each end of the domino bridge): an arrow board per
  * destination, the lowest in view at toy height. All boards of all posts are one instanced mesh;
- * their painted faces are part of the gates' merged sign layer (Gates.tsx), drawn from the shared
- * sign atlas.
+ * their painted faces are one merged layer (SignFaces) drawn from the shared sign atlas.
  */
 export function Fingerpost() {
   const boardGeo = useArrowBoardGeometry(POST_BOARD.len, POST_BOARD.h);
@@ -59,6 +73,7 @@ export function Fingerpost() {
   }, [boardGeo, plain, posts]);
   return (
     <group>
+      <SignFaces />
       {/* Posts and boards stop the camera: without that, turning beside a signpost (the bridge ends)
           swung the camera inside the post, filling the view with dark wood. */}
       <primitive object={mesh} ref={camBlock} />

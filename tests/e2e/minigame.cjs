@@ -66,7 +66,7 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   await page.evaluate(() => window.__toybox.match.timeScale(4));
 
   // --- Solo practice via the Copycat gate
-  await page.evaluate((id) => { const g = window.__toybox.hub.gates().find((x) => x.game === id); window.__toybox.teleport(g.standX, g.standZ, g.yaw); }, 'copycat-conductor');
+  await page.evaluate((id) => { const g = window.__toybox.hub.machines().find((x) => x.game === id); window.__toybox.teleport(g.standX, g.standZ, g.yaw, g.level); }, 'copycat-conductor');
   await page.waitForFunction((t) => document.querySelector('.prompt')?.textContent.includes(t), 'Copycat', { timeout: 120000 }).catch(() => null);
   check('gate prompt says Play Copycat Conductor', (await page.textContent('.prompt'))?.includes('Play'));
   await page.keyboard.press('KeyE');
@@ -143,7 +143,7 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   await page.waitForSelector('.hud-sign', { timeout: SLOW });
   await page.waitForTimeout(1500);
   const pos = await page.evaluate(() => window.__toybox.state());
-  const cc = await page.evaluate(() => window.__toybox.hub.gates().find((g) => g.game === 'copycat-conductor'));
+  const cc = await page.evaluate(() => window.__toybox.hub.machines().find((g) => g.game === 'copycat-conductor'));
   check('quitting returns to the hub where you left it', Math.hypot(pos.x - cc.standX, pos.z - cc.standZ) < 1.5, `x=${pos.x.toFixed(1)} z=${pos.z.toFixed(1)} (gate stand ${cc.standX.toFixed(1)}, ${cc.standZ.toFixed(1)})`);
 
   // --- Jack-in-the-Box practice via the coral gate: type real answers into the answer box
@@ -162,7 +162,7 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   };
   /** A valid answer from the category's common tier that hasn't been said yet. */
   const freshAnswer = (j) => j.tiers[0].split(',').map((e) => e.split('|')[0].trim()).find((a) => !j.said.includes(a));
-  await page.evaluate((id) => { const g = window.__toybox.hub.gates().find((x) => x.game === id); window.__toybox.teleport(g.standX, g.standZ, g.yaw); }, 'jack-in-the-box');
+  await page.evaluate((id) => { const g = window.__toybox.hub.machines().find((x) => x.game === id); window.__toybox.teleport(g.standX, g.standZ, g.yaw, g.level); }, 'jack-in-the-box');
   // The prompt updates on the next rendered frames: wait for it rather than a fixed delay (slow software GL).
   await page.waitForFunction(() => document.querySelector('.prompt')?.textContent.includes('Jack-in-the-Box'), null, { timeout: SLOW }).catch(() => null);
   check('coral gate prompt says Play Jack-in-the-Box', (await page.textContent('.prompt'))?.includes('Jack-in-the-Box'), await page.textContent('.prompt'));
@@ -216,7 +216,7 @@ const KEYS = ['KeyA', 'KeyS', 'KeyJ', 'KeyK'];
   await page.waitForTimeout(1200);
 
   // --- The blue gate opens Wind-Up Dash (the race itself is covered by tests/e2e/movement.cjs)
-  await page.evaluate((id) => { const g = window.__toybox.hub.gates().find((x) => x.game === id); window.__toybox.teleport(g.standX, g.standZ, g.yaw); }, 'wind-up-dash');
+  await page.evaluate((id) => { const g = window.__toybox.hub.machines().find((x) => x.game === id); window.__toybox.teleport(g.standX, g.standZ, g.yaw, g.level); }, 'wind-up-dash');
   await page.waitForFunction((t) => document.querySelector('.prompt')?.textContent.includes(t), 'Wind-Up Dash', { timeout: 120000 }).catch(() => null);
   check('blue gate prompt says Play Wind-Up Dash', (await page.textContent('.prompt'))?.includes('Wind-Up Dash'), await page.textContent('.prompt'));
   await page.keyboard.press('KeyE');

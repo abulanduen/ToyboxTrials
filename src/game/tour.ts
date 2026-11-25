@@ -10,7 +10,7 @@
  */
 import { JUKEBOX, PAVILION, PIPWICK_HOME, SCOREBOARD, SHOP, TV, WORKSHOP, frontOf } from '../scene/layout';
 import { BALL, HOOP } from './hubPlay';
-import { BRIDGE_X } from './hubBounds';
+import { CAR } from './hubRides';
 import { TOUR_LINES, type TourStopId } from './voiceLines';
 
 export type Vec3 = readonly [number, number, number];
@@ -33,7 +33,8 @@ const front = (o: { x: number; z: number; rot: number }, d: number, side = 0) =>
 export const TOUR_STOPS: TourStop[] = [
   { id: 'hello', mascot: { x: 2.6, z: 16.5 }, cam: [11, 5, 24], look: [1.6, 2.2, 18] },
   { id: 'pavilion', mascot: front(PAVILION, PAVILION.d / 2 + 3.2, -3), cam: [12, 8.5, 6], look: [PAVILION.x - 3, 5, PAVILION.z] },
-  { id: 'trials', mascot: { x: BRIDGE_X + 3, z: -121 }, cam: [BRIDGE_X - 4, 26, -100], look: [BRIDGE_X + 6, 0, -136] },
+  // by the toy car at the table's front edge, looking down its drop towards the loop and the arcade below
+  { id: 'trials', mascot: { x: CAR.x - 3.6, z: CAR.boardZ + 1.5 }, cam: [CAR.x - 16, 13, CAR.boardZ - 10], look: [CAR.x + 4, -26, CAR.loopZ - 30] },
   { id: 'workshop', mascot: front(WORKSHOP, WORKSHOP.d / 2 + 2.6, 3.6), cam: [-16, 8, 9], look: [WORKSHOP.x + 2, 4, WORKSHOP.z + 1] },
   { id: 'shop', mascot: front(SHOP, SHOP.d / 2 + 6.2, -3.8), cam: [-21, 8, 25], look: [SHOP.x + 4, 4, SHOP.z + 1] },
   {

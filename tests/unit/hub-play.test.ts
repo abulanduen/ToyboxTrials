@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { GATES_WALK, isWalkable } from '../../src/game/hubBounds';
 import { overlaps, type Collider } from '../../src/game/collision';
 import { INTERACTABLES } from '../../src/game/interactables';
-import { GATES, GATE_ROAD, GATE_STAND, gateLocal, hubColliders } from '../../src/scene/layout';
+import { hubColliders } from '../../src/scene/layout';
 import { BALL, BRIDGE_DECK, HOOP, MARBLE, NET, NETS, PITCH_CENTRE, rollFloorAt } from '../../src/game/hubPlay';
 import {
   BALL_IDLE_RESET,
@@ -50,7 +50,7 @@ describe('where the hub play objects stand', () => {
   const others = all.filter((c) => !mine(c) && c.top > 0.6);
   const hits = (x: number, z: number, r: number, list = others) => list.filter((c) => overlaps(c, x, z, r)).map((c) => c.id);
 
-  it('the nets and the hoop are in the layout, on the trials table, clear of every gate, arch, tree and prop', () => {
+  it('the nets and the hoop are in the layout, on the gates table, clear of every tree and prop', () => {
     const hp = all.filter(mine);
     expect(hp.length).toBe(11); // 2 × (2 posts + 2 sides + back) + the hoop's pole
     for (const c of hp) {
@@ -59,20 +59,12 @@ describe('where the hub play objects stand', () => {
       // a toy can walk all the way round each piece: 2 cm clear of anything else solid
       expect(hits(c.x, c.z, r + 2), c.id).toEqual([]);
     }
-    // a gate's stand spot and the way through its arch are not touched (hub-layout.test.ts checks the roads)
-    for (const g of GATES) for (const lz of [GATE_ROAD, GATE_STAND, 0]) {
-      const p = gateLocal(g, 0, lz);
-      expect(hp.filter((c) => overlaps(c, p.x, p.z, 1.5)).map((c) => c.id), g.id).toEqual([]);
-    }
   });
 
-  it("each net's mouth faces the pitch with nothing in front of it, and the end arch stands behind it across the road", () => {
+  it("each net's mouth faces the pitch with nothing in front of it", () => {
     for (const n of NETS) {
       for (let d = 0.5; d <= 14; d += 0.5)
         for (const dz of [-NET.width / 2, 0, NET.width / 2]) expect(hits(n.mouthX + n.dir * d, n.z + dz, MARBLE.r), `${n.id} ${d} ${dz}`).toEqual([]);
-      const arch = GATES.find((g) => g.game === (n.id === 'w' ? 'inferno-escape' : 'spellbox-showdown'))!;
-      expect(arch.z).toBe(n.z);
-      expect((arch.x - n.backX) * n.dir).toBeLessThan(-5); // behind the net, beyond the loop road
     }
     // the centre spot, the ball's spot and the space under the rim are clear
     expect(hits(PITCH_CENTRE.x, PITCH_CENTRE.z, MARBLE.r + 1)).toEqual([]);

@@ -19,6 +19,15 @@ allowed audio), the captions run on the same schedule and the tour waits for Nex
 To re-record: record the stops' lines (or the whole script again), replace the clips, and update
 the `at` times in `TOUR_CAPTIONS` (seconds into each clip where each caption starts).
 
+**Three clips are stale (25 Nov 2026).** The trials moved from the gates over the domino bridge to
+the arcade's machines under the spawn table (docs/ARCADE_PLAN.md), so the `trials`, `jukebox` and
+`bye` stops' lines were reworded ("Ride this toy car down to the arcade, under our table. Every
+machine holds a different game.", "The jukebox waits over the bridge, by the window.", "choose a
+machine"). Their old clips stay in the folder but are not played (`STALE_RECORDINGS` in
+`src/game/voiceLines.ts`): those stops show their captions as text, on the same schedule, until the
+lines are recorded again. To put a new take in: replace the clip, update that stop's `at` times,
+take its id out of `STALE_RECORDINGS`, and set its manifest entry's status back to production.
+
 ## Who speaks
 
 - **Pipwick** (the Hub's welcome mascot): a small wind-up tin songbird in a postman's cap, coral
@@ -26,7 +35,7 @@ the `at` times in `TOUR_CAPTIONS` (seconds into each clip where each caption sta
   the Playroom": bright, quick, a little officious, proud of his polished tin. He waits by the
   fountain plaza, flies new players round the Hub on their first visit, and replays the tour when
   you talk to him. Code: `src/scene/Pipwick.tsx`, `src/game/welcome.ts`, `src/game/tour.ts`.
-- **The gate greeters**: one small peg-doll toy by each of the 16 trial arches, dressed for its
+- **The machine greeters**: one small peg-doll toy by each of the 16 trial machines in the arcade, dressed for its
   game (Maestro Tibbs the conductor by Copycat, Jangles the jester by Jack-in-the-Box, Sir Rally the
   knight by the Siege fort, Ref Rookie the referee by Hoop Clash, and so on). Each says hello, pitches its game in a sentence or two and
   asks "Want to have a go?"; the gate's usual Play prompt opens the trial's intro card.

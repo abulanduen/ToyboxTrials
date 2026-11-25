@@ -882,7 +882,7 @@
     {
       "id": "voice-pipwick-tour-trials",
       "type": "voice",
-      "status": "production",
+      "status": "stale (its line was reworded on 2026-11-25 when the trials moved to the arcade; not played until re-recorded: src/game/voiceLines.ts STALE_RECORDINGS)",
       "file": "audio/voice/pipwick-tour-trials.mp3",
       "where": "src/game/voice.ts plays it at that stop of the welcome tour (src/game/welcome.ts)",
       "intendedUse": "Pipwick's welcome tour, the 'trials' stop (text and caption timings in src/game/voiceLines.ts TOUR_CAPTIONS)",
@@ -922,7 +922,7 @@
     {
       "id": "voice-pipwick-tour-jukebox",
       "type": "voice",
-      "status": "production",
+      "status": "stale (its line was reworded on 2026-11-25 when the trials moved to the arcade; not played until re-recorded: src/game/voiceLines.ts STALE_RECORDINGS)",
       "file": "audio/voice/pipwick-tour-jukebox.mp3",
       "where": "src/game/voice.ts plays it at that stop of the welcome tour (src/game/welcome.ts)",
       "intendedUse": "Pipwick's welcome tour, the 'jukebox' stop (text and caption timings in src/game/voiceLines.ts TOUR_CAPTIONS)",
@@ -942,7 +942,7 @@
     {
       "id": "voice-pipwick-tour-bye",
       "type": "voice",
-      "status": "production",
+      "status": "stale (its line was reworded on 2026-11-25 when the trials moved to the arcade; not played until re-recorded: src/game/voiceLines.ts STALE_RECORDINGS)",
       "file": "audio/voice/pipwick-tour-bye.mp3",
       "where": "src/game/voice.ts plays it at that stop of the welcome tour (src/game/welcome.ts)",
       "intendedUse": "Pipwick's welcome tour, the 'bye' stop (text and caption timings in src/game/voiceLines.ts TOUR_CAPTIONS)",

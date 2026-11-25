@@ -22,7 +22,7 @@ import { boardRide, riding } from './rideState';
 import { useNet } from '../net/store';
 import { requestCard, wearingCard } from '../net/chat';
 import { CHAT_NOTE_TEXT } from '../net/protocol';
-import { CURATOR, GATES, GATE_STAND, JUKEBOX, MUSICBOX, PAVILION, PIPWICK_HOME, SCOREBOARD, SHOP, TOWER, TV, WORKSHOP, frontOf, gateLocal } from '../scene/layout';
+import { CURATOR, MACHINES, machineStand, JUKEBOX, MUSICBOX, PAVILION, PIPWICK_HOME, SCOREBOARD, SHOP, TOWER, TV, WORKSHOP, frontOf, gateLocal } from '../scene/layout';
 
 export interface Interactable {
   id: string;
@@ -47,8 +47,8 @@ let keyCooldownUntil = 0;
 export const keyAvailable = () => performance.now() > keyCooldownUntil;
 
 export const INTERACTABLES: Interactable[] = [
-  // one gate per playable trial: E / Interact opens that trial's lobby (the practice intro card)
-  ...GATES.map((g) => ({ id: g.id, ...frontOf(g.x, g.z, g.rot, GATE_STAND), radius: 4.5, verb: 'Play', label: g.title })),
+  // one arcade machine per playable trial, down in the arcade: E / Interact opens that trial's lobby (the practice intro card)
+  ...MACHINES.map((m) => ({ id: m.id, ...machineStand(m), radius: 3.6, verb: 'Play', label: m.title, level: 'floor' as const })),
   // inside the Pavilion, in front of the Tournament Curator (the id stays 'pavilion': tests and goTo use it)
   { id: 'pavilion', ...gateLocal(PAVILION, 0, CURATOR.lz + 2.6), radius: 3.2, verb: 'Talk to', label: 'the Tournament Curator' },
   { id: 'workshop', ...frontOf(WORKSHOP.x, WORKSHOP.z, WORKSHOP.rot, WORKSHOP.d / 2 + 2.5), radius: 5, verb: 'Tinker at', label: 'the Workshop' },
@@ -105,11 +105,11 @@ export function interact(id: string, facing: { x: number; z: number }) {
   const g = useGame.getState();
   events.emit('player:interact');
 
-  const gate = GATES.find((x) => x.id === id);
-  if (gate) {
+  const machine = MACHINES.find((x) => x.id === id);
+  if (machine) {
     sfx.interact();
-    events.emit('gate:open', { id });
-    openPractice(gate.game);
+    events.emit('machine:open', { id });
+    openPractice(machine.game);
     return;
   }
 
