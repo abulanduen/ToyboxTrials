@@ -490,8 +490,8 @@ async function voiceMicOnline(browser, phone) {
     await measure(915, 412, 'landscape', 'mobile-13-voice-mic-landscape.png');
     check('voice chat: no microphone request before the mic button is pressed', (await p.evaluate(() => window.__gum)) === 0);
     await p.tap('[data-testid=voice-mic]');
-    await p.waitForFunction(() => window.__toybox.voice.state().mic === 'on', null, { timeout: 30000, polling: 100 }).catch(() => null);
-    const v = await p.evaluate(() => window.__toybox.voice.state());
+    await p.waitForFunction(() => window.__toybox.voiceChat.state().mic === 'on', null, { timeout: 30000, polling: 100 }).catch(() => null);
+    const v = await p.evaluate(() => window.__toybox.voiceChat.state());
     check('voice chat: tapping the mic button asks once and opens the mic (push to talk: not sending on the first tap)', v.mic === 'on' && !v.transmitting && (await p.evaluate(() => window.__gum)) === 1, JSON.stringify({ mic: v.mic, tx: v.transmitting }));
     await p.waitForTimeout(4500); // let the "Mic ready" ticket go
     await p.screenshot({ path: `${OUT}/mobile-14-voice-mic-on-landscape.png` });

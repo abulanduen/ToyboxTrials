@@ -42,10 +42,11 @@ export function PipwickBadge({ size = 64 }: { size?: number }) {
  * without sound (the browser hasn't allowed audio yet, or the line is still loading) it runs on the
  * recording's own schedule from when Pipwick lands, so a long line never fills the card at once.
  * Polled a few times a second; React only re-renders when the caption changes. -1 means the line
- * has no recording: show it whole.
+ * has no recording: show it whole. The index is kept with the stop it belongs to: on the first render
+ * after the tour moves on, the old stop's index would point past the end of the new stop's captions.
  */
 function useTourCaption(id: TourStopId, phase: string): number {
-  const [index, setIndex] = useState(-1);
+  const [shown, setShown] = useState<{ id: TourStopId; index: number }>({ id, index: -1 });
   useEffect(() => {
     const caps = TOUR_CAPTIONS[id];
     const at = (t: number) => {
@@ -62,11 +63,16 @@ function useTourCaption(id: TourStopId, phase: string): number {
       if (v.state === 'ended') return caps.length - 1;
       return at(tourRt.state.t);
     };
-    setIndex(pick());
-    const timer = window.setInterval(() => setIndex(pick()), 120);
+    const update = () => {
+      const index = pick();
+      setShown((s) => (s.id === id && s.index === index ? s : { id, index }));
+    };
+    update();
+    const timer = window.setInterval(update, 120);
     return () => window.clearInterval(timer);
   }, [id, phase]);
-  return index;
+  if (shown.id === id) return shown.index;
+  return hasRecording(tourLineId(id)) ? 0 : -1;
 }
 
 function TourCard() {

@@ -148,13 +148,13 @@ const remoteBy = (p, name) => p.evaluate((n) => window.__toybox.net.remotes().fi
 const shot = (p, file) => p.screenshot({ path: path.join(OUT, file), timeout: T });
 
 // ---------------------------------------------------------------- voice chat (A speaks, B listens; then B speaks with V)
-const vstate = (p) => p.evaluate(() => window.__toybox.voice.state());
+const vstate = (p) => p.evaluate(() => window.__toybox.voiceChat.state());
 const gum = (p) => p.evaluate(() => window.__gum);
 /** Loudest sound P's analyser measured from player `id` over `ms` (null when there is no link). */
 async function loudness(P, id, ms = 2500) {
-  await P.page.evaluate((i) => window.__toybox.voice.peak(i), id);
+  await P.page.evaluate((i) => window.__toybox.voiceChat.peak(i), id);
   await sleep(ms);
-  return P.page.evaluate((i) => window.__toybox.voice.peak(i), id);
+  return P.page.evaluate((i) => window.__toybox.voiceChat.peak(i), id);
 }
 /**
  * The fake microphone beeps; its RMS as measured (one 512-sample window per rendered frame, and
@@ -203,12 +203,12 @@ async function voiceChecks(A, B) {
   await A.page.waitForSelector('.pause', { state: 'detached' });
   check('voice: still no microphone request before the press', (await gum(A.page)) === 0);
   await A.page.click('[data-testid=voice-mic]');
-  await A.page.waitForFunction(() => window.__toybox.voice.state().mic === 'on' && window.__toybox.voice.state().transmitting, null, { timeout: 30000, polling: 100 }).catch(() => null);
+  await A.page.waitForFunction(() => window.__toybox.voiceChat.state().mic === 'on' && window.__toybox.voiceChat.state().transmitting, null, { timeout: 30000, polling: 100 }).catch(() => null);
   let a = await vstate(A.page);
   check('voice: pressing the mic button asks once and turns the mic on (Always on)', a.mic === 'on' && (await gum(A.page)) === 1 && a.transmitting, JSON.stringify({ mic: a.mic, gum: await gum(A.page), tx: a.transmitting }));
-  await B.page.waitForFunction((id) => window.__toybox.voice.state().micOn.includes(id), aId, { timeout: 20000, polling: 100 }).catch(() => null);
+  await B.page.waitForFunction((id) => window.__toybox.voiceChat.state().micOn.includes(id), aId, { timeout: 20000, polling: 100 }).catch(() => null);
   check("voice: B is told A's mic is on, and B was never asked for a microphone", (await vstate(B.page)).micOn.includes(aId) && (await gum(B.page)) === 0);
-  await B.page.waitForFunction((id) => window.__toybox.voice.state().inbound.some((l) => l.id === id && l.state === 'connected' && l.audio), aId, { timeout: 60000, polling: 250 }).catch(() => null);
+  await B.page.waitForFunction((id) => window.__toybox.voiceChat.state().inbound.some((l) => l.id === id && l.state === 'connected' && l.audio), aId, { timeout: 60000, polling: 250 }).catch(() => null);
   let b = await vstate(B.page);
   check("voice: A and B close together: B's link from A reaches connected", inLink(b, aId)?.state === 'connected', JSON.stringify(b.inbound));
   check("voice: …and A's side sends to B", (await vstate(A.page)).outbound.some((l) => l.id === bId && l.state === 'connected'), JSON.stringify((await vstate(A.page)).outbound));
@@ -226,11 +226,11 @@ async function voiceChecks(A, B) {
 
   // Move apart (beyond 60 cm): the link closes. Come back: it opens again.
   await walk(B, A, [[20, 10], [24, -40], [24, -108]], 0);
-  await B.page.waitForFunction((id) => !window.__toybox.voice.state().inbound.some((l) => l.id === id), aId, { timeout: 30000, polling: 250 }).catch(() => null);
-  await A.page.waitForFunction((id) => !window.__toybox.voice.state().outbound.some((l) => l.id === id), bId, { timeout: 30000, polling: 250 }).catch(() => null);
+  await B.page.waitForFunction((id) => !window.__toybox.voiceChat.state().inbound.some((l) => l.id === id), aId, { timeout: 30000, polling: 250 }).catch(() => null);
+  await A.page.waitForFunction((id) => !window.__toybox.voiceChat.state().outbound.some((l) => l.id === id), bId, { timeout: 30000, polling: 250 }).catch(() => null);
   check('voice: B walks far away: both ends close the link', !inLink(await vstate(B.page), aId) && !(await vstate(A.page)).outbound.some((l) => l.id === bId));
   await walk(B, A, [[24, -40], [20, 10], [-3, 18]], 0.3);
-  await B.page.waitForFunction((id) => window.__toybox.voice.state().inbound.some((l) => l.id === id && l.state === 'connected'), aId, { timeout: 60000, polling: 250 }).catch(() => null);
+  await B.page.waitForFunction((id) => window.__toybox.voiceChat.state().inbound.some((l) => l.id === id && l.state === 'connected'), aId, { timeout: 60000, polling: 250 }).catch(() => null);
   check('voice: B comes back: the link connects again', inLink(await vstate(B.page), aId)?.state === 'connected');
 
   // B mutes A (pause menu → Voice chat): the link closes and B hears nothing from A.
@@ -245,42 +245,42 @@ async function voiceChecks(A, B) {
   const mutedPeak = await loudness(B, aId, 1500);
   check('voice: B mutes A: link closed, silence', b.muted.includes(aId) && !inLink(b, aId) && !mutedPeak, JSON.stringify({ muted: b.muted, link: inLink(b, aId), mutedPeak }));
   check("voice: …and A's name tag shows the muted mark", await B.page.evaluate((id) => !!document.querySelector(`.name-tag[data-player="${id}"] .voice-tag--muted`), aId));
-  await B.page.evaluate((id) => window.__toybox.voice.mute(id), aId); // unmute
+  await B.page.evaluate((id) => window.__toybox.voiceChat.mute(id), aId); // unmute
 
   // B: push to talk (the default) on V. The first press only asks for the microphone.
   check('voice: B is in push-to-talk mode by default', (await vstate(B.page)).mode === 'ptt');
   await B.page.keyboard.down('KeyV');
-  await B.page.waitForFunction(() => window.__toybox.voice.state().mic === 'on', null, { timeout: 30000, polling: 100 }).catch(() => null);
+  await B.page.waitForFunction(() => window.__toybox.voiceChat.state().mic === 'on', null, { timeout: 30000, polling: 100 }).catch(() => null);
   await sleep(500);
   b = await vstate(B.page);
   check('voice: the first V press asks for the microphone (once) and opens it without sending', b.mic === 'on' && (await gum(B.page)) === 1 && !b.transmitting, JSON.stringify({ mic: b.mic, gum: await gum(B.page), tx: b.transmitting }));
   await B.page.keyboard.up('KeyV');
-  await A.page.waitForFunction((id) => window.__toybox.voice.state().inbound.some((l) => l.id === id && l.state === 'connected' && l.audio), bId, { timeout: 60000, polling: 250 }).catch(() => null);
+  await A.page.waitForFunction((id) => window.__toybox.voiceChat.state().inbound.some((l) => l.id === id && l.state === 'connected' && l.audio), bId, { timeout: 60000, polling: 250 }).catch(() => null);
   check('voice: A connects to B (B is now a speaker)', inLink(await vstate(A.page), bId)?.state === 'connected');
   const idle = await loudness(A, bId, 3000);
   check('voice: V not held: A hears nothing from B', idle !== null && idle < QUIET, `peak ${idle}`);
   await B.page.keyboard.down('KeyV');
-  await B.page.waitForFunction(() => window.__toybox.voice.state().transmitting, null, { timeout: 10000, polling: 50 }).catch(() => null);
+  await B.page.waitForFunction(() => window.__toybox.voiceChat.state().transmitting, null, { timeout: 10000, polling: 50 }).catch(() => null);
   const talking = await loudness(A, bId, 5000);
   await shot(B.page, 'voice-06-B-holds-V.png');
   await B.page.keyboard.up('KeyV');
   check('voice: B holds V: B sends and A hears B', (await gum(B.page)) === 1 && talking !== null && talking > LOUD, `peak ${talking}`);
   // B's frame loop sees the release on its next frame (slow under software rendering); then the last packets drain
-  await B.page.waitForFunction(() => !window.__toybox.voice.state().transmitting, null, { timeout: 20000, polling: 50 }).catch(() => null);
+  await B.page.waitForFunction(() => !window.__toybox.voiceChat.state().transmitting, null, { timeout: 20000, polling: 50 }).catch(() => null);
   await sleep(800);
   const after = await loudness(A, bId, 3000);
   check('voice: B lets go of V: silence again', !(await vstate(B.page)).transmitting && after !== null && after < QUIET, `peak ${after}`);
 
   // A turns the mic off with the button (Always on): B's link from A closes.
   await A.page.click('[data-testid=voice-mic]');
-  await B.page.waitForFunction((id) => !window.__toybox.voice.state().micOn.includes(id) && !window.__toybox.voice.state().inbound.some((l) => l.id === id), aId, { timeout: 20000, polling: 100 }).catch(() => null);
+  await B.page.waitForFunction((id) => !window.__toybox.voiceChat.state().micOn.includes(id) && !window.__toybox.voiceChat.state().inbound.some((l) => l.id === id), aId, { timeout: 20000, polling: 100 }).catch(() => null);
   b = await vstate(B.page);
   check("voice: A presses the button again: A's mic is off, B's link from A closes", (await vstate(A.page)).mic === 'off' && !b.micOn.includes(aId) && !inLink(b, aId));
   // B goes into the Workshop: voice is Hub-only, so B's mic closes.
   await B.page.keyboard.press('Escape');
   await B.page.click('.pause__actions .toy-btn >> nth=1');
-  await B.page.waitForFunction(() => window.__toybox.voice.state().mic === 'off', null, { timeout: 20000, polling: 100 }).catch(() => null);
-  await A.page.waitForFunction((id) => !window.__toybox.voice.state().micOn.includes(id), bId, { timeout: 20000, polling: 100 }).catch(() => null);
+  await B.page.waitForFunction(() => window.__toybox.voiceChat.state().mic === 'off', null, { timeout: 20000, polling: 100 }).catch(() => null);
+  await A.page.waitForFunction((id) => !window.__toybox.voiceChat.state().micOn.includes(id), bId, { timeout: 20000, polling: 100 }).catch(() => null);
   check("voice: B opens the Workshop: B's mic closes and A no longer lists it", (await vstate(B.page)).mic === 'off' && !(await vstate(A.page)).micOn.includes(bId) && (await vstate(A.page)).inbound.length === 0);
   await B.page.keyboard.press('Escape');
   await B.page.waitForSelector('.hud-sign', { timeout: 60000 }).catch(() => null);

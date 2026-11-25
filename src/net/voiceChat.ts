@@ -630,8 +630,9 @@ export function installVoice() {
     if (s.voiceHear !== p.voiceHear || s.voiceChatVolume !== p.voiceChatVolume || s.masterVolume !== p.masterVolume) applyBus();
   });
 
+  // Its own key: src/game/voice.ts exposes `voice` (the voice-line log) and exposeDebug merges shallowly.
   exposeDebug({
-    voice: {
+    voiceChat: {
       state: () => ({
         mic: useVoice.getState().mic,
         blocked: useVoice.getState().blocked,
