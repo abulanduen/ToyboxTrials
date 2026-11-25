@@ -166,7 +166,8 @@ const check = (n, ok, d = '') => res.push(`${ok ? 'PASS' : 'FAIL'}  ${n}${d ? ' 
   const hp = () => page.evaluate(() => window.__toybox.hubplay.state());
   const btnText = (t) => page.waitForFunction((s) => document.querySelector('.touch-btn--interact')?.textContent?.includes(s), t, { timeout: 120000 }).catch(() => null);
   const pressBtn = async (id, ms) => {
-    const el = await page.$('.touch-btn--interact');
+    // the button can blink out for a frame as the prompt changes: wait for it rather than grab it once
+    const el = await page.waitForSelector('.touch-btn--interact', { timeout: 60000 });
     const b = await el.boundingBox();
     // the button pops in with a scale animation: its layout size is the touch target
     const [w, h] = await el.evaluate((e) => [e.offsetWidth, e.offsetHeight]);
