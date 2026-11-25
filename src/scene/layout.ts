@@ -156,7 +156,8 @@ export const FINGERPOST = { x: -5.5, z: 14, h: 9.8 };
 export const SIGNPOSTS = {
   spawn: FINGERPOST,
   'bridge-hub': { x: 31.5, z: -40.5, h: 5.3 },
-  gates: { x: 15.5, z: -114, h: 8.3 },
+  // by the bridge's landing on the gates table, off the pitch
+  gates: { x: 31.5, z: -103, h: 8.3 },
 } as const;
 export type SignpostId = keyof typeof SIGNPOSTS;
 
@@ -197,6 +198,33 @@ export const BRIDGE = {
 export const BRIDGE_RAIL_X = BRIDGE.halfW + BRIDGE.rail.t / 2 + 0.02;
 /** Number of collider steps per ramp (each rise is well under the step height). */
 const RAMP_STEPS = 4;
+
+// ------------------------------------------------------------------ the sports ground's stands
+
+/**
+ * The stands round the sports ground on the gates table (docs/ARCADE_PLAN.md phase 4;
+ * src/scene/SportsGround.tsx): benches of toy bricks stepping up away from the pitch, along its north
+ * side (either side of the jukebox) and its south side (either side of the bridge's landing). Each
+ * tier is a solid step `rise` cm higher than the one in front (a hop up: higher than a step), `d` cm
+ * deep. `front` is the z of the stand's edge nearest the pitch; `dir` the way its tiers climb (z).
+ */
+export const STAND_TIER = { d: 3, rise: 1.4 };
+export interface Stand {
+  id: string;
+  minX: number;
+  maxX: number;
+  front: number;
+  dir: 1 | -1;
+  tiers: number;
+}
+export const STANDS: readonly Stand[] = [
+  { id: 'north-w', minX: -56, maxX: 64, front: -150.5, dir: -1, tiers: 3 },
+  { id: 'north-e', minX: 84, maxX: 113, front: -150.5, dir: -1, tiers: 3 },
+  { id: 'south-w', minX: -56, maxX: 12, front: -100.5, dir: 1, tiers: 2 },
+  { id: 'south-e', minX: 36, maxX: 112, front: -100.5, dir: 1, tiers: 2 },
+];
+/** Tier `i` of a stand (0 nearest the pitch): its centre z and top. */
+export const standTier = (st: Stand, i: number) => ({ z: st.front + st.dir * (i + 0.5) * STAND_TIER.d, top: (i + 1) * STAND_TIER.rise });
 
 // ------------------------------------------------------------------ the arcade's machines
 
@@ -325,11 +353,7 @@ export const TREES: [number, number, number][] = [
   [22, 12, 1.1],
   [27, 31.5, 0.8], // kept clear of the menu / Workshop camera paths near spawn
   [-40, 31, 0.8],
-  // gates table: the green inside the loop road, and its corners
-  [-30, -138, 1.0], // off the pitch's centre line (the west net is at x = -49)
-  [-4, -130, 0.9],
-  [52, -130, 0.9],
-  [90, -114, 1.0], // off the pitch's centre line (the east net is at x = 101)
+  // gates table: only its corners (the sports ground fills the rest)
   [-61, -157, 0.9],
   [116, -157, 0.9],
   [116, -98, 0.8],
@@ -345,9 +369,6 @@ export const BLOCKS: { x: number; z: number; y: number; rot: number; color: stri
   { x: 8.5, z: 10.5, y: 0, rot: 0.7, color: PALETTE.inkPurple, s: 0.8 },
   { x: -8, z: 12, y: 0, rot: 0.3, color: PALETTE.toyBlue, s: 0.8 },
   // gates table, behind the north row
-  { x: 41, z: -157, y: 0, rot: 0.3, color: PALETTE.coral },
-  { x: -32, z: -157, y: 0, rot: -0.2, color: PALETTE.toyBlue },
-  { x: -32, z: -157, y: 3, rot: 0.4, color: PALETTE.honey, s: 0.8 },
 ];
 export const BLOCK_SIZE = 3;
 
@@ -402,6 +423,13 @@ export function hubColliders(): Collider[] {
     list.push({ kind: 'box', id: 'scoreboard', x: c.x, z: c.z, hx: SCOREBOARD.w / 2, hz: 1.8, rot: SCOREBOARD.rot, top: SCOREBOARD.h });
   }
   list.push({ kind: 'box', id: 'tv', x: TV.x, z: TV.z, hx: TV.w / 2, hz: TV.d / 2, rot: TV.rot, top: TV.h });
+  // the sports ground's stands: one solid step per tier
+  for (const st of STANDS) {
+    for (let i = 0; i < st.tiers; i++) {
+      const t = standTier(st, i);
+      list.push({ kind: 'box', id: `stand-${st.id}-${i}`, x: (st.minX + st.maxX) / 2, z: t.z, hx: (st.maxX - st.minX) / 2, hz: STAND_TIER.d / 2, rot: 0, top: t.top });
+    }
+  }
   // the arcade's machines and their greeters, down on the floor
   for (const m of MACHINES) {
     list.push({ kind: 'box', id: m.id, x: m.x, z: m.z, hx: MACHINE.w / 2, hz: MACHINE.d / 2, rot: m.rot, top: LEVEL_Y.floor + MACHINE.h, lv: 'floor' });

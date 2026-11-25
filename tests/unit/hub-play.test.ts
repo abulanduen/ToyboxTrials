@@ -3,11 +3,12 @@
  * The online server runs the same code as the authority, so these also pin down online behaviour.
  */
 import { describe, expect, it } from 'vitest';
-import { GATES_WALK, isWalkable } from '../../src/game/hubBounds';
+import { BRIDGE_X, GATES_WALK, isWalkable } from '../../src/game/hubBounds';
 import { overlaps, type Collider } from '../../src/game/collision';
 import { INTERACTABLES } from '../../src/game/interactables';
-import { hubColliders } from '../../src/scene/layout';
-import { BALL, BRIDGE_DECK, HOOP, MARBLE, NET, NETS, PITCH_CENTRE, rollFloorAt } from '../../src/game/hubPlay';
+import { STANDS, STAND_TIER, hubColliders, standTier } from '../../src/scene/layout';
+import { HUB_MOTION } from '../../src/game/hubMotion';
+import { BALL, BRIDGE_DECK, HOOP, MARBLE, NET, NETS, PITCH_AREA, PITCH_CENTRE, rollFloorAt } from '../../src/game/hubPlay';
 import {
   BALL_IDLE_RESET,
   GOAL_PAUSE,
@@ -43,6 +44,29 @@ function kickFrom(s: HubPlayState, x: number, z: number, dx: number, dz: number,
   const b = body('p1', x - (dx / l) * 2.2, z - (dz / l) * 2.2, Math.atan2(dx, dz));
   return kickMarble(s, b, dx, dz, p, 0, ev);
 }
+
+describe('the sports ground’s stands', () => {
+  it('stand on the gates table, off the pitch, clear of the bridge’s landing and of everything else solid', () => {
+    const all = hubColliders();
+    for (const st of STANDS) {
+      for (let i = 0; i < st.tiers; i++) {
+        const t = standTier(st, i);
+        for (const x of [st.minX, st.maxX])
+          for (const dz of [-STAND_TIER.d / 2, STAND_TIER.d / 2]) expect(isWalkable(x, t.z + dz, 0, [GATES_WALK]), `${st.id} ${i}`).toBe(true);
+        // off the pitch (its touchline is PITCH_AREA's edge)
+        expect(t.z + STAND_TIER.d / 2 < PITCH_AREA.minZ || t.z - STAND_TIER.d / 2 > PITCH_AREA.maxZ, `${st.id} ${i}`).toBe(true);
+        const me = all.find((c) => c.id === `stand-${st.id}-${i}`)!;
+        const others = all.filter((c) => !c.id?.startsWith('stand-') && c.top > 0.6);
+        for (let x = st.minX; x <= st.maxX; x += 1) expect(others.filter((c) => overlaps(c, x, t.z, STAND_TIER.d / 2)).map((c) => c.id), `${st.id} ${i} at x ${x}`).toEqual([]);
+        expect(me.top).toBeCloseTo(t.top, 6);
+      }
+      // each tier is one hop higher than the one in front (toys climb them a hop at a time)
+      expect(STAND_TIER.rise).toBeLessThan(HUB_MOTION.jumpV ** 2 / (2 * HUB_MOTION.gravity));
+    }
+    // the bridge's landing (x = BRIDGE_X) is not blocked
+    for (const st of STANDS.filter((s) => s.dir === 1)) expect(BRIDGE_X < st.minX - 5 || BRIDGE_X > st.maxX + 5, st.id).toBe(true);
+  });
+});
 
 describe('where the hub play objects stand', () => {
   const all = hubColliders();

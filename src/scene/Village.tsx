@@ -16,6 +16,8 @@ import { Rides } from './Rides';
 import { Bridge } from './Bridge';
 import { HubTV, TV_AERIAL_TIP } from './HubTV';
 import { Machines } from './Machines';
+import { SportsGround } from './SportsGround';
+import { Npcs } from './Npcs';
 import { DustMotes, Fingerpost } from './Ambience';
 import { hubFence, hubPathTiles, TILE_SIZE } from './paths';
 import { JackInTheBox, KeyTower, MusicBox, PencilLog, Train, TrainTrack } from './Interactive';
@@ -165,6 +167,8 @@ export function Village() {
       <Arcade />
       <Rides />
       <Machines />
+      <SportsGround />
+      <Npcs />
       <MusicBox />
       <JackInTheBox />
       <KeyTower />

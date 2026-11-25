@@ -4,10 +4,10 @@
  * types, so the online server can use them (like hubBounds.ts); src/scene/layout.ts re-exports
  * them and adds `hubPlayColliders()` to the hub's colliders.
  *
- * The marble lives on the spawn table (a playroom secret, where it always was). The pitch is the
- * green inside the loop road on the trials table: a net at each end, just inside the road, with
- * the end arches (Inferno Escape, Spellbox Showdown) standing behind them across the road, so
- * nothing blocks a net's mouth. The hoop stands on the pitch's north edge, east of the Siege fort.
+ * The marble lives on the spawn table (a playroom secret, where it always was). The pitch fills the
+ * gates table, the Hub's sports ground (src/scene/SportsGround.tsx): a net at each end, nothing in
+ * front of either net's mouth, stands along both touchlines. The hoop stands on the pitch's north
+ * touchline, its little wooden court painted at the pitch's east end.
  */
 import type { Collider } from './collision';
 

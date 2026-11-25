@@ -1,8 +1,8 @@
 # Arcade under the table: plan (proposal)
 
-Status: agreed in outline with the owner on 25 Nov 2026. **Phases 1–3 are built** (two levels, the
-arcade shell, the toy-car ride down and the lift up, a machine for every trial in place of the
-gates). Phases 4 and 5 are planned.
+Status: agreed in outline with the owner on 25 Nov 2026. **All five phases are built** (two levels,
+the arcade shell, the toy-car ride down and the lift up, a machine for every trial in place of the
+gates, the sports ground with its stands, and the NPC toys).
 It moves the trials off the gates table into an arcade on the floor under the spawn table, turns the
 gates table into the Hub's sports ground, and adds wandering NPC toys.
 
@@ -87,12 +87,20 @@ desktop and phone.
    - **Voice lines that mention the domino bridge or the gates need new recordings.** Their text
      changes in `voiceLines.ts`; until re-recorded they play as text-only captions
      (`docs/VOICE.md`).
-4. **The sports ground.**
+4. **The sports ground.** *(Built.)* The ball games keep their places (the nets, the hoop and the
+   ball: `src/game/hubPlay.ts` is unchanged, so the shared physics and the tests that walk to them are
+   too); the gates table round them became the ground: `src/scene/SportsGround.tsx` (painted pitch
+   and court markings, team flags), `layout.ts` STANDS (benches of toy bricks along both
+   touchlines, one solid step per tier); the trees and stray blocks on the pitch went, and the gates
+   table's signpost moved to the bridge's landing. `HUB_SOLIDS` regenerated (the server's ball
+   physics: redeploy it).
    - The pitch and court spread over the whole gates table, with stands. The bridge stays, as the
      way across.
    - The hub play constants and walk areas change (`src/game/hubPlay.ts`, `hubPlaySim.ts`), and
      `HUB_SOLIDS` is regenerated. The online server needs a redeploy.
-5. **NPC toys.**
+5. **NPC toys.** *(Built.)* `src/game/npcs.ts` (pure scripts on the room's clock: the dog's),
+   `src/scene/Npcs.tsx` (MiniContenders; only the toys on the player's level are drawn; the Low tier
+   keeps 7 of 15); tests: `tests/unit/npcs.test.ts`.
    - A pure, clock-driven script system like the dog's (`src/game/dogRoute.ts`): each NPC gets
      routes, stops and actions (play a machine, watch, cheer, sit, chat bubble).
    - They're drawn with `MiniContender`, in the arcade, on the plaza and in the stands.

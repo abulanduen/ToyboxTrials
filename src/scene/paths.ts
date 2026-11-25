@@ -78,7 +78,7 @@ function plazaEdge(x: number, z: number): Pt {
 export const BRIDGE_ROAD_BEND: Pt = [19, -20];
 
 /** Where the path off the bridge ends on the gates table (the ball games' ground). */
-const GATES_LANDING_Z = -110;
+const GATES_LANDING_Z = -107;
 
 /**
  * Every street in the hub.
