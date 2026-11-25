@@ -3,8 +3,9 @@
  * room's clock, play the arcade's machines (a little hop as they press), watch, cheer, chat (a "…"
  * bubble) and sit in the stands. They turn to look at a player who comes close while they stand.
  *
- * Budget: only the toys on the player's own level are drawn (the arcade's while you are down there,
- * the plaza's and the stands' up on the tables), and the Low tier keeps only the ones marked `low`.
+ * Budget: only the toys on the player's own level and within DRAW_R of the camera are drawn (the
+ * arcade's while you are down there, the plaza's and the stands' up on the tables); the Low tier
+ * keeps only the ones marked `low`, without shadows.
  * The per-frame work is a pose from the clock and a turn.
  */
 import { useMemo, useRef } from 'react';
@@ -49,7 +50,10 @@ function bubbleTexture() {
   return bubbleTex;
 }
 
-function Npc({ def }: { def: NpcDef }) {
+/** NPCs further than this from the camera are not drawn (cm): at that range a toy is a few pixels. */
+const DRAW_R = 75;
+
+function Npc({ def, low }: { def: NpcDef; low: boolean }) {
   const root = useRef<THREE.Group>(null!);
   const bubble = useRef<THREE.Sprite>(null!);
   const anim = useRef<MiniAnim>(createMiniAnim());
@@ -57,14 +61,19 @@ function Npc({ def }: { def: NpcDef }) {
   const paint = PAINT_JOBS[def.paint % PAINT_JOBS.length];
   const bubbleMat = useMemo(() => new THREE.SpriteMaterial({ map: bubbleTexture(), depthWrite: false }), []);
 
-  useFrame((_, rawDt) => {
+  useFrame((state, rawDt) => {
     const dt = Math.min(rawDt, 1 / 20);
     const s = st.current;
     const g = root.current;
     const here = player.level === def.level && useGame.getState().screen !== 'minigame';
-    g.visible = here;
-    if (!here) return;
+    if (!here) {
+      g.visible = false;
+      return;
+    }
     const p = npcPose(def, dogNow(), s.pose);
+    const cam = state.camera.position;
+    g.visible = Math.hypot(cam.x - p.x, cam.y - p.y, cam.z - p.z) < DRAW_R;
+    if (!g.visible) return;
     g.position.set(p.x, p.y, p.z);
     // facing: the way it walks, or its stop's; an idle toy looks at a player close by
     let want = p.yaw;
@@ -101,7 +110,7 @@ function Npc({ def }: { def: NpcDef }) {
   return (
     <group ref={root} visible={false}>
       {/* scaled to a wind-up toy's 3.5 cm */}
-      <MiniContender paint={paint} anim={anim} scale={1.2} />
+      <MiniContender paint={paint} anim={anim} scale={1.2} shadows={!low} />
       <sprite ref={bubble} position={[1.1, 4.8, 0]} scale={[1.8, 1.35, 1]} material={bubbleMat} visible={false} />
     </group>
   );
@@ -123,7 +132,7 @@ export function Npcs() {
   return (
     <group name="npcs">
       {list.map((n) => (
-        <Npc key={n.id} def={n} />
+        <Npc key={n.id} def={n} low={low} />
       ))}
     </group>
   );

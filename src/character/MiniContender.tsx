@@ -38,7 +38,8 @@ const brassMat = new THREE.MeshStandardMaterial({ color: PALETTE.brass, roughnes
 const greyMat = new THREE.MeshStandardMaterial({ color: '#8E8A93', roughness: 0.8 });
 
 /** `jersey`: a team jersey over the body (Hoop Clash); unset, none. */
-export function MiniContender({ paint, anim, scale = 1, jersey }: { paint: PaintJob; anim: React.RefObject<MiniAnim>; scale?: number; jersey?: JerseyLook }) {
+/** `shadows`: cast shadows (default on; the Hub's NPC toys turn them off on the Low tier). */
+export function MiniContender({ paint, anim, scale = 1, jersey, shadows = true }: { paint: PaintJob; anim: React.RefObject<MiniAnim>; scale?: number; jersey?: JerseyLook; shadows?: boolean }) {
   const mats = useMemo(
     () => ({
       body: new THREE.MeshStandardMaterial({ color: paint.body, roughness: 0.45 }),
@@ -86,12 +87,12 @@ export function MiniContender({ paint, anim, scale = 1, jersey }: { paint: Paint
     <group scale={scale}>
       <group ref={root}>
         {[-0.4, 0.4].map((x) => (
-          <mesh key={x} geometry={geo.foot} position={[x, 0.18, 0.08]} material={mats.body} castShadow />
+          <mesh key={x} geometry={geo.foot} position={[x, 0.18, 0.08]} material={mats.body} castShadow={shadows} />
         ))}
-        <mesh ref={bodyMesh} geometry={geo.body} position={[0, 1.05, 0]} material={mats.body} castShadow />
+        <mesh ref={bodyMesh} geometry={geo.body} position={[0, 1.05, 0]} material={mats.body} castShadow={shadows} />
         <mesh geometry={geo.chest} position={[0, 1.1, 0.56]} material={mats.trim} />
-        <mesh ref={headMesh} geometry={geo.head} position={[0, 2.15, 0]} material={mats.body} castShadow />
-        <mesh geometry={geo.turret} position={[0, 2.85, 0.02]} material={mats.accent} castShadow />
+        <mesh ref={headMesh} geometry={geo.head} position={[0, 2.15, 0]} material={mats.body} castShadow={shadows} />
+        <mesh geometry={geo.turret} position={[0, 2.85, 0.02]} material={mats.accent} castShadow={shadows} />
         <mesh geometry={geo.eye} position={[0, 2.85, 0.28]} material={eyeMat} />
         <mesh geometry={geo.pupil} position={[0, 2.85, 0.29]} material={inkMat} />
         {jersey && <Jersey look={jersey} fit="mini" />}

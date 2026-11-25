@@ -125,7 +125,7 @@ export function SportsGround() {
   const bricks = useRef<THREE.InstancedMesh>(null!);
   // a brick 1 cm tall, scaled up to its tier's height
   const brickGeo = useMemo(() => {
-    const g = new RoundedBoxGeometry(BRICK_W - 0.15, 1, STAND_TIER.d - 0.15, 2, 0.12);
+    const g = new RoundedBoxGeometry(BRICK_W - 0.15, 1, STAND_TIER.d - 0.15, 1, 0.12);
     g.translate(0, 0.5, 0);
     return g;
   }, []);
