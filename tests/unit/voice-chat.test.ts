@@ -61,7 +61,7 @@ const ice = (toId: string, c = 1, s: 0 | 1 = 0): SignalMsg => ({ t: 'sig', to: t
 
 // ---------------------------------------------------------------- protocol
 describe('voice protocol (v6)', () => {
-  it('arrived in version 6 (now 7: the shared dog)', () => expect(PROTOCOL_VERSION).toBe(7));
+  it('arrived in version 6 (now 8: the shared dog, then rides)', () => expect(PROTOCOL_VERSION).toBe(8));
 
   it('accepts well-formed mic and sig messages', () => {
     expect(parseClientMessage(JSON.stringify({ t: 'mic', on: true }))).toEqual({ t: 'mic', on: true });

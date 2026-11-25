@@ -311,6 +311,27 @@ and the server clock, so the server only steps it when someone pets it, and neve
 - **Tests:** on a test server (`MATCH_DEBUG=1`), `dog` with `at` moves the room's dog to a point in
   its loop (`__toybox.dog.perch()` online); a production server ignores it.
 
+### Rides between the levels
+
+The Hub has two levels: the tables, and the arcade on the room floor under the spawn table
+(`src/game/hubBounds.ts`). A toy only goes between them on a ride (`src/game/hubRides.ts`, pure and
+shared with the server): the **toy car** off the spawn table's front edge, down the drop, round the
+loop and into the arcade, and the **lift** from the arcade back up to the table top. A ride is a
+scripted journey: input is locked, and the ride's clock alone says where the toy is.
+
+- **Boarding:** Interact by the car (on the table) or the lift (in the arcade) sends `ride` with the
+  ride's kind. The server checks the toy is in the Hub (no activity), on that ride's level, within
+  reach of its boarding spot (plus the reach slack), and not riding already, then answers the rider
+  (`ride`, `ok`). The client starts the ride on `ok: true`; on `false` it shows "Not just now".
+- **On the ride:** the server moves the rider itself from the ride's clock and ignores its moves (the
+  client stops sending them). Snapshots carry the rider's ride and how far into it they are (`rd`,
+  `rt`), so other players draw them, car or platform included, from the same path (smooth through
+  the loop) as far behind as they draw everything else.
+- **Landing:** when the ride's time is up the server puts the rider down at its landing spot on the
+  other level, with a fresh move budget. A rider who drops the connection lands all the same.
+- A ride takes about 4 s (the car) or 7 s (the lift). The toy holds nothing on a ride (a held
+  basketball is let go when it boards), and hub play, the dog and Who Am I? ignore riders.
+
 ### Reconnects and limits
 
 - The welcome message carries a secret resume token. If a connection drops, the player's slot is
@@ -525,8 +546,9 @@ online"). The other choice in both places is the existing **practice with bots**
 - **In the game:** the Hub Scoreboard panel shows the top ten per format above your local records
   (which stay on this device), and the TV beside it has a "Leaderboard" channel (Blitz).
 
-## Protocol (version 7)
+## Protocol (version 8)
 
+Version 8 (rides between the levels): adds `ride` both ways, and the snapshot's `rd` and `rt`.
 Version 7 (the shared dog): `welcome` carries `dog`, and adds `dog` both ways.
 Version 6 (voice chat): adds `mic`, `mics` and `sig`, and allows `sig` frames up to 8 KB.
 Version 5 (chat and Who Am I?): adds `chat` (both ways), `chatNote`, `card` (both ways) and `cards`.
@@ -558,12 +580,14 @@ Client → server:
 | `chat` | `text` (at most 300 characters as sent) | Say something in the room (v5). Cleaned to at most 120 characters, filtered, rate-limited (3, then 1 per 1.5 s). |
 | `card` | `a`: `deal` or `peel` | Who Am I? at the suspicious box (v5): ask for a card, or give up on yours. |
 | `dog` | `at?` (test servers only) | Pet the room's dog (v7): checked on the server (in the Hub, by the pet spot, the dog up at the table). |
+| `ride` | `k`: `car` \| `lift` | Board a ride between the levels (v8): checked on the server (in the Hub, on its level, by its boarding spot, not riding). |
 | `mic` | `on` (boolean) | Voice chat (v6): my mic is on (willing to send) or off. Refused outside the Hub; 6 in a burst, 1 a second. |
 | `sig` | `to` (player id), `c` (link id, positive integer chosen by the listener), `s` (1 = sent by the link's speaker side, 0 = listener side), `k`: `offer` (s 0, `d` SDP) / `answer` (s 1, `d` SDP) / `ice` (`d`: 1–8 `{c, m, i}` candidates) / `bye` | WebRTC handshake for one voice link (v6). Relayed only to a connected player in the same room, both in the Hub; offers only to a player whose mic is on, answers only from one. SDP ≤ 6000 characters; up to 8 KB per frame. |
 
 Server → client: `welcome` (your id, resume token, room, roster, spawn point, server time, and
 from v7 `dog`: the room's dog `{o, p, e, n, v}`, seconds on the server clock),
-`joined`, `left`, `room` (host changed), `snap` (`now`, players: `id x y z r s g e es a off`, and
+`joined`, `left`, `room` (host changed), `snap` (`now`, players: `id x y z r s g e es a off`, from v8
+`rd` and `rt` while riding (the ride and seconds into it), and
 from v4 `hp`: `m` marble `[x, z, vx, vz]`, `n` in a net, `b` ball `[x, y, z, vx, vy, vz]`, `h` holder,
 `s` goals `[Coral, Blue]`, `k` baskets), `play` (`e`: hub play events `{k, by?, net?, score?, total?,
 p?, v?}`), `emote`, `look`, and `error` (`code`, `message`, `fatal`). The error codes are
@@ -588,6 +612,9 @@ tournament table and result; `null` with a reason when you left, were kicked or 
 Voice chat (v6): `mic` (`id`, `on`: a player's mic changed; sent to the others, and to the player
 only when the server overrode them), `mics` (`on`: the ids whose mic is on, sent right after
 `welcome` when there are any), and `sig` (`from`, set by the server, plus `c`, `s`, `k`, `d` as sent).
+
+Rides (v8): `ride` (`k`, `ok`), to the rider only: their boarding was accepted (the ride starts now)
+or refused.
 
 The dog (v7): `dog` (`c`: the room's dog `{o, p, e, n, v}`, plus `k` pet/lick and `by` when someone
 petted it; to everyone, or to the petter alone when their pet didn't count).

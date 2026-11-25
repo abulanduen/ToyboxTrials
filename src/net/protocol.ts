@@ -10,6 +10,7 @@
 import { EMOTE_IDS, isEmoteId, type EmoteId } from '../game/emotes';
 import { MINIGAME_IDS, type MinigameId } from '../minigames/ids';
 import { CHAT_RAW_MAX } from './chatFilter';
+import { isRideKind, type RideKind } from '../game/hubRides';
 
 /**
  * v2: looks carry the accessory slots (back/face/neck), six more gesture ids, and a 'shop' activity.
@@ -20,8 +21,10 @@ import { CHAT_RAW_MAX } from './chatFilter';
  *     (`card` both ways, `cards`).
  * v6: proximity voice chat: mic state (`mic`, `mics`) and WebRTC signalling (`sig`).
  * v7: the shared family dog: its clock in `welcome` (`dog`), petting it (`dog` both ways).
+ * v8: rides between the Hub's levels (the toy car down to the arcade, the lift back up): `ride` both
+ *     ways, and a rider's ride and time along it in its snapshot state (`rd`, `rt`).
  */
-export const PROTOCOL_VERSION = 7;
+export const PROTOCOL_VERSION = 8;
 
 // ---------------------------------------------------------------- limits and rates
 /** Largest client → server message the server accepts (bytes), except voice signalling (`sig`). */
@@ -146,6 +149,9 @@ export interface PlayerState {
   a: Activity | null;
   /** 1 while this player's connection is lost and their slot is being held. */
   off: 0 | 1;
+  /** On a ride (v8, src/game/hubRides.ts): which, and how many seconds into it as of this snapshot. */
+  rd?: RideKind;
+  rt?: number;
 }
 
 export type ErrorCode =
@@ -424,7 +430,13 @@ export interface DogPetMsg {
   t: 'dog';
   at?: number;
 }
-export type ClientMsg = HelloMsg | MoveMsg | EmoteMsg | ActivityMsg | LookMsg | LeaveMsg | LobbyMsg | InputMsg | AuthMsg | KickMsg | BallMsg | HubPlayDebugMsg | ChatSendMsg | CardActionMsg | MicMsg | SignalMsg | DogPetMsg;
+// ---------------------------------------------------------------- rides between levels (v8)
+/** Board ride `k` (the server checks you are at its boarding spot, on its level, and not riding). */
+export interface RideBoardMsg {
+  t: 'ride';
+  k: RideKind;
+}
+export type ClientMsg = HelloMsg | MoveMsg | EmoteMsg | ActivityMsg | LookMsg | LeaveMsg | LobbyMsg | InputMsg | AuthMsg | KickMsg | BallMsg | HubPlayDebugMsg | ChatSendMsg | CardActionMsg | MicMsg | SignalMsg | DogPetMsg | RideBoardMsg;
 
 // ---------------------------------------------------------------- server → client
 export interface WelcomeMsg {
@@ -461,6 +473,12 @@ export interface DogMsg {
   c: DogWire;
   k?: 'pet' | 'lick';
   by?: string;
+}
+/** To the rider only: boarding ride `k` was accepted (`ok`: the ride starts now) or refused. */
+export interface RideMsg {
+  t: 'ride';
+  k: RideKind;
+  ok: boolean;
 }
 export interface JoinedMsg {
   t: 'joined';
@@ -535,6 +553,7 @@ export interface ErrorMsg {
   fatal: boolean;
 }
 export type ServerMsg =
+  | RideMsg
   | WelcomeMsg
   | JoinedMsg
   | LeftMsg
@@ -794,6 +813,8 @@ export function validateClientMessage(m: unknown): ClientMsg | null {
     case 'dog':
       if (m.at === undefined) return { t: 'dog' };
       return isNum(m.at) ? { t: 'dog', at: m.at } : null;
+    case 'ride':
+      return isRideKind(m.k) ? { t: 'ride', k: m.k } : null;
     case 'sig': {
       if (!isPlayerId(m.to)) return null;
       const body = parseSignalBody(m);
@@ -1021,6 +1042,7 @@ function parsePlayerState(v: unknown): PlayerState | null {
     es: v.es,
     a: isActivity(v.a) ? v.a : null,
     off: v.off ? 1 : 0,
+    ...(isRideKind(v.rd) && isNum(v.rt) ? { rd: v.rd, rt: v.rt } : {}),
   };
 }
 
@@ -1151,6 +1173,8 @@ export function validateServerMessage(m: unknown): ServerMsg | null {
       return isPlayerId(m.id) && typeof m.on === 'boolean' ? { t: 'mic', id: m.id, on: m.on } : null;
     case 'mics':
       return Array.isArray(m.on) ? { t: 'mics', on: m.on.filter(isPlayerId) } : null;
+    case 'ride':
+      return isRideKind(m.k) && typeof m.ok === 'boolean' ? { t: 'ride', k: m.k, ok: m.ok } : null;
     case 'dog': {
       const c = parseDog(m.c);
       if (!c) return null;

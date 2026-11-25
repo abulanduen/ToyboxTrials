@@ -14,6 +14,7 @@
 import { clampToBounds } from '../src/game/collision';
 import { LEVEL_MAX_RISE, LEVEL_Y, levelOfY, type HubLevel } from '../src/game/hubBounds';
 import { HUB_MAX_SPEED, HUB_MOTION, HUB_SPAWN } from '../src/game/hubMotion';
+import { RIDES, riderAt, type RideKind } from '../src/game/hubRides';
 import { EMOTE_COOLDOWN, EMOTE_DURATION, type EmoteId } from '../src/game/emotes';
 import { DOG_PERCH, DOG_VISIT, dogPet, newDogClock, settleDog, type DogClock } from '../src/game/dogRoute';
 import {
@@ -116,6 +117,8 @@ interface PlayerRecord {
   activity: Activity | null;
   /** The level the toy is on: the tables, or the arcade on the floor under the spawn table. */
   level: HubLevel;
+  /** On a ride between the levels (src/game/hubRides.ts): which, and when it boarded (server ms). */
+  ride: { k: RideKind; at: number } | null;
   /** When the connection dropped (slot held for RESUME_WINDOW_MS), or null while connected. */
   disconnectedAt: number | null;
   /** Signed-in account's username, linked with an `auth` message (leaderboard names). */
@@ -330,6 +333,8 @@ export class HubRoom {
         return this.fromLobby(msg.a === 'deal' ? this.chat.deal(this.chatPlayer(p), now) : this.chat.peel(this.chatPlayer(p)));
       case 'mic':
         return this.setMic(p, msg.on, now);
+      case 'ride':
+        return this.board(p, msg.k, now);
       case 'dog':
         if (msg.at === undefined) return this.petDog(p, now);
         if (!this.matchDebug) return [];
@@ -376,13 +381,14 @@ export class HubRoom {
       return out;
     }
     if (!this.byConn.size) return out;
+    for (const p of this.players.values()) this.settleRide(p, now);
     this.advancePlay(now);
     const to: string[] = [];
     const states: PlayerState[] = [];
     for (const p of this.players.values()) {
       if (p.emote && now >= p.emoteUntil) p.emote = null;
       if (p.conn) to.push(p.conn);
-      states.push(this.state(p));
+      states.push(this.state(p, now));
     }
     if (this.playEvents.length) {
       out.push({ kind: 'send', to, msg: { t: 'play', e: this.playEvents.slice(0, MAX_PLAY_EVENTS) } });
@@ -444,6 +450,7 @@ export class HubRoom {
       y: LEVEL_Y.table,
       z: spawn.z,
       level: 'table',
+      ride: null,
       yaw: HUB_SPAWN.yaw,
       speed: 0,
       grounded: true,
@@ -506,12 +513,14 @@ export class HubRoom {
    * Non-finite numbers never get here (the protocol validator rejects them).
    */
   private move(p: Player, m: MoveMsg, now: number) {
+    // On a ride the server says where the toy is (the ride's clock); the client's word is ignored.
+    if (this.settleRide(p, now)) return;
     const dt = Math.max(0, now - p.budgetAt) / 1000;
     p.budgetAt = now;
     p.budget = Math.min(ALLOWED_SPEED * MOVE_BUDGET_SECONDS, p.budget + dt * ALLOWED_SPEED);
 
-    // A toy changes level only on a ride or a lift (to come: docs/ARCADE_PLAN.md phase 2), or after
-    // being sent back to the spawn point. Test servers (MATCH_DEBUG) also let a move put it on the
+    // A toy changes level only on a ride (the toy car or the lift: board()), or after being sent
+    // back to the spawn point. Test servers (MATCH_DEBUG) also let a move put it on the
     // other level, where the browser tests' teleport hook put it.
     const said = levelOfY(m.y);
     if (said !== p.level && this.matchDebug) {
@@ -667,7 +676,53 @@ export class HubRoom {
 
   /** Walking the Hub's tables (not in a trial, the Workshop or the shop, and not down in the arcade). */
   private onTables(p: Player): boolean {
-    return !p.activity && p.level === 'table';
+    return !p.activity && !p.ride && p.level === 'table';
+  }
+
+  /**
+   * `p` boards ride `k`: they must be in the Hub (not in a trial), on the ride's level, within reach
+   * of its boarding spot where the server has them (plus REACH_SLACK for their last move's trip), and
+   * not already riding. The rider is told either way; while riding, the server moves them.
+   */
+  private board(p: Player, k: RideKind, now: number): Outgoing[] {
+    const r = RIDES[k];
+    this.settleRide(p, now);
+    const ok = !p.activity && !p.ride && p.level === r.from && Math.hypot(p.x - r.board.x, p.z - r.board.z) <= r.reach + REACH_SLACK;
+    if (ok) {
+      this.letGoOfBall(p, now);
+      p.ride = { k, at: now };
+      p.speed = 0;
+      this.settleRide(p, now);
+    }
+    return p.conn ? [{ kind: 'send', to: [p.conn], msg: { t: 'ride', k, ok } }] : [];
+  }
+
+  /**
+   * Bring a rider up to date: where the ride has them now, or, once it is over, set down at its
+   * landing spot on the other level (with a fresh move budget). Returns whether they are still riding.
+   */
+  private settleRide(p: Player, now: number): boolean {
+    if (!p.ride) return false;
+    const r = RIDES[p.ride.k];
+    const t = (now - p.ride.at) / 1000;
+    if (t >= r.duration) {
+      this.changeLevel(p, r.to, now);
+      p.x = r.land.x;
+      p.z = r.land.z;
+      p.y = LEVEL_Y[r.to];
+      p.yaw = r.land.yaw;
+      p.ride = null;
+      p.budget = 0;
+      p.budgetAt = now;
+      return false;
+    }
+    const at = riderAt(p.ride.k, t);
+    p.x = at.x;
+    p.y = at.y;
+    p.z = at.z;
+    p.yaw = at.yaw;
+    p.grounded = true;
+    return true;
   }
 
   /** Move `p` to another level: the ball they hold stays behind. */
@@ -795,8 +850,8 @@ export class HubRoom {
     return { id: p.id, name: p.name, look: { ...p.look } };
   }
 
-  private state(p: Player): PlayerState {
-    return {
+  private state(p: Player, now?: number): PlayerState {
+    const s: PlayerState = {
       id: p.id,
       x: round(p.x, 100),
       y: round(p.y, 100),
@@ -809,6 +864,11 @@ export class HubRoom {
       a: p.activity,
       off: p.conn ? 0 : 1,
     };
+    if (p.ride) {
+      s.rd = p.ride.k;
+      s.rt = now === undefined ? 0 : round((now - p.ride.at) / 1000, 1000);
+    }
+    return s;
   }
 
   private chatPlayer(p: Player): ChatPlayer {

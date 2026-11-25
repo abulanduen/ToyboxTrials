@@ -17,6 +17,9 @@
    ONLY=voice runs just the raw-socket checks, A + B and the voice checks.
    The shared dog (A and B): the same dog on both screens; brought to the table (test server), A
    pets it and B sees the heart and the hold. ONLY=dog runs just A + B and the dog checks.
+   Rides between the levels (A and B): A boards the toy car (the server says yes) and B sees A ride
+   it down into the arcade; A takes the lift back up and B sees A on the table again. ONLY=ride runs
+   just A + B and the ride checks.
    Software rendering is slow: page loads wait up to LOAD_TIMEOUT (default 10 min). */
 const { chromium } = require('playwright');
 const { spawn } = require('child_process');
@@ -41,9 +44,10 @@ const check = (n, ok, d = '') => {
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /** The protocol version this test expects (src/net/protocol.ts PROTOCOL_VERSION). */
-const PROTO = 7; // v7: the shared dog; v6: proximity voice chat; v5: chat and Who Am I? cards (v4: hub play)
+const PROTO = 8; // v8: rides between the levels; v7: the shared dog; v6: proximity voice chat; v5: chat and Who Am I? cards (v4: hub play)
 const VOICE_ONLY = process.env.ONLY === 'voice';
 const DOG_ONLY = process.env.ONLY === 'dog';
+const RIDE_ONLY = process.env.ONLY === 'ride';
 
 // ---------------------------------------------------------------- server
 async function startServer() {
@@ -206,6 +210,42 @@ async function dogChecks(A, B) {
   await B.page.evaluate(() => window.__toybox.dog.patience(10));
   await walk(A, B, [[-18, 30], [-8, 26], [5, 21.5]], Math.PI); // back where the rest of the run expects A
 }
+async function rideChecks(A, B) {
+  const FLOOR_Y = -75.5;
+  const ride = (P) => P.page.evaluate(() => window.__toybox.ride.state());
+  const seen = () => remoteBy(B.page, 'Alpha');
+  const press = async (P) => {
+    await P.page.evaluate(() => document.activeElement && document.activeElement.blur());
+    await P.page.keyboard.press('e');
+  };
+  // A walks to the toy car at the spawn table's front edge (hubRides.ts CAR: boards at (10, 30))
+  await walk(A, B, [[8, 26], [10, 28]], 0);
+  await press(A);
+  await A.page.waitForFunction(() => window.__toybox.ride.state().kind === 'car', null, { timeout: 20000, polling: 100 }).catch(() => null);
+  check('ride: A boards the toy car (the server says yes)', (await ride(A)).kind === 'car');
+  await B.page.waitForFunction(() => window.__toybox.net.remotes().some((r) => r.name === 'Alpha' && r.ride === 'car'), null, { timeout: 20000, polling: 100 }).catch(() => null);
+  check('ride: B sees A on the toy car', (await seen())?.ride === 'car', JSON.stringify(await seen()));
+  await B.page.waitForFunction(() => { const r = window.__toybox.net.remotes().find((q) => q.name === 'Alpha'); return r && r.y !== null && r.y < -40; }, null, { timeout: 30000, polling: 100 }).catch(() => null);
+  const drop = await seen();
+  check('ride: …and sees A go over the table’s edge, down the drop', drop && drop.y < -40, JSON.stringify(drop));
+  await shot(B.page, 'ride-01-A-on-the-car-seen-by-B.png');
+  await A.page.waitForFunction(() => !window.__toybox.ride.state().kind, null, { timeout: 60000, polling: 200 }).catch(() => null);
+  await B.page.waitForFunction((y) => { const r = window.__toybox.net.remotes().find((q) => q.name === 'Alpha'); return r && r.y !== null && Math.abs(r.y - y) < 0.1; }, FLOOR_Y, { timeout: 30000, polling: 200 }).catch(() => null);
+  const a = await A.page.evaluate(() => window.__toybox.state());
+  const down = await seen();
+  check('ride: A lands in the arcade, and B sees A down there', a.level === 'floor' && down && Math.abs(down.y - FLOOR_Y) < 0.1 && Math.hypot(down.x - a.x, down.z - a.z) < 1, JSON.stringify({ a: [a.level, a.x, a.y, a.z], seen: down }));
+  // over to the lift (on the arcade floor) and back up
+  await walk(A, B, [[8, 30], [-4, 30]], 0);
+  await press(A);
+  await A.page.waitForFunction(() => window.__toybox.ride.state().kind === 'lift', null, { timeout: 20000, polling: 100 }).catch(() => null);
+  check('ride: A boards the lift', (await ride(A)).kind === 'lift');
+  await A.page.waitForFunction(() => !window.__toybox.ride.state().kind, null, { timeout: 60000, polling: 200 }).catch(() => null);
+  await B.page.waitForFunction(() => { const r = window.__toybox.net.remotes().find((q) => q.name === 'Alpha'); return r && r.y !== null && Math.abs(r.y) < 0.1 && !r.ride; }, null, { timeout: 30000, polling: 200 }).catch(() => null);
+  const up = await seen();
+  check('ride: the lift brings A back up to the table, on both screens', (await A.page.evaluate(() => window.__toybox.state().level)) === 'table' && up && Math.abs(up.y) < 0.1, JSON.stringify(up));
+  await walk(A, B, [[-4, 28], [5, 21.5]], Math.PI); // back where the rest of the run expects A
+}
+
 async function voiceChecks(A, B) {
   const aId = await net(A.page, 'selfId');
   const bId = await net(B.page, 'selfId');
@@ -411,10 +451,11 @@ async function phoneMic(P, w, h, label, file) {
     check('B joins with the code', (await net(B.page, 'room')).code === code);
 
     // ONLY=voice / ONLY=dog: just A and B and those checks (the full run does them after the emotes, with C in the room too).
-    if (VOICE_ONLY || DOG_ONLY) {
+    if (VOICE_ONLY || DOG_ONLY || RIDE_ONLY) {
       await A.page.setViewportSize({ width: 1280, height: 720 });
       await Promise.all([waitTags(A.page, ['Bravo']), waitTags(B.page, ['Alpha'])]).catch(() => null);
-      if (DOG_ONLY) await dogChecks(A, B);
+      if (RIDE_ONLY) await rideChecks(A, B);
+      else if (DOG_ONLY) await dogChecks(A, B);
       else {
         await voiceChecks(A, B);
         await dogChecks(A, B);
@@ -636,6 +677,7 @@ async function phoneMic(P, w, h, label, file) {
     // ------------------------------------------------------------ proximity voice chat
     await voiceChecks(A, B);
     await dogChecks(A, B);
+    await rideChecks(A, B);
 
     // ------------------------------------------------------------ hub play: one shared marble, ball and score per room
     const hp = (p) => p.evaluate(() => window.__toybox.hubplay.state());

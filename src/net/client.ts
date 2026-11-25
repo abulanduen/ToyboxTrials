@@ -5,6 +5,7 @@
  * (positions, emotes). Gameplay never waits on any of this: offline play is unchanged.
  */
 import { dogFromServer, dogOffline, lickCheer, setDogSkew } from '../game/dogVisit';
+import { rideAnswer, rideOffline, riding } from '../game/rideState';
 import { levelOfY } from '../game/hubBounds';
 import { SERVER_URL, OFFLINE_TEXT } from './config';
 import { wsTransport, type Transport, type TransportConn } from './transport';
@@ -188,6 +189,7 @@ function reset() {
   sent.x = NaN;
   setHubPlayOnline(false);
   dogOffline();
+  rideOffline();
 }
 
 /** Give up: back to offline play, with a message. */
@@ -300,6 +302,9 @@ const handlers: { [K in ServerMsg['t']]: (m: Extract<ServerMsg, { t: K }>) => vo
   room(m) {
     useNet.getState().set({ room: m.room });
   },
+  ride(m) {
+    rideAnswer(m.k, m.ok);
+  },
   dog(m) {
     if (dogFromServer(m.c, m.k && m.by ? { k: m.k, by: m.by } : undefined, useNet.getState().selfId)) lickCheer();
   },
@@ -319,6 +324,8 @@ const handlers: { [K in ServerMsg['t']]: (m: Extract<ServerMsg, { t: K }>) => vo
       }
       r.activity = p.a;
       r.off = p.off === 1;
+      // on a ride: when it boarded, on the server clock (s); kept after the ride ends until it is drawn landing
+      if (p.rd && p.rt !== undefined) r.ride = { kind: p.rd, t0: m.now / 1000 - p.rt };
     }
     if (m.hp) onHubPlaySnap(m.now, m.hp);
   },
@@ -383,6 +390,7 @@ function pump() {
   }
   const screen = useGame.getState().screen;
   if (screen !== 'playing' && screen !== 'workshop') return; // in a minigame the hub toy stands still
+  if (riding()) return; // on a ride the server moves us (src/game/hubRides.ts)
   const p = player.pos;
   const changed =
     Number.isNaN(sent.x) ||
@@ -451,7 +459,9 @@ export function installNet() {
             name: r.info.name,
             look: r.info.look,
             x: s?.x ?? null,
+            y: s?.y ?? null,
             z: s?.z ?? null,
+            ride: r.ride?.kind ?? null,
             speed: s?.speed ?? null,
             activity: r.activity,
             off: r.off,

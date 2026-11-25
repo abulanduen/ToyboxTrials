@@ -5,6 +5,7 @@
  */
 import { overlaps, type Collider } from '../game/collision';
 import { GATES_WALK, HUB_WALK, type WalkRect } from '../game/hubBounds';
+import { CAR, LIFT } from '../game/hubRides';
 import { PALETTE } from '../game/palette';
 import type { DominoSpec } from './domino';
 import {
@@ -207,7 +208,9 @@ function fenceObstacles(): Collider[] {
     { kind: 'box', x: BRIDGE.x, z: BRIDGE.rail.z, hx: BRIDGE_RAIL_X + 0.4, hz: BRIDGE.rail.len / 2, rot: 0, top: 4 },
   ];
 }
-const fenceBlocked = (x: number, z: number) => fenceObstacles().some((c) => overlaps(c, x, z, 1.6));
+/** Gaps in the spawn table's front fence where the toy car's track and the lift's rails go over the edge (hubRides.ts). */
+const rideGap = (x: number, z: number) => Math.abs(z - (HUB_WALK.maxZ + 3.2)) < 1 && (Math.abs(x - CAR.x) < 4.6 || Math.abs(x - LIFT.x) < 4.6);
+const fenceBlocked = (x: number, z: number) => rideGap(x, z) || fenceObstacles().some((c) => overlaps(c, x, z, 1.6));
 
 /** A domino fence round one play mat, 3.2 cm outside it. `fallen(x)` topples some on its south edge. */
 function fenceAround(b: WalkRect, fallen: (x: number) => boolean, out: DominoSpec[], seed: number) {

@@ -13,7 +13,7 @@ import { addMouseDelta, consumeMouseDelta, endFrame, getMoveAxis, isDown, stickR
 import { HUB_MOTION } from '../game/hubMotion';
 import { EMOTE_COOLDOWN, EMOTE_DURATION, type EmoteId } from '../game/emotes';
 import { cameraCeiling, cameraFloorAt, groundHeightAt, resolve } from '../game/collision';
-import { LEVEL_Y, isHubLevel, type HubLevel } from '../game/hubBounds';
+import { ARCADE_CEILING, LEVEL_Y, isHubLevel, type HubLevel } from '../game/hubBounds';
 import { inputBlocked, useGame, useShownLoadout } from '../game/store';
 import { sfx } from '../game/audio';
 import { events } from '../game/events';
@@ -26,6 +26,9 @@ import { exposeDebug } from '../game/debug';
 import { stepPavilionView, pavilionView } from '../scene/pavilionView';
 import { tourFlag } from '../game/tourFlag';
 import { tourCamera } from '../game/welcome';
+import { RIDES, riderAt, type RideKind, type RidePose } from '../game/hubRides';
+import { endRide, ride, rideTime } from '../game/rideState';
+import { FLOOR_Y, TABLE } from '../scene/layout';
 
 // Shared with the online server's movement validation (src/game/hubMotion.ts).
 const { radius: RADIUS, walk: WALK, run: RUN, boost: BOOST, jumpV: JUMP_V, gravity: GRAVITY, turnRate: TURN_RATE } = HUB_MOTION;
@@ -45,6 +48,26 @@ const DEFAULT_PITCH = 0.3;
 
 const damp = (a: number, b: number, l: number, dt: number) => THREE.MathUtils.lerp(a, b, 1 - Math.exp(-l * dt));
 const wrapAngle = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
+
+/**
+ * Keep a ride's chase camera out of the spawn table's slab and above the room floor. Over the table
+ * it stays on the side it is already on (`above` the top, or under the apron) until it has followed
+ * the rider out past the table's edge: so it looks down the drop from the table top, and never passes
+ * through the table.
+ */
+/**
+ * A ride's chase camera looks from behind and to one side (radians off straight behind): the car's
+ * from the open side of its drop and loop (the track's way back runs on the other), so the track
+ * never hides the car; and from a little above.
+ */
+const RIDE_CAM_SIDE: Record<RideKind, number> = { car: 0.9, lift: 0.5 };
+const RIDE_CAM_PITCH = 0.5;
+
+function rideCameraClamp(c: THREE.Vector3, above: boolean) {
+  const overTable = c.x > TABLE.minX - 1 && c.x < TABLE.maxX + 1 && c.z > TABLE.minZ - 1 && c.z < TABLE.maxZ + 1;
+  if (overTable) c.y = above ? Math.max(c.y, 3) : Math.min(c.y, ARCADE_CEILING - 1);
+  c.y = Math.max(c.y, FLOOR_Y + 1.5);
+}
 
 export function PlayerController() {
   const { camera, gl } = useThree();
@@ -97,6 +120,7 @@ export function PlayerController() {
   });
 
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
+  const rideTmp = useMemo(() => ({ pose: { x: 0, y: 0, z: 0, f: [0, 0, 1], u: [0, 1, 0], yaw: 0, h: 0 } as RidePose, x: new THREE.Vector3(), y: new THREE.Vector3(), z: new THREE.Vector3(), m: new THREE.Matrix4() }), []);
   const tmp = useMemo(() => ({ dir: new THREE.Vector3(), desired: new THREE.Vector3(), look: new THREE.Vector3() }), []);
 
   // ---------- look: pointer lock (mouse), drag (mouse fallback), drag (touch) ----------
@@ -362,6 +386,72 @@ export function PlayerController() {
     }
     const eliminated = a.elimT >= 0;
     a.boosted = performance.now() < s.boostUntil;
+
+    // ---------- riding: the toy car down to the arcade, the lift back up (src/game/hubRides.ts) ----------
+    // A scripted journey: no walking, jumping or prompts; the ride's clock says where the toy is.
+    if (ride.kind) {
+      const def = RIDES[ride.kind];
+      const t = rideTime();
+      if (t >= def.duration || !playing) {
+        // landed (or the Hub was left mid-ride: put the toy down at the end)
+        s.level = def.to;
+        s.pos.set(def.land.x, LEVEL_Y[def.to], def.land.z);
+        s.vel.set(0, 0);
+        s.yaw = def.land.yaw;
+        s.yawTarget = null;
+        s.camYaw = s.yaw + Math.PI;
+        s.camPitch = DEFAULT_PITCH;
+        a.vy = 0;
+        a.grounded = true;
+        root.current.rotation.set(0, s.yaw, 0);
+        shadow.current.visible = true;
+        endRide();
+      } else {
+        const p = riderAt(ride.kind, t, rideTmp.pose);
+        s.pos.set(p.x, p.y, p.z);
+        s.vel.set(0, 0);
+        s.yaw = p.yaw;
+        a.speed = 0;
+        a.vy = 0;
+        a.grounded = true;
+        player.pos.copy(s.pos);
+        player.yaw = s.yaw;
+        player.grounded = true;
+        player.level = s.level;
+        player.speed = 0;
+        root.current.position.copy(s.pos);
+        // stand on the car's floor or the lift's deck, whichever way up they are (upside down in the loop)
+        rideTmp.z.set(p.f[0], p.f[1], p.f[2]);
+        rideTmp.y.set(p.u[0], p.u[1], p.u[2]);
+        rideTmp.x.crossVectors(rideTmp.y, rideTmp.z).normalize();
+        rideTmp.y.crossVectors(rideTmp.z, rideTmp.x);
+        root.current.quaternion.setFromRotationMatrix(rideTmp.m.makeBasis(rideTmp.x, rideTmp.y, rideTmp.z));
+        shadow.current.visible = false;
+        if (s.lastPrompt) {
+          s.lastPrompt = '';
+          g.setPrompt(null);
+        }
+        consumeMouseDelta(); // no looking around mid-ride (and no jump of the camera when it ends)
+        // chase camera: behind the ride's heading (steady through the loop), a little above
+        const k = 1 - Math.exp(-3 * dt);
+        s.camYaw += wrapAngle(p.h + Math.PI + RIDE_CAM_SIDE[ride.kind] - s.camYaw) * k;
+        s.camPitch = damp(s.camPitch, RIDE_CAM_PITCH, 3, dt);
+        s.camTarget.x = damp(s.camTarget.x, p.x, 10, dt);
+        s.camTarget.y = damp(s.camTarget.y, p.y + TARGET_H * 0.7, 10, dt);
+        s.camTarget.z = damp(s.camTarget.z, p.z, 10, dt);
+        const cp = Math.cos(s.camPitch);
+        tmp.dir.set(Math.sin(s.camYaw) * cp, Math.sin(s.camPitch), Math.cos(s.camYaw) * cp);
+        tmp.desired.copy(s.camTarget).addScaledVector(tmp.dir, CAM_DIST + 2);
+        const above = s.camPos.y > -TABLE.thickness / 2;
+        rideCameraClamp(tmp.desired, above);
+        s.camPos.lerp(tmp.desired, 1 - Math.exp(-10 * dt));
+        rideCameraClamp(s.camPos, above);
+        camera.position.copy(s.camPos);
+        camera.lookAt(s.camTarget);
+        endFrame();
+        return;
+      }
+    }
 
     // ---------- emotes (keys 1–4 / touch Emote menu) ----------
     if (!s.holdPose) stepEmote(a, dt, EMOTE_DURATION);

@@ -1,8 +1,7 @@
 # Arcade under the table: plan (proposal)
 
-Status: agreed in outline with the owner on 25 Nov 2026. **Phase 1 is built** (two levels and the
-arcade shell; reachable only through the `?debug` teleport hook until phase 2). Phases 2–5 are
-planned.
+Status: agreed in outline with the owner on 25 Nov 2026. **Phases 1 and 2 are built** (two levels,
+the arcade shell, the toy-car ride down and the lift up). Phases 3–5 are planned.
 It moves the trials off the gates table into an arcade on the floor under the spawn table, turns the
 gates table into the Hub's sports ground, and adds wandering NPC toys.
 
@@ -61,7 +60,12 @@ desktop and phone.
      so the speed check doesn't treat the drop as cheating.
    - Build the arcade shell: the floor, the table's underside and legs, string lights, the
      entrance.
-2. **The ride down and the lift up.**
+2. **The ride down and the lift up.** *(Built.)* `src/game/hubRides.ts` (both paths and their
+   timing, pure, shared with the server), `src/game/rideState.ts` (boarding; online the server says
+   yes), `src/character/PlayerController.tsx` (follows the ride, chase camera),
+   `src/character/RemotePlayers.tsx` (others on a ride), `src/scene/Rides.tsx` (track, car, lift),
+   `server/hubRoom.ts` (`board`, `settleRide`); protocol v8; tests: `tests/unit/hub-rides.test.ts`,
+   `tests/e2e/arcade.cjs`, `tests/e2e/online.cjs` (ONLY=ride).
    - Both are scripted journeys: input is locked, the camera follows, and you board with
      Interact (the phone Interact button too).
    - Online, others see you ride. The server times the journey, so positions on it are valid.

@@ -5,6 +5,7 @@
  */
 import type { EmoteId } from './emotes';
 import type { HubLevel } from './hubBounds';
+import type { RideKind } from './hubRides';
 
 export type GameEvents = {
   'player:interact': void;
@@ -15,9 +16,11 @@ export type GameEvents = {
   'player:boost': { seconds: number };
   /** The local toy started an emote (the online client forwards it to the room). */
   'player:emote': { id: EmoteId };
-  /** Put the local toy here (online: the room's spawn spot on joining). */
   /** Put the local toy somewhere (on the tables unless `level` says otherwise). */
   'player:teleport': { x: number; z: number; yaw: number; level?: HubLevel };
+  /** The local toy boarded a ride between the levels (src/game/hubRides.ts), or got off at its end. */
+  'ride:start': { kind: RideKind };
+  'ride:land': { kind: RideKind };
   'prop:marble-push': { dirX: number; dirZ: number };
   'prop:jack-pop': void;
   /** The jack pops to slap a Who Am I? card on someone (online): the same pop, no ambush. */

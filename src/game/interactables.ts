@@ -17,6 +17,8 @@ import { JACK_SPOT } from './whoAmI';
 import { dogVisit, lickCheer, petDog } from './dogVisit';
 import { DOG_PERCH } from './dogRoute';
 import type { HubLevel } from './hubBounds';
+import { RIDES } from './hubRides';
+import { boardRide, riding } from './rideState';
 import { useNet } from '../net/store';
 import { requestCard, wearingCard } from '../net/chat';
 import { CHAT_NOTE_TEXT } from '../net/protocol';
@@ -68,6 +70,9 @@ export const INTERACTABLES: Interactable[] = [
   { id: 'ball-throw', x: BALL.spot.x, z: BALL.spot.z, radius: 3, verb: 'Hold to throw', label: 'the basketball', disabled: () => !iHold() },
   // the dog, when it stands up at the spawn table's front edge (every loop of its stroll)
   { id: 'dog', x: DOG_PERCH.pet.x, z: DOG_PERCH.pet.z, radius: 6, verb: 'Pet', label: 'the dog', disabled: () => !dogVisit.perched },
+  // the rides between the levels (src/game/hubRides.ts): the toy car down to the arcade, the lift back up
+  { id: 'ride-car', x: RIDES.car.board.x, z: RIDES.car.board.z, radius: RIDES.car.reach, verb: 'Ride', label: 'the toy car down to the arcade', disabled: riding },
+  { id: 'ride-lift', x: RIDES.lift.board.x, z: RIDES.lift.board.z, radius: RIDES.lift.reach, verb: 'Ride', label: 'the lift up to the Hub', level: 'floor', disabled: riding },
   { id: 'jack', x: JACK_SPOT.x, z: JACK_SPOT.z, radius: JACK_SPOT.radius, verb: 'Open', label: 'a suspicious box', secret: true },
   { id: 'key', x: TOWER.block.x, z: TOWER.block.z, radius: 2.4, verb: 'Grab', label: 'the golden key', secret: true, minY: TOWER.block.top - 0.5, disabled: () => !keyAvailable() },
 ];
@@ -109,6 +114,12 @@ export function interact(id: string, facing: { x: number; z: number }) {
   }
 
   switch (id) {
+    case 'ride-car':
+      boardRide('car');
+      return;
+    case 'ride-lift':
+      boardRide('lift');
+      return;
     case 'pavilion':
       // talking to the Tournament Curator (they hop: src/scene/Greeters.tsx)
       sfx.click();

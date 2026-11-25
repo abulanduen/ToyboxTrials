@@ -41,7 +41,8 @@ export const ARCADE = {
   y: FLOOR_Y,
   carpet: { minX: -73, maxX: 73, minZ: -53, maxZ: 39 },
   wall: { minX: -72, maxX: 72, minZ: -52, maxZ: 38, h: 2.6, t: 2, brick: 4 },
-  entrance: { x: 0, halfW: 9 },
+  // wide enough for both ways in and out: the car track (hubRides.ts CAR.inX) and the lift's rails (LIFT.x)
+  entrance: { x: 9, halfW: 18 },
   ceiling: ARCADE_CEILING,
   strands: [-42, -18, 6, 28],
   /** Each strand hangs from just under the apron and sags this far at its middle (cm). */

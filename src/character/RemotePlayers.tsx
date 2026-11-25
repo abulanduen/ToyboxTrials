@@ -24,6 +24,10 @@ import { cleanAccessories, isHatId, isKeySkinId } from '../game/cosmetics';
 import { blobShadowTexture } from '../scene/textures';
 import { groundHeightAt } from '../game/collision';
 import { MINIGAMES } from '../minigames/registry';
+import { RIDES, riderAt, type RidePose } from '../game/hubRides';
+import { levelOfY } from '../game/hubBounds';
+import { netLink } from '../net/link';
+import { INTERP_DELAY_MS } from '../net/protocol';
 
 /** Name tags further than this from the camera are hidden (cm). */
 const TAG_RANGE = 90;
@@ -63,6 +67,7 @@ function RemoteToy({ info }: { info: PlayerInfo }) {
   const shadow = useRef<THREE.Mesh>(null!);
   const st = useRef({ sample: { t: 0, x: 0, y: 0, z: 0, yaw: 0, speed: 0, grounded: true } as NetSample, placed: false, prevY: 0, prevYaw: 0, subText: '', tagShown: false, tagX: NaN, tagY: NaN, tagEl: undefined as HTMLElement | undefined });
   const head = useMemo(() => new THREE.Vector3(), []);
+  const rideTmp = useMemo(() => ({ pose: { x: 0, y: 0, z: 0, f: [0, 0, 1], u: [0, 1, 0], yaw: 0, h: 0 } as RidePose, x: new THREE.Vector3(), y: new THREE.Vector3(), z: new THREE.Vector3(), m: new THREE.Matrix4() }), []);
 
   const paint = PAINT_JOBS[((info.look.paint % PAINT_JOBS.length) + PAINT_JOBS.length) % PAINT_JOBS.length];
   const hat = isHatId(info.look.hat) ? info.look.hat : 'none';
@@ -92,9 +97,35 @@ function RemoteToy({ info }: { info: PlayerInfo }) {
       return;
     }
     g.visible = true;
-    shadow.current.visible = true;
+    // On a ride between the levels: placed from the ride's own clock (smooth through the loop), drawn
+    // as far behind the server as the snapshots are.
+    let onRide = false;
+    const rd = remote.ride;
+    const serverNow = rd ? netLink.serverTime() : null;
+    if (rd && serverNow !== null) {
+      const t = (serverNow - INTERP_DELAY_MS) / 1000 - rd.t0;
+      if (t >= RIDES[rd.kind].duration) remote.ride = null;
+      else if (t >= 0) {
+        const p = riderAt(rd.kind, t, rideTmp.pose);
+        r.x = p.x;
+        r.y = p.y;
+        r.z = p.z;
+        r.yaw = p.yaw;
+        r.speed = 0;
+        r.grounded = true;
+        onRide = true;
+      }
+    }
+    shadow.current.visible = !onRide;
     g.position.set(r.x, r.y, r.z);
-    g.rotation.y = r.yaw;
+    if (onRide) {
+      const p = rideTmp.pose;
+      rideTmp.z.set(p.f[0], p.f[1], p.f[2]);
+      rideTmp.y.set(p.u[0], p.u[1], p.u[2]);
+      rideTmp.x.crossVectors(rideTmp.y, rideTmp.z).normalize();
+      rideTmp.y.crossVectors(rideTmp.z, rideTmp.x);
+      g.quaternion.setFromRotationMatrix(rideTmp.m.makeBasis(rideTmp.x, rideTmp.y, rideTmp.z));
+    } else g.rotation.set(0, r.yaw, 0);
 
     // Animation from the interpolated motion.
     a.speed = remote.activity ? 0 : r.speed;
@@ -115,7 +146,7 @@ function RemoteToy({ info }: { info: PlayerInfo }) {
     s.prevYaw = r.yaw;
     s.placed = true;
 
-    shadow.current.position.set(r.x, groundHeightAt(r.x, r.z, 0.85, r.y) + 0.03, r.z);
+    shadow.current.position.set(r.x, groundHeightAt(r.x, r.z, 0.85, r.y, levelOfY(r.y)) + 0.03, r.z);
 
     // Name tag: project the point above the head to the screen; hide when behind or far away.
     if (tag) {

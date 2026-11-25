@@ -1,9 +1,10 @@
-/* The arcade under the spawn table (docs/ARCADE_PLAN.md phase 1: the second level and the shell).
-   Until the toy-car ride and the lift exist (phase 2), the test hook puts the toy down there:
+/* The arcade under the spawn table (docs/ARCADE_PLAN.md: the second level, the shell, the rides).
      BASE_URL=http://localhost:4173/ node tests/e2e/arcade.cjs        (ONLY=desktop|phone)
-   Desktop: the toy stands on the arcade floor, walks on it and stays inside it, the camera stays
-   between the floor and the table above, nothing on the table overhead offers a prompt, and back on
-   the table everything is as before. Phone portrait: the joystick walks the toy round the arcade. */
+   Desktop: the toy car (Interact by it) carries the toy off the table, round the loop and into the
+   arcade, with input locked on the way; the toy walks the arcade floor and stays inside it, the camera
+   stays between the floor and the table above, nothing on the table overhead offers a prompt, and the
+   lift (Interact) takes it back up to the table. Phone portrait: the Interact button boards the car;
+   the joystick walks the toy round the arcade; the Interact button boards the lift. */
 const { chromium, devices } = require('playwright');
 const path = require('path');
 const fs = require('fs');
@@ -39,14 +40,38 @@ const frames = (page, n) => page.evaluate((n) => new Promise((res) => { let i = 
 const me = (page) => page.evaluate(() => { const s = window.__toybox.state(); const c = window.__toybox.three().camera.position; return { level: s.level, x: s.x, y: s.y, z: s.z, cam: { x: c.x, y: c.y, z: c.z } }; });
 const inArcade = (p, r = 0.8) => p.x >= ARCADE.minX + r - 0.01 && p.x <= ARCADE.maxX - r + 0.01 && p.z >= ARCADE.minZ + r - 0.01 && p.z <= ARCADE.maxZ - r + 0.01;
 const prompt = (page) => page.evaluate(() => document.querySelector('.prompt')?.textContent ?? '');
+const CAR = { x: 10, z: 30 }; // src/game/hubRides.ts CAR (boarding spot)
+const LIFT = { x: -4, z: 32, landZ: 33 }; // LIFT
+const rideState = (page) => page.evaluate(() => window.__toybox.ride.state());
+/** Wait until the ride is over (the toy got off): its level and where it stands. */
+async function waitLanded(page, ms = 60000) {
+  await page.waitForFunction(() => !window.__toybox.ride.state().kind, null, { timeout: ms, polling: 100 }).catch(() => null);
+  await frames(page, 4);
+  return me(page);
+}
 
 async function desktop(browser) {
   const { ctx, page, errs } = await open(browser, { viewport: { width: 1280, height: 720 } });
-  // down to the arcade (the hook stands in for the ride)
-  await page.evaluate(() => { window.__toybox.teleport(0, 10, Math.PI, 'floor'); window.__toybox.aim(0, 0.2); });
+  // down to the arcade on the toy car
+  await page.evaluate(([x, z]) => { window.__toybox.teleport(x + 1, z - 2.5, 0); window.__toybox.aim(Math.PI + 0.7, 0.35); }, [CAR.x, CAR.z]);
   await frames(page, 8);
-  let s = await me(page);
-  check('the toy stands on the arcade floor under the spawn table', s.level === 'floor' && Math.abs(s.y - FLOOR_Y) < 0.05, JSON.stringify(s));
+  check('by the toy car, the prompt offers the ride down', /Ride.*toy car/.test(await prompt(page)), JSON.stringify(await prompt(page)));
+  await page.evaluate(() => document.activeElement && document.activeElement.blur());
+  await page.keyboard.press('e');
+  await page.waitForFunction(() => window.__toybox.ride.state().kind === 'car', null, { timeout: 10000 }).catch(() => null);
+  check('Interact boards the car', (await rideState(page)).kind === 'car');
+  // halfway: hold the ride still and look (input is locked: walking keys do nothing)
+  await page.evaluate(() => window.__toybox.ride.hold(2.15));
+  await page.keyboard.down('a');
+  await frames(page, 20);
+  await page.keyboard.up('a');
+  const mid = await me(page);
+  check('halfway, the car has the toy off the table, round the loop on the rug (walking keys do nothing)', mid.y < -60 && mid.z > 90 && Math.abs(mid.x - 10) < 8, JSON.stringify(mid));
+  check('no prompt while riding', !(await prompt(page)).trim());
+  await page.screenshot({ path: `${OUT}/arcade-00-ride-loop.png` });
+  await page.evaluate(() => window.__toybox.ride.hold(null));
+  let s = await waitLanded(page);
+  check('the car sets the toy down on the arcade floor under the spawn table', s.level === 'floor' && Math.abs(s.y - FLOOR_Y) < 0.05 && inArcade(s), JSON.stringify(s));
   check('the camera is between the floor and the table above', s.cam.y > FLOOR_Y + 0.5 && s.cam.y < CEILING, `camera y ${s.cam.y.toFixed(1)}`);
   await page.screenshot({ path: `${OUT}/arcade-01-desktop.png` });
 
@@ -85,11 +110,29 @@ async function desktop(browser) {
   await frames(page, 10);
   check('standing under the Pavilion does not open it up', !(await page.evaluate(() => window.__toybox.hub.pavilion().inside)));
 
-  // back up on the table: as before
-  await page.evaluate(() => window.__toybox.teleport(0, 22, Math.PI, 'table'));
+  // back up on the lift
+  await page.evaluate(([x, z]) => window.__toybox.teleport(x, z - 2, 0, 'floor'), [LIFT.x, LIFT.z]);
   await frames(page, 6);
-  const s4 = await me(page);
-  check('back on the table, the toy stands on its top again', s4.level === 'table' && Math.abs(s4.y) < 0.05 && s4.cam.y > 0, JSON.stringify(s4));
+  check('by the lift, the prompt offers the ride up', /Ride.*lift/.test(await prompt(page)), JSON.stringify(await prompt(page)));
+  await page.keyboard.press('e');
+  await page.waitForFunction(() => window.__toybox.ride.state().kind === 'lift', null, { timeout: 10000 }).catch(() => null);
+  check('Interact boards the lift', (await rideState(page)).kind === 'lift');
+  await page.evaluate(() => window.__toybox.ride.hold(3.6));
+  await frames(page, 30);
+  const climbing = await me(page);
+  check('the lift climbs outside the table’s edge', climbing.y > FLOOR_Y + 10 && climbing.y < -5 && climbing.z > 47, JSON.stringify(climbing));
+  await page.screenshot({ path: `${OUT}/arcade-03-lift.png` });
+  await page.evaluate(() => window.__toybox.ride.hold(null));
+  const s4 = await waitLanded(page);
+  check('the lift sets the toy down on the table top, and the camera is back above it', s4.level === 'table' && Math.abs(s4.y) < 0.05 && Math.abs(s4.z - LIFT.landZ) < 0.1 && s4.cam.y > 0, JSON.stringify(s4));
+  // and it walks on from there as before
+  await page.evaluate(() => window.__toybox.aim(0, 0.3)); // camera south of the toy: W walks north, into the Hub
+  await page.keyboard.down('w');
+  await page.waitForTimeout(1200);
+  await page.keyboard.up('w');
+  await frames(page, 4);
+  const s5 = await me(page);
+  check('off the lift, the toy walks on into the Hub', s5.level === 'table' && s5.z < s4.z - 0.5, JSON.stringify(s5));
   check('no page errors (desktop)', errs.length === 0, errs.slice(0, 3).join(' | '));
   await ctx.close();
 }
@@ -98,10 +141,21 @@ async function phone(browser) {
   const { ctx, page, errs } = await open(browser, { ...devices['iPhone 13'] });
   const cdp = await ctx.newCDPSession(page);
   const touch = (type, points) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: points.map(([x, y, id = 0]) => ({ x, y, id })) });
-  await page.evaluate(() => { window.__toybox.teleport(0, 10, Math.PI, 'floor'); window.__toybox.aim(0, 0.2); });
-  await frames(page, 8);
-  const s = await me(page);
-  check('phone: the toy is on the arcade floor', s.level === 'floor' && Math.abs(s.y - FLOOR_Y) < 0.05);
+  const tapInteract = async (id) => {
+    const el = await page.waitForSelector('.touch-btn--interact', { timeout: 60000 });
+    const b = await el.boundingBox();
+    await touch('touchStart', [[b.x + b.width / 2, b.y + b.height / 2, id]]);
+    await page.waitForTimeout(150);
+    await touch('touchEnd', []);
+  };
+  // the Interact button boards the car
+  await page.evaluate(([x, z]) => { window.__toybox.teleport(x, z - 2.5, 0); window.__toybox.aim(Math.PI, 0.35); }, [CAR.x, CAR.z]);
+  await page.waitForFunction(() => document.querySelector('.touch-btn--interact')?.getAttribute('aria-label')?.includes('toy car'), null, { timeout: 60000 }).catch(() => null);
+  await tapInteract(7);
+  await page.waitForFunction(() => window.__toybox.ride.state().kind === 'car', null, { timeout: 10000 }).catch(() => null);
+  check('phone: the Interact button boards the toy car', (await rideState(page)).kind === 'car');
+  const s = await waitLanded(page);
+  check('phone: the car brings the toy down to the arcade floor', s.level === 'floor' && Math.abs(s.y - FLOOR_Y) < 0.05, JSON.stringify(s));
   const vp = page.viewportSize();
   const x0 = Math.round(vp.width * 0.25);
   const y0 = Math.round(vp.height * 0.8);
@@ -115,6 +169,14 @@ async function phone(browser) {
   check('phone: the joystick walks the toy across the arcade floor', Math.hypot(s2.x - s.x, s2.z - s.z) > 1 && s2.level === 'floor' && Math.abs(s2.y - FLOOR_Y) < 0.05, `(${s.x.toFixed(1)}, ${s.z.toFixed(1)}) → (${s2.x.toFixed(1)}, ${s2.z.toFixed(1)})`);
   check('phone: the camera stays under the table', s2.cam.y < CEILING && s2.cam.y > FLOOR_Y + 0.5, `camera y ${s2.cam.y.toFixed(1)}`);
   await page.screenshot({ path: `${OUT}/arcade-02-phone-portrait.png` });
+  // and the lift back up
+  await page.evaluate(([x, z]) => window.__toybox.teleport(x, z - 2, 0, 'floor'), [LIFT.x, LIFT.z]);
+  await page.waitForFunction(() => document.querySelector('.touch-btn--interact')?.getAttribute('aria-label')?.includes('lift'), null, { timeout: 60000 }).catch(() => null);
+  await tapInteract(8);
+  await page.waitForFunction(() => window.__toybox.ride.state().kind === 'lift', null, { timeout: 10000 }).catch(() => null);
+  check('phone: the Interact button boards the lift', (await rideState(page)).kind === 'lift');
+  const up = await waitLanded(page);
+  check('phone: the lift brings the toy back up to the table', up.level === 'table' && Math.abs(up.y) < 0.05, JSON.stringify(up));
   check('no page errors (phone)', errs.length === 0, errs.slice(0, 3).join(' | '));
   await ctx.close();
 }
