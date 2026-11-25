@@ -13,6 +13,7 @@ import { Dominoes, paintMat, feltMat, woodMat, type DominoSpec } from './props';
 import { DOMINO } from './domino';
 import { FOUNTAIN, PAVILION, PAVILION_PROPS, PAVILION_WALL, SCOREBOARD, SHOP, WORKSHOP } from './layout';
 import { Kit } from './kit';
+import { BOWL_WATER, POOL_R, POOL_Y, dripPoints, fountainBasinGeometry, fountainTiersGeometry } from './fountainDecor';
 import { buildPavilionInterior, doorTrimGeometry, pavilionWallGeometry } from './pavilionDecor';
 import { pavilionCutEased } from './pavilionView';
 import { SECRET_IDS } from '../game/interactables';
@@ -20,97 +21,69 @@ import { SECRET_IDS } from '../game/interactables';
 const cardboardMat = (tint: string = PALETTE.cardboard) =>
   new THREE.MeshStandardMaterial({ color: '#ffffff', map: cardboardTexture(tint, [1, 1]), roughness: 0.95 });
 
-// ---------------- Fountain: an upturned bottle cap with a marble on a thread spool ----------------
-/** The pool's surface, and how far the spool, marble and jets sit below their modelled heights so the
- *  spool's bottom flange stands on the water (it floated almost 1 cm above it before). */
-const FOUNTAIN_WATER_Y = FOUNTAIN.top - 0.25;
-const SPOOL_DROP = 2.2 - 0.175 - FOUNTAIN_WATER_Y;
+// ---------------- Fountain: a two-tier resin garden fountain in a basin of stone blocks ----------------
+// Geometry: src/scene/fountainDecor.ts. Water drips from the bowls' scallops, one drop per tip at a time.
+const DRIPS = dripPoints();
+/** Seconds between drops from one tip, and how far they fall per second² (slow, toy-like). */
+const DRIP_EVERY = 1.6;
+const DRIP_FALL = 14;
 
 export function Fountain() {
-  const capGeo = useMemo(() => {
-    // crimped bottle-cap ring: alternate vertex radii
-    const g = new THREE.CylinderGeometry(FOUNTAIN.r, FOUNTAIN.r, FOUNTAIN.top, 42, 1, true);
-    const pos = g.attributes.position;
-    for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i);
-      const z = pos.getZ(i);
-      const a = Math.atan2(z, x);
-      const k = 1 + 0.045 * Math.sign(Math.sin(a * 21));
-      pos.setX(i, x * k);
-      pos.setZ(i, z * k);
-    }
-    g.computeVertexNormals();
-    return g;
-  }, []);
+  const tiersGeo = useMemo(fountainTiersGeometry, []);
+  const basinGeo = useMemo(fountainBasinGeometry, []);
+  const basinMat = useMemo(() => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 }), []);
+  // Water stays fairly rough and low in specular on purpose: a near-mirror surface threw pixel-sized
+  // sun highlights above the bloom threshold, and seen towards the window a normal-strength reflection
+  // turned the whole pool near-white within a few degrees of camera turn. Painted toy water, not a mirror.
+  const waterMat = useMemo(
+    () => new THREE.MeshPhysicalMaterial({ color: PALETTE.fountainWater, emissive: PALETTE.fountainWater, emissiveIntensity: 0.18, roughness: 0.45, metalness: 0, specularIntensity: 0.25 }),
+    [],
+  );
   const drops = useRef<THREE.InstancedMesh>(null!);
-  const N = 28;
   const dummy = useMemo(() => new THREE.Object3D(), []);
-  const water = useRef<THREE.Mesh>(null!);
+  // each tip starts at its own point in the cycle so the drops don't fall in step
+  const phase = useMemo(() => DRIPS.map((_, i) => (i * 0.618) % 1), []);
 
   useFrame((s) => {
     const t = s.clock.elapsedTime;
-    for (let i = 0; i < N; i++) {
-      const jet = i % 4;
-      const ang = (jet / 4) * Math.PI * 2 + 0.4;
-      const k = ((t * 0.9 + i / N) % 1 + 1) % 1;
-      const r = 0.8 + k * 3.2;
-      dummy.position.set(FOUNTAIN.x + Math.cos(ang) * r, 4.3 - SPOOL_DROP + Math.sin(k * Math.PI) * 1.6 - k * 3.2, FOUNTAIN.z + Math.sin(ang) * r);
-      dummy.scale.setScalar(0.22 * (1 - k * 0.4));
+    for (let i = 0; i < DRIPS.length; i++) {
+      const d = DRIPS[i];
+      const k = (t / DRIP_EVERY + phase[i]) % 1;
+      const tf = Math.sqrt((2 * (d.y - d.floor)) / DRIP_FALL); // time to reach the water
+      const age = k * DRIP_EVERY;
+      // swell on the tip for the first part of the cycle, then fall; hidden once it reaches the water
+      const swell = Math.min(1, age / 0.5);
+      const fallT = Math.max(0, age - 0.5);
+      const y = d.y - 0.5 * DRIP_FALL * fallT * fallT;
+      const gone = fallT > tf;
+      dummy.position.set(FOUNTAIN.x + d.x, gone ? -10 : y - 0.12 * swell, FOUNTAIN.z + d.z);
+      dummy.scale.set(0.13 * swell, 0.13 * swell * (fallT > 0 ? 1.5 : 1), 0.13 * swell);
       dummy.updateMatrix();
       drops.current.setMatrixAt(i, dummy.matrix);
     }
     drops.current.instanceMatrix.needsUpdate = true;
-    (water.current.material as THREE.MeshPhysicalMaterial).emissiveIntensity = 0.25 + Math.sin(t * 2) * 0.05;
+    waterMat.emissiveIntensity = 0.18 + Math.sin(t * 2) * 0.04;
   });
 
   return (
     <group>
       <group position={[FOUNTAIN.x, 0, FOUNTAIN.z]}>
-        <mesh geometry={capGeo} position={[0, FOUNTAIN.top / 2, 0]} castShadow receiveShadow material={paintMat(PALETTE.honey, 0.3, 0.75)} ref={camBlock} />
-        <mesh position={[0, FOUNTAIN.top / 2, 0]} material={paintMat('#9B7A3A', 0.4, 0.6)}>
-          <cylinderGeometry args={[FOUNTAIN.r - 0.25, FOUNTAIN.r - 0.25, FOUNTAIN.top - 0.1, 32, 1, true]} />
+        <mesh geometry={basinGeo} material={basinMat} castShadow receiveShadow ref={camBlock} />
+        <mesh position={[0, POOL_Y, 0]} rotation={[-Math.PI / 2, 0, 0]} material={waterMat} receiveShadow>
+          <circleGeometry args={[POOL_R, 40]} />
         </mesh>
-        {/* Water and glass stay fairly rough on purpose: near-mirror surfaces threw pixel-sized sun
-            highlights above the bloom threshold that flashed on and off as the camera turned. */}
-        <mesh ref={water} position={[0, FOUNTAIN_WATER_Y, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-          <circleGeometry args={[FOUNTAIN.r - 0.3, 32]} />
-          {/* Low specular: seen towards the window, a normal-strength sun reflection turned the whole
-              pool from blue to near-white within a few degrees of camera turn (with bloom on top),
-              which read as the fountain flickering while panning. Painted toy water, not a mirror. */}
-          <meshPhysicalMaterial color={PALETTE.toyBlue} emissive={PALETTE.toyBlue} emissiveIntensity={0.25} roughness={0.5} metalness={0} specularIntensity={0.25} />
-        </mesh>
-        {/* thread spool pillar, standing in the pool (the group lowers it onto the water) */}
-        <group position={[0, -SPOOL_DROP, 0]}>
-        <mesh position={[0, 2.2, 0]} castShadow material={woodMat(PALETTE.woodLight)}>
-          <cylinderGeometry args={[0.9, 0.9, 0.35, 16]} />
-        </mesh>
-        <mesh position={[0, 2.9, 0]} castShadow material={paintMat(PALETTE.coral, 0.9)}>
-          <cylinderGeometry args={[0.65, 0.65, 1.1, 16]} />
-        </mesh>
-        <mesh position={[0, 3.6, 0]} castShadow material={woodMat(PALETTE.woodLight)}>
-          <cylinderGeometry args={[0.9, 0.9, 0.35, 16]} />
-        </mesh>
-        {/* glass marble */}
-        {/* Not a camera blocker: a ball this small only grazes the camera ray, which then flicked
-            between hit and miss as the view turned and jolted the camera in and out. */}
-        <mesh position={[0, 4.75, 0]} castShadow>
-          <sphereGeometry args={[1.05, 24, 18]} />
-          {/* depthWrite off: as see-through glass it must not hide the droplets behind it. With it on,
-              the droplets popped in and out as the camera turned and the transparent sort order flipped. */}
-          <meshPhysicalMaterial color="#BFE2F2" roughness={0.2} transmission={0} transparent opacity={0.72} depthWrite={false} clearcoat={0.6} clearcoatRoughness={0.3} />
-        </mesh>
-        <mesh position={[0.15, 4.75, 0]} rotation={[0.3, 0, 0.6]}>
-          <torusGeometry args={[0.55, 0.12, 6, 18, Math.PI * 1.2]} />
-          <meshStandardMaterial color={PALETTE.coral} emissive={PALETTE.coral} emissiveIntensity={0.3} />
-        </mesh>
-        </group>
+        {/* Not a camera blocker: as slim as it is, the camera ray would only graze it and flick
+            between hit and miss as the view turned, jolting the camera in and out. */}
+        <mesh geometry={tiersGeo} castShadow receiveShadow material={paintMat(PALETTE.fountainResin, 0.6)} />
+        {BOWL_WATER.map((w, i) => (
+          <mesh key={i} position={[0, w.y, 0]} rotation={[-Math.PI / 2, 0, 0]} material={waterMat} receiveShadow>
+            <circleGeometry args={[w.r, 32]} />
+          </mesh>
+        ))}
       </group>
-      <instancedMesh ref={drops} args={[undefined, undefined, N]}>
+      <instancedMesh ref={drops} args={[undefined, undefined, DRIPS.length]} frustumCulled={false}>
         <sphereGeometry args={[1, 8, 6]} />
-        {/* Opaque on purpose: as a transparent mesh the droplets and the glass marble swapped draw
-            order as the camera turned (their sort points cross), so drops behind the marble popped in
-            front of it and back. Opaque drops are drawn first and the marble blends over them. */}
-        <meshStandardMaterial color="#D8F0FF" emissive={PALETTE.toyBlue} emissiveIntensity={0.4} roughness={0.5} />
+        <meshStandardMaterial color={PALETTE.fountainWater} emissive={PALETTE.fountainWater} emissiveIntensity={0.3} roughness={0.4} />
       </instancedMesh>
     </group>
   );

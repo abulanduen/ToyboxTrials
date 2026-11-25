@@ -44,7 +44,7 @@ _What is not done, not verified, or risky. Updated at Milestone 2._
    patch), which doubled the texel count of each tier's map. Not measured on a real GPU.
    *Mitigation:* halve the sizes in `QUALITY` (`src/scene/PlayroomScene.tsx`), or bake a static
    shadow texture for the village.
-4. **Transparent overdraw** (fountain droplets, marble, glass). Small today. Watch it as VFX are added.
+4. **Transparent overdraw** (glass; the fountain's drips are opaque). Small today. Watch it as VFX are added.
 5. **Canvas texture regeneration** (scoreboard face) happens on secret count changes only. This is fine now,
    but avoid per-frame text textures.
 6. **Bundle size:** about 400 kB of gzipped JS, mostly three.js and postprocessing. Minigames must be

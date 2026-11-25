@@ -27,6 +27,11 @@ export const PALETTE = {
   blush: '#EE9A8E',
   /** Polished steel (the greeter knight's helmet, fencing foils). */
   steel: '#C9CED6',
+  /** The plaza fountain (src/scene/fountainDecor.ts): cream resin tiers, dusty stone blocks, painted turquoise water. */
+  fountainResin: '#EFE9DD',
+  fountainStone: '#C7B2AE',
+  fountainMortar: '#958280',
+  fountainWater: '#62CBBF',
   /** The hub's basketball (src/scene/HubPlay.tsx). */
   ballOrange: '#E8893F',
   /** Team jerseys (Hoop Clash): deeper than the coral and toy-blue paint jobs, so a jersey always reads on any toy. */
