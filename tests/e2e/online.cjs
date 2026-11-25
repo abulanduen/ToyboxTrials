@@ -41,7 +41,7 @@ const check = (n, ok, d = '') => {
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /** The protocol version this test expects (src/net/protocol.ts PROTOCOL_VERSION). */
-const PROTO = 6; // v6: proximity voice chat; v5: chat and Who Am I? cards (v4: hub play)
+const PROTO = 7; // v7: the shared dog; v6: proximity voice chat; v5: chat and Who Am I? cards (v4: hub play)
 const VOICE_ONLY = process.env.ONLY === 'voice';
 const DOG_ONLY = process.env.ONLY === 'dog';
 
