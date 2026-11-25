@@ -1,13 +1,18 @@
 /**
- * Where a contender may walk in the hub: a union of rounded rectangles (1 unit = 1 cm, table top
- * y = 0). Pure numbers with no imports, shared by the client (collision.ts) and the online server,
- * which keeps every reported position inside these same rectangles.
+ * Where a contender may walk in the hub: a union of rounded rectangles per level (1 unit = 1 cm,
+ * table top y = 0). Pure numbers with no imports, shared by the client (collision.ts) and the online
+ * server, which keeps every reported position inside these same rectangles.
  *
- *  - `hub`: the play mat on the spawn table (fountain plaza, Pavilion, Workshop, shop, Scoreboard);
- *  - `gates`: the play mat on the second table, the desk under the window, where the trial gates stand;
- *  - `bridge`: the domino bridge between them, exactly as wide as the walkway between its rails.
+ * Two levels (`HubLevel`):
+ *  - `table` (y = 0): the tables' play mats and the bridge between them.
+ *    - `hub`: the play mat on the spawn table (fountain plaza, Pavilion, Workshop, shop, Scoreboard);
+ *    - `gates`: the play mat on the second table, the desk under the window, where the trial gates stand;
+ *    - `bridge`: the domino bridge between them, exactly as wide as the walkway between its rails.
+ *  - `floor` (y = LEVEL_Y.floor, the room floor): the arcade, the den under the spawn table, between
+ *    its legs (docs/ARCADE_PLAN.md).
  *
- * Nowhere else is walkable: the gap between the two tables and the tables' margins are not.
+ * Nowhere else is walkable: the gap between the two tables and the tables' margins are not, and a toy
+ * never walks or falls from one level to the other (only a ride or a lift takes it between them).
  */
 export interface WalkRect {
   id: string;
@@ -34,6 +39,38 @@ export const BRIDGE_HALF_W = 3.5;
 export const BRIDGE_WALK: WalkRect = { id: 'bridge', minX: BRIDGE_X - BRIDGE_HALF_W, maxX: BRIDGE_X + BRIDGE_HALF_W, minZ: -104, maxZ: -42, corner: 0 };
 
 export const WALK_AREAS: readonly WalkRect[] = [HUB_WALK, BRIDGE_WALK, GATES_WALK];
+
+// ---------------------------------------------------------------- levels
+
+export type HubLevel = 'table' | 'floor';
+export const HUB_LEVELS: readonly HubLevel[] = ['table', 'floor'];
+export const isHubLevel = (v: unknown): v is HubLevel => v === 'table' || v === 'floor';
+
+/**
+ * The ground of each level (cm): the table tops, and the room floor (src/scene/layout.ts FLOOR_Y:
+ * the tables' 3.5 cm tops on 72 cm legs; a unit test keeps them equal).
+ */
+export const LEVEL_Y: Record<HubLevel, number> = { table: 0, floor: -75.5 };
+
+/**
+ * The arcade under the spawn table: its walkable floor (inside the four legs, which stand at
+ * x = ±74, z = -54 and 40) and its ceiling, the underside of the table's apron (cm).
+ */
+export const ARCADE_WALK: WalkRect = { id: 'arcade', minX: -70, maxX: 70, minZ: -50, maxZ: 36, corner: 6 };
+export const ARCADE_CEILING = -11.5;
+
+/** The level a height belongs to: anything nearer the floor than the tables is the floor's. */
+export const levelOfY = (y: number): HubLevel => (y < LEVEL_Y.floor / 2 ? 'floor' : 'table');
+
+/** Where each level's toys may walk. */
+export const LEVEL_WALK: Record<HubLevel, readonly WalkRect[]> = { table: WALK_AREAS, floor: [ARCADE_WALK] };
+
+/**
+ * Highest a contender's feet can legitimately be above its level's ground (cm): on the tables the
+ * tallest thing you can stand on is about 16 cm, plus a jump; the arcade has nothing taller than a
+ * jump yet. Used by the online server's position clamp (hubMotion.ts HUB_MAX_Y is the table's).
+ */
+export const LEVEL_MAX_RISE: Record<HubLevel, number> = { table: 24, floor: 12 };
 
 /** Clamp a point (circle of radius r) into one rounded rectangle, in place. */
 function clampToRect(pos: { x: number; z: number }, b: WalkRect, r: number) {

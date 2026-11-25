@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { HUB_SPAWN } from './hubMotion';
+import type { HubLevel } from './hubBounds';
 
 /** Read-only snapshot of the local player for props/UI (written by PlayerController). */
 export const player = {
@@ -9,6 +10,8 @@ export const player = {
   /** Horizontal speed (cm/s), for the online movement updates. */
   speed: 0,
   eliminated: false,
+  /** Which level the toy is on: the tables, or the arcade on the floor under the spawn table. */
+  level: 'table' as HubLevel,
 };
 
 export const SPAWN = { x: HUB_SPAWN.x, z: HUB_SPAWN.z, yaw: HUB_SPAWN.yaw };

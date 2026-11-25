@@ -16,6 +16,7 @@ import { ballFree, ballInAir, canSnatch, canSteal, grab, iHold, kick, startCharg
 import { JACK_SPOT } from './whoAmI';
 import { dogVisit, lickCheer, petDog } from './dogVisit';
 import { DOG_PERCH } from './dogRoute';
+import type { HubLevel } from './hubBounds';
 import { useNet } from '../net/store';
 import { requestCard, wearingCard } from '../net/chat';
 import { CHAT_NOTE_TEXT } from '../net/protocol';
@@ -30,6 +31,8 @@ export interface Interactable {
   label: string;
   /** Required feet height range (e.g. the key on top of the tower). */
   minY?: number;
+  /** The level it's on (default: the tables); a toy on another level never sees its prompt. */
+  level?: HubLevel;
   /** Hidden objects don't advertise themselves until you're close. */
   secret?: boolean;
   /** Temporarily unavailable (e.g. key collected). */

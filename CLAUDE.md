@@ -53,6 +53,10 @@ Build one complete, testable system at a time.
 - 1 world unit = 1 cm. Table top is y = 0. The contender is 3.5 cm tall.
 - Positions and colliders live in `src/scene/layout.ts`. Collision box `rot` uses the same
   convention as three.js `rotation.y`.
+- Two Hub levels (`src/game/hubBounds.ts`): `table` (y = 0) and `floor` (the arcade under the spawn
+  table, y = -75.5; docs/ARCADE_PLAN.md). Colliders (`lv`), walk areas, interactables (`level`), the
+  camera floor/ceiling and the server's movement checks are per level; a toy only changes level by
+  ride or lift (the `?debug` teleport hook takes a level for tests).
 - No React state changes per frame. The frame loop reads the Zustand store and plain objects.
 - Colours come from `src/game/palette.ts`.
 - `?debug` exposes `window.__toybox` test hooks. Gameplay must never depend on them.
@@ -80,6 +84,7 @@ node tests/e2e/secrets.cjs
 node tests/e2e/mobile.cjs       # touch/phone checks
 node tests/e2e/menu.cjs         # main menu, Workshop, unlocks, persistence, deep links
 node tests/e2e/hubgates.cjs     # hub: every trial gate opens its lobby (desktop + phone Interact), gate screenshots
+node tests/e2e/arcade.cjs       # the arcade under the spawn table (floor level): walking, edges, camera, no prompts from the table above (desktop + phone; ONLY=desktop|phone)
 node tests/e2e/shop.cjs         # Odds & Ends shop: earn cogs, buy, try on, equip, gestures, persistence (desktop + phone)
 node tests/e2e/minigame.cjs     # Copycat + Jack-in-the-Box practice, full Blitz tournament flow
 node tests/e2e/findoriginal.cjs # Find the Original, desktop + phone portrait

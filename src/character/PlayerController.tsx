@@ -12,7 +12,8 @@ import { createToyAnim, ELIM_DURATION, INTERACT_DURATION, RESPAWN_DURATION, star
 import { addMouseDelta, consumeMouseDelta, endFrame, getMoveAxis, isDown, stickRunning, wasPressed, clearInput, EMOTE_ACTIONS } from '../game/input';
 import { HUB_MOTION } from '../game/hubMotion';
 import { EMOTE_COOLDOWN, EMOTE_DURATION, type EmoteId } from '../game/emotes';
-import { cameraFloorAt, groundHeightAt, resolve } from '../game/collision';
+import { cameraCeiling, cameraFloorAt, groundHeightAt, resolve } from '../game/collision';
+import { LEVEL_Y, isHubLevel, type HubLevel } from '../game/hubBounds';
 import { inputBlocked, useGame, useShownLoadout } from '../game/store';
 import { sfx } from '../game/audio';
 import { events } from '../game/events';
@@ -60,8 +61,11 @@ export function PlayerController() {
   // Coming back from a minigame: stand where we left the hub, camera already behind us.
   const ret = useGame.getState().hubReturn;
   const startYaw = ret ? ret.yaw : useGame.getState().screen === 'menu' ? 0 : SPAWN.yaw; // face the camera on the menu
+  const startLevel: HubLevel = ret?.level ?? 'table';
   const sim = useRef({
-    pos: new THREE.Vector3(ret ? ret.x : SPAWN.x, 0, ret ? ret.z : SPAWN.z),
+    /** The level the toy is on (hubBounds.ts): the tables, or the arcade on the floor. */
+    level: startLevel,
+    pos: new THREE.Vector3(ret ? ret.x : SPAWN.x, LEVEL_Y[startLevel], ret ? ret.z : SPAWN.z),
     vel: new THREE.Vector2(),
     yaw: startYaw,
     camYaw: startYaw + Math.PI,
@@ -256,11 +260,15 @@ export function PlayerController() {
   // ---------- test hooks (?debug only) ----------
   useEffect(() => {
     exposeDebug({
-      teleport: (x: number, z: number, yaw?: number) => {
-        sim.current.pos.set(x, groundHeightAt(x, z, RADIUS, 99), z);
-        sim.current.vel.set(0, 0);
-        if (yaw !== undefined) sim.current.yaw = yaw;
-        player.pos.copy(sim.current.pos); // publish at once (tests read it before the next frame)
+      /** Put the toy at (x, z), on `level` if given (else the one it's on): tests only, no ride needed. */
+      teleport: (x: number, z: number, yaw?: number, level?: HubLevel) => {
+        const s = sim.current;
+        if (isHubLevel(level)) s.level = level;
+        s.pos.set(x, groundHeightAt(x, z, RADIUS, LEVEL_Y[s.level] + 99, s.level), z);
+        s.vel.set(0, 0);
+        if (yaw !== undefined) s.yaw = yaw;
+        player.pos.copy(s.pos); // publish at once (tests read it before the next frame)
+        player.level = s.level;
       },
       aim: (camYaw: number, camPitch: number) => {
         sim.current.camYaw = camYaw;
@@ -274,7 +282,7 @@ export function PlayerController() {
         }
         sim.current.holdPose = !!id;
       },
-      state: () => ({ x: sim.current.pos.x, y: sim.current.pos.y, z: sim.current.pos.z, yaw: sim.current.yaw, camYaw: sim.current.camYaw, camPitch: sim.current.camPitch, fov: (camera as THREE.PerspectiveCamera).fov, anim: { ...anim.current } }),
+      state: () => ({ level: sim.current.level, x: sim.current.pos.x, y: sim.current.pos.y, z: sim.current.pos.z, yaw: sim.current.yaw, camYaw: sim.current.camYaw, camPitch: sim.current.camPitch, fov: (camera as THREE.PerspectiveCamera).fov, anim: { ...anim.current } }),
     });
   }, []);
 
@@ -294,9 +302,10 @@ export function PlayerController() {
       events.on('player:boost', ({ seconds }) => {
         sim.current.boostUntil = performance.now() + seconds * 1000;
       }),
-      events.on('player:teleport', ({ x, z, yaw }) => {
+      events.on('player:teleport', ({ x, z, yaw, level }) => {
         const s = sim.current;
-        s.pos.set(x, groundHeightAt(x, z, RADIUS, 99), z);
+        s.level = level ?? 'table';
+        s.pos.set(x, groundHeightAt(x, z, RADIUS, LEVEL_Y[s.level] + 99, s.level), z);
         s.vel.set(0, 0);
         s.yaw = yaw;
         s.yawTarget = null;
@@ -304,6 +313,7 @@ export function PlayerController() {
         s.snapCam = true;
         player.pos.copy(s.pos);
         player.yaw = yaw;
+        player.level = s.level;
       }),
       events.on('toy:preview-gesture', ({ id }) => {
         // Workshop/shop preview: play it on the turntable toy (never sent online).
@@ -340,7 +350,8 @@ export function PlayerController() {
       if (a.elimT >= ELIM_DURATION) {
         a.elimT = -1;
         a.respawnT = 0;
-        s.pos.set(SPAWN.x, 0, SPAWN.z);
+        s.level = 'table'; // back to the spawn point on the table
+        s.pos.set(SPAWN.x, LEVEL_Y.table, SPAWN.z);
         s.vel.set(0, 0);
         s.yaw = SPAWN.yaw;
         a.vy = 0;
@@ -411,7 +422,7 @@ export function PlayerController() {
     const prevZ = s.pos.z;
     s.pos.x += s.vel.x * dt;
     s.pos.z += s.vel.y * dt;
-    const hit = resolve(s.pos, RADIUS, s.pos.y);
+    const hit = resolve(s.pos, RADIUS, s.pos.y, s.level);
     // Remove velocity lost to collisions so we slide instead of pushing.
     if (dt > 0) {
       s.vel.x = (s.pos.x - prevX) / dt;
@@ -450,7 +461,7 @@ export function PlayerController() {
     }
     if (!a.grounded) a.vy -= GRAVITY * dt;
     s.pos.y += a.vy * dt;
-    const ground = groundHeightAt(s.pos.x, s.pos.z, RADIUS, Math.max(s.pos.y, s.pos.y - a.vy * dt));
+    const ground = groundHeightAt(s.pos.x, s.pos.z, RADIUS, Math.max(s.pos.y, s.pos.y - a.vy * dt), s.level);
     if (s.pos.y <= ground) {
       if (!a.grounded && a.vy < -4) {
         a.landImpact = Math.min(2, -a.vy / 14);
@@ -479,6 +490,7 @@ export function PlayerController() {
       let bestD = Infinity;
       for (const it of INTERACTABLES) {
         if (it.disabled?.()) continue;
+        if ((it.level ?? 'table') !== s.level) continue; // only what's on your own level
         if (it.minY !== undefined && s.pos.y < it.minY) continue;
         const p = interactablePos(it);
         const d = Math.hypot(p.x - s.pos.x, p.z - s.pos.z);
@@ -509,10 +521,11 @@ export function PlayerController() {
     player.pos.copy(s.pos);
     player.yaw = s.yaw;
     player.grounded = a.grounded;
+    player.level = s.level;
     player.speed = hSpeed;
     root.current.position.copy(s.pos);
     root.current.rotation.y = s.yaw;
-    const groundBelow = groundHeightAt(s.pos.x, s.pos.z, RADIUS, s.pos.y);
+    const groundBelow = groundHeightAt(s.pos.x, s.pos.z, RADIUS, s.pos.y, s.level);
     shadow.current.position.set(s.pos.x, groundBelow + 0.03, s.pos.z);
     const hAbove = s.pos.y - groundBelow;
     const sc = THREE.MathUtils.clamp(1 - hAbove * 0.12, 0.45, 1);
@@ -521,7 +534,7 @@ export function PlayerController() {
 
     // ---------- camera ----------
     // walking into the Tournament Pavilion lifts its lid and folds its walls down (src/scene/pavilionView.ts)
-    stepPavilionView(s.pos.x, s.pos.z, playing, dt);
+    stepPavilionView(s.pos.x, s.pos.z, playing && s.level === 'table', dt);
     // Portrait phones: widen the vertical FOV so the horizontal view isn't a keyhole.
     const persp = camera as THREE.PerspectiveCamera;
     const wantFov = persp.aspect < 1 ? 50 + (1 - persp.aspect) * 40 : 50;
@@ -603,13 +616,13 @@ export function PlayerController() {
       s.camDist = damp(s.camDist, want, want < s.camDist ? 18 : 2.5, dt);
 
       tmp.desired.copy(s.camTarget).addScaledVector(tmp.dir, s.camDist);
-      tmp.desired.y = Math.max(tmp.desired.y, cameraFloorAt(tmp.desired.x, tmp.desired.z));
+      tmp.desired.y = Math.min(Math.max(tmp.desired.y, cameraFloorAt(tmp.desired.x, tmp.desired.z, s.level)), cameraCeiling(s.level));
       if (s.snapCam) {
         s.camPos.copy(tmp.desired);
         s.camDist = want;
         s.snapCam = false;
       } else s.camPos.lerp(tmp.desired, 1 - Math.exp(-(g.paused ? 3 : 14) * dt));
-      s.camPos.y = Math.max(s.camPos.y, cameraFloorAt(s.camPos.x, s.camPos.z));
+      s.camPos.y = Math.min(Math.max(s.camPos.y, cameraFloorAt(s.camPos.x, s.camPos.z, s.level)), cameraCeiling(s.level));
       camera.position.copy(s.camPos);
       // look slightly ahead of the toy so the world opens up in front of it
       // Pitching down low turns into looking up at the giant room (worm's-eye view).

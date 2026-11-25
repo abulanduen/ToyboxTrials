@@ -7,8 +7,12 @@
  * - If the player's feet are below `top - STEP_HEIGHT`, the footprint blocks horizontal movement.
  * - Otherwise the footprint is something you can stand on (blocks, books, the fountain rim).
  * This gives satisfying hop-up-onto-things platforming without a physics engine.
+ *
+ * Levels (hubBounds.ts): every collider belongs to one (`lv`, the tables when absent), and every
+ * query asks about one: a toy in the arcade under the spawn table neither bumps into nor stands on
+ * the props above its head. `top` is a world height either way (the floor's props have tops below 0).
  */
-import { HUB_WALK, clampToWalkable } from './hubBounds';
+import { HUB_WALK, LEVEL_WALK, LEVEL_Y, ARCADE_CEILING, clampToWalkable, type HubLevel } from './hubBounds';
 
 export interface CircleCollider {
   kind: 'circle';
@@ -19,6 +23,8 @@ export interface CircleCollider {
   top: number;
   /** Does it block the camera? (large solid props only) */
   cam?: boolean;
+  /** The level it stands on (default: the tables). */
+  lv?: HubLevel;
 }
 
 export interface BoxCollider {
@@ -31,6 +37,7 @@ export interface BoxCollider {
   rot: number; // radians around Y (same convention as three.js rotation.y)
   top: number;
   cam?: boolean;
+  lv?: HubLevel;
 }
 
 export type Collider = CircleCollider | BoxCollider;
@@ -62,6 +69,7 @@ export function setDynamic(owner: string, list: Collider[]) {
 export function allColliders(): readonly Collider[] {
   return dynamicColliders.length ? staticColliders.concat(dynamicColliders) : staticColliders;
 }
+const onLevel = (c: Collider, level: HubLevel) => (c.lv ?? 'table') === level;
 
 // Rotation convention matches three.js `rotation.y`: local +x maps to (cos r, -sin r) in world xz.
 function toLocal(c: BoxCollider, px: number, pz: number): [number, number] {
@@ -93,11 +101,11 @@ export function overlaps(c: Collider, x: number, z: number, r: number): boolean 
   return dx * dx + dz * dz < r * r;
 }
 
-/** Highest standable surface under a footprint (at most `feetY + STEP_HEIGHT`). */
-export function groundHeightAt(x: number, z: number, r: number, feetY: number): number {
-  let g = 0;
+/** Highest standable surface under a footprint on `level` (its ground, or a prop at most `feetY + STEP_HEIGHT`). */
+export function groundHeightAt(x: number, z: number, r: number, feetY: number, level: HubLevel = 'table'): number {
+  let g = LEVEL_Y[level];
   for (const c of allColliders()) {
-    if (c.top > g && c.top <= feetY + STEP_HEIGHT && overlaps(c, x, z, r * 0.6)) g = c.top;
+    if (c.top > g && c.top <= feetY + STEP_HEIGHT && onLevel(c, level) && overlaps(c, x, z, r * 0.6)) g = c.top;
   }
   return g;
 }
@@ -112,24 +120,33 @@ const CAMERA_LOW_PROP = 6;
  * the table top and dipped inside raised props (the bridge deck, a passing train car), where the
  * unlit inside faces showed as black flashes.
  */
-export function cameraFloorAt(x: number, z: number): number {
-  let floor = CAMERA_CLEARANCE;
+export function cameraFloorAt(x: number, z: number, level: HubLevel = 'table'): number {
+  const base = LEVEL_Y[level];
+  let floor = base + CAMERA_CLEARANCE;
   for (const c of allColliders()) {
-    if (c.top <= CAMERA_LOW_PROP && c.top + CAMERA_CLEARANCE > floor && overlaps(c, x, z, 0.7)) floor = c.top + CAMERA_CLEARANCE;
+    if (c.top <= base + CAMERA_LOW_PROP && c.top + CAMERA_CLEARANCE > floor && onLevel(c, level) && overlaps(c, x, z, 0.7)) floor = c.top + CAMERA_CLEARANCE;
   }
   return floor;
+}
+
+/**
+ * Highest the camera may go on `level`: in the arcade, just under the spawn table's apron, so it
+ * never pokes up through the table into the village. (On the tables there is no ceiling.)
+ */
+export function cameraCeiling(level: HubLevel): number {
+  return level === 'floor' ? ARCADE_CEILING - CAMERA_CLEARANCE : Infinity;
 }
 
 /**
  * Push a circle (player) out of every collider it is not standing above.
  * Mutates and returns pos. Returns the id of the first collider hit (for bump sounds).
  */
-export function resolve(pos: { x: number; z: number }, r: number, feetY: number): string | null {
+export function resolve(pos: { x: number; z: number }, r: number, feetY: number, level: HubLevel = 'table'): string | null {
   let hit: string | null = null;
   for (let iter = 0; iter < 3; iter++) {
     let moved = false;
     for (const c of allColliders()) {
-      if (feetY >= c.top - STEP_HEIGHT) continue; // we're above it: it's floor, not wall
+      if (feetY >= c.top - STEP_HEIGHT || !onLevel(c, level)) continue; // we're above it (it's floor, not wall), or it's on another level
       if (c.kind === 'circle') {
         const dx = pos.x - c.x;
         const dz = pos.z - c.z;
@@ -180,14 +197,15 @@ export function resolve(pos: { x: number; z: number }, r: number, feetY: number)
     }
     if (!moved) break;
   }
-  clampToBounds(pos, r);
+  clampToBounds(pos, r, level);
   return hit;
 }
 
 /**
- * Keep the player on walkable ground (the "you can't fall off" rule): inside the union of the two
- * play mats and the bridge between them (hubBounds.ts). The online server uses the same function.
+ * Keep the player on walkable ground (the "you can't fall off" rule): on the tables, inside the
+ * union of the two play mats and the bridge between them; in the arcade, inside its floor
+ * (hubBounds.ts LEVEL_WALK). The online server uses the same function.
  */
-export function clampToBounds(pos: { x: number; z: number }, r: number) {
-  clampToWalkable(pos, r);
+export function clampToBounds(pos: { x: number; z: number }, r: number, level: HubLevel = 'table') {
+  clampToWalkable(pos, r, LEVEL_WALK[level]);
 }

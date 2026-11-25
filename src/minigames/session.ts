@@ -148,7 +148,7 @@ export function enterMinigameScreen() {
   const g = useGame.getState();
   if (g.screen !== 'minigame') {
     // Remember where to put the toy back in the hub.
-    g.set({ hubReturn: { x: player.pos.x, z: player.pos.z, yaw: player.yaw } });
+    g.set({ hubReturn: { x: player.pos.x, z: player.pos.z, yaw: player.yaw, level: player.level } });
     g.goTo('minigame');
   }
   player.pos.set(0, 0, 0); // centre the shadow frustum on the stage

@@ -11,6 +11,7 @@ import { INTERACTABLES } from '../game/interactables';
 import { feltTexture } from './textures';
 import { Blocks, Bunting, Dominoes, FeltTrees, woodMat } from './props';
 import { Fountain, Pavilion, Scoreboard, Shop, Workshop } from './Buildings';
+import { Arcade } from './Arcade';
 import { Bridge } from './Bridge';
 import { HubTV, TV_AERIAL_TIP } from './HubTV';
 import { Gates } from './Gates';
@@ -160,6 +161,7 @@ export function Village() {
       <Train />
       {/* the shared marble, the football nets, the basketball hoop and its ball */}
       <HubPlay />
+      <Arcade />
       <MusicBox />
       <JackInTheBox />
       <KeyTower />

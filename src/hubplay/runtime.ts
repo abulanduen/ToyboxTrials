@@ -111,7 +111,8 @@ const rt = {
 const LOCAL_ID = 'me';
 export const selfId = () => (rt.mode === 'remote' ? (useNet.getState().selfId ?? LOCAL_ID) : LOCAL_ID);
 const selfBody = (): PlayBody => ({ id: selfId(), x: player.pos.x, y: player.pos.y, z: player.pos.z, yaw: player.yaw });
-const inHub = () => useGame.getState().screen === 'playing' && !player.eliminated;
+/** On the Hub's tables (not in a trial, the Workshop, or down in the arcade): only then does the toy take part. */
+const inHub = () => useGame.getState().screen === 'playing' && !player.eliminated && player.level === 'table';
 
 // ---------------------------------------------------------------- the local world (offline)
 function localBodies(): PlayBody[] {

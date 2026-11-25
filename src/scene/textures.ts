@@ -594,3 +594,111 @@ export function rulerTexture(cm = 30) {
     return t;
   });
 }
+
+// ---------------------------------------------------------------------------------------------
+// The arcade under the spawn table (src/scene/Arcade.tsx)
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Arcade carpet: deep ink-blue with scattered confetti (rings, stars, zigzags, dots) in the toy
+ * palette, the kind that glows under a black light. Tileable (shapes wrap round the edges).
+ * Returns the colour map; `glow` is the same pattern on black, for an emissive map.
+ */
+export function arcadeCarpetTexture(glow = false) {
+  return memo(`arcade-carpet:${glow}`, () => {
+    const S = 512;
+    const c = document.createElement('canvas');
+    c.width = c.height = S;
+    const g = c.getContext('2d')!;
+    g.fillStyle = glow ? '#000000' : '#1E2140';
+    g.fillRect(0, 0, S, S);
+    if (!glow) {
+      // a faint woven speckle
+      const r0 = rng(41);
+      for (let i = 0; i < 2600; i++) {
+        g.fillStyle = r0() < 0.5 ? 'rgba(255,255,255,0.035)' : 'rgba(0,0,0,0.12)';
+        g.fillRect(r0() * S, r0() * S, 2, 2);
+      }
+    }
+    const cols = [PALETTE.honey, PALETTE.coral, PALETTE.toyBlue, PALETTE.sage, '#C9A7E8', '#7FE0D6'];
+    const r = rng(97);
+    const shape = (x: number, y: number, col: string, kind: number, sz: number, rot: number) => {
+      g.save();
+      g.translate(x, y);
+      g.rotate(rot);
+      g.strokeStyle = col;
+      g.fillStyle = col;
+      g.lineWidth = 4;
+      g.lineCap = 'round';
+      g.lineJoin = 'round';
+      g.beginPath();
+      if (kind === 0) {
+        g.arc(0, 0, sz * 0.6, 0, Math.PI * 2);
+        g.stroke();
+      } else if (kind === 1) {
+        for (let k = 0; k < 10; k++) {
+          const a = (k / 10) * Math.PI * 2;
+          const rr = k % 2 ? sz * 0.32 : sz * 0.75;
+          if (k === 0) g.moveTo(Math.cos(a) * rr, Math.sin(a) * rr);
+          else g.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+        }
+        g.closePath();
+        g.fill();
+      } else if (kind === 2) {
+        g.moveTo(-sz, 0);
+        for (let k = 1; k <= 4; k++) g.lineTo(-sz + (k * sz) / 2, k % 2 ? -sz * 0.4 : sz * 0.4);
+        g.stroke();
+      } else {
+        g.arc(0, 0, sz * 0.28, 0, Math.PI * 2);
+        g.fill();
+      }
+      g.restore();
+    };
+    for (let i = 0; i < 70; i++) {
+      const x = r() * S;
+      const y = r() * S;
+      const col = cols[Math.floor(r() * cols.length)];
+      const kind = Math.floor(r() * 4);
+      const sz = 10 + r() * 14;
+      const rot = r() * Math.PI * 2;
+      // the same shape again a tile away wherever it overhangs an edge, so the carpet repeats seamlessly
+      for (const dx of [-S, 0, S]) for (const dy of [-S, 0, S]) if (x + dx > -30 && x + dx < S + 30 && y + dy > -30 && y + dy < S + 30) shape(x + dx, y + dy, col, kind, sz, rot);
+    }
+    return finish(c, [1, 1]);
+  });
+}
+
+/** A hanging sign's face: `text` in chunky cream letters on ink, with a row of bulbs round the edge. */
+export function arcadeSignTexture(text: string) {
+  return memo(`arcade-sign:${text}`, () => {
+    const W = 512;
+    const H = 160;
+    const c = document.createElement('canvas');
+    c.width = W;
+    c.height = H;
+    const g = c.getContext('2d')!;
+    g.fillStyle = '#2B2433';
+    g.fillRect(0, 0, W, H);
+    g.strokeStyle = PALETTE.honey;
+    g.lineWidth = 8;
+    g.strokeRect(10, 10, W - 20, H - 20);
+    for (let i = 0; i < 26; i++) {
+      const x = 22 + (i * (W - 44)) / 25;
+      for (const y of [22, H - 22]) {
+        g.fillStyle = i % 2 ? PALETTE.coral : PALETTE.cream;
+        g.beginPath();
+        g.arc(x, y, 5, 0, Math.PI * 2);
+        g.fill();
+      }
+    }
+    g.fillStyle = PALETTE.cream;
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.font = '700 84px Fredoka, "Trebuchet MS", sans-serif';
+    g.fillText(text, W / 2, H / 2 + 4, W - 70);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = 4;
+    return t;
+  });
+}

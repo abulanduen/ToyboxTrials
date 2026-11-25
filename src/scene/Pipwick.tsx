@@ -137,7 +137,7 @@ export function Pipwick() {
       s.x += (PIPWICK_HOME.x - s.x) * Math.min(1, dt * 4);
       s.z += (PIPWICK_HOME.z - s.z) * Math.min(1, dt * 4);
       s.y = Math.max(0, s.y - dt * 8);
-      const d = Math.hypot(player.pos.x - s.x, player.pos.z - s.z);
+      const d = player.level === 'table' ? Math.hypot(player.pos.x - s.x, player.pos.z - s.z) : Infinity;
       faceYaw = d < 10 || w.mode === 'chat' ? Math.atan2(player.pos.x - s.x, player.pos.z - s.z) : PIPWICK_HOME.yaw;
       if (t > s.nextHop) {
         s.hop = 0.001;

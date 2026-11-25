@@ -9,7 +9,7 @@
  * union of rectangles in src/game/hubBounds.ts, shared with the online server.
  */
 import { addStatic, resetStatic, type Collider } from '../game/collision';
-import { BRIDGE_WALK, BRIDGE_X, GATES_WALK, HUB_WALK, WALK_AREAS } from '../game/hubBounds';
+import { ARCADE_CEILING, BRIDGE_WALK, BRIDGE_X, GATES_WALK, HUB_WALK, WALK_AREAS } from '../game/hubBounds';
 import { hubPlayColliders } from '../game/hubPlay';
 import { PALETTE } from '../game/palette';
 import { JACK_BOX } from '../game/whoAmI';
@@ -30,6 +30,23 @@ export const FLOOR_Y = -(TABLE.thickness + TABLE.legHeight);
  */
 export const TABLE_B = { minX: -76, maxX: 130, minZ: -172, maxZ: -86, thickness: TABLE.thickness, legHeight: TABLE.legHeight };
 export const TABLES = [TABLE, TABLE_B] as const;
+
+/**
+ * The arcade on the room floor under the spawn table (docs/ARCADE_PLAN.md; walkable floor and
+ * ceiling: hubBounds.ts ARCADE_WALK, ARCADE_CEILING). Its carpet reaches the table's legs; a low
+ * wall of toy bricks runs round the walkable floor's edge, open at the front (`entrance`, where the
+ * ride and the lift come in); strings of bulbs hang under the table's apron across x at `strands` z.
+ */
+export const ARCADE = {
+  y: FLOOR_Y,
+  carpet: { minX: -73, maxX: 73, minZ: -53, maxZ: 39 },
+  wall: { minX: -72, maxX: 72, minZ: -52, maxZ: 38, h: 2.6, t: 2, brick: 4 },
+  entrance: { x: 0, halfW: 9 },
+  ceiling: ARCADE_CEILING,
+  strands: [-42, -18, 6, 28],
+  /** Each strand hangs from just under the apron and sags this far at its middle (cm). */
+  sag: 5,
+};
 /** Bounding box of both table tops (shadow frustum, room lighting). */
 export const TABLES_BOX = {
   minX: Math.min(TABLE.minX, TABLE_B.minX),

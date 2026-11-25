@@ -5,6 +5,7 @@
  * (positions, emotes). Gameplay never waits on any of this: offline play is unchanged.
  */
 import { dogFromServer, dogOffline, lickCheer, setDogSkew } from '../game/dogVisit';
+import { levelOfY } from '../game/hubBounds';
 import { SERVER_URL, OFFLINE_TEXT } from './config';
 import { wsTransport, type Transport, type TransportConn } from './transport';
 import {
@@ -273,11 +274,11 @@ const handlers: { [K in ServerMsg['t']]: (m: Extract<ServerMsg, { t: K }>) => vo
     s.set({ status: 'online', error: null, room: m.room, selfId: m.you, players: m.players, sheetOpen: false });
 
     // Stand where the room has us: always on a fresh join, after a reconnect only if far off.
-    const far = Math.hypot(player.pos.x - m.spawn.x, player.pos.z - m.spawn.z) > 3;
+    const far = Math.hypot(player.pos.x - m.spawn.x, player.pos.z - m.spawn.z, player.pos.y - m.spawn.y) > 3;
     const g = useGame.getState();
     if (!m.resumed || far) {
-      if (g.screen === 'minigame') g.set({ hubReturn: { x: m.spawn.x, z: m.spawn.z, yaw: m.spawn.yaw } });
-      else events.emit('player:teleport', { x: m.spawn.x, z: m.spawn.z, yaw: m.spawn.yaw });
+      if (g.screen === 'minigame') g.set({ hubReturn: { x: m.spawn.x, z: m.spawn.z, yaw: m.spawn.yaw, level: levelOfY(m.spawn.y) } });
+      else events.emit('player:teleport', { x: m.spawn.x, z: m.spawn.z, yaw: m.spawn.yaw, level: levelOfY(m.spawn.y) });
     }
     if (fresh) {
       if (g.screen === 'menu') g.goTo('playing');

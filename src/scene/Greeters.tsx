@@ -300,7 +300,7 @@ export function Greeters() {
       const s = spots[i];
       const m = refs.current[i];
       if (!m) continue;
-      const d = Math.hypot(player.pos.x - s.x, player.pos.z - s.z);
+      const d = player.level === 'table' ? Math.hypot(player.pos.x - s.x, player.pos.z - s.z) : Infinity;
       const near = s.near();
       const want = d < s.watchR && near ? Math.atan2(player.pos.x - s.x, player.pos.z - s.z) : s.home;
       s.yaw += wrap(want - s.yaw) * Math.min(1, dt * 5);

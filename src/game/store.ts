@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { device } from './input';
 import type { AccessorySlot } from './cosmetics';
+import type { HubLevel } from './hubBounds';
 import { defaultProfile, normalizeProfile, type Loadout, type Profile } from './profile';
 import { STORE_VERSION, buyItem, dateKey, equipItem, migratePersisted, rewardSecret, unequipSlot, type BuyResult, type EquipResult } from './economy';
 import type { MinigameId } from '../minigames/types';
@@ -99,7 +100,7 @@ interface SettingsSlice extends VoiceSettings {
 interface SessionSlice {
   screen: Screen;
   /** Where to put the toy back in the hub after a minigame. */
-  hubReturn: { x: number; z: number; yaw: number } | null;
+  hubReturn: { x: number; z: number; yaw: number; level?: HubLevel } | null;
   /** Where the Workshop returns to when closed. */
   workshopReturn: Screen;
   /** Which panel the Workshop screen shows. */

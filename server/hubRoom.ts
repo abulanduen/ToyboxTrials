@@ -12,7 +12,8 @@
  * that takes the same slot back within RESUME_WINDOW_MS of a dropped connection.
  */
 import { clampToBounds } from '../src/game/collision';
-import { HUB_MAX_SPEED, HUB_MAX_Y, HUB_MOTION, HUB_SPAWN } from '../src/game/hubMotion';
+import { LEVEL_MAX_RISE, LEVEL_Y, levelOfY, type HubLevel } from '../src/game/hubBounds';
+import { HUB_MAX_SPEED, HUB_MOTION, HUB_SPAWN } from '../src/game/hubMotion';
 import { EMOTE_COOLDOWN, EMOTE_DURATION, type EmoteId } from '../src/game/emotes';
 import { DOG_PERCH, DOG_VISIT, dogPet, newDogClock, settleDog, type DogClock } from '../src/game/dogRoute';
 import {
@@ -113,6 +114,8 @@ interface PlayerRecord {
   yaw: number;
   emoteSeq: number;
   activity: Activity | null;
+  /** The level the toy is on: the tables, or the arcade on the floor under the spawn table. */
+  level: HubLevel;
   /** When the connection dropped (slot held for RESUME_WINDOW_MS), or null while connected. */
   disconnectedAt: number | null;
   /** Signed-in account's username, linked with an `auth` message (leaderboard names). */
@@ -438,8 +441,9 @@ export class HubRoom {
       resume,
       joinedAt: now,
       x: spawn.x,
-      y: 0,
+      y: LEVEL_Y.table,
       z: spawn.z,
+      level: 'table',
       yaw: HUB_SPAWN.yaw,
       speed: 0,
       grounded: true,
@@ -506,15 +510,34 @@ export class HubRoom {
     p.budgetAt = now;
     p.budget = Math.min(ALLOWED_SPEED * MOVE_BUDGET_SECONDS, p.budget + dt * ALLOWED_SPEED);
 
+    // A toy changes level only on a ride or a lift (to come: docs/ARCADE_PLAN.md phase 2), or after
+    // being sent back to the spawn point. Test servers (MATCH_DEBUG) also let a move put it on the
+    // other level, where the browser tests' teleport hook put it.
+    const said = levelOfY(m.y);
+    if (said !== p.level && this.matchDebug) {
+      this.changeLevel(p, said, now);
+      p.x = m.x;
+      p.z = m.z;
+    }
+    const lv = p.level;
     const target = { x: m.x, z: m.z };
-    clampToBounds(target, HUB_MOTION.radius);
+    clampToBounds(target, HUB_MOTION.radius, lv);
     let clamped = target.x !== m.x || target.z !== m.z;
-    const y = clamp(m.y, 0, HUB_MAX_Y);
+    let y = clamp(m.y, LEVEL_Y[lv], LEVEL_Y[lv] + LEVEL_MAX_RISE[lv]);
     clamped ||= y !== m.y;
     const dx = target.x - p.x;
     const dz = target.z - p.z;
     const d = Math.hypot(dx, dz);
-    const respawn = Math.hypot(target.x - HUB_SPAWN.x, target.z - HUB_SPAWN.z) <= RESPAWN_SNAP_RADIUS && y <= 0.5;
+    let respawn = lv === 'table' && Math.hypot(target.x - HUB_SPAWN.x, target.z - HUB_SPAWN.z) <= RESPAWN_SNAP_RADIUS && y <= 0.5;
+    if (!respawn && said === 'table' && lv === 'floor' && Math.hypot(m.x - HUB_SPAWN.x, m.z - HUB_SPAWN.z) <= RESPAWN_SNAP_RADIUS && m.y <= 0.5) {
+      // sent back to the spawn point from the arcade (the client respawns a toy there)
+      this.changeLevel(p, 'table', now);
+      target.x = m.x;
+      target.z = m.z;
+      clampToBounds(target, HUB_MOTION.radius);
+      y = LEVEL_Y.table;
+      respawn = true;
+    }
     if (respawn || d <= p.budget) {
       p.x = target.x;
       p.z = target.z;
@@ -525,7 +548,7 @@ export class HubRoom {
       // The hub is two tables joined by a bridge (not one convex area): a straight crawl towards a
       // far target can cross the gap between the tables, so the partial step is kept on walkable
       // ground too.
-      clampToBounds(partial, HUB_MOTION.radius);
+      clampToBounds(partial, HUB_MOTION.radius, lv);
       p.x = partial.x;
       p.z = partial.z;
       p.budget = 0;
@@ -553,7 +576,7 @@ export class HubRoom {
    * Everyone hears of it (the heart, the lick); a pet that doesn't count just resyncs the petter.
    */
   private petDog(p: Player, now: number): Outgoing[] {
-    const ok = !p.activity && Math.hypot(p.x - DOG_PERCH.pet.x, p.z - DOG_PERCH.pet.z) <= DOG_VISIT.reach;
+    const ok = this.onTables(p) && Math.hypot(p.x - DOG_PERCH.pet.x, p.z - DOG_PERCH.pet.z) <= DOG_VISIT.reach;
     const r = ok ? dogPet(now / 1000, this.dog) : null;
     if (!r) return p.conn ? [{ kind: 'send', to: [p.conn], msg: { t: 'dog', c: this.dogWire(now) } }] : [];
     return [{ kind: 'send', to: this.conns(), msg: { t: 'dog', c: this.dogWire(now), k: r, by: p.id } }];
@@ -638,8 +661,20 @@ export class HubRoom {
 
   private playBodies(): PlayBody[] {
     const out: PlayBody[] = [];
-    for (const p of this.players.values()) if (p.conn && !p.activity) out.push(this.body(p));
+    for (const p of this.players.values()) if (p.conn && this.onTables(p)) out.push(this.body(p));
     return out;
+  }
+
+  /** Walking the Hub's tables (not in a trial, the Workshop or the shop, and not down in the arcade). */
+  private onTables(p: Player): boolean {
+    return !p.activity && p.level === 'table';
+  }
+
+  /** Move `p` to another level: the ball they hold stays behind. */
+  private changeLevel(p: Player, level: HubLevel, now: number) {
+    if (p.level === level) return;
+    this.letGoOfBall(p, now);
+    p.level = level;
   }
 
   private body(p: Player): PlayBody {
@@ -653,7 +688,7 @@ export class HubRoom {
    * KICK_COOLDOWN_MS (extra kicks are dropped).
    */
   private kick(p: Player, m: KickMsg, now: number): Outgoing[] {
-    if (p.activity || now - p.lastKickAt < KICK_COOLDOWN_MS) return [];
+    if (!this.onTables(p) || now - p.lastKickAt < KICK_COOLDOWN_MS) return [];
     p.lastKickAt = now;
     this.advancePlay(now);
     kickMarble(this.play, this.body(p), m.dx, m.dz, m.p, REACH_SLACK, this.playEvents);
@@ -666,7 +701,7 @@ export class HubRoom {
    * SNATCH_REWIND_MS; a holder is dribbling while the server has them moving on the ground.
    */
   private ball(p: Player, m: BallMsg, now: number): Outgoing[] {
-    if (p.activity || now - p.lastBallAt < BALL_COOLDOWN_MS) return [];
+    if (!this.onTables(p) || now - p.lastBallAt < BALL_COOLDOWN_MS) return [];
     p.lastBallAt = now;
     this.advancePlay(now);
     if (m.a === 'grab') {
@@ -777,7 +812,7 @@ export class HubRoom {
   }
 
   private chatPlayer(p: Player): ChatPlayer {
-    return { id: p.id, name: p.name, connected: !!p.conn, away: !!p.activity, x: p.x, z: p.z };
+    return { id: p.id, name: p.name, connected: !!p.conn, away: !!p.activity, x: p.x, z: p.z, below: p.level !== 'table' };
   }
 
   /** Who wears a Who Am I? card, for a player arriving (only sent when someone does). */

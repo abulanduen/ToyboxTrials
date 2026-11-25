@@ -23,6 +23,8 @@ export interface ChatPlayer {
   away: boolean;
   x: number;
   z: number;
+  /** Down in the arcade under the spawn table (the suspicious box is up on the table). */
+  below?: boolean;
 }
 
 export type ChatOut = { kind: 'send'; to: string[]; msg: ServerMsg };
@@ -85,7 +87,7 @@ export class HubChat {
   deal(p: ChatPlayer, now: number): ChatOut[] {
     if (p.away) return [this.note(p.id, 'card_away')];
     if (this.cards.has(p.id)) return [this.note(p.id, 'card_busy')];
-    if (Math.hypot(p.x - JACK_SPOT.x, p.z - JACK_SPOT.z) > JACK_DEAL_REACH) return [this.note(p.id, 'card_far')];
+    if (p.below || Math.hypot(p.x - JACK_SPOT.x, p.z - JACK_SPOT.z) > JACK_DEAL_REACH) return [this.note(p.id, 'card_far')];
     if (now - (this.lastDeal.get(p.id) ?? -Infinity) < CARD_COOLDOWN_MS) return [this.note(p.id, 'card_wait')];
     const recent = this.recent.get(p.id) ?? [];
     const inPlay = [...this.cards.values()].map((c) => c.index);

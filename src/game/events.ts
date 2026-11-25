@@ -4,6 +4,7 @@
  * which keeps React re-renders out of the frame loop.
  */
 import type { EmoteId } from './emotes';
+import type { HubLevel } from './hubBounds';
 
 export type GameEvents = {
   'player:interact': void;
@@ -15,7 +16,8 @@ export type GameEvents = {
   /** The local toy started an emote (the online client forwards it to the room). */
   'player:emote': { id: EmoteId };
   /** Put the local toy here (online: the room's spawn spot on joining). */
-  'player:teleport': { x: number; z: number; yaw: number };
+  /** Put the local toy somewhere (on the tables unless `level` says otherwise). */
+  'player:teleport': { x: number; z: number; yaw: number; level?: HubLevel };
   'prop:marble-push': { dirX: number; dirZ: number };
   'prop:jack-pop': void;
   /** The jack pops to slap a Who Am I? card on someone (online): the same pop, no ambush. */

@@ -32,6 +32,8 @@ const KEEP_BONUS_CM = 4;
 export interface Point {
   x: number;
   z: number;
+  /** Height (cm): a toy in the arcade under the table is 75 cm below one on it. Missing reads as 0. */
+  y?: number;
 }
 
 /** Another player as the planner sees them. */
@@ -52,7 +54,7 @@ export interface ListenerOptions {
   blocked?: ReadonlySet<string>;
 }
 
-const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.z - b.z);
+const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.z - b.z, (a.y ?? 0) - (b.y ?? 0));
 
 /**
  * The speakers this listener should be connected to, nearest first. `current` are the speakers it

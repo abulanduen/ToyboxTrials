@@ -339,7 +339,7 @@ function Confetti() {
 function Pusher() {
   useFrame(() => {
     const g = useGame.getState();
-    if (g.screen !== 'playing' || inputBlocked(g) || player.eliminated) return;
+    if (g.screen !== 'playing' || inputBlocked(g) || player.eliminated || player.level !== 'table') return;
     const m = view.marble;
     const dx = m.x - player.pos.x;
     const dz = m.z - player.pos.z;

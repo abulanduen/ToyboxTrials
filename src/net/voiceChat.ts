@@ -112,7 +112,7 @@ const blockedUntil = new Map<string, number>();
 /** Last known positions (from the frame loop), for answering offers between plans. */
 const where = new Map<string, Point & { inHub: boolean; seen: number }>();
 let frameNo = 0;
-const self: Point = { x: 0, z: 0 };
+const self: Point = { x: 0, z: 0, y: 0 };
 let bus: GainNode | null = null;
 /** The talk action (V / held mic button) as of the last frame, and when that hold began. */
 let held = false;
@@ -437,13 +437,15 @@ export function voiceFrame(f: VoiceFrameInput) {
   const now = performance.now();
   self.x = f.self.x;
   self.z = f.self.z;
+  self.y = f.self.y ?? 0;
   // (objects reused frame to frame: no garbage per frame)
   const stamp = ++frameNo;
   for (const o of f.others) {
     let w = where.get(o.id);
-    if (!w) where.set(o.id, (w = { x: 0, z: 0, inHub: false, seen: 0 }));
+    if (!w) where.set(o.id, (w = { x: 0, z: 0, y: 0, inHub: false, seen: 0 }));
     w.x = o.x;
     w.z = o.z;
+    w.y = o.y ?? 0;
     w.inHub = o.inHub;
     w.seen = stamp;
   }

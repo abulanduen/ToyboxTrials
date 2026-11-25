@@ -1,6 +1,8 @@
 # Arcade under the table: plan (proposal)
 
-Status: **proposal**, agreed in outline with the owner on 25 Nov 2026; nothing here is built yet.
+Status: agreed in outline with the owner on 25 Nov 2026. **Phase 1 is built** (two levels and the
+arcade shell; reachable only through the `?debug` teleport hook until phase 2). Phases 2–5 are
+planned.
 It moves the trials off the gates table into an arcade on the floor under the spawn table, turns the
 gates table into the Hub's sports ground, and adds wandering NPC toys.
 
@@ -49,7 +51,10 @@ gates table into the Hub's sports ground, and adds wandering NPC toys.
 Each phase ships on its own: the build, the unit tests and the affected browser suites pass, on
 desktop and phone.
 
-1. **Two levels and the arcade shell.**
+1. **Two levels and the arcade shell.** *(Built.)* `src/game/hubBounds.ts` (levels, ARCADE_WALK),
+   `src/game/collision.ts` (per-level queries, camera ceiling), `server/hubRoom.ts` (per-player
+   level; test servers only change it), `src/scene/Arcade.tsx` (carpet, brick wall, bulbs, sign);
+   tests: `tests/unit/hub-levels*.test.ts`, `tests/e2e/arcade.cjs`.
    - Walk areas, ground height and the camera floor get a level (table or floor). Changing level
      happens only by ride or lift: you can't walk or fall off a table edge, as now.
    - The server's movement checks learn the floor level. A ride or lift is a server-known state,
