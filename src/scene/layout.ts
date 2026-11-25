@@ -40,7 +40,11 @@ export const TABLES_BOX = {
 
 // ------------------------------------------------------------------ spawn table
 
-export const FOUNTAIN = { x: 0, z: -1, r: 5.2, top: 1.4 };
+/**
+ * The plaza fountain: a basin you can hop onto (r, top: the rim; its water is walkable), and the
+ * resin tiers in the middle (column: the pedestal's foot, too tall to climb; src/scene/fountainDecor.ts).
+ */
+export const FOUNTAIN = { x: 0, z: -1, r: 5.2, top: 1.4, column: { r: 1.95, top: 9 } };
 /**
  * Tournament Pavilion: the east side of the plaza, its door facing the fountain. A hollow striped
  * gift box: walk in through the doorway in its front (local +z) and talk to the Tournament Curator.
@@ -390,6 +394,7 @@ export function bridgeColliders(): Collider[] {
 export function hubColliders(): Collider[] {
   const list: Collider[] = [];
   list.push({ kind: 'circle', id: 'fountain', x: FOUNTAIN.x, z: FOUNTAIN.z, r: FOUNTAIN.r, top: FOUNTAIN.top });
+  list.push({ kind: 'circle', id: 'fountain-column', x: FOUNTAIN.x, z: FOUNTAIN.z, r: FOUNTAIN.column.r, top: FOUNTAIN.column.top });
   // the Pavilion: hollow, with a doorway in front; the Curator and the furniture inside
   for (const wl of pavilionWalls()) list.push({ kind: 'box', id: wl.id, ...gateLocal(PAVILION, wl.lx, wl.lz), hx: wl.hx, hz: wl.hz, rot: PAVILION.rot, top: 14 });
   list.push({ kind: 'circle', id: 'curator', x: CURATOR.x, z: CURATOR.z, r: CURATOR.r, top: CURATOR.top });

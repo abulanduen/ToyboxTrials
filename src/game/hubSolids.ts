@@ -8,6 +8,7 @@ import type { Collider } from './collision';
 
 export const HUB_SOLIDS: readonly Collider[] = [
   {"kind":"circle","id":"fountain","x":0,"z":-1,"r":5.2,"top":1.4},
+  {"kind":"circle","id":"fountain-column","x":0,"z":-1,"r":1.95,"top":9},
   {"kind":"box","id":"pavilion-back","x":38.7369,"z":-11.2539,"hx":7.3,"hz":0.4,"rot":-1.312,"top":14},
   {"kind":"box","id":"pavilion-left","x":32.2343,"z":-16.6703,"hx":0.4,"hz":5.3,"rot":-1.312,"top":14},
   {"kind":"box","id":"pavilion-right","x":35.7657,"z":-3.3297,"hx":0.4,"hz":5.3,"rot":-1.312,"top":14},

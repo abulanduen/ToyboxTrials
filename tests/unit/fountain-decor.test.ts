@@ -40,6 +40,16 @@ describe('fountain geometry', () => {
     expect(maxR(tiers)).toBeLessThan(POOL_R);
   });
 
+  it('the column collider covers the pedestal and is as tall as the tiers', () => {
+    // the pedestal's foot (the widest part below the lower bowl) fits inside the column's circle
+    const p = tiers.attributes.position;
+    let foot = 0;
+    for (let i = 0; i < p.count; i++) if (p.getY(i) < 4.6) foot = Math.max(foot, Math.hypot(p.getX(i), p.getZ(i)));
+    expect(foot).toBeLessThanOrEqual(FOUNTAIN.column.r + 0.01);
+    expect(foot).toBeGreaterThan(FOUNTAIN.column.r - 0.2);
+    expect(FOUNTAIN.column.top).toBeGreaterThanOrEqual(FOUNTAIN_TOP);
+  });
+
   it('drips start at the bowl tips and fall into water inside the basin', () => {
     for (const d of dripPoints()) {
       expect(Math.hypot(d.x, d.z)).toBeLessThan(POOL_R);

@@ -2,8 +2,8 @@
  * The plaza fountain's geometry, built in code (pure three.js, no DOM): a round basin of stone blocks
  * and a two-tier cream resin fountain (a fluted pedestal, two scalloped bowls and a finial), like a
  * dollhouse garden ornament. Everything is in fountain-local space (the Fountain's group places it).
- * The footprint, rim height and pool level come from FOUNTAIN in src/scene/layout.ts; the collider is
- * still the basin alone (the tiers stand over the pool as the old spool did).
+ * The footprint, rim height and pool level come from FOUNTAIN in src/scene/layout.ts, and so does the
+ * pedestal's collider (FOUNTAIN.column), which the tiers' foot must fit inside.
  */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
