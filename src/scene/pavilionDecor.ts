@@ -127,8 +127,11 @@ export function buildPavilionInterior(k: Kit) {
       k.cyl(0.42, 0.42, h, sx * (w / 2), h / 2, sz * (d / 2), P.cardboardDark, 12);
       k.ball(0.55, sx * (w / 2), h + 0.25, sz * (d / 2), P.honey, 12);
     }
-  // one string along the back, over the sign (strings across the room swung through the camera's view)
-  bunting(k, new THREE.Vector3(-w / 2, h + 0.05, -d / 2), new THREE.Vector3(w / 2, h + 0.05, -d / 2), 1.3, 13);
+  // one string along the back, over the sign (strings across the room swung through the camera's view).
+  // Just inside the back wall: hung from the corner knobs at the wall's outer face, the pennants lay in
+  // that face and flickered against the stripes when seen from outside.
+  const bz = -d / 2 + PAVILION_WALL.t + 0.15; // between the wall (−4.5) and the sign's legs (−4.25)
+  bunting(k, new THREE.Vector3(-w / 2 + 0.5, h + 0.05, bz), new THREE.Vector3(w / 2 - 0.5, h + 0.05, bz), 1.3, 13);
 
   // the trophy shelf against the back wall, left of the Curator
   {

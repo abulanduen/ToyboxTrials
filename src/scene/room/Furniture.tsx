@@ -291,9 +291,12 @@ function cubeStorage(b: Builder, detail: boolean) {
   const h = rows * cell + 4;
   const d = 36;
   b.push(RL.cubes.x, F, RL.cubes.z, Math.PI);
-  b.box(w, h, d - 2, 0, h / 2, -1, ROOM.darkWood); // dark interior
+  // Dark interior, a centimetre inside the frame on every side: at the frame's own size its sides lay in
+  // the end boards' outer faces, and the two flickered against each other as the camera moved.
+  b.box(w - 2, h - 2, d - 4, 0, h / 2, -1, ROOM.darkWood);
   for (let i = 0; i <= cols; i++) b.box(3, h, d, -w / 2 + 1.5 + i * (cell + 0.33), h / 2, 0, ROOM.paleWood);
-  for (let j = 0; j <= rows; j++) b.box(w, 3, d, 0, 1.5 + j * (cell + 0.33), 0, ROOM.paleWood);
+  // (a hair inside the end boards and the front/back edges, so no faces lie flush with theirs: same flicker)
+  for (let j = 0; j <= rows; j++) b.box(w - 0.6, 3, d - 0.4, 0, 1.5 + j * (cell + 0.33), 0, ROOM.paleWood);
   const bins = [ROOM.bin, ROOM.cushionB, ROOM.sofa, ROOM.cushionA, ROOM.leaf];
   for (let j = 0; j < rows; j++)
     for (let i = 0; i < cols; i++) {
@@ -442,7 +445,7 @@ function buildFurniture(detail: boolean) {
   b.push(0, 0, SHELL.maxZ, Math.PI);
   // local x = −world x
   framed(b, q, 0, -60, 96, 60, 44);
-  framed(b, q, 1, -6, 104, 36, 36, ROOM.shelfWood);
+  framed(b, q, 1, -5, 104, 36, 36, ROOM.shelfWood); // (at −6 its frame overlapped the big picture's by 0.4 cm, flush: flicker)
   framed(b, q, 2, 36, 92, 30, 40);
   // a swag of fairy lights above the toy chest (tiny self-lit bulbs: they bokeh nicely on High)
   {
